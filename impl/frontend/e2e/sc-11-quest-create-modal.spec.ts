@@ -1,18 +1,13 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // SC-11 クエスト作成（実接続・C.2）＋ URL 付きモーダル（Parallel@modal＋Intercept）＋入力検証 §4.7。
 // 一般ユーザー ACME-01（デモグループ所属・handoff §4-4 の dev seed 前提）でログインし、
 // /quests から作成モーダルの開閉・直アクセス・検証・下書き作成→一覧反映を確認する。
 // 根拠＝doc/画面設計/screens/SC-11／API設計 C.2／デザイン標準 §4.7／フロントエンド実装フロー規約 §1.1。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 // 実 DB に作ったクエストを API で後片付け（title 前方一致・同一 Cookie の CSRF を載せる）。
 async function cleanupByTitlePrefix(page: Page, prefix: string) {
@@ -30,7 +25,7 @@ async function cleanupByTitlePrefix(page: Page, prefix: string) {
 
 // 一覧からのソフト遷移＝モーダルで差し込まれ、Esc で閉じて一覧へ戻る（URL を持つモーダル）。
 test("C-TC-201 quest-create URL modal opens from list and closes", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/quests");
   await page.getByRole("link", { name: /クエストを作成/ }).click();
 
@@ -46,7 +41,7 @@ test("C-TC-201 quest-create URL modal opens from list and closes", async ({ page
 
 // 直アクセス/リロードはフルページにフォールバック（モーダルではない）。
 test("C-TC-202 quest-create direct access renders full page (no modal)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/quests/new");
   await expect(page.getByRole("heading", { name: "クエスト作成" })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -54,7 +49,7 @@ test("C-TC-202 quest-create direct access renders full page (no modal)", async (
 
 // §4.7: 必須未入力で「クエストを作成」＝上部サマリ＋インライン aria-invalid、遷移しない（フォーカス移動もしない）。
 test("C-TC-203 SC-11 validation shows inline errors and summary on empty submit", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/quests/new"); // フルページで検証（モーダルと同一フォーム）
   await page.getByRole("button", { name: "クエストを作成" }).click();
 
@@ -65,7 +60,7 @@ test("C-TC-203 SC-11 validation shows inline errors and summary on empty submit"
 
 // 実接続: 下書きを作成→一覧に下書きが出る（GET /quest-groups の実データ＝デモグループを使用）。
 test("C-TC-204 SC-11 create draft persists and appears in list", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const title = `E2E下書き_${Date.now().toString().slice(-8)}`;
   try {
     await page.goto("/quests/new");
@@ -90,7 +85,7 @@ test("C-TC-204 SC-11 create draft persists and appears in list", async ({ page }
 // 修正＝`.switch{position:relative}`＋input を left/top:0 で封じ込め。表示/挙動ガード＝e2e（テスト規約 §5.3）。
 test("C-TC-278 SC-11 discoverable toggle keeps modal footer pinned (no layout jump)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 640 }); // フッターが見えるまでスクロールが要る高さ
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/quests");
   await page.getByRole("link", { name: /クエストを作成/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -111,7 +106,7 @@ test("C-TC-278 SC-11 discoverable toggle keeps modal footer pinned (no layout ju
 // C-TC-284: 編集で無変更保存＝updateQuest を呼ばず info「変更はありません」（保存ボタン統一・デザイン標準 §14）。
 // API で recruiting クエストを作成（作成者=user@acme＝編集可）→編集ページを開き、何も変えず「保存する」。
 test("C-TC-284 no-change edit save shows info toast (no success)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const prefix = "E2E無変更編集_";
   const title = `${prefix}${Date.now().toString().slice(-8)}`;
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());

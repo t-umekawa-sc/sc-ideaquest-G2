@@ -5,15 +5,12 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
 
-async function login(page: Page) {
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("N-TC-225 情報側リンク編集で採否ロックが分かる（コンボ非活性＋🔒）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const csrf = csrfOf(await page.context().cookies());
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const stamp = Date.now().toString().slice(-8);

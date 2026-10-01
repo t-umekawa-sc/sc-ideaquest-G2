@@ -1,17 +1,12 @@
 // SC-50 内容・説明の入力欄（.rt__area）は内部スクロールせず縦に伸びる（最低高さは維持）。台帳＝N §3.5（N-TC-216）。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
+import { gotoAuthed } from "./helpers";
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("N-TC-216: 内容・説明は内部スクロールせず縦に伸びる（登録ダイアログ）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items/new");
   const area = page.locator(".rt__area");
   await expect(area).toBeVisible();
@@ -32,7 +27,7 @@ test("N-TC-216: 内容・説明は内部スクロールせず縦に伸びる（�
 });
 
 test("N-TC-217: 内容・説明は手動で縦幅をドラッグ変更できる（登録ダイアログ）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items/new");
   const area = page.locator(".rt__area");
   await expect(area).toBeVisible();
@@ -42,7 +37,7 @@ test("N-TC-217: 内容・説明は手動で縦幅をドラッグ変更できる�
 });
 
 test("N-TC-218: 手動リサイズ後も内容で伸びてスクロールが出ない（DFT-N-004）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items/new");
   const area = page.locator(".rt__area");
   await expect(area).toBeVisible();
@@ -59,7 +54,7 @@ test("N-TC-218: 手動リサイズ後も内容で伸びてスクロールが出�
 });
 
 test("N-TC-219: 拡大後に縮小できる／元サイズ(140px)より下げない（DFT-N-005）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items/new");
   const area = page.locator(".rt__area");
   await expect(area).toBeVisible();

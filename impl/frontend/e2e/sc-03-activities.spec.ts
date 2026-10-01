@@ -1,21 +1,16 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // SC-03 獲得履歴＝GET /me/activities（G.6）の backend 接続 e2e。
 // 根拠＝doc/API設計/G_ゲーミフィケーション.md G.6・§1.8／フロントエンド実装フロー規約 §1.1。
 // 担保＝(1) 履歴セクションが /me/activities の件数と一致（値ハードコードせず API と突合＝接続の証明）、
 // (2) has_next のとき「もっと見る」でカーソル追加読込され行が増える。ref 解決（D/E）は範囲外。
 const U = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("SC-03 activity history reflects GET /me/activities and paginates", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   // 認証済み Cookie で初回ページを取得（UI と突合）。ログイン XP で最低1件は存在する。
   const first = await page.request.get("/api/v1/me/activities?limit=8").then((r) => r.json());
   expect(first.data.length).toBeGreaterThan(0);

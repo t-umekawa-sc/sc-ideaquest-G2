@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // SC-13 発見カタログ（FR-40・C.9）の掲示板ダイアログ標準機能の回帰（受入不具合 DFT-E-013/014）。
 // C-TC-266＝最大化(⤢)が出る（前セッションで `maximizable={false}` を誤って上書き＝標準機能欠落・§106）。
 // C-TC-267＝閉じアニメが出る（`{detail && <Dialog>}` の即アンマウントで exit アニメが飛んでいた）。
@@ -9,12 +10,6 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワ
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const DEMO_TITLE = "【発見デモ】部署横断アイデア募集";
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 async function openCatalogDialog(page: Page) {
   await page.goto("/quest-catalog");
@@ -23,7 +18,7 @@ async function openCatalogDialog(page: Page) {
 }
 
 test("C-TC-266 catalog dialog is maximizable (DFT-E-013)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await openCatalogDialog(page);
   // 標準の最大化(⤢)ボタンが出る＝`maximizable` 既定 on（§106）。誤って false 上書きすると出ない。
   const maxBtn = page.getByRole("button", { name: "最大化" });
@@ -35,7 +30,7 @@ test("C-TC-266 catalog dialog is maximizable (DFT-E-013)", async ({ page }) => {
 });
 
 test("C-TC-267 catalog dialog plays close animation (DFT-E-014)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await openCatalogDialog(page);
   // 開いている間は .modal.show（enter 済み）。
   await expect(page.locator(".modal.show")).toBeVisible();
@@ -52,7 +47,7 @@ test("C-TC-268 reduce-motion suppresses modal CRT animation, keeps behavior", as
   // 抑制 ON（OS reduce）＝CRT 電源ON/OFF 演出は出ない（`--crt-in` クラス自体を付けない）が、
   // 情報（ダイアログ本文）は残り・閉じる挙動も保つ（即時クローズ）。テスト規約 §6・デザイン標準 §4.9。
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await login(page);
+  await gotoAuthed(page);
   await openCatalogDialog(page);
   await expect(page.locator(".modal__panel")).toBeVisible();          // 情報は残る
   await expect(page.locator(".modal__panel--crt-in")).toHaveCount(0); // CRT 演出は付かない（open/close とも抑制）

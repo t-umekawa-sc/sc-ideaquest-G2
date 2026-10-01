@@ -1,20 +1,15 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // SC-41 ランキング（G.5 実接続）＝会社内ランキングが実データ（getRankings）で描画される。ACME-01 で確認。
 // 集計は会社全体（共有 DB）で非決定的なため、in-test で GET /rankings と照合して決定的に検証する。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-206）・API設計 G.5・§7・SC-41。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("G-TC-206 SC-41 ranking renders real data (me/total)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const rk = await page.request.get("/api/v1/rankings?period=this_week&scope=company").then((r) => r.json());
   await page.goto("/ranking");
   await expect(page.getByRole("heading", { name: "ランキング", exact: true })).toBeVisible();
@@ -30,7 +25,7 @@ test("G-TC-206 SC-41 ranking renders real data (me/total)", async ({ page }) => 
 // #13 回帰ガード＝期間タブ切替で表彰台コンテナが累積しない（旧タブの .podium が消えず残るキー重複バグの再発防止）。
 // 原因＝podium と rank-list が兄弟で同じ key={period} を使い、兄弟間キー重複で reconciliation が壊れて .podium が残っていた。
 test("G-TC-167 SC-41 podium does not accumulate on period switch (#13)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/ranking");
   await expect(page.locator(".rank-panel.full")).toBeVisible();
   await expect(page.locator(".podium")).toHaveCount(1);
@@ -45,7 +40,7 @@ test("G-TC-167 SC-41 podium does not accumulate on period switch (#13)", async (
 // 自動スクロール実装は無く「▼ 自分の順位へ」ボタンのみ（SC-41 §5）。実ブラウザ/Next のスクロール復元が
 // 前回の手動ジャンプ位置を再現しても、マウントで先頭へ戻す（RankingView の mount effect）。
 test("G-TC-171 SC-41 opens at the top and does not auto-scroll to own rank", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/ranking");
   await expect(page.getByRole("heading", { name: "ランキング", exact: true })).toBeVisible();
   // 開いた直後は先頭（自分の順位＝画面中央に自動スクロールしていない）。
@@ -68,7 +63,7 @@ test("G-TC-171 SC-41 opens at the top and does not auto-scroll to own rank", asy
 // #13 回帰ガード＝自分の行の登場ハイライト（rank-me-row）が暗いガラスパネル上で明色不透明背景（#EFF6FF）で終わらない
 // ＝名前（明色）が潰れないこと。終了色は base .is-me の半透明シアンに揃える。is-me 行が無い期間はスキップ。
 test("G-TC-168 SC-41 own row highlight is not near-white on dark panel (#13)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/ranking");
   await expect(page.locator(".rank-panel.full")).toBeVisible();
   await page.getByRole("tab", { name: "通算", exact: true }).click(); // 通算なら自分がランクインしている可能性が高い
@@ -86,7 +81,7 @@ test("G-TC-168 SC-41 own row highlight is not near-white on dark panel (#13)", a
 test.describe("reduce-motion #13", () => {
   test("G-TC-169 SC-41 ranking entrance/idle animations are disabled under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" }); // OS reduce をエミュレート（prefers-reduced-motion: reduce）
-    await login(page);
+    await gotoAuthed(page);
     await page.goto("/ranking");
     await expect(page.locator(".rank-panel.full")).toBeVisible();
     const animOff = async (sel: string) =>

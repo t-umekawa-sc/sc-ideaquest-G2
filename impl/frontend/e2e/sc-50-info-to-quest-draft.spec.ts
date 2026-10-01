@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
+import { gotoAuthed } from "./helpers";
 
 // 「この情報からクエストを作成」の閉じ挙動＋Step B 遷移回帰。
 // N-TC-226（改定 2026-09-28）＝登録系ダイアログ標準（デザイン標準 §4.1）＝作成後は詳細（クエスト）へ遷移せず、
@@ -8,11 +9,6 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝
 // N-TC-227＝作成した下書きをクエスト一覧から開いても from-info ダイアログが再表示されない（履歴汚染回帰）。
 // 根拠＝doc/テスト/N_情報インプット §3.6（N-TC-226/227）／SC-50／API C.2・N.3／デザイン標準 §4.1。
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で user@acme 認証済み＝再ログイン不要。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 // 実 DB に作った下書きクエストを API で後片付け（title 前方一致・同一 Cookie の CSRF を載せる）。
 async function cleanupByTitlePrefix(page: Page, prefix: string) {
@@ -29,7 +25,7 @@ async function cleanupByTitlePrefix(page: Page, prefix: string) {
 
 // N-TC-226/227: 情報→下書き作成→ダイアログを閉じて情報詳細へ戻る＋一覧から開いても from-info ダイアログが出ない。
 test("N-TC-226/227 create quest-from-info → closes back to info detail dialog → reopening draft never shows from-info dialog", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const prefix = "N-TC-227_";
   const title = `${prefix}${Date.now().toString().slice(-8)}`;
   try {

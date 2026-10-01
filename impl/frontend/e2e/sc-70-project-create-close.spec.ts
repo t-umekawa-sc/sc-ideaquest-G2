@@ -1,16 +1,12 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // Q-TC-140: 登録系ダイアログの閉じ標準（デザイン標準 §4.1・決定 2026-09-28）。
 // 受入不具合＝プロジェクト作成ダイアログで作成すると `/projects/{id}` 詳細へ遷移していた。
 // 期待＝作成後は詳細へ遷移せず、ダイアログを閉じて呼び元（一覧 `/projects`）へ戻る。作成自体は成功。
 // 根拠＝doc/テスト/Q_ソリューション開発 §5（Q-TC-140）／SC-70／Q.1／デザイン標準 §4.1。
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で user@acme 認証済み＝再ログイン不要。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 // 実 DB に作ったプロジェクトを API で後片付け（title 前方一致・同一 Cookie の CSRF を載せる）。
 async function cleanupByTitlePrefix(page: Page, prefix: string) {
@@ -26,7 +22,7 @@ async function cleanupByTitlePrefix(page: Page, prefix: string) {
 }
 
 test("Q-TC-140 create project → closes back to list (no navigate to detail)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const prefix = "Q-TC-140_";
   const title = `${prefix}${Date.now().toString().slice(-8)}`;
   try {

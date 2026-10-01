@@ -1,45 +1,13 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
-
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社でログイン・DB操作
+import { gotoAuthed, formLogin, csrfToken, csrfHeaders, psql, psqlValue, createRecruiting } from "./helpers";
 
 // SC-24 アイデアチャット（E 実接続）＝メッセージ投稿→スレッド反映＋通常リアクション。owner（comment 権限）で、
 // recruiting クエスト＋published アイデア（公開で chat_group 自動作成）を API で用意して確認する。
 // チャットは会社スコープ＝並列で同一会社DBを奪い合い race した（E-TC-222 等）。ワーカ別会社DBで隔離。
+// 別アカウント（user2 等）は formLogin で実ログイン。createRecruiting は会社全体（questGroupIds:[]・FR-38）で作る。
 // 根拠＝doc/テスト/E_チャット.md §3（E-TC-201）・API設計 E.1/E.2/E.4・screens/SC-24。
-const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
-// psql/psqlValue は会社DB名を引数で受ける（ワーカ別DBを叩くため・`ideaquest_company_acme` 直書きをやめる）。
-function psql(db: string, sql: string) {
-  try {
-    execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR, stdio: "pipe" });
-  } catch (e) {
-    const err = e as { stderr?: Buffer; stdout?: Buffer; message: string };
-    throw new Error(`psql failed: ${err.stderr?.toString() || ""} ${err.stdout?.toString() || ""} ${err.message}`);
-  }
-}
-function psqlValue(db: string, sql: string): string {
-  return execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -tA -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR }).toString().trim();
-}
-async function loginAs(page: Page, c: { company: string; loginId: string; password: string }) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(c.company);
-  await page.locator("#login_id").fill(c.loginId);
-  await page.locator("#password").fill(c.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  // 別アカウント（user2 等）は loginAs で実ログインする（別バケット・低頻度）。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
 
 // 入力欄は既定で最小化（composerMin=true・スリムバー .composer__mini）。textarea .composer__box を使う前に展開する。
 async function openComposer(page: Page) {
@@ -49,21 +17,10 @@ async function openComposer(page: Page) {
   await expect(box).toBeVisible();
 }
 
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    // quest_group_ids は複数・0件＝会社全体（FR-38）。旧 API の quest_group_id（単数）は現行スキーマで extra_forbidden。
-    data: { title, color: "#0D9488", quest_group_ids: [], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
+// published アイデアを作る。タイトル（チャットアイデア_）を spec が検証する（E-TC-201）ため helpers と別の専用名で残す。
 async function createPublishedIdea(page: Page, questId: string, stamp: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    headers: await csrfHeaders(page),
     data: { title: `チャットアイデア_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
   });
   expect(res.status(), await res.text()).toBe(201);
@@ -71,9 +28,9 @@ async function createPublishedIdea(page: Page, questId: string, stamp: string): 
 }
 
 test("E-TC-201 SC-24 post message appears and normal reaction", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2Eチャット_${stamp}`);
+  const questId = await createRecruiting(page, `E2Eチャット_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `テスト投稿_${stamp}`;
   try {
@@ -97,13 +54,13 @@ test("E-TC-201 SC-24 post message appears and normal reaction", async ({ page })
     expect(chat.data.length).toBe(1);
     expect(chat.data[0].reactions.normal.some((n: { emoji: string }) => n.emoji === "👍")).toBe(true);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 async function postMsg(page: Page, ideaId: string, body: string) {
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const res = await page.request.post("/api/v1/chat-messages", {
     headers: { "X-CSRF-Token": csrf },
     multipart: { idea_id: ideaId, body },
@@ -115,9 +72,9 @@ async function postMsg(page: Page, ideaId: string, body: string) {
 // クリックで📌ボタンにフォーカスが残っても :focus-visible ではないため、ホバーが外れれば .msg__actions は隠れる
 // （旧 .msg:focus-within .msg__actions ではクリック後にメニューが出っぱなしだった）。owner＝ピン権限あり。
 test("E-TC-213 SC-24 action menu hides after pinning when hover leaves (DFT-E-005)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2Eピン_${stamp}`);
+  const questId = await createRecruiting(page, `E2Eピン_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `ピン対象_${stamp}`;
   try {
@@ -139,7 +96,7 @@ test("E-TC-213 SC-24 action menu hides after pinning when hover leaves (DFT-E-00
     await page.mouse.move(2, 2);
     await expect(msg.locator(".msg__actions")).toBeHidden();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -147,9 +104,9 @@ test("E-TC-213 SC-24 action menu hides after pinning when hover leaves (DFT-E-00
 // E-TC-218 SC-24 ホバー操作メニューのツールチップ＋使用中アクティブ表示（ユーザー要望）。
 // 各ボタンに機能説明の title／自分が使っているアクション（リアクション済み・ピン留め中）は is-active＋aria-pressed=true。
 test("E-TC-218 SC-24 action menu tooltips and active state", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2Eメニュー_${stamp}`);
+  const questId = await createRecruiting(page, `E2Eメニュー_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `メニュー対象_${stamp}`;
   try {
@@ -190,7 +147,7 @@ test("E-TC-218 SC-24 action menu tooltips and active state", async ({ page }) =>
     await expect(pinBtn).toHaveAttribute("aria-pressed", "true");
     await expect(pinBtn).toHaveAttribute("title", /ピン留め中/);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -199,9 +156,9 @@ test("E-TC-218 SC-24 action menu tooltips and active state", async ({ page }) =>
 // 旧＝送信で既読ポインタが進まず、戻る→再入室で backend の first_unread が自分の投稿を指し「ここから未読」が自分の投稿の上に出た。
 // 新＝送信時に既読前進＋表示側で自分の投稿の上に区切りを出さない。
 test("E-TC-219 SC-24 own sent message is not marked unread on re-entry (DFT-E-009)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E未読_${stamp}`);
+  const questId = await createRecruiting(page, `E2E未読_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}/chat`);
@@ -218,7 +175,7 @@ test("E-TC-219 SC-24 own sent message is not marked unread on re-entry (DFT-E-00
     // 自分の投稿は既読扱い＝「ここから未読」が出ない。
     await expect(page.locator(".unread-sep")).toHaveCount(0);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -227,9 +184,9 @@ test("E-TC-219 SC-24 own sent message is not marked unread on re-entry (DFT-E-00
 // 旧＝未読区切りへ block:"start" でスクロールし、全件未読時に区切り＋先頭メッセージがフローティング文脈バーの背後に潜り込んだ。
 // 新＝バー下端＋余白の直下へ着地（scrollTopForTarget）。他ユーザー著者の未読メッセージを DB 直挿入して再現する。
 test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar when all unread (DFT-E-010)", async ({ page, workerCompany }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E未読スクロール_${stamp}`);
+  const questId = await createRecruiting(page, `E2E未読スクロール_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   // chat thread を遅延生成しつつ thread_id を取得（GET は既読化しない）。chat_messages は thread_id 所属（chat_thread 刷新）。
   const chat = await page.request.get(`/api/v1/ideas/${ideaId}/chat`).then((r) => r.json());
@@ -258,7 +215,7 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
     // chat_reads.last_read_message_id が挿入メッセージを参照するため先に read カーソルを消す（FK 制約）。
     psql(workerCompany.dbName, `DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
     psql(workerCompany.dbName, `DELETE FROM chat_messages WHERE thread_id='${tid}';`);
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -266,9 +223,9 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
 // E-TC-221 SC-24 入室時は「画面に見えたメッセージだけ既読」（受入不具合 DFT-E-011・ユーザー選択）。
 // 旧＝入室で最新まで一律既読にしていた。新＝可視領域に入ったメッセージまでのみ既読＝見えていない下方の未読は残る。
 test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011)", async ({ page, workerCompany }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E可視既読_${stamp}`);
+  const questId = await createRecruiting(page, `E2E可視既読_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const chat = await page.request.get(`/api/v1/ideas/${ideaId}/chat`).then((r) => r.json());
   const tid = chat.thread_id as string;
@@ -290,7 +247,7 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
   } finally {
     psql(workerCompany.dbName, `DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
     psql(workerCompany.dbName, `DELETE FROM chat_messages WHERE thread_id='${tid}';`);
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -298,13 +255,13 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
 // E-TC-222 SC-24 リアルタイム反映された他ユーザーの新着は、画面で見たら再入室で既読（受入不具合 DFT-E-011 の報告シナリオ）。
 // A（owner）が投稿→B（user2・パーティー員）に realtime 反映→B は画面で見る→離脱→再入室で未読にならない。
 test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (DFT-E-011)", async ({ page, browser, workerCompany }) => {
-  await login(page); // A = owner
+  await gotoAuthed(page); // A = owner
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2Ert_${stamp}`);
+  const questId = await createRecruiting(page, `E2Ert_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   // B（user2）を comment 権限でパーティーに追加（会社全体でも非作成者は有効パーティー員が必須）。
   const u2 = psqlValue(workerCompany.dbName, "SELECT id FROM users WHERE login_id='user2@acme.example'");
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const add = await page.request.post(`/api/v1/quests/${questId}/members`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
     data: { user_id: u2, permissions: ["comment"] },
@@ -313,7 +270,7 @@ test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (
   const ctxB = await browser.newContext();
   try {
     const pageB = await ctxB.newPage();
-    await loginAs(pageB, { company: workerCompany.company, loginId: "user2@acme.example", password: "Passw0rd!" });
+    await formLogin(pageB, { company: workerCompany.company, loginId: "user2@acme.example", password: "Passw0rd!" });
     await pageB.goto(`/ideas/${ideaId}/chat`);
     await expect(pageB.locator(".chat-context--float")).toBeVisible();
     await pageB.waitForTimeout(1200); // realtime 購読の確立を待つ
@@ -329,16 +286,16 @@ test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (
     await expect(pageB.locator(".unread-sep")).toHaveCount(0); // 見たので既読＝未読区切りは出ない
   } finally {
     await ctxB.close();
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 // E-TC-203 SC-24 複数引用返信＝2件を引用して1つの返信に積む。
 test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E複数引用_${stamp}`);
+  const questId = await createRecruiting(page, `E2E複数引用_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}/chat`);
@@ -362,7 +319,7 @@ test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
     const reply = page.locator(".msg", { hasText: `まとめ_${stamp}` });
     await expect(reply.locator(".msg__quote")).toHaveCount(2);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -371,9 +328,9 @@ test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
 // 旧＝native アンカー(#id)でフローティング文脈バーの背後に潜り込み、どこへ飛んだか分からなかった。
 // 新＝jumpToQuote がバー下端＋余白の直下へスクロール＋引用元に .msg--flash を一時付与。
 test("E-TC-215 SC-24 quote click reveals target below floating bar and flashes it (DFT-E-006)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E引用ジャンプ_${stamp}`);
+  const questId = await createRecruiting(page, `E2E引用ジャンプ_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const parent = `親_${stamp}`;
   try {
@@ -408,7 +365,7 @@ test("E-TC-215 SC-24 quote click reveals target below floating bar and flashes i
       })
       .toBeGreaterThanOrEqual(-1);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -418,9 +375,9 @@ test("E-TC-215 SC-24 quote click reveals target below floating bar and flashes i
 // 魔法行 .msg-row=3）が前面に出て、メッセージと入力欄が重なる位置でクリックを奪っていた（左だけ効く症状）。
 // 新＝上部バー(.chat-context--float=9)と対称に z-index を付与＝メッセージ内容(≤3)より前・ポップアップ(≥40)より後ろ。
 test("E-TC-216 SC-24 sticky composer stacks above message content (DFT-E-007)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E入力欄重なり_${stamp}`);
+  const questId = await createRecruiting(page, `E2E入力欄重なり_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}/chat`);
@@ -432,7 +389,7 @@ test("E-TC-216 SC-24 sticky composer stacks above message content (DFT-E-007)", 
     expect(z).toBeGreaterThan(3); // メッセージ内容の最大 z-index（魔法行=3）より前面
     expect(z).toBeLessThan(40); // reaction-picker(40)/emoji(45)/mention(46)/lightbox(60) より背面（ポップアップは奪ってよい）
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -441,9 +398,9 @@ test("E-TC-216 SC-24 sticky composer stacks above message content (DFT-E-007)", 
 // 旧＝最小化中は composer__full（reply-ctx/textarea）が非表示で、💬を押しても引用チップが見えず「何も起きない」ように見えた。
 // 新＝引用追加時に setComposerMin(false) で展開してから textarea へフォーカス。openComposer は呼ばない（最小化のまま操作する）。
 test("E-TC-217 SC-24 quote-reply expands the minimized composer (DFT-E-008)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E最小化引用_${stamp}`);
+  const questId = await createRecruiting(page, `E2E最小化引用_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `引用元_${stamp}`;
   try {
@@ -462,16 +419,16 @@ test("E-TC-217 SC-24 quote-reply expands the minimized composer (DFT-E-008)", as
     await expect(page.locator(".composer__box")).toBeVisible();
     await expect(page.locator(".reply-ctx__head")).toHaveText("引用返信（1件）");
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 // E-TC-202 SC-22 §4.4 チャット活発度/プレビューが実データ。
 test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const questId = await createRecruiting(page, `E2E活発度_${stamp}`);
+  const questId = await createRecruiting(page, `E2E活発度_${stamp}`, { questGroupIds: [] });
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `プレビュー投稿_${stamp}`;
   await postMsg(page, ideaId, body);
@@ -481,7 +438,7 @@ test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page 
     await expect(chatCard.getByText("💬 1")).toBeVisible(); // 実 total_messages
     await expect(chatCard.locator(".chat-preview").getByText(body)).toBeVisible();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -491,9 +448,9 @@ test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page 
 test.describe("reduce-motion #17", () => {
   test("G-TC-173 SC-24 message-enter and reaction-pop are disabled under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     const stamp = Date.now().toString().slice(-8);
-    const questId = await createRecruiting(page, `E2E手触りR_${stamp}`);
+    const questId = await createRecruiting(page, `E2E手触りR_${stamp}`, { questGroupIds: [] });
     const ideaId = await createPublishedIdea(page, questId, stamp);
     const body = `テスト投稿R_${stamp}`;
     try {
@@ -515,7 +472,7 @@ test.describe("reduce-motion #17", () => {
       const reactAnim = await reaction.evaluate((el) => getComputedStyle(el).animationName);
       expect(reactAnim).toBe("none");
     } finally {
-      const c2 = csrfOf(await page.context().cookies());
+      const c2 = await csrfToken(page);
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });
@@ -523,9 +480,9 @@ test.describe("reduce-motion #17", () => {
   // G-TC-178 ピン留めアニメ（§17P 移植）の抑制＝reduce では stamp 押印アニメを付けない（ピル＝情報は残る）。
   test("G-TC-178 SC-24 pin stamp animation is disabled under reduced motion (pill still shows)", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     const stamp = Date.now().toString().slice(-8);
-    const questId = await createRecruiting(page, `E2Eピン抑制_${stamp}`);
+    const questId = await createRecruiting(page, `E2Eピン抑制_${stamp}`, { questGroupIds: [] });
     const ideaId = await createPublishedIdea(page, questId, stamp);
     const body = `ピン抑制_${stamp}`;
     try {
@@ -541,7 +498,7 @@ test.describe("reduce-motion #17", () => {
       const pillAnim = await pill.evaluate((el) => getComputedStyle(el).animationName);
       expect(pillAnim).toBe("none");
     } finally {
-      const c2 = csrfOf(await page.context().cookies());
+      const c2 = await csrfToken(page);
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });

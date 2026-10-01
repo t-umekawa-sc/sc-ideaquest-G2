@@ -2,17 +2,12 @@
 // 全文検索は title＋本文（body_text）を対象に一致する。結果は要約だけでなく「一致箇所の抜粋」を出し、
 // 要約に出ない箇所（例＝『コメ』が本文の『コメント』に一致）でもハイライトで該当箇所が見えること。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
+import { gotoAuthed } from "./helpers";
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const KEYWORD = "ゾルタンネスビット"; // 要約（先頭抜粋）に出ないよう本文末尾にだけ置く特徴語
 const TITLE = `検索ハイライトテスト ${Date.now()}`;
 
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 async function csrf(page: import("@playwright/test").Page): Promise<string> {
   const cookies = await page.context().cookies();
@@ -20,7 +15,7 @@ async function csrf(page: import("@playwright/test").Page): Promise<string> {
 }
 
 test("N-TC-215: 全文検索結果で一致箇所のハイライトが必ず出る（本文一致・DFT-N-003）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   // 要約に出ない語を本文末尾に持つ情報を作成（API＝長い本文を確実に投入）。
   const filler = "これは全文検索の一致抜粋を確認するためのダミー本文の説明文です。要約の先頭抜粋に特徴語を含めないよう十分に長くしてあります。検索対象はタイトルと本文で要約ではありません。";
   const body = `<p>${filler}末尾の一文にだけ特徴語${KEYWORD}が登場します。</p>`;

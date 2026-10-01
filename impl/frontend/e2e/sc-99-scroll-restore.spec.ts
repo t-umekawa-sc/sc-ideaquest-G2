@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
+import { gotoAuthed } from "./helpers";
 
 // M-TC-013: 一覧のスクロール位置復元（デザイン標準 §4.12）。
 // 再現する不具合＝ダッシュボードを下方向に見てから遷移し、**push 型の「戻る」リンク**（`<Link href="/">`＝
@@ -9,17 +10,11 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝
 // 併せて「初回訪問（保存なし）は先頭のまま＝誤復元しない」を陰性対照で見る。
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md M-TC-013／デザイン標準 §4.12。
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("M-TC-013 dashboard restores scroll after a push-style back link (and no false restore on first visit)", async ({ page }) => {
   // 縦スクロールを確実に発生させる（低めビューポートで担保）。
   await page.setViewportSize({ width: 1280, height: 640 });
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/");
   // 取得完了（コンテンツ実寸）まで待つ＝常設の「すべての通知 →」リンクを起点にする。
   await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
@@ -58,7 +53,7 @@ test("M-TC-013 dashboard restores scroll after a push-style back link (and no fa
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md M-TC-014／デザイン標準 §4.12。
 test("M-TC-014 dashboard restores scroll after a card link and browser Back (pop navigation)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await login(page);
+  await gotoAuthed(page);
   // 参加中クエストのカードを確実に出すため、user@acme 所有の募集中クエストを1件用意する（自己完結・seed
   // 非依存＝デモ seed のクエスト有無に依らない）。デモグループ（GET /quest-groups）があれば所属させる。
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());

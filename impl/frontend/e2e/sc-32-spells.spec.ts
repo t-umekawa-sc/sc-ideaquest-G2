@@ -1,21 +1,16 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
+import { gotoAuthed } from "./helpers";
 
 // SC-32 魔法スキル（G 実接続）＝魔法カタログ/SP残高が実データ（getSpells）で描画される。
 // SP残高/解放は会社スコープ（user@acme）＝並列競合を避けるためワーカ別会社DBで隔離。
 // 解放成功の分岐は backend G-TC-102〜105 で担保（SP 前提のため e2e は実データ照合に限定）。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-201）・SC-32。
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("G-TC-201 SC-32 spell catalog renders real data", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   // 実データ（GET /spells）を取得して画面と照合。
   const cat = await page.request.get("/api/v1/spells").then((r) => r.json());
   const unlocked = cat.data.filter((s: { unlocked: boolean }) => s.unlocked).length;

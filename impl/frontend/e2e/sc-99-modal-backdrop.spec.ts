@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // M-TC-015: モーダル/確認ダイアログ表示中はバックドロップ背後の CSS 無限アニメを停止する
 // （デザイン標準 §モーダル／受入不具合 DFT-E-012 の回帰）。
 // 再現した不具合＝半透明バックドロップ(45%)の背後で transform 系の無限アニメ（未読ベルの
@@ -11,15 +12,9 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワ
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md M-TC-015／DFT-E-012。
 const OWNER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("M-TC-015 open modal pauses background CSS animations behind backdrop (DFT-E-012)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/quests");
 
   // 背景に既知の (1)無限アニメ と (2)backdrop-filter を持つ要素を注入

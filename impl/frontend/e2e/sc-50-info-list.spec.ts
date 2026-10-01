@@ -2,15 +2,10 @@
 // 不具合＝roots_only トグルが QueryState 外のため DataTable server が再クエリせず件数が変わらなかった
 // （InfoListView が refreshToken を渡していなかった）。seed（続報 i2 あり）で件数が減ることを検証する。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
+import { gotoAuthed } from "./helpers";
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 async function tabCount(page: import("@playwright/test").Page): Promise<number> {
   const tab = page.locator(".tab", { hasText: "情報インプット" });
@@ -19,7 +14,7 @@ async function tabCount(page: import("@playwright/test").Page): Promise<number> 
 }
 
 test("N-TC-202: 続報を束ねるトグルで一覧が再クエリされ件数が減る", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items");
   await expect(page.locator(".tab", { hasText: "情報インプット" })).toBeVisible();
   // facets が入るまで待つ（初期は 0 のことがある）。
@@ -37,7 +32,7 @@ test("N-TC-202: 続報を束ねるトグルで一覧が再クエリされ件数�
 
 test("N-TC-203: 一覧ヘッダー（列見出し行）がページスクロールで上部に貼り付く", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 520 }); // 低い高さ＝少ない行でもスクロールする
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items");
   // データ描画を待つ＝テーブル高が確定してからスクロール。特定タイトルは seed 増加で既定ページ（-created_at）から
   // 外れて不安定なため、行数（>=5）で待つ＝sticky 検証に必要なのは十分な行高でありアンカー文言ではない。

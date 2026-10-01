@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // I-TC-162（e2e・レスポンシブ回帰／受入不具合）＝ダッシュボードの議論2カラム（💬新着／🕒最近）が
 // 狭幅（375px＝iPhone SE 相当）で**横スクロールを生まない**ことの担保。
 // 根拠＝doc/テスト/I_ダッシュボード.md I-TC-162／SC-01 §4.8c／dashboard.css .dash-discuss。
@@ -10,18 +11,12 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワ
 // 再現には「最近の議論」に長いタイトルのチャットが要る＝seed 会社 ACME-01（seed_demo で投入済み）を使う。
 const ACME = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test.describe("SC-01 ダッシュボード レスポンシブ（I-TC-162）", () => {
   test.use({ viewport: { width: 375, height: 667 } }); // iPhone SE 相当（狭幅）
 
   test("狭幅で横スクロール（オーバーフロー）を生まない・議論は1カラム・ヘッダーは残る", async ({ page }) => {
-    await login(page);
+    await gotoAuthed(page);
     await page.waitForSelector(".dash-discuss");
 
     // ① ページ全体が横に溢れない（本丸の回帰＝doc scrollWidth ≤ clientWidth）。

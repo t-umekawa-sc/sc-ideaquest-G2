@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // SC-03 画像アップロード（K.4・MinIO 署名URL）の backend 接続 e2e。
 // 根拠＝doc/API設計/K_プロフィール・背景画像.md K.4・§1.10／実装計画 フェーズ1。
 // 担保＝(1) プロフィール画像（アイコン）を選ぶと署名URL(/avatars/)の img が表示され、削除で頭文字に戻る、
@@ -13,15 +14,9 @@ const PNG = Buffer.from(
   "hex",
 );
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("SC-03 avatar icon upload and delete", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "プロフィール編集" })).toBeVisible();
 
@@ -42,7 +37,7 @@ test("SC-03 avatar icon upload and delete", async ({ page }) => {
 });
 
 test("SC-03 background image set and reset from header menu", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/profile");
   // ユーザーメニューを開く→「背景画像を変更」の隠し input へファイル設定。
   await page.getByRole("button", { name: /のメニュー/ }).click();

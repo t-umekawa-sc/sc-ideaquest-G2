@@ -5,20 +5,15 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 const U = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" }; // MFA OFF
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 const avatarBase = async (page: Page): Promise<string> =>
   (await page.request.get("/api/v1/me").then((r) => r.json())).profile.avatar_base;
 
 test("K-TC-015 ベース体切替が永続する（SC-31 / K.4.1・3D or 2D 不問）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/avatar");
 
   const group = page.getByRole("group", { name: "ベース体の切替" });

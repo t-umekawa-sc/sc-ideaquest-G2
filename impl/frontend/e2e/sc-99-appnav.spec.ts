@@ -1,20 +1,15 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed } from "./helpers";
 // レビュー#1 グローバルナビ（☰→左ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・画面遷移図 §4 集約）。
 // 分散導線（ホームタイル・GameNav）を集約したドロワーの開閉・遷移・ピン留め永続・reduce を e2e で担保。
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md §2-A（M-TC-001〜004）。
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("M-TC-001 global nav drawer opens with items and closes on Esc/backdrop (#1)", async ({ page }) => {
   // ナビ既定はピン留め（docked）に変更＝burger 非表示。オーバーレイ挙動は明示的に非ピン（iq_nav_pinned=0）で検証する。
   await page.addInitScript(() => { try { localStorage.setItem("iq_nav_pinned", "0"); } catch { /* ignore */ } });
-  await login(page);
+  await gotoAuthed(page);
   const burger = page.locator(".appnav-burger");
   await expect(burger).toBeVisible();
   // 開く＝.appnav-root.is-open が立ち、業務群＋ゲーム群の項目が出る。
@@ -39,7 +34,7 @@ test("M-TC-001 global nav drawer opens with items and closes on Esc/backdrop (#1
 
 test("M-TC-002 selecting a nav item navigates and closes the drawer (#1)", async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem("iq_nav_pinned", "0"); } catch { /* ignore */ } });
-  await login(page);
+  await gotoAuthed(page);
   await page.locator(".appnav-burger").click();
   await expect(page.locator(".appnav-root.is-open")).toHaveCount(1); // ドロワーが開くのを待ってから項目クリック（開閉アニメ中の空振り防止）
   await page.locator("#appnav-drawer").getByRole("menuitem", { name: "ショップ" }).click();
@@ -48,7 +43,7 @@ test("M-TC-002 selecting a nav item navigates and closes the drawer (#1)", async
 });
 
 test("M-TC-003 pin makes a persistent sidebar remembered across reload, and can be unpinned (#1)", async ({ page }) => {
-  await login(page); // 既定＝ピン留め（docked・localStorage 未設定でも既定 ON）。viewport 1280px（≥1024）＝ピン可。
+  await gotoAuthed(page); // 既定＝ピン留め（docked・localStorage 未設定でも既定 ON）。viewport 1280px（≥1024）＝ピン可。
   // 既定でドック（本文右シフト＝html.iq-nav-pinned）＝☰は隠れる。
   await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(true);
   await expect(page.locator(".appnav-burger")).toBeHidden();
@@ -74,7 +69,7 @@ test("M-TC-003 pin makes a persistent sidebar remembered across reload, and can 
 test.describe("reduce-motion #1", () => {
   test("M-TC-004 drawer/backdrop slide is disabled under reduced motion (#1)", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     // ドロワーはマウント時からポータルに存在（閉じていても DOM にある）。
     const durOf = (sel: string) => page.locator(sel).evaluate((el) => getComputedStyle(el).transitionDuration);
     expect(await durOf(".appnav")).toBe("0s");
