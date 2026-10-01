@@ -1,23 +1,26 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
-// SC-24 アイデアチャット（E 実接続）＝メッセージ投稿→スレッド反映＋通常リアクション。ACME-01（owner＝comment 権限）で、
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社でログイン・DB操作
+
+// SC-24 アイデアチャット（E 実接続）＝メッセージ投稿→スレッド反映＋通常リアクション。owner（comment 権限）で、
 // recruiting クエスト＋published アイデア（公開で chat_group 自動作成）を API で用意して確認する。
+// チャットは会社スコープ＝並列で同一会社DBを奪い合い race した（E-TC-222 等）。ワーカ別会社DBで隔離。
 // 根拠＝doc/テスト/E_チャット.md §3（E-TC-201）・API設計 E.1/E.2/E.4・screens/SC-24。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
-function psql(sql: string) {
+// psql/psqlValue は会社DB名を引数で受ける（ワーカ別DBを叩くため・`ideaquest_company_acme` 直書きをやめる）。
+function psql(db: string, sql: string) {
   try {
-    execSync(`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR, stdio: "pipe" });
+    execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR, stdio: "pipe" });
   } catch (e) {
     const err = e as { stderr?: Buffer; stdout?: Buffer; message: string };
     throw new Error(`psql failed: ${err.stderr?.toString() || ""} ${err.stdout?.toString() || ""} ${err.message}`);
   }
 }
-function psqlValue(sql: string): string {
-  return execSync(`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -tA -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR }).toString().trim();
+function psqlValue(db: string, sql: string): string {
+  return execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -tA -c ${JSON.stringify(sql)}`, { cwd: IMPL_DIR }).toString().trim();
 }
 async function loginAs(page: Page, c: { company: string; loginId: string; password: string }) {
   await page.goto("/login");
@@ -223,7 +226,7 @@ test("E-TC-219 SC-24 own sent message is not marked unread on re-entry (DFT-E-00
 // E-TC-220 SC-24 全件未読での初期スクロール位置（受入不具合 DFT-E-010 の回帰）。
 // 旧＝未読区切りへ block:"start" でスクロールし、全件未読時に区切り＋先頭メッセージがフローティング文脈バーの背後に潜り込んだ。
 // 新＝バー下端＋余白の直下へ着地（scrollTopForTarget）。他ユーザー著者の未読メッセージを DB 直挿入して再現する。
-test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar when all unread (DFT-E-010)", async ({ page }) => {
+test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar when all unread (DFT-E-010)", async ({ page, workerCompany }) => {
   await login(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E未読スクロール_${stamp}`);
@@ -234,6 +237,7 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
   try {
     // owner 以外（user2）著者の未読メッセージを十分な数だけ DB 挿入＝全件未読・スクロール可能に。
     psql(
+      workerCompany.dbName,
       `INSERT INTO chat_messages (id, thread_id, author_id, body, created_at) ` +
         `SELECT gen_random_uuid(), '${tid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
         `'スクロール未読_${stamp}_'||g, now() + (g || ' seconds')::interval FROM generate_series(1,12) g;`,
@@ -252,8 +256,8 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
       .toBeGreaterThanOrEqual(-1);
   } finally {
     // chat_reads.last_read_message_id が挿入メッセージを参照するため先に read カーソルを消す（FK 制約）。
-    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
-    psql(`DELETE FROM chat_messages WHERE thread_id='${tid}';`);
+    psql(workerCompany.dbName, `DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
+    psql(workerCompany.dbName, `DELETE FROM chat_messages WHERE thread_id='${tid}';`);
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
@@ -261,7 +265,7 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
 
 // E-TC-221 SC-24 入室時は「画面に見えたメッセージだけ既読」（受入不具合 DFT-E-011・ユーザー選択）。
 // 旧＝入室で最新まで一律既読にしていた。新＝可視領域に入ったメッセージまでのみ既読＝見えていない下方の未読は残る。
-test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011)", async ({ page }) => {
+test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011)", async ({ page, workerCompany }) => {
   await login(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E可視既読_${stamp}`);
@@ -271,6 +275,7 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
   try {
     // 他ユーザー著者の未読メッセージをビューポート超過数だけ挿入（全件未読・スクロールしないと下方は見えない）。
     psql(
+      workerCompany.dbName,
       `INSERT INTO chat_messages (id, thread_id, author_id, body, created_at) ` +
         `SELECT gen_random_uuid(), '${tid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
         `'可視既読_${stamp}_'||g, now() + (g || ' seconds')::interval FROM generate_series(1,15) g;`,
@@ -283,8 +288,8 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
     // まだ未読が残る＝区切りが再び出る（旧＝入室で一律全既読なら区切りは消えていた）。
     await expect(page.locator(".unread-sep")).toHaveCount(1);
   } finally {
-    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
-    psql(`DELETE FROM chat_messages WHERE thread_id='${tid}';`);
+    psql(workerCompany.dbName, `DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
+    psql(workerCompany.dbName, `DELETE FROM chat_messages WHERE thread_id='${tid}';`);
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
@@ -292,13 +297,13 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
 
 // E-TC-222 SC-24 リアルタイム反映された他ユーザーの新着は、画面で見たら再入室で既読（受入不具合 DFT-E-011 の報告シナリオ）。
 // A（owner）が投稿→B（user2・パーティー員）に realtime 反映→B は画面で見る→離脱→再入室で未読にならない。
-test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (DFT-E-011)", async ({ page, browser }) => {
+test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (DFT-E-011)", async ({ page, browser, workerCompany }) => {
   await login(page); // A = owner
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2Ert_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
   // B（user2）を comment 権限でパーティーに追加（会社全体でも非作成者は有効パーティー員が必須）。
-  const u2 = psqlValue("SELECT id FROM users WHERE login_id='user2@acme.example'");
+  const u2 = psqlValue(workerCompany.dbName, "SELECT id FROM users WHERE login_id='user2@acme.example'");
   const csrf = csrfOf(await page.context().cookies());
   const add = await page.request.post(`/api/v1/quests/${questId}/members`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
@@ -308,7 +313,7 @@ test("E-TC-222 SC-24 realtime message seen by another user is read on re-entry (
   const ctxB = await browser.newContext();
   try {
     const pageB = await ctxB.newPage();
-    await loginAs(pageB, { company: "ACME-01", loginId: "user2@acme.example", password: "Passw0rd!" });
+    await loginAs(pageB, { company: workerCompany.company, loginId: "user2@acme.example", password: "Passw0rd!" });
     await pageB.goto(`/ideas/${ideaId}/chat`);
     await expect(pageB.locator(".chat-context--float")).toBeVisible();
     await pageB.waitForTimeout(1200); // realtime 購読の確立を待つ
