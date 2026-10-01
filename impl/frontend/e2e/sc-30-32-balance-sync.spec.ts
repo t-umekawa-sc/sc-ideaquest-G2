@@ -1,9 +1,7 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
-
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン・DB操作
+import { psql, formLogin } from "./helpers";
 
 // 残高（コイン/SP）が「アクション後にヒーローとヘッダー右上の両方で同期して減る」回帰ガード（G-TC-163/164・GF-AC-111/121）。
 // ヘッダーはサーバー layout の GET /me 由来＝router.refresh 忘れで更新漏れが起きやすい（魔法解放SPで実際に発生・修正済み）。
@@ -11,15 +9,7 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワ
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-M／doc/フェーズ毎ルール/ゲーム感フェーズ.md §1.1。
 
 const U = { company: "ACME-01", loginId: "user2@acme.example", password: "Passw0rd!" };
-const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
 const UID = "(SELECT id FROM users WHERE login_id='user2@acme.example')";
-
-function psql(db: string, sql: string) {
-  execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, {
-    cwd: IMPL_DIR,
-    stdio: "pipe",
-  });
-}
 
 // user2 を baseline（SP100/コイン1000・未所有・消費台帳クリア）へ戻す。魔法/ショップの自己修復ガードに当たらないよう台帳も消す。
 // 会社DBは引数で受ける（ワーカ別DB隔離＝各ワーカ専用会社の user2 を対象）。
@@ -30,16 +20,6 @@ function resetUser(db: string) {
   psql(db, `DELETE FROM user_spells WHERE user_id=${UID};`);
   psql(db, `DELETE FROM user_items WHERE user_id=${UID};`);
   psql(db, `UPDATE users SET skill_point_balance=100, coin_balance=1000 WHERE id=${UID};`);
-}
-
-async function login(page: Page, company: string) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(company);
-  await page.locator("#login_id").fill(U.loginId);
-  await page.locator("#password").fill(U.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 const numOf = (s: string | null) => Number((s ?? "").replace(/[^0-9]/g, ""));
@@ -55,7 +35,7 @@ const headCoin = (page: Page) => page.locator(".app-header .pixel-stat.coin").fi
 const pollNum = async (loc: ReturnType<Page["locator"]>) => numOf(await loc.textContent());
 
 test("G-TC-163 unlock deducts SP in both hero and header", async ({ page, workerCompany }) => {
-  await login(page, workerCompany.company);
+  await formLogin(page, { company: workerCompany.company, loginId: U.loginId, password: U.password });
   await page.goto("/spells");
   await expect.poll(() => pollNum(heroSp(page))).toBe(100);
   await expect.poll(() => pollNum(headSp(page))).toBe(100);
@@ -70,7 +50,7 @@ test("G-TC-163 unlock deducts SP in both hero and header", async ({ page, worker
 });
 
 test("G-TC-164 purchase deducts coin in both wallet and header", async ({ page, workerCompany }) => {
-  await login(page, workerCompany.company);
+  await formLogin(page, { company: workerCompany.company, loginId: U.loginId, password: U.password });
   await page.goto("/shop");
   await expect.poll(() => pollNum(wallet(page))).toBe(1000);
   await expect.poll(() => pollNum(headCoin(page))).toBe(1000);
@@ -92,7 +72,7 @@ test("G-TC-164 purchase deducts coin in both wallet and header", async ({ page, 
 test.describe("reduce-motion", () => {
   test.use({ reducedMotion: "reduce" });
   test("G-TC-166 purchase with reduced motion shows no fx overlay and updates instantly", async ({ page, workerCompany }) => {
-    await login(page, workerCompany.company);
+    await formLogin(page, { company: workerCompany.company, loginId: U.loginId, password: U.password });
     await page.goto("/shop");
     await expect.poll(() => pollNum(wallet(page))).toBe(1000);
 

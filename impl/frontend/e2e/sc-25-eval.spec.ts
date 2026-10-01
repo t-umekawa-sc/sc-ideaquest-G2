@@ -1,39 +1,10 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed, csrfToken, createRecruiting, createPublishedIdea } from "./helpers";
 // SC-25 評価画面（F.2 実接続）＋SC-22 §4.6 評価結果（F.1）＋選定（F.3）。ACME-01（owner＝評価者＋選定可）で、
 // recruiting クエスト＋published アイデアを API で作成し、評価の確定/下書き/選定を画面↔API で確認する。
 // 根拠＝doc/テスト/F_評価.md §4（F-TC-201〜203）・API設計 F・screens/SC-25/SC-22。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
-
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
-async function createPublishedIdea(page: Page, questId: string, stamp: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title: `評価アイデア_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
 
 const ASPECTS = ["新規性", "影響度", "実現度", "適合性", "コスト"];
 
@@ -44,7 +15,7 @@ async function rateAll(page: Page, n: number) {
 }
 
 test("F-TC-201 SC-25 submit evaluation reflects in SC-22 result", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E評価_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -64,13 +35,13 @@ test("F-TC-201 SC-25 submit evaluation reflects in SC-22 result", async ({ page 
     await expect(evalSection.getByText("5.0", { exact: true }).first()).toBeVisible();
     await expect(evalSection.getByText("全体として非常に良い。")).toBeVisible();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 test("F-TC-202 SC-25 draft is prefilled on revisit", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E下書き_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -90,13 +61,13 @@ test("F-TC-202 SC-25 draft is prefilled on revisit", async ({ page }) => {
     await page.goto(`/ideas/${ideaId}`);
     await expect(page.getByLabel("評価結果").getByText(/まだ提出済みの評価がありません/)).toBeVisible();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 test("F-TC-203 SC-22 select toggle by owner", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E選定_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -114,14 +85,14 @@ test("F-TC-203 SC-22 select toggle by owner", async ({ page }) => {
     const detail = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
     expect(detail.is_selected).toBe(true);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 // #16 クエスト選定の祝福（GF-AC-160/161）＝初回選定（XP付与）で中央に祝福オーバーレイ（.select-celebrate）が出る／クリックで閉じる／解除では出ない。
 test("G-TC-171 SC-22 selection celebration appears on award and not on unselect (#16)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E祝福_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -141,7 +112,7 @@ test("G-TC-171 SC-22 selection celebration appears on award and not on unselect 
     await expect(page.getByText("選定を解除しました。")).toBeVisible();
     await expect(page.locator(".select-celebrate")).toHaveCount(0);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -153,7 +124,7 @@ test("G-TC-171 SC-22 selection celebration appears on award and not on unselect 
 test.describe("reduce-motion #22", () => {
   test("G-TC-176 star hover-scale/pop suppressed under reduced motion, still lights up (#22)", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     const stamp = Date.now().toString().slice(-8);
     const questId = await createRecruiting(page, `E2E星R_${stamp}`);
     const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -170,7 +141,7 @@ test.describe("reduce-motion #22", () => {
       await expect(group.locator(".star.is-on")).toHaveCount(3); // 選んだ点数まで即点灯
       await expect(page.locator('.stars[data-pop="true"]')).toHaveCount(0); // ポップ抑制（data-pop を張らない）
     } finally {
-      const c2 = csrfOf(await page.context().cookies());
+      const c2 = await csrfToken(page);
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });
@@ -180,7 +151,7 @@ test.describe("reduce-motion #22", () => {
 test.describe("reduce-motion #16", () => {
   test("G-TC-172 SC-22 selection celebration is suppressed under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     const stamp = Date.now().toString().slice(-8);
     const questId = await createRecruiting(page, `E2E祝福R_${stamp}`);
     const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -192,7 +163,7 @@ test.describe("reduce-motion #16", () => {
       await expect(page.getByRole("button", { name: /選定済み/ })).toBeVisible();
       await expect(page.locator(".select-celebrate")).toHaveCount(0);
     } finally {
-      const c2 = csrfOf(await page.context().cookies());
+      const c2 = await csrfToken(page);
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });
@@ -200,7 +171,7 @@ test.describe("reduce-motion #16", () => {
 
 // F-TC-207 SC-25 評価の下書き保存後は評価ビューを閉じる（モーダル=close／フルページ=詳細へ・ユーザー要望）。
 test("F-TC-207 SC-25 saving evaluation draft closes the view", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E下書き閉じ_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -211,7 +182,7 @@ test("F-TC-207 SC-25 saving evaluation draft closes the view", async ({ page }) 
     // 下書き保存で評価ビューを離れる（フルページ＝詳細 /ideas/{id} へ遷移＝閉じる）。
     await page.waitForURL((u) => u.pathname === `/ideas/${ideaId}`, { timeout: 8000 });
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -219,13 +190,13 @@ test("F-TC-207 SC-25 saving evaluation draft closes the view", async ({ page }) 
 // F-TC-210: 既存評価を無変更で再確定＝putEvaluation を呼ばず info「変更はありません」（保存ボタン統一・デザイン標準 §14）。
 // API で submitted 評価を作成しておき、評価ビューを開いて（プリフィル済）何も変えず「評価を確定」を押す。
 test("F-TC-210 no-change re-submit shows info toast (no success)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E無変更確定_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     // 事前に submitted 評価を作成（この後の再確定が「無変更」になる基準）。
-    const csrf = csrfOf(await page.context().cookies());
+    const csrf = await csrfToken(page);
     const put = await page.request.put(`/api/v1/ideas/${ideaId}/evaluation`, {
       headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
       data: {
@@ -243,7 +214,7 @@ test("F-TC-210 no-change re-submit shows info toast (no success)", async ({ page
     await expect(page.getByText("変更はありません")).toBeVisible();
     await expect(page.getByText("評価を更新しました")).toHaveCount(0);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
