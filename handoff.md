@@ -8,13 +8,14 @@
 - 最終更新: 2026-10-01（セッション末）
 - ブランチ: `main`（作業ツリー clean 見込み）。origin 同期＝本更新を push 予定。
 - 最新コミット（新しい順）:
+  - `2c7b43c8` test(e2e): 会社スコープ spec 追加変換（sc-21/sc-32/sc-99-scroll-restore）
   - `a2d9a7d1` test(e2e): fixtures に N=0 フォールバック（通常スタックは ACME-01 共有＝移行互換）
   - `0899a013` test(e2e): sc-22-attachments を会社スコープ隔離に変換
   - `709e7a74` test(e2e): ワーカ別DB隔離の基盤＋sc-02を会社スコープ隔離に変換（MVP実証）
   - `6ca34373` docs(handoff): e2e信頼性トラックの区切り＋並行開発の取り決め
   - `447f3f89` test(e2e): フレーク硬化（隠れ決定的seed依存の自己完結化＋race修正）
   - `f278e339` test(e2e): pristine復元(方式A)＋正準seed再現化で「毎回同じ失敗」を解消
-- worktree `../g2-e2e`（ブランチ `e2e/per-worker-db-isolation`）は main に ff マージ済み＝**撤去してよい**（§7-注）。
+- 直近2増分は main に ff マージ済み（基盤＋sc-02/sc-22／追加3本 sc-21/sc-32/sc-99-scroll-restore）。作業用 worktree/ブランチ（`../g2-e2e*`・`e2e/*`）は**撤去してよい**（§7-注）。
 
 ## 2. ゴール
 社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発をゲーム感UIで一気通貫。直近の本命＝FR-45 LLM連携基盤（機能トラック）／**e2e 信頼性確立（本トラック）**。
@@ -34,13 +35,15 @@
   - `impl/frontend/e2e/fixtures.ts`（新規）＝worker スコープ fixture（`workerCompany`）＋ storageState 上書き（各ワーカが自社 user@acme で1回ログイン）。**N=0 は ACME-01 共有へフォールバック**（通常スタック互換）。
   - `impl/frontend/e2e/db.reset.ts`＝ワーカ会社DBも drop 対象（N から算出）。
   - `impl/frontend/playwright.config.ts`＝N>0 のとき `workers=N`（parallelIndex↔会社対応）。
-- 変換済み spec＝`sc-02-notifications`（H-TC-208 通知count競合）・`sc-22-attachments`。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・login_id は `LOGIN_ID`**。両モード（隔離/フォールバック）で動く。
+- 変換済み spec（計5本）＝`sc-02-notifications`（H-TC-208）・`sc-22-attachments`・`sc-21-idea-form`・`sc-32-spells`・`sc-99-scroll-restore`。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・login_id は `LOGIN_ID`・未使用の ACME-01 const 除去**。storageState のみの spec は import 替えだけ（sc-22/sc-21/sc-32/sc-99 と同型）。両モード（隔離/フォールバック）で動く。
+  - **見送り**＝`sc-50-info-to-quest-draft`（情報デモ seed 依存＝情報は書込API未実装でDB直挿し。ワーカ会社は quest group のみ seed で info/discovery 無し＝7社分 seed は費用対効果×）→共有 ACME-01 のまま。
 
 ## 4. 現在の状態
 - **確認済み（本セッション）**:
   - **通常 main の品質**＝backend pytest（クリーンDB）907 passed／frontend vitest 218 passed／TC トレーサビリティ OK（927）。e2e フル（既定ワーカ・ワーカ起動）＝green（0 failed・flaky は retries 吸収）。
   - **ワーカ別DB隔離（iqe2e）**＝機構を end-to-end 実証。sc-02（repeat-each=3・workers=2）12 passed／sc-22（同）8 passed/1 flaky（残は添付アップロードtiming）。フォールバック（N 未設定）でも sc-02/sc-22＝8 passed。
-  - **フル iqe2e（N=7・workers=7）＝5 failed / 10 flaky / 146 passed**。変換済み2本は failed/flaky に不在（隔離は効き・回帰なし）。
+  - **フル iqe2e（N=7・workers=7）＝5 failed / 10 flaky / 146 passed**（基盤マージ時点）。
+  - **追加3本変換後の iqe2e（N=7・5本単発）＝16 passed / 1 failed**＝残 `D-TC-215`(sc-22 添付)のみ＝**アップロードのタイミングflake（データ競合でない＝隔離対象外）**。データ競合は隔離で解消済み。
 - **重要な確定事項（§6）**＝per-worker 会社DB隔離は**会社スコープの競合にのみ有効**。フル iqe2e の**ハード失敗5件中4件が control-plane（OPS/認証）/タイミング**（SC-00 MFA/再設定・B-TC-124・M-TC-013／会社スコープは D-TC-203 のみ）。**会社DB隔離だけでは全 green に届かない**（別アプローチが要る）。
 - **壊れているもの**＝確認範囲で無し（通常スタックは不変＝E2E_WORKER_COMPANIES 既定0）。
 - **未確認**＝機能側（FR-45 SC-04 挙動・SC-94 等）は本セッションで個別未検証＝機能トラックに委ねる。実機 LLM（Ollama）未実施（FakeChat 固定）。
@@ -58,7 +61,7 @@
 
 ## 7. 次にやること（優先順・本トラック＝テストコード）
 > 機能実装は別セッション。着手前に取り決め md を読む。**worktree 撤去**＝`git worktree remove ../g2-e2e --force`（node_modules シンボリックリンク済のため --force）＋ `git branch -d e2e/per-worker-db-isolation`（ff 済）。**iqe2e スタック撤去**＝`cd impl && COMPOSE_PROJECT_NAME=iqe2e docker compose --profile workers down -v`（別プロジェクトのボリュームも消す）。
-1. **（やるなら）会社スコープ spec を追加変換**＝`D-TC-203`(sc-21-idea-form) 等の会社スコープ系を fixtures へ（import 替え＋psql は `workerCompany.dbName`）。storageState のみの spec は **import 替えだけ**で済む（sc-22 と同型）。変換後 iqe2e（N=7）で再測定。
+1. **残りの会社スコープ spec 変換（任意）**＝(a) **info/discovery seed 依存**（sc-50-*・sc-13-catalog 等）を隔離するなら、まず bootstrap の `seed_demo_discovery`/`seed_demo_info`/`seed_demo_info_filler` も `_worker_company_defs()` でループさせる（`_seed_quest_group_for` と同型に会社パラメータ化）＝7社分 seed（reset が重くなる）。(b) sc-24-chat は psql 複数箇所＋user2 二人目ログイン（`loginAs` の company を `workerCompany.company` に・psql を `workerCompany.dbName` に・全 test に `workerCompany` 引数追加）＝やや大。(c) それ以外の storageState のみ会社スコープ spec は import 替えだけ。
 2. **control-plane フレーク**（B-TC-113/114/116/124/138/140/169・SC-00 MFA/再設定）＝OPS/認証の共有が原因。per-worker 会社DBでは直らない＝(a) 各テストの個別硬化（waitFor/scoped assertion）か (b) OPS 側 per-worker 化（大）。費用対効果で判断。
 3. **タイミングフレーク**（M-TC-013 scroll・D-TC-215 添付アップロード・M-TC-002 drawer）＝描画/アップロード待ちの個別硬化。
 4. **（任意）実機 LLM 縦1本**＝`docker compose --profile ai up -d ollama`→`ollama pull qwen3:4b`→worker 起動→SC-04 から enqueue。
