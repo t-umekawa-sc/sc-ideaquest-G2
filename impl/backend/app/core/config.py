@@ -11,6 +11,11 @@ class Settings(BaseSettings):
 
     app_env: str = "dev"
 
+    # e2e 並列隔離（ワーカ別DB）＝Playwright の各ワーカに専用会社DBを割り当てて並列競合を断つため、
+    # bootstrap が ACME-01 に加えて N 社（ACME-W0..W{N-1}／ideaquest_company_acme_w{i}）を seed する。
+    # 既定0＝seed しない（通常スタック/本番は不変）。e2e 隔離プロジェクト（iqe2e）でのみ env で立てる。
+    e2e_worker_companies: int = 0
+
     # システムログ（本番の問題/データ不整合の追跡・JSONL ファイル出力・doc/本番デプロイ要件.md §6.6）。
     # 出力先はデプロイで永続化を決める（dev=消えてよい／prod=永続ボリューム）。保持日数は env で調整可（既定30日）。
     log_level: str = "INFO"                 # ルートログレベル（dev は DEBUG も可）

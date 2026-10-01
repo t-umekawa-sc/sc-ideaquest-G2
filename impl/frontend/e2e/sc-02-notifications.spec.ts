@@ -1,16 +1,20 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
-// SC-02 通知一覧（H 実接続）＝一覧/未読数が実データ（getNotifications）で描画される。ACME-01 で確認。
+import { test, expect, LOGIN_ID } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社でログイン・DB操作
+
+// SC-02 通知一覧（H 実接続）＝一覧/未読数が実データ（getNotifications）で描画される。
+// 通知 count/一覧は user@acme のグローバル状態＝並列で他テストが同一会社の通知を変更すると race した。
+// 対策＝ワーカ別DB隔離（各ワーカが専用会社 ACME-W{i}／DB ideaquest_company_acme_w{i} で動く）。
 // 生成はサーバー（発火ドメイン）＝backend H-TC-101〜143 で担保。e2e は実データ照合＋デモ排除に限定。
 // 根拠＝doc/テスト/H_通知.md §1e（H-TC-208）・API設計 H.2・SC-02。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
 
-function psql(sql: string) {
-  execSync(`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c ${JSON.stringify(sql)}`, {
+// psql は会社DB名を引数で受ける（ワーカ別DBを叩くため・`ideaquest_company_acme` 直書きをやめる）。
+function psql(db: string, sql: string) {
+  execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, {
     cwd: IMPL_DIR,
     stdio: "pipe",
   });
@@ -45,11 +49,12 @@ test("H-TC-208 SC-02 notifications render real list and unread count", async ({ 
 // フォーカス要素を可視化しようとページを上へスクロールさせていた。修正＝ボタンの onMouseDown で focus を奪わせない。
 // 決定的な核＝クリックでボタンにフォーカスが移らない（activeElement != .n__read）／症状＝scrollY が動かない。
 // 根拠＝doc/テスト/H_通知.md H-TC-211・デザイン標準 §4.12（sticky 戻るバー §4.10 との併用）。
-test("H-TC-211 marking read under the sticky back-link does not steal focus or scroll", async ({ page }) => {
+test("H-TC-211 marking read under the sticky back-link does not steal focus or scroll", async ({ page, workerCompany }) => {
   const stamp = `フォーカス検証${Date.now().toString().slice(-8)}`;
   psql(
+    workerCompany.dbName,
     `INSERT INTO notifications (id, recipient_id, type, params, is_read, created_at) ` +
-      `SELECT gen_random_uuid(), (SELECT id FROM users WHERE login_id='${USER.loginId}'), 'mention', ` +
+      `SELECT gen_random_uuid(), (SELECT id FROM users WHERE login_id='${LOGIN_ID}'), 'mention', ` +
       `('{"actor_name":"${stamp}"}')::jsonb, false, now() - (g||' minutes')::interval FROM generate_series(1,25) g;`,
   );
   try {
@@ -81,7 +86,7 @@ test("H-TC-211 marking read under the sticky back-link does not steal focus or s
     // 既読化自体は成立（「既読にする」ボタンが1件減る）。
     await expect(btns).toHaveCount(cntBefore - 1);
   } finally {
-    psql(`DELETE FROM notifications WHERE params->>'actor_name'='${stamp}';`);
+    psql(workerCompany.dbName, `DELETE FROM notifications WHERE params->>'actor_name'='${stamp}';`);
   }
 });
 

@@ -14,7 +14,14 @@ import { test as setup } from "@playwright/test";
 const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
 
 // 復元対象＝デモ会社DBのみ（control DB は drop しない＝OPS/会社行は不変・bootstrap が冪等に通る）。
-const COMPANY_DBS = ["ideaquest_company_acme", "ideaquest_company_acme2"] as const;
+// ワーカ別DB隔離（§4.1）が有効（E2E_WORKER_COMPANIES=N）なら ACME-W0..W{N-1} の会社DBも対象に含める
+// ＝各ワーカ専用会社も毎回 pristine に戻す。N は backend の seed 数と一致させること。
+const WORKER_N = Number(process.env.E2E_WORKER_COMPANIES ?? 0) || 0;
+const COMPANY_DBS = [
+  "ideaquest_company_acme",
+  "ideaquest_company_acme2",
+  ...Array.from({ length: WORKER_N }, (_, i) => `ideaquest_company_acme_w${i}`),
+];
 
 function dc(args: string): string {
   return execSync(`docker compose ${args}`, { cwd: IMPL_DIR, stdio: "pipe" }).toString();

@@ -12,13 +12,18 @@ import { defineConfig, devices } from "@playwright/test";
 // を宣言して未認証にし、自前でログインする。
 const USER_STATE = path.join(__dirname, "playwright", ".auth", "user.json");
 
+// ワーカ別DB隔離（§4.1・fixtures.ts）が有効なときは、workers を seed 済みワーカ会社数
+// （E2E_WORKER_COMPANIES）に一致させる＝parallelIndex 0..N-1 が ACME-W0..W{N-1} に対応する。
+// 未設定（通常スタック）は Playwright 既定（コア50%）。
+const WORKER_N = Number(process.env.E2E_WORKER_COMPANIES ?? 0) || 0;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
-  // 並列フル実行（workers=7）は共有 backend へのアクセス競合で固有の並列タイミング分散が残る
-  // （各テストは単体 green・実行毎に落ちる顔ぶれが変わる非決定・~4%）。systemic 要因
-  // （ログイン衝突・データ蓄積・実バグ）は解消済みなので、失敗テストのみ 1 回再試行して吸収する。
-  // 実バグは全試行で落ちるためマスクされない（Playwright は再試行 pass を "flaky" として可視化）。
+  ...(WORKER_N > 0 ? { workers: WORKER_N } : {}),
+  // 並列フル実行で共有 backend への競合由来のタイミングフレークが残り得る。ワーカ別DB隔離（fixtures.ts）
+  // で会社スコープの競合は断つ。残る control-plane/タイミングのフレークは失敗テストのみ再試行して吸収する
+  // （実バグは全試行で落ちるためマスクされない＝Playwright は再試行 pass を "flaky" として可視化）。
   retries: 2,
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",

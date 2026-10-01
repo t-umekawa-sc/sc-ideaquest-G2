@@ -75,6 +75,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       COOKIE_SECURE: "false"           # ローカルは HTTP のため false（本番は true）
       APP_ENV: dev
+      # e2e 並列隔離＝ワーカ別会社DB（ACME-W0..）を N 社 seed（既定0＝通常スタックは不変・iqe2e のみ立てる）。
+      E2E_WORKER_COMPANIES: ${E2E_WORKER_COMPANIES:-0}
       # メール送信（置き場所は env=ADR-0003）。dev は MailHog（認証なし・平文）＝既定でそのまま動く
       SMTP_HOST: ${SMTP_HOST:-mailhog}       # PW設定リンクの送信先（ADR-0002 §2.5）
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -83,7 +85,10 @@ services:
       SMTP_START_TLS: ${SMTP_START_TLS:-false}   # 本番 587 送信で true・MailHog は false
       MAIL_FROM: ${MAIL_FROM:-no-reply@ideaquest.example}
       MAIL_ALERT_TO: ${MAIL_ALERT_TO:-alerts@ideaquest.example}   # 運用/システムアラート宛先
-      APP_BASE_URL: http://localhost:3000   # メールリンクの基点（フロントの password-setup ページ）
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}   # メールリンクの基点（フロントの password-setup ページ・iqe2e は 3100）
+      # ブラウザ Origin 許可リスト（CSRF/Origin 検証・core/deps.py・realtime）。既定 3000/8000。
+      # iqe2e 隔離スタックは別ポート（3100/8100）で動くため env で上書きする（JSON 配列文字列）。
+      ALLOWED_ORIGINS: '${ALLOWED_ORIGINS:-["http://localhost:3000","http://localhost:8000"]}'
       # MFA（メールOTP）・信頼端末のしきい値（ADR-0004・env で調整可）
       OTP_LENGTH: ${OTP_LENGTH:-6}
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}

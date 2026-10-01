@@ -123,6 +123,37 @@ _SEEDS = [
     (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT),
 ]
 
+# e2e 並列隔離用のワーカ会社（ACME-W0..W{N-1}）。Playwright の各ワーカに専用会社DBを割り当て、
+# 並列実行時の共有会社DB競合（通知 count・添付・一覧等）を断つ。各ワーカ会社は ACME-01 と同じ
+# login_id 群を持つ（login_id は会社単位一意＝使い回せる＝spec は会社コード/DB名の差し替えのみで済む）。
+# env `E2E_WORKER_COMPANIES`（既定0）かつ非prod のときだけ seed＝通常スタック/本番は不変。
+_WORKER_ACCOUNT_DEFS = [
+    SEED_ACCOUNT, SEED_E2E_SESSION_ACCOUNT, SEED_E2E_PWRESET_ACCOUNT,
+    SEED_DEMO_USER2, SEED_DEMO_USER3, SEED_DEMO_KANRI,
+]
+
+
+def _worker_company_def(i: int) -> dict:
+    return {
+        "company_code": f"ACME-W{i}",
+        "name": f"E2E Worker {i}",
+        "db_identifier": f"ideaquest_company_acme_w{i}",
+        "status": "active",
+        "mfa_required": False,
+    }
+
+
+def _worker_company_defs() -> list[dict]:
+    """seed 対象のワーカ会社 def 一覧（非prod・env>0 のときだけ・それ以外は空）。"""
+    s = get_settings()
+    n = s.e2e_worker_companies if _seed_demo_enabled(s.app_env) else 0
+    return [_worker_company_def(i) for i in range(n)]
+
+
+def _worker_seeds() -> list[tuple[dict, dict]]:
+    """ワーカ会社×アカウントの (company_def, account_def) タプル（seed_control 用）。"""
+    return [(cdef, adef) for cdef in _worker_company_defs() for adef in _WORKER_ACCOUNT_DEFS]
+
 
 def _seed_demo_enabled(app_env: str) -> bool:
     """demo 会社/アカウント（`_SEEDS`）を seed してよいか（本番デプロイ要件 §5）。
@@ -208,7 +239,7 @@ def seed_control() -> None:
             session.commit()  # prod は demo を seed しない（本番デプロイ要件 §5）
             print(f"[bootstrap] APP_ENV={s.app_env}: demo seed をスキップ（OPS のみ）")
             return
-        for company_def, account_def in _SEEDS:
+        for company_def, account_def in _SEEDS + _worker_seeds():
             company = (
                 session.query(Company)
                 .filter_by(company_code=company_def["company_code"])
@@ -303,19 +334,16 @@ DEMO_INFO_IDS = {
 DEMO_QUEST_GROUP_ID = uuid.UUID("de500000-0000-4000-a000-000000000001")
 
 
-def seed_demo_quest_group() -> None:
-    """ACME-01 にデモ用クエストグループ＋seed ユーザーの所属を seed（冪等・非prod）。"""
+def _seed_quest_group_for(company_code: str) -> None:
+    """指定会社にデモ用クエストグループ＋seed ユーザーの所属を seed（冪等）。"""
     from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-    s = get_settings()
-    if not _seed_demo_enabled(s.app_env):
-        return
     with control_session() as session:
-        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+        company = session.query(Company).filter_by(company_code=company_code).one_or_none()
         db_identifier = company.db_identifier if company else None
     if db_identifier is None:
         return
-    # ACME-01 の seed ユーザーを member で所属させる＝GET /quest-groups に出す（createRecruiting 等が前提）。
+    # seed ユーザーを member で所属させる＝GET /quest-groups に出す（createRecruiting 等が前提）。
     # admin にはしない＝SC-90 の「非QG管理者」テスト（B-TC-119/123・is_qg_admin=false 前提）を壊さない。
     # QG 管理者が要るテスト（B-TC-120 等）は各自 OPS 編集で admin を作る。
     member_logins = {
@@ -341,6 +369,16 @@ def seed_demo_quest_group() -> None:
             if existing is None:
                 ts.add(QuestGroupMember(quest_group_id=DEMO_QUEST_GROUP_ID, user_id=user.id, role=role))
         ts.commit()
+
+
+def seed_demo_quest_group() -> None:
+    """ACME-01＋（有効なら）ワーカ会社にデモ用クエストグループを seed（冪等・非prod）。"""
+    s = get_settings()
+    if not _seed_demo_enabled(s.app_env):
+        return
+    _seed_quest_group_for(SEED_COMPANY["company_code"])
+    for cdef in _worker_company_defs():
+        _seed_quest_group_for(cdef["company_code"])
 
 
 def seed_demo_discovery() -> None:
