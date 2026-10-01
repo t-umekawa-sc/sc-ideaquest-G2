@@ -13,6 +13,31 @@ async function login(page: Page) {
   await expect(page.locator(".app-header")).toBeVisible();
 }
 
+// 募集中クエスト（非下書き）を user@acme 所有で1件作る。デモグループ（GET /quest-groups）があれば所属させる。
+async function createRecruiting(page: Page, title: string): Promise<void> {
+  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const res = await page.request.post("/api/v1/quests", {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: {
+      title, color: "#0D9488",
+      quest_group_ids: groups.data?.length ? [groups.data[0].id] : [],
+      categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting",
+    },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+}
+
+// 一覧の状態復元/ソート/列設定の検証には、user@acme が参加する（カード表示される）クエストが複数必要。
+// pristine DB では user@acme はクエスト未参加のため、各テストが自前で募集中クエストを2件用意する
+// （seed 非依存・自己完結＝デモ seed のクエスト有無や他テストの生成物に依存しない）。
+test.beforeEach(async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  await createRecruiting(page, `一覧状態A_${stamp}`);
+  await createRecruiting(page, `一覧状態B_${stamp}`);
+});
+
 test("M-TC-016 quest list restores a user sort after opening a quest and going back (pop)", async ({ page }) => {
   await login(page);
   await page.goto("/quests");

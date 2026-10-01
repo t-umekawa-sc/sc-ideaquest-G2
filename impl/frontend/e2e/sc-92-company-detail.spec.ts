@@ -46,7 +46,11 @@ test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
   const mfa = page.getByRole("checkbox", { name: /MFA/ });
   const mfaSwitch = page.locator("label.switch", { has: mfa });
   const before = await mfa.isChecked();
-  await mfaSwitch.click();
+  // トグルは PATCH /settings を非同期発火する。完了を待たず reload すると旧値のままになり落ちる（race）。
+  await Promise.all([
+    page.waitForResponse((r) => /\/settings\b/.test(r.url()) && r.request().method() === "PATCH" && r.ok()),
+    mfaSwitch.click(),
+  ]);
   await page.reload();
   await expect(page.getByRole("checkbox", { name: /MFA/ })).toBeChecked({ checked: !before });
 });

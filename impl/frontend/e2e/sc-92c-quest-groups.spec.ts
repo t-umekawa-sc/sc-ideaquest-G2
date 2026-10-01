@@ -88,7 +88,8 @@ test("B-TC-179 no-change rename shows info toast (no success)", async ({ page })
   await page.locator("#g_name").fill(name);
   await page.getByRole("button", { name: "作成する" }).click();
   await page.getByRole("searchbox", { name: "グループ名・コード を検索" }).fill(code);
-  await expect(page.getByText(code)).toBeVisible();
+  // 行セル（role=cell）で確認＝検索チップ「🔍 "code" ✕」が getByText(code) に二重一致するのを避ける（strict 違反フレーク）。
+  await expect(page.getByRole("cell", { name: code })).toBeVisible();
 
   try {
     const row = page.getByRole("row", { name: new RegExp(code) });

@@ -71,6 +71,24 @@ test.describe("reduce-motion #21", () => {
 // I-TC-157 SC-01 ダッシュボードで「自分のクエスト」を参加中と分離＋下書きカードは編集ダイアログ導線（ユーザー要望・2026-09-16）。
 // is_owner（backend C-TC-247）でクエストを二分し、下書き（アイデア）は ?edit=1、クエスト下書きは /edit へ。
 const ACME = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+
+// user@acme 所有（is_owner）の募集中クエストを1件作り id を返す。ダッシュボードの「自分のクエスト」や
+// 下書きカード導線は所有クエストを前提にするが、pristine DB では user@acme はクエスト未所有のため、
+// 各テストが自前で用意する（seed 非依存・自己完結＝他テストの生成物に依存しない）。
+async function createOwnedQuest(page: Page): Promise<string> {
+  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const res = await page.request.post("/api/v1/quests", {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: {
+      title: `ダッシュボード自作_${Date.now().toString().slice(-8)}`, color: "#0D9488",
+      quest_group_ids: groups.data?.length ? [groups.data[0].id] : [],
+      categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting",
+    },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  return (await res.json()).id as string;
+}
 test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog", async ({ page }) => {
   await page.goto("/login");
   await page.locator("#company_code").fill(ACME.company);
@@ -78,6 +96,7 @@ test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog",
   await page.locator("#password").fill(ACME.password);
   await page.getByRole("button", { name: "ログイン" }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await createOwnedQuest(page); // 「自分のクエスト」セクションの前提＝自作クエストを用意（seed 非依存）。
   await page.goto("/");
   await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
   // 自分の作成クエストがあるので「自分のクエスト」セクションが出る（参加中とは別枠）。
@@ -106,12 +125,10 @@ test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (
   await page.locator("#password").fill(ACME.password);
   await page.getByRole("button", { name: "ログイン" }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
-  const own = (dash.quests ?? []).find((q: { is_owner?: boolean }) => q.is_owner);
-  expect(own).toBeTruthy();
+  const ownId = await createOwnedQuest(page);
   const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
   const created = await page.request
-    .post(`/api/v1/quests/${own.id}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "I-TC-158 draft", value: "v", body: "b", status: "draft" } })
+    .post(`/api/v1/quests/${ownId}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "I-TC-158 draft", value: "v", body: "b", status: "draft" } })
     .then((r) => r.json());
   const ideaId = created.id as string;
   try {
@@ -137,11 +154,10 @@ test("D-TC-226 draft idea edit dialog shows 下書き保存 and 投稿する (no
   await page.locator("#password").fill(ACME.password);
   await page.getByRole("button", { name: "ログイン" }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
-  const own = (dash.quests ?? []).find((q: { is_owner?: boolean }) => q.is_owner);
+  const ownId = await createOwnedQuest(page);
   const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
   const created = await page.request
-    .post(`/api/v1/quests/${own.id}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "D-TC-226 draft", value: "v", body: "b", status: "draft" } })
+    .post(`/api/v1/quests/${ownId}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "D-TC-226 draft", value: "v", body: "b", status: "draft" } })
     .then((r) => r.json());
   const ideaId = created.id as string;
   try {
