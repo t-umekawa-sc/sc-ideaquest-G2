@@ -35,8 +35,8 @@
   - `impl/frontend/e2e/fixtures.ts`（新規）＝worker スコープ fixture（`workerCompany`）＋ storageState 上書き（各ワーカが自社 user@acme で1回ログイン）。**N=0 は ACME-01 共有へフォールバック**（通常スタック互換）。
   - `impl/frontend/e2e/db.reset.ts`＝ワーカ会社DBも drop 対象（N から算出）。
   - `impl/frontend/playwright.config.ts`＝N>0 のとき `workers=N`（parallelIndex↔会社対応）。
-- 変換済み spec（計6本）＝`sc-02-notifications`（H-TC-208）・`sc-22-attachments`・`sc-21-idea-form`・`sc-32-spells`・`sc-99-scroll-restore`・`sc-24-chat`（psql/psqlValue に db 引数・pageB user2 を同一ワーカ会社でログイン・E-TC-222 競合解消）。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・login_id は `LOGIN_ID`・未使用の ACME-01 const 除去**。storageState のみの spec は import 替えだけ（sc-22/sc-21/sc-32/sc-99 と同型）。両モード（隔離/フォールバック）で動く。
-  - **見送り**＝`sc-50-info-to-quest-draft`（情報デモ seed 依存＝情報は書込API未実装でDB直挿し。ワーカ会社は quest group のみ seed で info/discovery 無し＝7社分 seed は費用対効果×）→共有 ACME-01 のまま。
+- 変換済み spec（計12本）＝`sc-02-notifications`・`sc-22-attachments`・`sc-21-idea-form`・`sc-32-spells`・`sc-99-scroll-restore`・`sc-24-chat`（psql/psqlValue に db 引数・pageB user2 を同一ワーカ会社でログイン）＋**sc-50 全6本**（`sc-50-info-attach`/`body-grow`/`history`/`list`/`search`/`info-to-quest-draft`）。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・login_id は `LOGIN_ID`・未使用の ACME-01 const 除去**。storageState のみの spec は import 替えだけ。両モード（隔離/フォールバック）で動く。
+  - **bootstrap が worker 会社にも discovery/info/filler を seed**（`seed_demo_discovery`/`seed_demo_info`/`seed_demo_info_filler` を `db_identifier` 引数化し `main()` で `_demo_db_identifiers()`＝ACME-01＋worker をループ）＝sc-50 を隔離可能に（前回の見送りを解消）。既定0＝通常スタックは ACME-01 のみで不変（clean pytest 907 passed で確認）。
 
 ## 4. 現在の状態
 - **確認済み（本セッション）**:
@@ -61,7 +61,7 @@
 
 ## 7. 次にやること（優先順・本トラック＝テストコード）
 > 機能実装は別セッション。着手前に取り決め md を読む。**worktree 撤去**＝`git worktree remove ../g2-e2e --force`（node_modules シンボリックリンク済のため --force）＋ `git branch -d e2e/per-worker-db-isolation`（ff 済）。**iqe2e スタック撤去**＝`cd impl && COMPOSE_PROJECT_NAME=iqe2e docker compose --profile workers down -v`（別プロジェクトのボリュームも消す）。
-1. **残りの会社スコープ spec 変換（任意）**＝(a) **info/discovery seed 依存**（sc-50-*・sc-13-catalog 等）を隔離するなら、まず bootstrap の `seed_demo_discovery`/`seed_demo_info`/`seed_demo_info_filler` も `_worker_company_defs()` でループさせる（`_seed_quest_group_for` と同型に会社パラメータ化）＝7社分 seed（reset が重くなる）。(b) それ以外の storageState のみ会社スコープ spec は import 替えだけ。psql/二人目ログインを含む spec は **sc-24-chat の変換パターンが参考**（psql に db 引数・test に `workerCompany` 引数・`loginAs` の company を `workerCompany.company` に）。
+1. **残りの会社スコープ spec 変換（任意）**＝bootstrap は既に discovery/info/filler を worker 会社へ seed 済（§3）。残りの会社スコープ spec（sc-12-*・sc-25-eval・sc-22-vote-follow/revisions/idea-detail/quest-ref/related-info・sc-13-catalog・sc-52-* 等）は **import 替えだけ**（storageState のみ）。psql/二人目ログインを含む spec は **sc-24-chat の変換パターンが参考**（psql に db 引数・test に `workerCompany` 引数・`loginAs` の company を `workerCompany.company` に）。変換後は iqe2e（N=7）で検証。
 2. **control-plane フレーク**（B-TC-113/114/116/124/138/140/169・SC-00 MFA/再設定）＝OPS/認証の共有が原因。per-worker 会社DBでは直らない＝(a) 各テストの個別硬化（waitFor/scoped assertion）か (b) OPS 側 per-worker 化（大）。費用対効果で判断。
 3. **タイミングフレーク**（M-TC-013 scroll・D-TC-215 添付アップロード・M-TC-002 drawer）＝描画/アップロード待ちの個別硬化。
 4. **（任意）実機 LLM 縦1本**＝`docker compose --profile ai up -d ollama`→`ollama pull qwen3:4b`→worker 起動→SC-04 から enqueue。
