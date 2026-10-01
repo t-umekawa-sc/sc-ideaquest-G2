@@ -1,29 +1,11 @@
-import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
-
-import { type Page } from "@playwright/test";
 
 import { test, expect, LOGIN_ID } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン・DB操作
+import { gotoAuthed, psql } from "./helpers";
 
 // I-TC-144 SC-01 ダッシュボード「最近の通知」に「既読にする」ボタン（ユーザー要望）。
 // 未読通知を会社DBへ直接 insert して決定的に用意し、ボタンで参照先を開かず既読化できることを検証する。
 // 根拠＝doc/テスト/I_ダッシュボード.md I-TC-144・SC-01 §4.8b／通知結線は H（H-TC-208/209/210）。
-const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
-
-function psql(db: string, sql: string) {
-  execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, {
-    cwd: IMPL_DIR,
-    stdio: "pipe",
-  });
-}
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("I-TC-144 dashboard recent notification has a mark-read button that marks read without navigating", async ({ page, workerCompany }) => {
   const id = randomUUID();
@@ -35,7 +17,7 @@ test("I-TC-144 dashboard recent notification has a mark-read button that marks r
       `('${id}', (SELECT id FROM users WHERE login_id='${LOGIN_ID}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
   );
   try {
-    await login(page);
+    await gotoAuthed(page);
     await page.goto("/");
 
     // 「最近の通知」に当該通知が未読で出る（本文に一意 stamp）。
@@ -83,7 +65,7 @@ test("I-TC-155 dashboard recent notification shows a relative timestamp", async 
       `('${id}', (SELECT id FROM users WHERE login_id='${LOGIN_ID}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
   );
   try {
-    await login(page);
+    await gotoAuthed(page);
     await page.goto("/");
     const li = page.locator(".notif-list li").filter({ hasText: stamp });
     await expect(li).toHaveClass(/unread/);

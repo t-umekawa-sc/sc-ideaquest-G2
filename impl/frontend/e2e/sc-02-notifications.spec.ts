@@ -1,34 +1,14 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
-
-import { type Page } from "@playwright/test";
-
 import { test, expect, LOGIN_ID } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社でログイン・DB操作
+import { gotoAuthed, psql } from "./helpers";
 
 // SC-02 通知一覧（H 実接続）＝一覧/未読数が実データ（getNotifications）で描画される。
 // 通知 count/一覧は user@acme のグローバル状態＝並列で他テストが同一会社の通知を変更すると race した。
 // 対策＝ワーカ別DB隔離（各ワーカが専用会社 ACME-W{i}／DB ideaquest_company_acme_w{i} で動く）。
 // 生成はサーバー（発火ドメイン）＝backend H-TC-101〜143 で担保。e2e は実データ照合＋デモ排除に限定。
 // 根拠＝doc/テスト/H_通知.md §1e（H-TC-208）・API設計 H.2・SC-02。
-const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
-
-// psql は会社DB名を引数で受ける（ワーカ別DBを叩くため・`ideaquest_company_acme` 直書きをやめる）。
-function psql(db: string, sql: string) {
-  execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, {
-    cwd: IMPL_DIR,
-    stdio: "pipe",
-  });
-}
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 test("H-TC-208 SC-02 notifications render real list and unread count", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const api = await page.request.get("/api/v1/notifications?limit=50").then((r) => r.json());
   await page.goto("/notifications");
   await expect(page.getByRole("heading", { name: "通知", exact: true })).toBeVisible();
@@ -59,7 +39,7 @@ test("H-TC-211 marking read under the sticky back-link does not steal focus or s
   );
   try {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await login(page);
+    await gotoAuthed(page);
     await page.goto("/notifications");
     await expect(page.locator("button.n__read").first()).toBeVisible();
     // 縦に長くしてから中ほどへスクロール＝sticky 戻るバー直下に行のボタンが来る状態を作る。
@@ -95,7 +75,7 @@ test("H-TC-211 marking read under the sticky back-link does not steal focus or s
 test.describe("reduce-motion #15", () => {
   test("G-TC-170 SC-02 bell arrival pop/wiggle are disabled under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await login(page);
+    await gotoAuthed(page);
     const bell = page.locator(".app-header .bell").first();
     await expect(bell).toBeVisible();
     // 新着相当（data-arrived）を強制的に立てても pop は無効。

@@ -5,12 +5,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
-const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
-
-async function login(page: Page) {
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
+import { gotoAuthed, csrfToken } from "./helpers";
 
 // カードを採否モードで開き、状態を選んで（任意でメモ）保存し、モーダルが閉じ切るまで待つ。
 async function dispose(page: Page, panel: ReturnType<Page["locator"]>, title: string, choice: string, note?: string) {
@@ -23,8 +18,8 @@ async function dispose(page: Page, panel: ReturnType<Page["locator"]>, title: st
 }
 
 test("C-TC-293 SC-12 採否＝採用でメモ表示・不採用で非表示＋件数", async ({ page }) => {
-  await login(page);
-  const csrf = csrfOf(await page.context().cookies());
+  await gotoAuthed(page);
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const stamp = Date.now().toString().slice(-8);
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
@@ -54,15 +49,15 @@ test("C-TC-293 SC-12 採否＝採用でメモ表示・不採用で非表示＋�
     await expect(panel.locator(".ri-card", { hasText: title })).toHaveCount(0);
     await expect(panel.locator(".ri-head__declined")).toContainText("不採用");
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${quest.id}`, { headers: { "X-CSRF-Token": c2 } });
     await page.request.delete(`/api/v1/info-items/${info.id}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 test("C-TC-295 結果タブに採用関連情報＋処理メモが出る", async ({ page }) => {
-  await login(page);
-  const csrf = csrfOf(await page.context().cookies());
+  await gotoAuthed(page);
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const stamp = Date.now().toString().slice(-8);
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());

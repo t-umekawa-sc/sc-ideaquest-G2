@@ -4,37 +4,15 @@
 // 修正＝ハンドラ内で Array.from を同期 materialize。setInputFiles は同じ onChange+value リセット経路を
 // 通るため本不具合を忠実に再現する（修正前は attach 行=0＝red）。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
-
-const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-async function createInfoItem(page: import("@playwright/test").Page, title: string): Promise<string> {
-  await page.goto("/info-items/new");
-  await page.locator("#im-title").fill(title);
-  const [resp] = await Promise.all([
-    page.waitForResponse((r) => /\/info-items$/.test(new URL(r.url()).pathname) && r.request().method() === "POST"),
-    page.getByRole("button", { name: "登録する" }).click(),
-  ]);
-  const created = (await resp.json()) as { id: string };
-  expect(created.id).toBeTruthy();
-  return created.id;
-}
+import { gotoAuthed, csrfToken, createInfoItem } from "./helpers";
 
 async function deleteInfoItem(page: import("@playwright/test").Page, id: string) {
-  const cookies = await page.context().cookies();
-  const csrf = cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
-  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": csrf } });
+  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": await csrfToken(page) } });
 }
 
 // N-TC-208: 登録ダイアログで参考資料をファイル選択すると一覧に載る（クリック選択経路）。
 test("N-TC-208: 登録ダイアログの参考資料ファイル選択が一覧に載る（DFT-N-001）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   await page.goto("/info-items/new");
   await page.locator("#im-title").fill(`添付回帰 ${Date.now()}`);
 
@@ -48,7 +26,7 @@ test("N-TC-208: 登録ダイアログの参考資料ファイル選択が一覧�
 
 // N-TC-209: 詳細インライン編集で参考資料をファイル選択すると追加候補に載る（クリック選択経路）。
 test("N-TC-209: 詳細編集の参考資料ファイル選択が一覧に載る（DFT-N-001）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const id = await createInfoItem(page, `添付回帰-詳細 ${Date.now()}`);
   try {
     await page.goto(`/info-items/${id}`);
@@ -67,7 +45,7 @@ test("N-TC-209: 詳細編集の参考資料ファイル選択が一覧に載る�
 
 // N-TC-210: 参考資料だけ変更して保存すると版が1つ増える（保存単位で1版・DFT-N-002）。
 test("N-TC-210: 参考資料だけの変更で版が1つ増える（DFT-N-002）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const id = await createInfoItem(page, `版回帰 ${Date.now()}`);
   try {
     await page.goto(`/info-items/${id}`);

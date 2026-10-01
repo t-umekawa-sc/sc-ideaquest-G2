@@ -1,34 +1,14 @@
 // SC-50 §85 更新履歴＝変更内容を見せる（アイデア SC-22 相当）。台帳＝N §3.3（N-TC-213）。
 // 作成者が内容を編集して保存すると、更新履歴の最新版に変更フィールドのバッジが付き、「差分を表示」で差分が出る。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
-
-const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-async function createInfoItem(page: import("@playwright/test").Page, title: string): Promise<string> {
-  await page.goto("/info-items/new");
-  await page.locator("#im-title").fill(title);
-  const [resp] = await Promise.all([
-    page.waitForResponse((r) => /\/info-items$/.test(new URL(r.url()).pathname) && r.request().method() === "POST"),
-    page.getByRole("button", { name: "登録する" }).click(),
-  ]);
-  return ((await resp.json()) as { id: string }).id;
-}
+import { gotoAuthed, csrfToken, createInfoItem } from "./helpers";
 
 async function deleteInfoItem(page: import("@playwright/test").Page, id: string) {
-  const cookies = await page.context().cookies();
-  const csrf = cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
-  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": csrf } });
+  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": await csrfToken(page) } });
 }
 
 test("N-TC-213: 更新履歴が変更内容を見せる（バッジ＋差分展開）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const id = await createInfoItem(page, "履歴タイトルX");
   try {
     await page.goto(`/info-items/${id}`);

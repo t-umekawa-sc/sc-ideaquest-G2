@@ -1,19 +1,12 @@
 // SC-12 クエスト詳細＝上部「関連情報ストリップ」（FR-41・情報インプット連携・C.8b）。
 // C-TC-287: リンクした情報がストリップにカード表示され、反証は⚠強調＋ヘッダーに反証件数が出る。
 // 根拠＝doc/テスト/C_クエスト.md・SC-12 §4.1d・API設計 C.8b。
-import { type Page } from "@playwright/test";
-
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
-const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
-
-async function login(page: Page) {
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
+import { gotoAuthed, csrfToken } from "./helpers";
 
 test("C-TC-287 SC-12 上部の関連情報ストリップにリンク情報が出る（反証は⚠）", async ({ page }) => {
-  await login(page);
-  const csrf = csrfOf(await page.context().cookies());
+  await gotoAuthed(page);
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   // user@acme が owner のクエストを作成（自分がパーティー＝閲覧可）。
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
@@ -46,8 +39,8 @@ test("C-TC-287 SC-12 上部の関連情報ストリップにリンク情報が�
 });
 
 test("C-TC-288 SC-12 ストリップの「＋ 関連情報を追加」で既存情報を関連付けできる（成果物→情報）", async ({ page }) => {
-  await login(page);
-  const csrf = csrfOf(await page.context().cookies());
+  await gotoAuthed(page);
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
   const quest = await page.request.post("/api/v1/quests", {

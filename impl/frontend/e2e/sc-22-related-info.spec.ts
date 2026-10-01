@@ -6,16 +6,11 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
-const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
-
-async function login(page: Page) {
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
+import { gotoAuthed, csrfToken } from "./helpers";
 
 // user@acme が owner の recruiting クエスト＋public アイデアを作成し idea id を返す。
 async function createIdea(page: Page, tag: string): Promise<{ questId: string; ideaId: string }> {
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
   const quest = await page.request.post("/api/v1/quests", {
@@ -31,9 +26,9 @@ async function createIdea(page: Page, tag: string): Promise<{ questId: string; i
 }
 
 test("D-TC-237 SC-22 概要直下の関連情報ストリップにリンク情報が出る（反証は⚠）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const { questId, ideaId } = await createIdea(page, stamp);
   // 情報を作成し、反証としてこのアイデアへ関連付け。
@@ -58,9 +53,9 @@ test("D-TC-237 SC-22 概要直下の関連情報ストリップにリンク情�
 });
 
 test("D-TC-238 SC-22 ストリップの「＋ 関連情報を追加」で既存情報を関連付けできる（成果物→情報）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const { questId, ideaId } = await createIdea(page, stamp);
   const info = await page.request.post("/api/v1/info-items", { headers: h, data: { title: `追加候補情報_${stamp}` } }).then((r) => r.json());

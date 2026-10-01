@@ -5,18 +5,11 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
-const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（auth.setup.ts）で user@acme 認証済み＝ホームへ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
+import { gotoAuthed, csrfToken } from "./helpers";
 
 // 情報＋関連リンク（related）を API で n 件用意し、情報 id を返す。
 async function seedInfoWithLinks(page: Page, n: number): Promise<{ infoId: string; titles: string[] }> {
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const info = await page.request.post("/api/v1/info-items", { headers: h, data: { title: `LINKOPS_${Date.now()}` } }).then((r) => r.json());
   const cand = await page.request.get(`/api/v1/info-link-candidates?limit=${n}`).then((r) => r.json());
@@ -30,12 +23,12 @@ async function seedInfoWithLinks(page: Page, n: number): Promise<{ infoId: strin
 }
 
 async function cleanup(page: Page, infoId: string) {
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   await page.request.delete(`/api/v1/info-items/${infoId}`, { headers: { "X-CSRF-Token": csrf } });
 }
 
 test("N-TC-220 リンク種別変更で完了トーストが最前面に出る（モーダル起動中も見える）", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const { infoId } = await seedInfoWithLinks(page, 1);
   try {
     await page.goto(`/info-items/${infoId}`);
@@ -57,8 +50,8 @@ test("N-TC-220 リンク種別変更で完了トーストが最前面に出る�
 });
 
 test("N-TC-222 棄却済みリンクも対象ピッカーで既存扱い＝結果から除外（再追加409を防ぐ）", async ({ page }) => {
-  await login(page);
-  const csrf = csrfOf(await page.context().cookies());
+  await gotoAuthed(page);
+  const csrf = await csrfToken(page);
   const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
   const info = await page.request.post("/api/v1/info-items", { headers: h, data: { title: `REJ_${Date.now()}` } }).then((r) => r.json());
   const cand = await page.request.get("/api/v1/info-link-candidates?limit=1").then((r) => r.json());
@@ -85,7 +78,7 @@ test("N-TC-222 棄却済みリンクも対象ピッカーで既存扱い＝結�
 });
 
 test("N-TC-221 リンク種別変更で並び順が変わらない", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const { infoId } = await seedInfoWithLinks(page, 2);
   try {
     await page.goto(`/info-items/${infoId}`);

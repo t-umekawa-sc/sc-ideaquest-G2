@@ -3,38 +3,16 @@
 // N-TC-207: 無変更で「保存する」を押すと版を増やさずダイアログを閉じて「変更はありません」を通知（他フォームと統一）。
 // フィクスチャは自己完結＝seed 情報の作成者はデモ user のため編集不可。テスト内で user@acme が新規登録し作成者になる。
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
-const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: import("@playwright/test").Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-// user@acme で情報を新規登録し、作成された情報の id を返す（作成者＝内容編集可）。
-async function createInfoItem(page: import("@playwright/test").Page, title: string): Promise<string> {
-  await page.goto("/info-items/new");
-  await page.locator("#im-title").fill(title);
-  const [resp] = await Promise.all([
-    page.waitForResponse((r) => /\/info-items$/.test(new URL(r.url()).pathname) && r.request().method() === "POST"),
-    page.getByRole("button", { name: "登録する" }).click(),
-  ]);
-  const created = (await resp.json()) as { id: string };
-  expect(created.id).toBeTruthy();
-  return created.id;
-}
+import { gotoAuthed, csrfToken, createInfoItem } from "./helpers";
 
 // テストが作った情報を物理削除して後始末する（raw・作成者本人なら DELETE 可）。
 // 一覧に残ると created_at 降順で seed 行を押し出し、他 e2e（N-TC-203 等）を壊すため必須。
 async function deleteInfoItem(page: import("@playwright/test").Page, id: string) {
-  const cookies = await page.context().cookies();
-  const csrf = cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
-  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": csrf } });
+  await page.request.delete(`/api/v1/info-items/${id}`, { headers: { "X-CSRF-Token": await csrfToken(page) } });
 }
 
 test("N-TC-206: 未保存で閉じると破棄確認＝編集に戻るで残り破棄して閉じるで閉じる", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const title = `破棄確認テスト ${Date.now()}`;
   const id = await createInfoItem(page, title);
   try {
@@ -71,7 +49,7 @@ test("N-TC-206: 未保存で閉じると破棄確認＝編集に戻るで残り�
 });
 
 test("N-TC-207: 無変更で保存すると閉じて『変更はありません』を通知", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const title = `無変更保存テスト ${Date.now()}`;
   const id = await createInfoItem(page, title);
   try {
