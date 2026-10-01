@@ -19,7 +19,7 @@ async function login(page: Page) {
 }
 
 // ヒーロー残高＝GET /me の balance と一致（接続の証明）。ヘッダー通貨も同値。
-test("hero and header balance reflect GET /me", async ({ page }) => {
+test("hero and header balance reflect GET /me", { tag: "@serial" }, async ({ page }) => {
   await login(page); // ダッシュボード（/）表示
   // 認証済みページと同一 Cookie で /me を取得し、UI 表示と突合する。
   const me = await page.request.get("/api/v1/me").then((r) => r.json());
@@ -46,8 +46,8 @@ test("hero and header balance reflect GET /me", async ({ page }) => {
 // data-tier は levelRank(level).tier で全レベル付与ゆえ ::after は常設。ゲーム層ダッシュボード（.dash-page ヒーロー）を見る ACME ユーザーで観測。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-T（G-TC-175）・GF-AC-212。
 const GAME_USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-test.describe("reduce-motion #21", () => {
-  test("G-TC-175 hero level aura pulse stops under reduced motion (#21)", async ({ page }) => {
+test.describe("reduce-motion #21", { tag: "@serial" }, () => {
+  test("G-TC-175 hero level aura pulse stops under reduced motion (#21)", { tag: "@serial" }, async ({ page }) => {
     await page.goto("/login");
     await page.locator("#company_code").fill(GAME_USER.company);
     await page.locator("#login_id").fill(GAME_USER.loginId);
@@ -89,7 +89,7 @@ async function createOwnedQuest(page: Page): Promise<string> {
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()).id as string;
 }
-test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog", async ({ page }) => {
+test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog", { tag: "@serial" }, async ({ page }) => {
   await page.goto("/login");
   await page.locator("#company_code").fill(ACME.company);
   await page.locator("#login_id").fill(ACME.loginId);
@@ -118,7 +118,7 @@ test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog",
 
 // I-TC-158 SC-01 アイデア下書きカードは「編集ダイアログをダッシュボード上に重ねて」開く（詳細ページへフル遷移しない）。
 // ユーザー指摘＝?edit=1 だと詳細画面へ移動してからダイアログが出る（クエスト/評価の下書きと不整合）→ 専用 intercept モーダルに統一。
-test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (no full nav)", async ({ page }) => {
+test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (no full nav)", { tag: "@serial" }, async ({ page }) => {
   await page.goto("/login");
   await page.locator("#company_code").fill(ACME.company);
   await page.locator("#login_id").fill(ACME.loginId);
@@ -147,7 +147,7 @@ test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (
 });
 
 // D-TC-226 SC-21 下書きアイデアの編集ダイアログは「下書き保存」「投稿する」を出す（公開中の「変更を保存」ではない・ユーザー指摘）。
-test("D-TC-226 draft idea edit dialog shows 下書き保存 and 投稿する (not 変更を保存)", async ({ page }) => {
+test("D-TC-226 draft idea edit dialog shows 下書き保存 and 投稿する (not 変更を保存)", { tag: "@serial" }, async ({ page }) => {
   await page.goto("/login");
   await page.locator("#company_code").fill(ACME.company);
   await page.locator("#login_id").fill(ACME.loginId);

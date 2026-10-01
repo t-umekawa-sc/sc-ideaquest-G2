@@ -15,7 +15,7 @@ async function login(page: Page) {
 }
 
 // K-TC-006: 自分のプロフィール（表示名）を編集→保存→GET /me で永続。
-test("K-TC-006 edit own profile persists", async ({ page }) => {
+test("K-TC-006 edit own profile persists", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "プロフィール", exact: true })).toBeVisible();
@@ -32,7 +32,7 @@ test("K-TC-006 edit own profile persists", async ({ page }) => {
 
 // K-TC-026: 無変更で保存＝更新 API を呼ばず info「変更はありません」（成功通知を誤発火しない・デザイン標準 §14）。
 // 何も編集しないので OPS の値は変わらない＝共有資格情報を壊さない。
-test("K-TC-026 no-change save shows info toast (no success)", async ({ page }) => {
+test("K-TC-026 no-change save shows info toast (no success)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/profile");
   await expect(page.locator("#p_name")).toBeVisible(); // GET /me 読込済＝スナップショット確定
@@ -45,7 +45,7 @@ test("K-TC-026 no-change save shows info toast (no success)", async ({ page }) =
 
 // K-TC-009: PW変更の error-path（確認不一致＝クライアント／現在PW不一致＝403 reauth_failed）。
 // 共有 OPS の資格情報を壊さないため成功パスは踏まない（happy path は backend K-TC-007 が担保）。
-test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
+test("K-TC-009 password change error paths (no mutation)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/profile");
   // 確認用が不一致＝クライアント側で弾く（サーバーに送らない）
@@ -65,7 +65,7 @@ test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
 // K-TC-009(email): メール変更の error-path＋要求成功の文言（ダブルオプトイン・ADR-0008）。
 // 要求成功（202）は OPS の email/PW を変えず pending_email を立てるだけ＝確定は踏まないので共有資格情報は壊れない。
 // 確定（confirm）の happy は backend K-TC-010 が担保。
-test("K-TC-009 email change request paths (double opt-in)", async ({ page }) => {
+test("K-TC-009 email change request paths (double opt-in)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/profile");
   // 現在PW不一致＝403 reauth_failed（未反映）

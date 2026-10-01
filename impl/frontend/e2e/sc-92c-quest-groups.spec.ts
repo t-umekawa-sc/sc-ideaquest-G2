@@ -15,7 +15,7 @@ async function login(page: Page) {
 
 // B-TC-117: 作成ダイアログのフォーカス保持（Modal の初期フォーカス effect が入力のたびに再実行され
 // 先頭フィールドへ飛ぶバグの回帰）。コード入力後、グループ名に文字入力してもフォーカスが名前に残る。
-test("B-TC-117 create dialog keeps focus while typing name", async ({ page }) => {
+test("B-TC-117 create dialog keeps focus while typing name", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
@@ -34,7 +34,7 @@ test("B-TC-117 create dialog keeps focus while typing name", async ({ page }) =>
 });
 
 // B-TC-116: グループ作成→リネーム→削除（空グループ）の縦通し。
-test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
+test("B-TC-116 quest group create/rename/delete", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
@@ -74,7 +74,7 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
 });
 
 // B-TC-179: グループ名の無変更保存＝rename API を呼ばず info「変更はありません」（無音にしない・デザイン標準 §14）。
-test("B-TC-179 no-change rename shows info toast (no success)", async ({ page }) => {
+test("B-TC-179 no-change rename shows info toast (no success)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1

@@ -69,10 +69,10 @@
 
 ## 7. 次にやること（優先順・具体的に）
 > いずれも iqe2e スタックで検証（§8）。着手前に `doc/セッション調整/並行開発の取り決め.md` を読む。
-1. **P2＝control-plane/認証 spec に `@serial` タグ＋2パス実行**（本命・未着手）。
-   - 対象12本＝`impl/frontend/e2e/` の `sc-90-quest-group-admin`・`sc-91-companies`・`sc-92-company-detail`・`sc-92b-accounts`・`sc-92b2-account-edit`・`sc-92c-quest-groups`・`sc-92d-email-verify`・`sc-93-own-accounts`・`sc-00-login`・`sc-00-mfa`・`sc-00-password-setup`・`sc-00-session-expiry`・`k-profile`・`sc-01-dashboard`（※sc-00-mfa/password-setup は login 定義なしだが control-plane）。
-   - 手順＝テスト名 or `test.describe` に `@serial` を付す → 実行を2パス化（バルク＝`npx playwright test --grep-invert @serial`／control＝`npx playwright test --grep @serial --workers=1`）。恒久化は `impl/frontend/playwright.config.ts` か `impl/frontend/package.json` の scripts。
-   - 併せて可能なら form login を `helpers.formLogin` に寄せて DRY 化（ただし OPS/admin creds は各 spec 固有なので opts で渡す）。
+1. **P2＝control-plane/認証 spec に `@serial` タグ＋2パス実行**（本命・**実装完了＝2026-10-02**）。
+   - 完了内容＝対象14本（`sc-90-quest-group-admin`・`sc-91-companies`・`sc-92-company-detail`・`sc-92b-accounts`・`sc-92b2-account-edit`・`sc-92c-quest-groups`・`sc-92d-email-verify`・`sc-93-own-accounts`・`sc-00-login`・`sc-00-mfa`・`sc-00-password-setup`・`sc-00-session-expiry`・`k-profile`・`sc-01-dashboard`）の全 `test()`/`test.describe()` 計44箇所に Playwright 1.49 の `{ tag: "@serial" }` を付与。`package.json` に `e2e:bulk`（`--grep-invert @serial`）／`e2e:control`（`--grep @serial --workers=1`）／`e2e:all`（bulk→control）を追加。
+   - 検証済み（iqe2e・N=3）＝control パス **46/46 green**（`MAILHOG_URL=http://localhost:8125` 付与時。未付与だと sc-00 メール2本が 8025 で ECONNREFUSED＝§8 に追記済）。`--list` で分離確認＝@serial 43本／会社スコープ 118本（計161）。@serial を含む spec はちょうど14本のみ。
+   - **残（P2 の follow-up）**＝①form login を `helpers.formLogin` に寄せて DRY 化（OPS/admin creds は opts）。②2パスの恒久ゲート化（CI/本番前）は scripts 追加済み・運用手順の明文化は P4 で。
 2. **P4＝テスト規約 `doc/規約/テスト規約.md §4.x` に 2系統モデルを明文化**（分類＝会社スコープ隔離／control-plane @serial・helpers 使用・static import ガードの運用・既知フレークの扱い）。前版 handoff §6 の不採用理由も規約へ移すと git 履歴以外に恒久保存される。
 3. **P5＝残タイミングフレークの恒久対策（別件・費用対効果で判断）**＝`D-TC-215`（投稿後ナビの `toHaveURL` timeout を延長）・`M-TC-013`（scroll 判定の待ち強化）・`B-TC-115`（編集反映）・`SC-00`（mail/OTP）。retries 吸収で受容 or 個別硬化。
 4. **（検証タスク）フル e2e N=7 の再実測**＝本セッションは N=3 の対象バッチのみ。helpers 集約後にフル実測し、前版の 144 passed 相当が維持されているか確認（§8 のフル手順）。backend pytest・frontend vitest も未実行なので節目で回す。
@@ -84,7 +84,8 @@
   `export COMPOSE_PROJECT_NAME=iqe2e DB_PORT=5533 REDIS_PORT=6380 MAILHOG_SMTP_PORT=1125 MAILHOG_UI_PORT=8125 MINIO_PORT=9100 MINIO_CONSOLE_PORT=9101 BACKEND_PORT=8100 FRONTEND_PORT=3100 E2E_WORKER_COMPANIES=3 APP_BASE_URL=http://localhost:3100 MINIO_PUBLIC_ENDPOINT=localhost:9100 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000`
   → `cd impl && docker compose --profile workers up -d --build`。**`LOGIN_RATE_LIMIT_MAX`（429回避）・`ALLOWED_ORIGINS`（:3100 の403回避）・`E2E_WORKER_COMPANIES`（workers と一致）は必須**。
   - 起動後は backend の bootstrap 完了（`docker compose logs backend | grep "[bootstrap] done"` と `Application startup complete`）を待ってから実行。bootstrap が ACME-01＋`ACME-W0..W{N-1}` を seed する。
-  - e2e 実行＝`cd impl/frontend && COMPOSE_PROJECT_NAME=iqe2e PLAYWRIGHT_BASE_URL=http://localhost:3100 E2E_WORKER_COMPANIES=3 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000 npx playwright test --project=chromium [spec名...]`（reset が全会社DBを drop→bootstrap・auth.setup/cleanup が前後に走る）。
+  - e2e 実行＝`cd impl/frontend && COMPOSE_PROJECT_NAME=iqe2e PLAYWRIGHT_BASE_URL=http://localhost:3100 E2E_WORKER_COMPANIES=3 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000 MAILHOG_URL=http://localhost:8125 npx playwright test --project=chromium [spec名...]`（reset が全会社DBを drop→bootstrap・auth.setup/cleanup が前後に走る）。
+    - **`MAILHOG_URL=http://localhost:8125` は sc-00-mfa／sc-00-password-setup（メール/OTP 系・@serial）に必須**＝spec の既定は `http://localhost:8025`（既定スタックの MailHog UI）だが iqe2e は 8125 に割当（8025 は閉）。未指定だと両 spec が `ECONNREFUSED 127.0.0.1:8025` で落ちる（P2 で判明＝タグ起因でなく run recipe の欠落）。
   - **フル実測は `E2E_WORKER_COMPANIES=7`＋`workers=7`（playwright.config が N>0 で workers=N）で全spec**。N は backend の seed 数（compose の env）と一致必須。
   - 出力は ANSI 除去（`sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'`）してから grep。**パイプで exit code がマスクされるので本体 exit か "N failed" 行で判定**。トリアージは `--workers=1`。密集バッチ失敗は単体 run で負荷フレークか実バグか切り分ける（本セッションの D-TC-215/M-TC-013 の手法）。
   - 撤去＝`cd impl && COMPOSE_PROJECT_NAME=iqe2e docker compose --profile workers down -v`。

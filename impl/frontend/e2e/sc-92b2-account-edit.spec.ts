@@ -14,7 +14,7 @@ async function login(page: Page) {
 }
 
 // B-TC-115: 発行したアカウントを編集して氏名を変更→一覧に反映（PATCH）。
-test("B-TC-115 edit account display name", async ({ page }) => {
+test("B-TC-115 edit account display name", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
@@ -50,7 +50,7 @@ test("B-TC-115 edit account display name", async ({ page }) => {
 
 // B-TC-178: 編集で無変更保存＝更新 API を呼ばず info「変更はありません」（成功通知を誤発火しない・デザイン標準 §14）。
 // 既存 seed アカウント（user@acme.example）を編集で開き、何も変えず保存＝mutation なし＝共有 seed を壊さない。
-test("B-TC-178 no-change edit save shows info toast (no success, no mutation)", async ({ page }) => {
+test("B-TC-178 no-change edit save shows info toast (no success, no mutation)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1

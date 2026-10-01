@@ -19,7 +19,7 @@ async function login(page: Page) {
 }
 
 // B-TC-113: SC-91 から会社詳細へ遷移→設定トグル（MFA）が永続する（PATCH /settings）。
-test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
+test("B-TC-113 company detail settings toggle persists", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
 
@@ -57,7 +57,7 @@ test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
 
 // B-TC-121: 一般ユーザーは SC-92 会社詳細に入れない（サーバーガード＝/ へリダイレクト）。
 // ※ガードは system_role!=="system_admin" で一律 redirect＝company_account_admin も同じ分岐（backend SoD は B-TC-095）。
-test("B-TC-121 general user cannot access SC-92 detail", async ({ page }) => {
+test("B-TC-121 general user cannot access SC-92 detail", { tag: "@serial" }, async ({ page }) => {
   await loginAs(page, GENERAL);
   await page.goto("/admin/companies/00000000-0000-0000-0000-000000000000");
   await expect(page).toHaveURL(/\/$/);

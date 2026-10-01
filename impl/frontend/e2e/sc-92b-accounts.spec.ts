@@ -16,7 +16,7 @@ async function login(page: Page) {
 }
 
 // B-TC-114: ACME-01 の会社詳細でアカウント発行→一覧に現れる（発行 EP＋一覧）。
-test("B-TC-114 issue account appears in company account list", async ({ page }) => {
+test("B-TC-114 issue account appears in company account list", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   // ACME-01 の行の会社名リンクから詳細へ
@@ -42,7 +42,7 @@ test("B-TC-114 issue account appears in company account list", async ({ page }) 
 
 // B-TC-125: SC-92 会社アカウント一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
-test("B-TC-125 company account list: search, email column, clear", async ({ page }) => {
+test("B-TC-125 company account list: search, email column, clear", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）

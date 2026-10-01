@@ -22,7 +22,7 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
 }
 
 // B-TC-117: /admin/accounts（自社固定）で発行→一覧に現れる。
-test("B-TC-117 own-company account issue appears", async ({ page }) => {
+test("B-TC-117 own-company account issue appears", { tag: "@serial" }, async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/accounts");
   await expect(page.getByRole("heading", { name: "会社アカウント管理" })).toBeVisible();
@@ -42,7 +42,7 @@ test("B-TC-117 own-company account issue appears", async ({ page }) => {
 });
 
 // B-TC-118: 一般ユーザーは SC-93 に入れない（サーバーガード）。
-test("B-TC-118 general user cannot access SC-93", async ({ page }) => {
+test("B-TC-118 general user cannot access SC-93", { tag: "@serial" }, async ({ page }) => {
   await login(page, GENERAL);
   await page.goto("/admin/accounts");
   await expect(page).toHaveURL(/\/$/);
@@ -50,7 +50,7 @@ test("B-TC-118 general user cannot access SC-93", async ({ page }) => {
 
 // B-TC-124: SC-93 一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
-test("B-TC-124 own-account list: search, email column, clear", async ({ page }) => {
+test("B-TC-124 own-account list: search, email column, clear", { tag: "@serial" }, async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/accounts");
   const region = page.getByRole("region", { name: "自社アカウント管理" });
@@ -84,7 +84,7 @@ test("B-TC-124 own-account list: search, email column, clear", async ({ page }) 
 });
 
 // B-TC-122: 自社グループ一覧 EP（/admin/company-quest-groups）で所属ピッカーが機能し、所属付きで発行できる。
-test("B-TC-122 self issue with membership picker", async ({ page }) => {
+test("B-TC-122 self issue with membership picker", { tag: "@serial" }, async ({ page }) => {
   await login(page, OPS);
   const headers = await csrfHeaders(page);
   const stamp = Date.now().toString().slice(-8);

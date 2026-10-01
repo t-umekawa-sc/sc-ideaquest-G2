@@ -36,7 +36,7 @@ async function fetchResetToken(request: APIRequestContext): Promise<string> {
   throw new Error("reset link email not received in MailHog");
 }
 
-test("SC-00 状態D→メール→状態B: 再設定リクエスト〜新PW設定〜ログイン画面", async ({ page, request }) => {
+test("SC-00 状態D→メール→状態B: 再設定リクエスト〜新PW設定〜ログイン画面", { tag: "@serial" }, async ({ page, request }) => {
   await clearMailbox(request);
 
   // 状態A → 「パスワードをお忘れですか？」→ 状態D

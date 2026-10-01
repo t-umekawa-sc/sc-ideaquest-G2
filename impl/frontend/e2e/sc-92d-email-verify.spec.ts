@@ -14,7 +14,7 @@ async function login(page: Page) {
   await expect(page.locator(".app-header")).toBeVisible();
 }
 
-test("B-TC-169 unverified badge and send verification action", async ({ page }) => {
+test("B-TC-169 unverified badge and send verification action", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1

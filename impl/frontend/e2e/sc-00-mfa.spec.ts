@@ -35,7 +35,7 @@ async function fetchOtp(request: APIRequestContext): Promise<string> {
   throw new Error("OTP email not received in MailHog");
 }
 
-test("SC-00 状態C: MFA会社で login→OTP→認証コード入力→ダッシュボード", async ({ page, request }) => {
+test("SC-00 状態C: MFA会社で login→OTP→認証コード入力→ダッシュボード", { tag: "@serial" }, async ({ page, request }) => {
   await clearMailbox(request);
 
   await page.goto("/login");

@@ -22,12 +22,12 @@ async function login(page: Page, creds: { company: string; loginId: string; pass
 }
 
 // A-TC-020（doc/テスト/A_認証.md）: SC-00 で正資格情報→ログイン→SC-01(保護ページ)到達。
-test("A-TC-020 login happy path reaches protected page", async ({ page }) => {
+test("A-TC-020 login happy path reaches protected page", { tag: "@serial" }, async ({ page }) => {
   await login(page);
 });
 
 // A-TC-021: 共通ヘッダーのユーザーメニュー→ログアウト→/login へ戻る。
-test("A-TC-021 logout from header returns to login", async ({ page }) => {
+test("A-TC-021 logout from header returns to login", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   // ユーザーメニューを開く（トリガーは display_name を含むボタン）
   await page.getByRole("button", { name: /テスト 太郎/ }).click();
@@ -41,7 +41,7 @@ test("A-TC-021 logout from header returns to login", async ({ page }) => {
 
 // A-TC-022: ユーザーメニュー→「全端末からログアウト」→/login へ戻る（A.0-⑤ の導線）。
 // 破棄系専用の隔離垢でログイン＝共有 user@acme の並列セッションを巻き込まない（e2e フレーク対策）。
-test("A-TC-022 logout-all from header returns to login", async ({ page }) => {
+test("A-TC-022 logout-all from header returns to login", { tag: "@serial" }, async ({ page }) => {
   await login(page, LOGOUT_ALL_CREDS);
   await page.getByRole("button", { name: new RegExp(LOGOUT_ALL_CREDS.displayName) }).click();
   await page.getByRole("menuitem", { name: "全端末からログアウト" }).click();
