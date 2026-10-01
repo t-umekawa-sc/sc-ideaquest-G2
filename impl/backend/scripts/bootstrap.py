@@ -155,6 +155,14 @@ def _worker_seeds() -> list[tuple[dict, dict]]:
     return [(cdef, adef) for cdef in _worker_company_defs() for adef in _WORKER_ACCOUNT_DEFS]
 
 
+def _demo_db_identifiers() -> list[str]:
+    """demo seed（discovery/info/filler）対象の会社DB識別子＝ACME-01 ＋（有効なら）ワーカ会社。"""
+    codes = [SEED_COMPANY["company_code"], *(c["company_code"] for c in _worker_company_defs())]
+    with control_session() as session:
+        by_code = {c.company_code: c.db_identifier for c in session.query(Company).all()}
+    return [by_code[c] for c in codes if c in by_code]
+
+
 def _seed_demo_enabled(app_env: str) -> bool:
     """demo 会社/アカウント（`_SEEDS`）を seed してよいか（本番デプロイ要件 §5）。
 
@@ -381,8 +389,11 @@ def seed_demo_quest_group() -> None:
         _seed_quest_group_for(cdef["company_code"])
 
 
-def seed_demo_discovery() -> None:
-    """ACME-01 に発見デモの discoverable クエスト（全社公開）＋活発度用の公開アイデア/チャットを seed（冪等・非prod）。"""
+def seed_demo_discovery(db_identifier: str | None = None) -> None:
+    """発見デモの discoverable クエスト（全社公開）＋活発度用の公開アイデア/チャットを seed（冪等・非prod）。
+
+    db_identifier 未指定なら ACME-01。ワーカ会社にも seed するため main() から各会社DBを渡してループする。
+    """
     from datetime import datetime, timedelta, timezone
 
     from app.tenant.chat import repository as chat_repo
@@ -394,9 +405,10 @@ def seed_demo_discovery() -> None:
     s = get_settings()
     if not _seed_demo_enabled(s.app_env):
         return
-    with control_session() as session:
-        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
-        db_identifier = company.db_identifier if company else None
+    if db_identifier is None:
+        with control_session() as session:
+            company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+            db_identifier = company.db_identifier if company else None
     if db_identifier is None:
         return
     with get_tenant_session(db_identifier) as ts:
@@ -434,11 +446,13 @@ def seed_demo_discovery() -> None:
         print(f"[bootstrap] seeded discovery demo quest in {db_identifier}")
 
 
-def seed_demo_info() -> None:
-    """ACME-01 に情報インプット（SC-50）デモを seed（冪等・非prod）＝frontend fixtures i1〜i5 相当。
+def seed_demo_info(db_identifier: str | None = None) -> None:
+    """情報インプット（SC-50）デモを seed（冪等・非prod）＝frontend fixtures i1〜i5 相当。
 
     i2 は i1 の続報（parent_info_id）。機会/脅威・関連リンク（未棄却/棄却）・カテゴリ・ワードクラウド用トークンを含む。
     書き込み API（Phase C）はまだ無いため DB 直挿し。created_by は専用のデモ author を用意する。
+    db_identifier 未指定なら ACME-01。ワーカ会社にも seed するため main() から各会社DBを渡してループする
+    （InfoLink は同一会社DBの discovery seed を指すため、discovery を先に seed すること）。
     """
     from datetime import datetime, timezone
     from decimal import Decimal
@@ -448,9 +462,10 @@ def seed_demo_info() -> None:
     s = get_settings()
     if not _seed_demo_enabled(s.app_env):
         return
-    with control_session() as session:
-        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
-        db_identifier = company.db_identifier if company else None
+    if db_identifier is None:
+        with control_session() as session:
+            company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+            db_identifier = company.db_identifier if company else None
     if db_identifier is None:
         return
     ids = DEMO_INFO_IDS
@@ -548,12 +563,13 @@ def seed_demo_info() -> None:
 DEMO_INFO_FILLER_N = 30
 
 
-def seed_demo_info_filler() -> None:
+def seed_demo_info_filler(db_identifier: str | None = None) -> None:
     """情報インプットのスクロール確認用フィラー（冪等・非prod）＝多数のバリエーション行を追加。
 
     core（i1〜i5）とは別に DEMO_INFO_FILLER_N 件を per-record 冪等で投入（既存はスキップ）。状態/優先度/
     影響分類/情報ソース/登録者/登録日を循環させ、一覧のソート・絞込・ページング・ヘッダー固定の確認に使う。
     全文検索テストと干渉しないよう本文は中立語彙のみ（「ブロックチェーン」等の検証キーワードは使わない）。
+    db_identifier 未指定なら ACME-01。ワーカ会社にも seed するため main() から各会社DBを渡してループする。
     """
     from datetime import datetime, timedelta, timezone
 
@@ -562,9 +578,10 @@ def seed_demo_info_filler() -> None:
     s = get_settings()
     if not _seed_demo_enabled(s.app_env):
         return
-    with control_session() as session:
-        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
-        db_identifier = company.db_identifier if company else None
+    if db_identifier is None:
+        with control_session() as session:
+            company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+            db_identifier = company.db_identifier if company else None
     if db_identifier is None:
         return
 
@@ -623,10 +640,13 @@ def main() -> None:
         create_database(db_identifier)
         migrate_company(db_identifier)
     seed_company_users()
-    seed_demo_quest_group()  # クエストグループのデモ（e2e createRecruiting 等が前提・非prod・冪等）
-    seed_demo_discovery()  # 発見カタログ（SC-13）デモ（非prod・冪等）
-    seed_demo_info()  # 情報インプット（SC-50・ドメイン N）デモ（非prod・冪等）
-    seed_demo_info_filler()  # 情報インプットのスクロール確認用フィラー（非prod・冪等）
+    seed_demo_quest_group()  # クエストグループのデモ（e2e createRecruiting 等が前提・非prod・冪等。内部で ACME-01＋ワーカ会社をループ）
+    # 発見カタログ（SC-13）／情報インプット（SC-50・ドメイン N）デモを ACME-01 ＋（有効なら）ワーカ会社の
+    # 各会社DBへ seed（冪等）。info の InfoLink は同一会社DBの discovery を指すため discovery を先に呼ぶ。
+    for db_identifier in _demo_db_identifiers():
+        seed_demo_discovery(db_identifier)
+        seed_demo_info(db_identifier)
+        seed_demo_info_filler(db_identifier)
     print("[bootstrap] done")
 
 

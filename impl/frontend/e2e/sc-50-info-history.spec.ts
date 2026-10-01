@@ -1,6 +1,6 @@
 // SC-50 §85 更新履歴＝変更内容を見せる（アイデア SC-22 相当）。台帳＝N §3.3（N-TC-213）。
 // 作成者が内容を編集して保存すると、更新履歴の最新版に変更フィールドのバッジが付き、「差分を表示」で差分が出る。
-import { expect, test } from "@playwright/test";
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 

@@ -3,7 +3,7 @@
 // 遅延 setState 内で評価していたため、更新時に live FileList が空になり選んだファイルが載らなかった。
 // 修正＝ハンドラ内で Array.from を同期 materialize。setInputFiles は同じ onChange+value リセット経路を
 // 通るため本不具合を忠実に再現する（修正前は attach 行=0＝red）。
-import { expect, test } from "@playwright/test";
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 

@@ -1,7 +1,7 @@
 // N-TC-202: 情報インプット一覧（SC-50・サーバー委譲）の回帰＝「続報を束ねる」で再クエリが発火する。
 // 不具合＝roots_only トグルが QueryState 外のため DataTable server が再クエリせず件数が変わらなかった
 // （InfoListView が refreshToken を渡していなかった）。seed（続報 i2 あり）で件数が減ることを検証する。
-import { expect, test } from "@playwright/test";
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 

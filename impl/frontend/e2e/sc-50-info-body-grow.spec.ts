@@ -1,5 +1,5 @@
 // SC-50 内容・説明の入力欄（.rt__area）は内部スクロールせず縦に伸びる（最低高さは維持）。台帳＝N §3.5（N-TC-216）。
-import { expect, test } from "@playwright/test";
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 

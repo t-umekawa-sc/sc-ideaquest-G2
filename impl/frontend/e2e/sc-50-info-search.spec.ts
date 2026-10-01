@@ -1,7 +1,7 @@
 // SC-50 全文検索＝一致箇所を必ず表示（DFT-N-003）。台帳＝N §3.4（N-TC-215）。
 // 全文検索は title＋本文（body_text）を対象に一致する。結果は要約だけでなく「一致箇所の抜粋」を出し、
 // 要約に出ない箇所（例＝『コメ』が本文の『コメント』に一致）でもハイライトで該当箇所が見えること。
-import { expect, test } from "@playwright/test";
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const KEYWORD = "ゾルタンネスビット"; // 要約（先頭抜粋）に出ないよう本文末尾にだけ置く特徴語

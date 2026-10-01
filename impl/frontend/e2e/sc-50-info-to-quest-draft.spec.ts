@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社で情報デモを隔離
 
 // 「この情報からクエストを作成」の閉じ挙動＋Step B 遷移回帰。
 // N-TC-226（改定 2026-09-28）＝登録系ダイアログ標準（デザイン標準 §4.1）＝作成後は詳細（クエスト）へ遷移せず、
