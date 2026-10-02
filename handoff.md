@@ -1,99 +1,91 @@
-# handoff（引き継ぎメモ）
+# handoff.md — 次セッションの自分への引き継ぎ
 
-> 読者＝このセッションの記憶が無い次回の自分。会話ログは参照不可。本ファイルだけで再開できるように書く。全文上書き運用（履歴は git）。
-> 各種正本＝`CLAUDE.md`（規約参照元）／`doc/実装計画.md`（実装順）／`impl/README.md`（実装現況）／`doc/規約/テスト規約.md §4.1`（e2e 方針）／`doc/セッション調整/並行開発の取り決め.md`（2トラック並行＋iqe2e 起動 env の正本）。
-> **体制**＝2トラック。**本トラック＝テストコード改修（e2e 信頼性基盤）**／**別セッション＝機能実装**。並行時は取り決め md を必読。
+> 読者＝このセッションの記憶が無い次回の自分。会話ログは参照不可。本ファイルだけで再開できるよう全文上書きで維持（履歴は git）。
+> 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: 2026-10-02（P2＝control-plane @serial 完了・フル N=7 実測 0 failed・P4 規約明文化まで）
-- ブランチ: `main`（作業ツリー clean）。本セッションのコミットは push 済み。
-- 最新コミット（新しい順）:
-  - `36e4faac` docs(規約): テスト規約 §4.2「2系統モデル」を新設（P4）
-  - `fc7a9bec` test(e2e): control-plane 9本を会社数非依存に硬化＋フルN=7実測を handoff 反映
-  - `fdd1eecc` test(e2e): P2 着手＝control-plane 14本に @serial タグ＋2パス scripts
-  - `502cfdfb` docs(handoff): 前セッション末（helpers.ts 新設＋会社スコープ43本集約）
-  - `c20fc030` test(e2e): P3 段階移行＝会社スコープ残り23本を helpers へ集約
-- iqe2e スタックは本 handoff 時点で **N=7 で起動したまま**（撤去する場合は §8 の `down -v`）。worktree は未使用（main 直接作業）。
+- 更新: 2026-10-02 23:32 JST
+- ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
+- 最新コミット: `26f72f44 feat(contest): Step2b-1 参加2階層（Tier1/Tier2）エンドポイント`
+- working tree: clean（全コミット済・push 済）
 
-## 2. ゴール
-社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発をゲーム感UIで一気通貫。本トラックの本命＝**肥大化しても安定する e2e テスト基盤の確立**（2系統モデル＝§6）。
+## 2. プロジェクトのゴール
+ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB）。ゲーミフィケーション付き。
+現フェーズ＝**アイデアコンテスト機能（FR-46/47/48）を段階実装中**。直前まで FR-44 経営資料・FR-45 LLM連携の仕上げを実施。
 
-## 3. 今回やったこと（変更とその理由）
-2系統モデルの横断層＝**共有ヘルパ `impl/frontend/e2e/helpers.ts` を新設し、会社スコープ spec 43本の重複実装を helpers へ集約**した（§6 の P1・P3）。目的＝各 spec に散った `psql`/`csrfOf`/`createRecruiting`/`login` 等の重複を一本化し、個別 spec を1本ずつ硬化し続ける whack-a-mole を根治する。
+## 3. 今回やったこと（変更ファイルと理由）
+### A. アイデアコンテスト機能（本セッションの主眼・設計ドラフト→正式反映→実装）
+正本ドラフト＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md`（全論点 A〜P/SEC 確定済）。
+- **Step0 正式反映（docs）** `57e80340`/`02179d3f`:
+  - 要件定義 `doc/要件定義/README.md`＝FR-46(コンテスト中核)/FR-47(会社レベル能力 user_capabilities＋アイデア→クエスト昇格・クエスト作成権限)/FR-48(セルフサインアップ＋公開/非公開モード)。※FR-45 が LLM連携で使用済のため +1 シフト。
+  - データモデル `doc/データモデル.md`＝§5.60 contests / 5.61 contest_participants / 5.62 idea_participants / 5.63 user_capabilities / 5.64 contest_idea_flags ＋ companies.access_mode/self_signup_enabled ＋ quests.origin_idea_id ＋ §5.37 info_curators に統合注記。
+  - API設計＝新ドメイン `doc/API設計/T_アイデアコンテスト.md`＋`doc/API設計/A_認証・セッション.md` §A.11（セルフサインアップ・SEC A〜J）＋README §1.6 外周ガード/索引。
+  - 画面遷移図 `doc/画面設計/画面遷移図.md`＝SC-05(アカウント作成)/SC-53(コンテスト一覧)/SC-54(コンテスト詳細)。
+  - テストパターン＝`doc/テスト/T_アイデアコンテスト.md`（T-TC-101〜201 先出し）＋`doc/テスト/A_認証.md`（A-TC-120〜127）。
+- **Step1a 下地** `354df5a8`: migration `impl/backend/migrations/control/versions/0019_company_access_mode.py`（companies へ access_mode/self_signup_enabled）＋`migrations/company/versions/0050_contests.py`（5新表＋quests.origin_idea_id）。ORM＝`app/tenant/contests/orm.py`（Contest/ContestParticipant/IdeaParticipant/ContestIdeaFlag）・`app/tenant/capabilities/orm.py`（UserCapability＋CAPABILITIES）・Company/Quest に列追加。既存 ideas/votes/evaluations/chat は無改修（＝クエストを器に再利用）。
+- **Step1b 能力＋ゲート** `6daaa74d`: `app/tenant/capabilities/`（repository/application/router/schemas）＝`/api/v1/admin/accounts/{uid}/capabilities` GET/POST/DELETE（管理者のみ）。`app/tenant/quests/application.py` の `create_quest` に `_can_create_quest`（管理者 OR quest_create 能力）ゲート追加＝`_is_company_admin`/`_can_create_quest` 新設。migration `0051_grant_quest_create.py`＝既存クエスト作成者へ自動付与（決定K）。seed＝`scripts/bootstrap.py` の `seed_quest_create_capabilities()`。テスト conftest に `factory.grant_capability` ＋ teardown で user_capabilities 掃除。
+- **Step2a コンテスト CRUD＋backing quest** `4a271338`(backend)/`c756ddc3`(frontend): `app/tenant/contests/`（repository/application/router/schemas）＝`GET/POST/PATCH /contests`。作成で backing quest を 1:1 生成（contests.quest_id）・状態機械 draft→open→judging→closed→archived を backing quest.status にマップ。frontend＝`src/features/contests/`（api/types/ContestListView）＋`src/app/(app)/contests/page.tsx`（SC-53）＋`src/components/layout/AppNav.tsx` に「🏆 アイデアコンテスト」。
+- **Step2b-1 参加2階層** `26f72f44`: contests repository に Tier1(contest_participants)/Tier2(idea_participants) の upsert/get/is_*/contest_by_quest。router＝`POST /contests/{id}/participation`・`PATCH /contests/{id}/participation/{uid}`（管理者）・`POST /ideas/{id}/participation`・`PATCH /ideas/{id}/participation/{uid}`（投稿者のみ）。
 
-### (A) helpers.ts 新設（`b6f2b383`）
-- `impl/frontend/e2e/helpers.ts` に以下を集約（export 関数）:
-  - 認証＝`gotoAuthed(page)`（storageState 前提で `/` へ＋`.app-header` 可視）／`formLogin(page, {company,loginId,password})`（フォーム実ログイン・SC-00/別アカウント用）。
-  - CSRF/HTTP＝`csrfToken(page)`（iq_csrf cookie 抽出）／`csrfHeaders(page)`（CSRF+JSON ヘッダ）。
-  - 会社DB＝`psql(db, sql)`／`psqlValue(db, sql)`（`docker compose exec db psql`・`IMPL_DIR` 内包）。db は fixtures の `workerCompany.dbName` を渡す。
-  - ドメイン生成＝`createRecruiting(page, title, opts?)`（opts＝categories/questGroupIds/status/deadline/purpose。既定値付き＝案B）／`createPublishedIdea(page, questId, stamp)`（title は固定「評価アイデア_」）／`createInfoItem(page, title)`。
-  - DataTable assertion＝`expectListCount(region, n)`（`tbody tr` 行数）／`expectRowVisible(region, name)`／`expectSearchCleared(region)`（`.list-count` 多重一致を回避）。
-- 設計＝**案B（既定値付き opts）**を採用（§6）。呼び出しの見た目は最頻ケースで最短（引数なし）、変種は opts で吸収しローカル再実装の復活を防ぐ。
+### B. FR-44 経営資料の仕上げ（コンテスト着手前・同一セッション）
+- R.1b クエスト側から経営資料を適用 `759152f1`＝`app/tenant/quests/`（QuestCreate/Update に strategy_document_ids・`_apply_strategy_docs`）＋QuestDetail に strategy_documents＋SC-11 QuestForm に Multiselect。R-TC-122。
+- SC-12 クエスト詳細「📐 経営資料とのマッチ度」パネル `4501b507`＝`GET /quests/{id}/strategy-match`（`quests/application.strategy_match`＋`strategy_repo.quest_match_by_doc`）＋`QuestDetailView`。R-TC-123。
+- SC-81 ダイアログのレイアウト調整 `0da564a2`/`0407d34d`/`7a276f17`/`10a51c39`（余白・補助パネル下部移動・仕切り線・下書き全文表示）＝`features/strategy/components/StrategyFormPanel.tsx`＋`strategy.css`。
 
-### (B) 会社スコープ spec 43本を helpers へ移行（`b6f2b383`/`8dc6194e`/`f6725ec4`/`c20fc030`）
-- `login(page)`（storageState の goto型）→ `gotoAuthed`、`csrfOf(...)` → `csrfToken`、`psql`/ドメイン生成 → helpers。死んだ `USER`/`CREDS` 定数・未使用 `type Page` import を除去。
-- spec 固有の生成/操作（`patchIdea`/`transition`/`setGameOverride`/`createIdeaApi`[status付き]/`createIdeaWithAttachment`/`deleteInfoItem`/`seedInfoWithLinks` 等）は残しつつ、csrf は `csrfHeaders`/`csrfToken` 経由に統一。
-- 変種の保持例＝`sc-24-chat` は会社全体クエスト（`createRecruiting(..., { questGroupIds: [] })`）＋タイトル検証のため `createPublishedIdea` のみローカル温存（title「チャットアイデア_」）。`loginAs`→`formLogin`。
-- `sc-22-quest-ref` は categories を helpers 既定（`["業務改善"]`）に寄せて positional 引数を除去。
+### C. FR-45 LLM の仕上げ（同一セッション・B より前）
+- Phase2 in-app 生成 iso_generate の dev ライブ完走＋会社別 max_output_tokens＋worker ORM 登録バグ修正（`app/tenant/ai_jobs/application.py` で FK 先 ORM を side-effect import・migration 0049）。コミットは本ログの範囲外（f09112d6 等・既 push）。
+- SC-04 ストリーミング進捗率＋WebSocket ライブ更新 `5d936662`＋ヘッダー🤖バッジの WS 購読修正 `e3e05d82`。
 
 ## 4. 現在の状態
-- **移行済み＝会社スコープ 43本**（helpers 集約・前セッション）＋**P2＝control-plane 14本に @serial 付与・会社数脆弱性9本を硬化（本セッション 2026-10-02）**。
-- **フル e2e N=7 実測済み（本セッション・iqe2e スタック N=7・2パス）＝ハード失敗 0**:
-  - **bulk パス**（会社スコープ 118本・workers=7・`npm run e2e:bulk`）＝**113 passed / 5 flaky / 0 failed**。flaky5＝既知タイミング（sc-03-images/sc-18-loading/D-TC-215/sc-12-quest-detail/sc-50-info-to-quest-draft・retry 吸収）。
-  - **control パス**（@serial 43本・workers=1・`npm run e2e:control`・`MAILHOG_URL=:8125` 必須）＝**45 passed / 1 flaky / 0 failed**。flaky1＝B-TC-115（§7-P5 既知の編集反映タイミング・retry 吸収）。
-  - **合計＝158 passed / 6 flaky / 0 failed**。前回フル N=7（12 failed/5 flaky/144 passed）→ **0 failed に到達**（control-plane の並列競合を @serial 直列化で解消＋per_page 脆弱性を硬化）。
-  - `npx playwright test --list` ＝exit 0・161 tests / 60 files（@serial 43／会社スコープ 118 に分離・@serial を含む spec はちょうど14本）。
-- **per_page 脆弱性の硬化（本セッション）**＝SC-91 会社一覧は初期 `per_page=5`。会社数が増える（N=7＝9社）と OPS 系テストが前提する「ACME-01 が無絞りの先頭ページにいる」が崩れる（backend 既定ソート＝`created_at, id`・タイブレーク依存）。対象9本（sc-91 B-TC-110／sc-92b 114,125／sc-92b2 115,178／sc-92c 116,117,179／sc-92d 169）に ACME-01 の `searchbox.fill` を前置して N 非依存化（手法は同spec B-TC-139 と同じ）。
-- **壊れているもの＝無し**。残フレークは全て既知タイミングで retry 吸収（恒久対策は §7-P5）。
-- **回帰確認済み（本セッション末）**:
-  - **backend pytest＝907 passed**（クリーン N=0 DB で確認・前回同値）。**落とし穴＝iqe2e スタック(N>0)のまま pytest を回すと 408 errors**＝`env` fixture が control-plane を `login_id` だけで `.one()` 照会し、N社ぶんの同一 login_id で `MultipleResultsFound`。pytest は必ず **N=0・会社DB クリーン**な DB で（`down -v` → N=0 で `up` が確実）。
-  - **frontend vitest＝218 passed**（ホスト実行・スタック不要・前回同値）。
-  - **tsc は e2e を型検査していない**（§5 の学び）。本セッションで `npx tsc --noEmit` は `src/features/info-input/api.test.ts`・`src/features/quests/joinRequests.api.test.ts` の2件で既に赤（feature track の既存エラー・本トラック変更外・未修正）。
+- **動いている**: backend/frontend は再ビルド済で稼働。コンテスト Step2a/2b-1 の API は dev 反映済。SC-53（`/contests`・ナビ「🏆 アイデアコンテスト」）表示・作成可（管理者 or contest_create）。
+- **テスト通過状況（確認済）**:
+  - 全backend 917 passed（Step1b 時点 `6daaa74d` で確認）。
+  - `tests/contests` 7 passed（Step2b-1 後に確認）＝T-TC-101/101b/102/103/105/110/111。
+  - `tests/capabilities`（T-TC-121/123）・`tests/quests` 135・`tests/strategy` 25 green（Step1b/2a 時点）。
+  - traceability `python3 scripts/check_tc_traceability.py`＝❌なし（Step2b-1 後も）。
+- **未確認**: 2b-1 追加後の**全917本の再実行は未実施**（追加は additive EP なので回帰は低いと判断・要再確認）。コンテスト画面（SC-53）の**ブラウザ目視は未実施**（ビルド green のみ）。
+- **壊れているもの**: 既知なし。
+- **dev スタックの非標準状態（重要）**: 通常 `llm-worker` を**停止**し、代わりに `iq-livefix-worker`（AI生成テスト用・`LLM_MODEL_SWALLOW=qwen2.5:0.5b`・source mount・`--name iq-livefix-worker`）が稼働中。`ollama` も起動中（qwen2.5:0.5b/qwen3:4b/bge-m3 pull 済）。AI生成を試さないなら復旧推奨（§7-末尾）。
+- alembic heads: control=`0019_company_access_mode` / company=`0051_grant_quest_create`。
 
-## 5. 詰まっている点（試して失敗した / なぜ）
-- **e2e の import 漏れはコンパイルで検知できない**＝e2e ディレクトリは `tsconfig.json` の型検査対象外、`playwright test --list` は transpile のみで型検査しない。実際、移行途中で `csrfToken is not defined`（import し忘れ）が `--list` も `tsc` も通過し、実機 run で初めて露見（10 failed → import 追加で解消）。
-  - **対策＝移行後は必ず「静的 import ガード grep」＋「対象 spec の実機 run」をセットで回す**。ガード＝「helpers の関数名が `name(` で呼ばれているのに `import {...} from "./helpers"` に無い」を検出する bash ループ（本セッションで毎バッチ実行）。注意＝spec にローカル同名関数がある場合（例 sc-24-chat の `createPublishedIdea`）は false positive になるのでローカル定義の有無で判断する。
-- **既存フレーク2件（移行起因でない・密集バッチ限定）**:
-  - `D-TC-215`（sc-22-attachments・添付アップロード→投稿後ナビ）＝8本×3worker 密集で投稿ナビの 5s `toHaveURL` timeout が負荷で trip。単体 run は移行前後とも green。失敗箇所は本移行が触れないアップロードフロー。
-  - `M-TC-013`（sc-99-scroll-restore・スクロール復元）＝23本×3worker 密集で scroll 位置判定が trip。単体 run は green（4 passed）。本 spec の diff は login→gotoAuthed のみでスクロール測定に無関係。handoff §7.5（前版）に既知フレークとして記載あり。
-  - ＝どちらも「密集バッチ特有の負荷タイミング」で、フル N=7 では各 spec が分散して通る見込み（前版では144 passed 側）。恒久対策は §7-P5。
+## 5. 詰まっている点（試して失敗 → 対処）
+- **quest_create ゲートが既存クエスト作成テストを壊す懸念**→ 実際に影響するのは API 経由 `POST /api/v1/quests` の非管理者作成のみ（`tests/quests/test_catalog.py` の `_make_owner`）。対処＝`_make_owner` に `factory.grant_capability(acc["id"], "quest_create")`、bootstrap に seed ユーザ付与、migration 0051 で既存作成者自動付与。他の `client.post(".../quests/{qid}/...")` はサブリソースでゲート非該当。
+- **conftest teardown の FK 違反**（user_capabilities が users 削除を阻害）→ teardown に user_capabilities(user_id/granted_by_id) 掃除を追加（`tests/conftest.py`）。
+- **（過去）worker が全 AIジョブを NoReferencedTableError で落とす**→ `ai_jobs/application.py` で FK 先 ORM を side-effect import（解決済・S-TC-132）。
+- **（過去）本番既定モデル qwen3-swallow は Ollama で pull 不可**（hf.co realm 不一致・GGUF 無）→ dev は qwen2.5:0.5b を override（§8）。
+- **2b-2（単一ポリシーのコアゲート統合）は未着手**＝最もリスクが高い所。
 
 ## 6. 決定事項と根拠（採用しなかった案も）
-- **2系統モデル（肥大化に耐える基盤）＝ユーザー合意済み**。本セッションで「仕様は検討中では？」の確認があり、2系統の大枠は合意・実装は横断層（helpers）と会社スコープ隔離が完了、control-plane の @serial は未着手、という状態で再確認済み。
-  - **会社スコープ**（機能＝増加の主体）＝per-worker 会社DB隔離（`impl/frontend/e2e/fixtures.ts` の `workerCompany`・前セッションで実装済）＋helpers 集約（本セッション完了）＝新規は import だけで無償隔離・フル並列。
-  - **control-plane/認証**（少数・増えにくい）＝`@serial` タグ→直列フェーズ（**未実装・§7-P2**）＝共有 admin@ops 競合を構造的に回避。
-- **helpers の createRecruiting は案B（既定値付き opts）を採用**（採用しなかった案A＝固定デフォルトのみ）。理由＝案A は変種 spec（categories 指定の sc-22-quest-ref・会社全体の sc-24-chat）が helpers に乗らずローカル再実装の穴が残る。案B は呼び出しの見た目は案Aと同じまま変種も1箇所に集約でき、whack-a-mole 根治の目的に合致。ユーザーに案A/B の違いを説明し案B で合意。
-- **control-plane spec を helpers 化しないで @serial に回す根拠**＝これらは会社スコープ外（OPS/admin の form login・`fixtures` 非使用）。性質が逆（会社スコープ＝発散／control-plane＝少数固定）なので別戦略が正しい。
-- **前版§6 の不採用案（記録保持）**：①backend への test 専用 Cookie ルーティング＝セキュリティで却下（マルチテナント分離のバイパス面をセキュア critical なコードに常駐／ワーカはリクエスト文脈外で Cookie 不可）＝ユーザー判断NG。②ワーカごと丸ごと別スタック＝資源過大で費用対効果×。③ワーカ数低減で決定性＝実測で無効。
+- **クエストを器に再利用（B案）**＝contests.quest_id が backing quest を 1:1 で指す。ideas/votes/evaluations/chat は無改修共有。A案（ideas.quest_id を nullable 化）はアクセス制御総取替で影響大のため不採用。
+- **FR 採番 46/47/48**＝FR-45 が LLM連携で使用済のため、ドラフトの暫定 45/46/47 を +1。
+- **SC 採番 05/53/54**＝ドラフトの SC-50/51 は情報インプットで使用済のため採り直し。
+- **user_capabilities＝②会社レベル能力の単一レジストリ**＝info_curator/quest_create/contest_create/contest_evaluator を1表に集約。**info_curators の統合（データ移行＋ドメインN参照差し替え）は未実施＝別ステップに保留**（情報インプット稼働部に触るため慎重に）。
+- **公開性は会社単位 `companies.access_mode`** に一本化（旧 contests.visibility は廃止）。
+- **評価は運営指名の審査員（contest_evaluator）のみ**（投稿者指名案は偏り防止で不採用）。
+- **投票=Tier1 全参加者 / チャット=Tier2 投稿者承認**（案X＝賛成票バイアス回避＋心理的安全性）。
+- **quest_create 移行＝既存作成者に自動付与で維持**（決定K・管理者は常時可）。
+- コミット/push は main 直（本プロジェクトの慣習・ユーザー指示で都度 commit&push）。
 
-## 7. 次にやること（優先順・具体的に）
-> いずれも iqe2e スタックで検証（§8）。着手前に `doc/セッション調整/並行開発の取り決め.md` を読む。
-1. **P2＝control-plane/認証 spec に `@serial` タグ＋2パス実行**（本命・**実装完了＝2026-10-02**）。
-   - 完了内容＝対象14本（`sc-90-quest-group-admin`・`sc-91-companies`・`sc-92-company-detail`・`sc-92b-accounts`・`sc-92b2-account-edit`・`sc-92c-quest-groups`・`sc-92d-email-verify`・`sc-93-own-accounts`・`sc-00-login`・`sc-00-mfa`・`sc-00-password-setup`・`sc-00-session-expiry`・`k-profile`・`sc-01-dashboard`）の全 `test()`/`test.describe()` 計44箇所に Playwright 1.49 の `{ tag: "@serial" }` を付与。`package.json` に `e2e:bulk`（`--grep-invert @serial`）／`e2e:control`（`--grep @serial --workers=1`）／`e2e:all`（bulk→control）を追加。
-   - 検証済み（iqe2e・**N=7 フル2パス**）＝合計 **158 passed / 6 flaky / 0 failed**（§4 詳細）。`MAILHOG_URL=http://localhost:8125` 必須（未付与だと sc-00 メール2本が 8025 で ECONNREFUSED＝§8 に追記済）。per_page 脆弱性9本も硬化済み（§4）。
-   - **P2 follow-up＝完了**＝control-plane 12本のローカル `login`/`loginAs` を全廃し `helpers.formLogin(page, creds)` に集約（creds＝各 spec の OPS/GENERAL/CREDS/USER/LOGOUT_ALL_CREDS 定数を opts で渡す）。未使用 `type Page` import も除去（csrfHeaders/createOwnedQuest を持つ sc-90/93/01 は保持）。net −113行。control パス実機＝46 passed / 0 failed で挙動不変を確認。残は sc-00-mfa/password-setup（ローカル login 無し・メール系ヘルパ別）。
-2. ~~**P4＝テスト規約に 2系統モデルを明文化**~~ ＝**完了（`36e4faac`）**。`doc/規約/テスト規約.md §4.2` を新設（会社スコープ隔離／control-plane @serial・2パス運用・分類指針・static import ガード・per_page 非依存・既知フレーク）。
-3. ~~**P5＝残タイミングフレークの恒久対策**~~ ＝**一次対応完了（2026-10-02）**。N=7 フルで観測した8件を個別硬化：
-   - **根本修正（再現しない）**＝`sc-03-images`（`.icon-field` が2つ＝アバター欄を `.first()` にスコープし strict 違反を断つ）・`M-TC-013`（復元前に「すべての通知」リンク可視＝コンテンツ実寸安定を待ち＋poll 6→12s）。
-   - **待ち延長（負荷吸収）**＝`D-TC-215`（投稿後 `toHaveURL` 5→15s）・`sc-50 N-TC-226/227`（モーダル `#qfi-name` 5→10s）・`C-TC-205`/`C-TC-206`（詳細見出し 5→15s）・`sc-18 G-TC-174`（スピナー窓 route 遅延 1500→3000ms）・`D-TC-218`（保存トースト 5→15s＋`test.slow`）・`B-TC-115`（保存完了トースト待ちを前置＝検索 churn レース対策）。
-   - **残存2件（retries:2 で吸収・0 hard failed）**＝`C-TC-206`・`B-TC-115` は N=7 密集時に「初回UI操作が稀に~90s ストール→retry は数秒でクリーン」の病的パターン。単一レースに特定できず、`test.slow()` は救済にならず flake 回復を遅らせるため**付けない**（30s で早く落として retry 吸収）方針に統一。最終 N=7 フル＝**bulk 117 passed/1 flaky・control 45 passed/1 flaky・両パス 0 hard failed**。次段の恒久策候補＝共有 backend/DB の並列負荷低減 or 当該2本の操作分解。
-4. **（節目タスク）backend pytest・frontend vitest の再実行**＝本セッション未実行（前回 907 / 218 passed）。今回の変更は e2e のみ＝無関係のはずだが節目で回す。
+## 7. 次にやること（優先順・ファイル/関数レベル）
+1. **Step2b-2 単一ポリシー解決をコアゲートに統合（最優先・リスク高）**:
+   - 新関数（例 `app/tenant/contests/access.py` か contests/application.py）に `resolve_idea_access(ts, quest, user)` を作る。コンテスト配下（`contest_repo.contest_by_quest(ts, quest.id)` が非 None）なら「可視=会社全体／投票=`is_contest_participant`（Tier1）／チャット=`is_idea_participant`（Tier2）／評価=`capabilities.user_has_capability(..., 'contest_evaluator')`」、通常クエストは従来の `quests/repository.py:261 can_access_quest`。
+   - 既存の投票(D=`app/tenant/ideas/`)/チャット(E=`app/tenant/chat/`)/評価(F=`app/tenant/evaluations/`)のゲート呼び出し箇所を洗い出し（`can_access_quest`/`can_access_quest_id` を grep）、コンテスト配下なら新ポリシーへ分岐。フォークせず1関数に集約（設計 §2.3）。
+   - 実装後**全917本を必ず再実行して回帰ゼロ確認**。TC＝`doc/テスト/T_アイデアコンテスト.md` の T-TC-112/113/120（md 先出し済）。
+2. **Step2b-3 SC-54 コンテスト詳細（frontend）**＝`src/features/contests/components/ContestDetailView.tsx`＋`src/app/(app)/contests/[contestId]/page.tsx`。SC-12 クエスト詳細を流用＝アイデア一覧タブ（応募中/入賞/殿堂入り/お蔵入り＝`contest_idea_flags`＋is_selected 導出）＋Tier1/Tier2 参加導線。codegen 要（`npm run codegen`・backend 起動中）。
+3. **Step2c 表彰**＝`POST /contests/{id}/finalize`（T.1・Idempotency・上位N へ ledger.grant 冪等 reason='contest_award'＋入賞実績＋is_selected＋通知）＋`GET /contests/{id}/ranking`（T.3）。TC＝T-TC-120/130/131/132。
+4. **Step3 公開/非公開モード**＝access_mode 外周ガード（README §1.6・A §A.11.1＝public×general はコンテスト系以外 403）＋`GET /public/bootstrap`。TC＝T-TC-150/151/201＋T-TC-114（public 自動承認）。
+5. **Step4 セルフサインアップ（FR-48・SEC 重）**＝SC-05＋`POST /public/signup`・`/public/signup/verify`。A-TC-120〜127。
+6. **保留タスク**＝info_curators → user_capabilities のデータ移行＋ドメインN参照差し替え（慎重に・別ステップ）。
+7. **dev 復旧（AI生成テスト不要なら）**＝`docker rm -f iq-livefix-worker`／`docker compose stop ollama`／`docker compose up -d llm-worker`（通常 worker は qwen3-swallow 想定＝Ollama未pullなので AIジョブは失敗する点に注意。生成を回すなら override を使う）。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝リポジトリ直下。実装は `impl/`。**コマンドは絶対パス**（シェル cd 不持続）。
-- **通常起動（既定スタック・別セッションもこれ）**＝`cd impl && docker compose up -d --build`。e2e は worker/mail-worker 起動（`docker compose up -d worker mail-worker`）。**この既定スタックで e2e を回すと隔離は効かない（N=0 フォールバック＝ACME-01 共有）**。
-- **iqe2e 隔離スタック（本トラックの e2e 検証＝隔離が効く・本セッションはこれで検証）**＝別 compose プロジェクトで起動（取り決め md §4 が正本）。本セッションは `E2E_WORKER_COMPANIES=3`（bootstrap を軽く）で回した。env:
-  `export COMPOSE_PROJECT_NAME=iqe2e DB_PORT=5533 REDIS_PORT=6380 MAILHOG_SMTP_PORT=1125 MAILHOG_UI_PORT=8125 MINIO_PORT=9100 MINIO_CONSOLE_PORT=9101 BACKEND_PORT=8100 FRONTEND_PORT=3100 E2E_WORKER_COMPANIES=3 APP_BASE_URL=http://localhost:3100 MINIO_PUBLIC_ENDPOINT=localhost:9100 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000`
-  → `cd impl && docker compose --profile workers up -d --build`。**`LOGIN_RATE_LIMIT_MAX`（429回避）・`ALLOWED_ORIGINS`（:3100 の403回避）・`E2E_WORKER_COMPANIES`（workers と一致）は必須**。
-  - 起動後は backend の bootstrap 完了（`docker compose logs backend | grep "[bootstrap] done"` と `Application startup complete`）を待ってから実行。bootstrap が ACME-01＋`ACME-W0..W{N-1}` を seed する。
-  - e2e 実行＝`cd impl/frontend && COMPOSE_PROJECT_NAME=iqe2e PLAYWRIGHT_BASE_URL=http://localhost:3100 E2E_WORKER_COMPANIES=3 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000 MAILHOG_URL=http://localhost:8125 npx playwright test --project=chromium [spec名...]`（reset が全会社DBを drop→bootstrap・auth.setup/cleanup が前後に走る）。
-    - **`MAILHOG_URL=http://localhost:8125` は sc-00-mfa／sc-00-password-setup（メール/OTP 系・@serial）に必須**＝spec の既定は `http://localhost:8025`（既定スタックの MailHog UI）だが iqe2e は 8125 に割当（8025 は閉）。未指定だと両 spec が `ECONNREFUSED 127.0.0.1:8025` で落ちる（P2 で判明＝タグ起因でなく run recipe の欠落）。
-  - **フル実測は `E2E_WORKER_COMPANIES=7`＋`workers=7`（playwright.config が N>0 で workers=N）で全spec**。N は backend の seed 数（compose の env）と一致必須。
-  - 出力は ANSI 除去（`sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'`）してから grep。**パイプで exit code がマスクされるので本体 exit か "N failed" 行で判定**。トリアージは `--workers=1`。密集バッチ失敗は単体 run で負荷フレークか実バグか切り分ける（本セッションの D-TC-215/M-TC-013 の手法）。
-  - 撤去＝`cd impl && COMPOSE_PROJECT_NAME=iqe2e docker compose --profile workers down -v`。
-- **backend pytest（クリーンDB・N=0）**＝ワーカ停止→会社DB drop（`docker compose exec -T db psql -U ideaquest -d postgres -c "DROP DATABASE IF EXISTS ideaquest_company_acme WITH (FORCE);"`・acme2 も）→`docker compose run --rm -T -v "$PWD/backend:/app" backend pytest -q`（cwd=impl）。**pytest 後はワーカを戻す**。iqe2e の DB で回すなら `-e E2E_WORKER_COMPANIES=0` 明示＋全DB drop 推奨。
-- **frontend 検証**＝`cd impl/frontend && npm run build`（Next lint/tsc・src 側）・`npx vitest run`。**e2e spec は `tsc` 対象外**なので import 漏れ検知は §5 の static ガード＋実機 run に頼る。e2e のコンパイル確認は `npx playwright test --project=chromium --list`（スタック不要）。
-- **helpers 集約の静的 import ガード（移行時に必ず実行）**＝`impl/frontend/e2e/` で各 spec について「helpers 関数名が `name(` で呼ばれているのに `import {...} from "./helpers"` に含まれない」を検出する bash ループ。ローカル同名関数（sc-24-chat の createPublishedIdea 等）は false positive なので除外判断する。
-- **seed（方式Aで毎回再現）**＝ACME-01: `user@acme`(member)/`user2`/`user3`/`kanri`(company_account_admin)/`e2e-session`/`e2e-pwreset`＋`DEV-DEMO`グループ＋発見/情報デモ。N>0 なら `ACME-W0..` にも同一 login_id 群＋デモ一式。`mfa@acme2`(ACME-02)。OPS `admin@ops`(system_admin)。全 PW `Passw0rd!`。login_id は会社単位一意（`uq_accounts_company_login`）なので全ワーカ会社で同じ `user@acme.example` を使う。
-- **ポート（既定）**＝front 3000／back 8000／db 5432。iqe2e＝3100/8100/5533/6380/8125/9100。
-- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py`（コミット前ゲート・本セッションは移行のみで新規TC無し・927件 OK）。company migration head＝`0048_ai_jobs`（次 0049）。
+- 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2/impl`（compose は `compose.yaml`）。
+- 起動: `docker compose up -d`（既起動中）。コード反映は `docker compose up -d --build backend`／`... frontend`（backend/frontend はイメージにベイク）。
+- ポート: frontend 3000・backend 8000・db(postgres) 5432（DB ユーザ `ideaquest`・`psql -U ideaquest`）・ollama 11434・mailhog 8025・minio 9000。
+- テスト（会社DB 要・source mount で未コミット反映）: `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest <path> -q`。エントリポイントが bootstrap（migration 適用＋seed）を実行してから pytest。
+- マイグレーション適用: `docker compose run --rm -T -v "$PWD/backend:/app" --entrypoint python backend scripts/bootstrap.py`（control+全会社DBへ alembic upgrade head）。
+- OpenAPI 型再生成（frontend）: backend を :8000 で起動後 `cd frontend && npm run codegen`（→ `src/lib/api/schema.d.ts`）。
+- traceability ゲート: `python3 scripts/check_tc_traceability.py`（リポジトリルート）。
+- frontend 検証: `cd impl/frontend && npx tsc --noEmit`（型）／`npm run build`（Next lint 含む・内部遷移は `<Link>`）。
+- dev ログイン（PW 全て `Passw0rd!`）: 会社コード `ACME-01`／一般 `user@acme.example`（quest_create 付与済）・会社管理者 `kanri@acme.example`（company_account_admin＝コンテスト作成・能力付与可）／system_admin は会社 `OPS`／`admin@ops.example`。
+- 必読の正本: `CLAUDE.md`（規約）／`doc/設計ドラフト/アイデアコンテスト機能_設計.md`（コンテスト全論点）／`doc/API設計/T_アイデアコンテスト.md`・`A_認証・セッション.md §A.11`／`doc/テスト/T_アイデアコンテスト.md`・`A_認証.md`／`impl/README.md`（実装現況）。
