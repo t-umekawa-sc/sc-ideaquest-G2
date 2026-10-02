@@ -9,8 +9,7 @@
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: var(--radius, 8px);
   background: var(--color-surface, #fff);
-  max-height: 24rem;
-  overflow: auto;
+  /* 下書きは内部スクロールさせず全文表示（ダイアログ本体のスクロールで追う・ユーザー指摘 2026-10-02）。 */
   font-family: inherit;
 }
 
