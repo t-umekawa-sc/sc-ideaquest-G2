@@ -30,6 +30,7 @@
 | SC-01 | ダッシュボード | ✅ | `(app)/` | **実接続（`GET /dashboard`＝I 集約1本）**＝ヒーロー（残高＋level）・週間ランキング・下書き（quest/idea/eval 進捗）・未投票・参加中クエスト・フォロー中・最近の通知・roles・login_bonus。クイック投票（POST /ideas/{id}/vote）・フォロー解除（D follow EP）実接続・login_bonus トースト。空パネル非表示。**FR-40＝フォロー中クエスト/参加リクエスト状況／`incoming_join_requests`（owner/quest_admin の未処理リクエスト・カードクリックで承認/却下ダイアログ＝共有 `JoinRequestDialog`）（2026-09-18・I-TC-159/160）** |
 | SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ**。**リアルタイム(L) 接続済み＝WS で新着/未読数を即時反映（ヘッダーベル＋一覧）**。**`join_request_received` は `/quests/{id}?joinreq={申請者}` へディープリンク＝該当申請者の承認/却下ダイアログを直接オープン（`ref.user_id`＝params 由来・H-TC-211）** |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
+| SC-04 | AI処理状況 | ✅ | `(app)/ai-jobs`・`[jobId]` | 実接続（`GET /ai-jobs`・`/summary`・`/{id}`・`POST /{id}/cancel`・**`GET /ai-jobs/running`＝他ユーザ running の進捗率・匿名・S.1a**・FR-45）。DataTable サーバー委譲／上部に他ユーザ実行中（XPバー）／待機列「前にN件待機」〔ETA廃止〕／行クリック=処理済みは関連画面へ・操作メニュー「結果を見る」＋キャンセル赤／詳細に実行方式（バッチ/API）。共通ヘッダーに🤖導線＋active バッジ。e2e S-TC-207/208/209 |
 | SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動。**backend `GET /quests?sort=` 実装済み（2026-09-17・§1.8.1＝`-created_at`/`deadline`/`-idea_count`/`-member_count`・複数キー・keyset・未知キー422）**＝frontend DataTable への結線は未（backend 側は契約充足） |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
 | SC-12 | クエスト詳細 | ✅ | `(app)/quests/[questId]` | 本体＋**アイデアタブ（D.1・評価列 F 実接続＝`evaluation` 集計 n/5・評価待ち/評価済・可視のみ）**＋**全文検索タブ（J・PGroonga・種別/スニペット/ページング/遷移）**＋**クエスト内週間ランキング（G 実接続＝`GET /rankings?scope=quest:{id}&period=this_week`）**。ヘッダー💡件数は `idea_count` 連動。**💬 コメント数も実接続（E 非削除チャット件数）**。**FR-41＝概要下に関連情報ストリップ（C.8b・採否バッジ/不採用非表示＋件数/全画面3グループ・逆向き追加・SC-52 採否モード）＋「🏁 結果」タブに採用関連情報を集約（C.8 adopted_info・クエスト＋配下アイデア）**。**変更履歴（2026-09-26）＝ヘッダー「🕘 更新履歴」モーダル（クエスト定義の版＋ステータスログ・0039）／結果タブの振り返りに「🕘 更新履歴」折り畳み（0038）**。残 demo なし |
@@ -47,7 +48,8 @@
 | SC-90 | クエストグループ管理 | ✅ | `(app)/admin/quest-groups` | メンバー管理含む |
 | SC-91 | システム管理 | ✅ | `(app)/admin/companies` | 会社一覧・手動プロビジョニング。複製対応済み（会社=会社コード/DB識別子/名前/カラー・QG=コード/名前を引き継ぎ） |
 | SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009）。アカウント複製対応（ログインID/メール/所属も引き継ぎ）・編集で現所属を読み取り専用表示 |
-| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み（ログインID/メール/所属も引き継ぎ）・編集で現所属を読み取り専用表示。**メール確認バッジ＋送信アクション**（ADR-0009） |
+| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み（ログインID/メール/所属も引き継ぎ）・編集で現所属を読み取り専用表示。**メール確認バッジ＋送信アクション**（ADR-0009）。SC-93 に「🤖 AI・LLM設定」導線（SC-94 へ） |
+| SC-94 | 会社のLLM設定 | ✅ | `(app)/admin/ai-settings` | 実接続（S.5＝`GET/PATCH /admin/ai-models`・`GET /admin/ai-usage`・FR-45）。company_account_admin 専用（system_admin 上位互換）・SC-93 から導線。モデル ON/OFFトグル・課金バッジ・特徴/用途（フロント metadata マップ）・月次予算〔paid〕・当月利用・利用明細（会社×モデル×月）・paid→ON は課金合意確認。Phase1 は無料ローカル2モデル（qwen3-light/swallow）。e2e S-TC-210/211 |
 
 **接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`shop`・`avatar`・`ranking`・`achievements`・`notifications`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
 **モック feature**（`api.ts` 無し）＝`dashboard`(一部)。**`projects`（FR-43）は backend 接続済み**（`api.ts` が `/api/v1/projects`・`/tasks` を叩く／タスクチャットも実 `taskChatSource`＝`/tasks/{id}/chat` 系で結線済み）。

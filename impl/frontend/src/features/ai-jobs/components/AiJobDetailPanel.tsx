@@ -19,6 +19,11 @@ function targetHref(r: AiJobDetail): string | null {
 
 const ts = (s: string | null) => (s ? s.slice(0, 16).replace("T", " ") : "—");
 
+// 実行方式（ai_jobs.execution・§5.2）＝queued=バッチ（バックグラウンド worker）／immediate=API（同期）。
+// どちらも状態機械は共通で ai_jobs に載る（§5.1）＝一覧(SC-04)に出る。Phase1 は queued のみ。
+const execLabel = (e: string): string =>
+  e === "queued" ? "バッチ（バックグラウンド）" : e === "immediate" ? "API（同期）" : e || "—";
+
 export function AiJobDetailPanel({ jobId, onClose }: { jobId: string; onClose: () => void }) {
   const [job, setJob] = useState<AiJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +64,7 @@ export function AiJobDetailPanel({ jobId, onClose }: { jobId: string; onClose: (
         <div className="dialog-section">
           <div className="dialog-label">実行情報</div>
           <dl className="dialog-grid">
+            <dt>実行方式</dt><dd>{execLabel(job.execution)}</dd>
             <dt>モデル（指定）</dt><dd>{job.requested_model ?? "（既定）"}</dd>
             <dt>モデル（実行）</dt><dd>{job.model ? `${job.model}${job.provider ? `（${job.provider}）` : ""}` : "—"}</dd>
             <dt>利用トークン</dt><dd>{job.input_tokens != null || job.output_tokens != null ? `入力 ${job.input_tokens ?? 0} / 出力 ${job.output_tokens ?? 0}` : "—"}</dd>

@@ -1,0 +1,63 @@
+/* SC-94 会社のLLM設定（FR-45）。踏襲＝SC-92/93 の設定UI（.card/.setting-row/.switch）。固有分のみ。 */
+.ai-settings__summary {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  margin: var(--space-3) 0 var(--space-5);
+}
+
+.ai-settings__sum {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-settings__sum-label {
+  font-size: var(--text-sm, .875rem);
+  color: var(--color-text-muted, #4b5563);
+}
+
+.ai-settings__sum-value {
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 700;
+}
+
+.ai-settings__usage {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm, .875rem);
+  color: var(--color-text-muted, #4b5563);
+}
+
+.ai-settings__budget {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm, .875rem);
+}
+
+.ai-settings__budget input {
+  width: 10rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius, 8px);
+}
+
+.ai-settings__usage-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ai-settings__usage-table th,
+.ai-settings__usage-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  text-align: left;
+  font-size: var(--text-sm, .875rem);
+}
+
+.ai-settings__usage-table th {
+  color: var(--color-text-muted, #4b5563);
+  font-weight: 600;
+}

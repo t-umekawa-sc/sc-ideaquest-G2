@@ -61,6 +61,7 @@
 ## 6. データ・API（正＝`S_AIジョブ・LLM連携.md`）
 
 - 一覧＝`GET /ai-jobs`（DataTable §1.8.1）／サマリ＝`GET /ai-jobs/summary`／詳細＝`GET /ai-jobs/{id}`／キャンセル＝`POST /ai-jobs/{id}/cancel`。
+- **詳細（AI処理の詳細）は実行方式（`execution`）も表示**＝`queued`＝「バッチ（バックグラウンド）」／`immediate`＝「API（同期）」（§5.2）。**どちらも状態機械は共通で `ai_jobs` に載る（§5.1）＝一覧(SC-04)に出る**（immediate は同期完結ゆえ一覧では一瞬で「完了」）。Phase1 は `queued` のみ。
 - 上部の他ユーザ実行中＝`GET /ai-jobs/running`（§S.1a・会社内 running の進捗率のみ・**自分除外**・匿名）。
 - ライブ＝WebSocket `ai_jobs:{user_id}`（§L・§1.12）。完了通知＝`notifications`（`ai_task_done`/`ai_task_failed`・§H）。
 

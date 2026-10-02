@@ -274,6 +274,11 @@ export function AccountSelfSection({ companyCode, children, after }: { companyCo
         <span className="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
       </div>
 
+      {/* 会社アカウント管理者の領分＝AI・LLM設定（ON/OFF・予算・利用量＝SC-94・FR-45）への導線。 */}
+      <p className="admin-links">
+        <Link className="btn btn-outline" href="/admin/ai-settings">🤖 AI・LLM設定</Link>
+      </p>
+
       {/* 見出し/自社バナーの直後に差し込むスロット（クエストグループ管理→アカウントの順・SC-92 と統一）。 */}
       {children}
 

@@ -61,6 +61,8 @@
 | S-TC-123 | int | 課金基礎の独立保持＝ジョブ論理削除後も ai_usage_events は残る | 実行済ジョブ＋usage 行 | ai_jobs を論理削除 | ai_usage_events 行は残る（job_id は保持 or SET NULL・集計から消えない） | §6.3／§5.59 |
 | S-TC-124 | int | 予算上限＝当月 SUM(cost_micros) 到達で paid の enqueue を保留/拒否・free は対象外 | 予算 ≒ 当月消化 | paid で enqueue／free で enqueue | paid=保留/422（予算超過）／free=通常 queued（止めない） | §4.2／S.2 |
 | S-TC-125 | api | 利用量可視化＝会社×モデル×月の集計・予算消化率 | usage を複数月/モデル | `GET /admin/ai-usage?period_ym=` | 集計が ai_usage_events と一致・消化率＝SUM/budget | S.5／§6.3 |
+| S-TC-210 | e2e | SC-94 アクセス制御＝一般ユーザーは会社のLLM設定に入れない（/ へ差し戻し） | 一般ユーザー（general） | `/admin/ai-settings` を開く | ダッシュボード（/）へリダイレクト（サーバーガード） | SC-94 §2／S.0 |
+| S-TC-211 | e2e | SC-94 表示＝会社アカウント管理者でモデル一覧（ON/OFFトグル・無料バッジ・特徴/用途）＋SC-93 導線 | company_account_admin（kanri） | `/admin/accounts`→導線→`/admin/ai-settings` | 「AI・LLM設定」リンクが見える／会社のLLM設定にモデル2件（switch・無料バッジ）が出る | SC-94 §3/§4／S.5 |
 
 ## 5. 通知・遷移（S.6・§8・データモデル §5.24）
 
