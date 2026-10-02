@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol
 
 from app.core.config import get_settings
 from app.infra.llm import registry
@@ -39,6 +39,7 @@ class ChatClient(Protocol):
         model: str,
         params: dict | None = None,
         timeout: float | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> LLMResult: ...
 
 
@@ -66,25 +67,27 @@ class OpenAICompatibleChat:
         model: str,
         params: dict | None = None,
         timeout: float | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> LLMResult:
         import httpx  # 遅延 import（テストは Fake 注入＝未接続）
 
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        body = {"model": model, "messages": messages, "stream": False}
+        body = {"model": model, "messages": messages}
         if params:
             body.update(params)
         # 会社別 max_tokens（params）が無ければグローバル上限を技術ガードとして付与（>0 のときのみ）。
         if self._max_tokens > 0 and "max_tokens" not in body:
             body["max_tokens"] = self._max_tokens
+        url = f"{self._base_url}/chat/completions"
+        to = timeout or self._timeout
+        # on_progress があれば SSE ストリーミング＝生成トークン数を逐次コールバック（SC-04 の進捗率用）。
+        if on_progress is not None:
+            return self._complete_streaming(httpx, url, headers, body, to, model, on_progress)
+        body["stream"] = False
         try:
-            resp = httpx.post(
-                f"{self._base_url}/chat/completions",
-                json=body,
-                headers=headers,
-                timeout=timeout or self._timeout,
-            )
+            resp = httpx.post(url, json=body, headers=headers, timeout=to)
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:  # noqa: BLE001（到達不能/形式不正はまとめて Unavailable へ）
@@ -99,6 +102,54 @@ class OpenAICompatibleChat:
             provider="openai_compat",
             model=model,
             finish_reason=choice.get("finish_reason", "stop") or "stop",
+        )
+
+    def _complete_streaming(self, httpx, url, headers, body, timeout, model,
+                            on_progress: Callable[[int], None]) -> LLMResult:
+        """SSE ストリーミング＝`data: {delta}` を逐次パースし、content デルタ毎に on_progress(累計トークン)。
+
+        usage は最終チャンク（`stream_options.include_usage`）があれば採用、無ければ受信デルタ数で近似する
+        （Ollama はトークン毎にデルタを流すため件数が completion_tokens の良い近似になる）。進捗は worker が
+        トークン差分でスロットルして DB/WS へ反映する（本層は毎デルタ呼ぶだけ）。
+        """
+        body = {**body, "stream": True, "stream_options": {"include_usage": True}}
+        parts: list[str] = []
+        out_tokens = 0
+        usage: dict = {}
+        finish_reason = "stop"
+        try:
+            with httpx.stream("POST", url, json=body, headers=headers, timeout=timeout) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    line = line[5:].strip() if line.startswith("data:") else line.strip()
+                    if not line or line == "[DONE]":
+                        continue
+                    import json as _json
+                    try:
+                        chunk = _json.loads(line)
+                    except ValueError:
+                        continue
+                    if chunk.get("usage"):
+                        usage = chunk["usage"]
+                    for ch in chunk.get("choices") or []:
+                        delta = (ch.get("delta") or {}).get("content")
+                        if delta:
+                            parts.append(delta)
+                            out_tokens += 1
+                            on_progress(out_tokens)
+                        if ch.get("finish_reason"):
+                            finish_reason = ch["finish_reason"]
+        except Exception as exc:  # noqa: BLE001（到達不能/ストリーム断はまとめて Unavailable へ）
+            raise LLMUnavailable(str(exc)) from exc
+        return LLMResult(
+            text="".join(parts),
+            input_tokens=int(usage.get("prompt_tokens", 0)),
+            output_tokens=int(usage.get("completion_tokens", out_tokens)),
+            provider="openai_compat",
+            model=model,
+            finish_reason=finish_reason or "stop",
         )
 
 
@@ -116,12 +167,15 @@ class FakeChat:
         model: str,
         params: dict | None = None,
         timeout: float | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> LLMResult:
         user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
         head = (user or "").strip().split("\n", 1)[0][:80]
         text = f"[要約] {head}" if head else "[要約]"
         in_tok = sum(len((m.get("content") or "").split()) for m in messages)
         out_tok = max(1, len(text.split()))
+        if on_progress is not None:  # 進捗配線の検証用＝生成相当のトークン数で1回通知（決定的）。
+            on_progress(out_tok)
         return LLMResult(
             text=text,
             input_tokens=in_tok,
@@ -160,18 +214,20 @@ def complete(
     model: str | None = None,
     params: dict | None = None,
     timeout: float | None = None,
+    on_progress: Callable[[int], None] | None = None,
 ) -> LLMResult:
     """補完を実行する（ドメインが知る唯一の口）。
 
     論理キーを解決（明示 model ＞ task_type 既定 ＞ グローバル既定・設計 §3.4）→物理へ写像→クライアント呼び出し。
     不正/無効キーは `LLMConfigError`（呼び出し側で 422）。到達不能は `LLMUnavailable`（リトライ/failed）。
+    `on_progress`（任意）＝生成トークン数の逐次コールバック（SC-04 進捗率・ストリーミング・S.1a）。
     """
     spec = registry.resolve(task_type, model)
     merged = dict(spec.params or {})
     if params:
         merged.update(params)
     result = get_chat_client().complete(
-        messages, model=spec.model, params=merged or None, timeout=timeout
+        messages, model=spec.model, params=merged or None, timeout=timeout, on_progress=on_progress
     )
     # provider は解決結果を正とする（クライアントの自己申告に依存しない・監査）。
     result.provider = spec.provider

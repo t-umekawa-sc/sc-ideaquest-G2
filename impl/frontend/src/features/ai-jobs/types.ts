@@ -7,7 +7,7 @@ export interface AiJobListItem {
   id: string;
   task_type: string;
   status: AiJobStatus;
-  progress: { phase?: string; ratio?: number } | null;
+  progress: { phase?: string; ratio?: number; tokens?: number } | null;
   queue_position: number | null; // queued のみ＝会社全体の待ち行列での順位（N番目）
   eta_seconds: number | null;    // queued のみ＝実行開始までの概算秒（履歴無しは null）
   created_at: string;
@@ -46,7 +46,7 @@ export interface AiJobDetail {
   input_tokens: number | null;
   output_tokens: number | null;
   cost_micros: number | null;
-  progress: { phase?: string; ratio?: number } | null;
+  progress: { phase?: string; ratio?: number; tokens?: number } | null;
   error: { code?: string; detail?: string } | null;
   result: { text?: string } | null;
   ref_idea_id: string | null;

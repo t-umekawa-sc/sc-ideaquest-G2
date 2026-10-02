@@ -237,6 +237,60 @@ def _insert_running(db: str, requester_id: uuid.UUID, ratio: float | None) -> st
         return str(j.id)
 
 
+def test_s_tc_133_streaming_progress_updates(client, factory, monkeypatch):
+    """S-TC-133(int): ストリーミング実行＝on_progress で progress.ratio が上限比で逐次更新される（SC-04 進捗率・§5.6）。
+
+    会社別上限 100・生成100トークンの Fake を注入し、worker のコールバックが set_progress を ratio 付きで
+    呼ぶことを確認（初期0.0＋途中0.5＋完了直前1.0）。完了時は progress がクリアされる。
+    """
+    from datetime import datetime, timezone
+
+    from app.infra.llm import gateway
+    from app.infra.llm.gateway import LLMResult
+    from app.tenant.ai_jobs import application as app_mod
+    from app.tenant.ai_jobs import repository as repo_mod
+
+    db = _db()
+    with get_tenant_session(db) as ts:
+        ts.execute(CompanyAiModelSetting.__table__.delete().where(CompanyAiModelSetting.model_key == "qwen3-swallow"))
+        ts.add(CompanyAiModelSetting(model_key="qwen3-swallow", enabled=True, max_output_tokens=100))
+        uid = ts.execute(select(User).limit(1)).scalars().first().id
+        j = AiJob(task_type="iso_generate", status="running", requested_by_id=uid,
+                  input={"context_md": "# 資料\n意図: テスト"}, started_at=datetime.now(timezone.utc))
+        ts.add(j)
+        ts.commit()
+        jid = j.id
+
+    class _FakeStream:
+        def complete(self, messages, *, model, params=None, timeout=None, on_progress=None):
+            if on_progress is not None:  # ストリーミング相当＝トークンを刻んで通知
+                on_progress(50)
+                on_progress(100)
+            return LLMResult(text="draft", input_tokens=5, output_tokens=100,
+                             provider="openai_compat", model=model)
+
+    gateway.set_chat_client(_FakeStream())
+    ratios: list[float] = []
+    orig = repo_mod.set_progress
+
+    def _spy(session, job_id, progress):
+        if progress and progress.get("ratio") is not None:
+            ratios.append(progress["ratio"])
+        return orig(session, job_id, progress)
+
+    monkeypatch.setattr(repo_mod, "set_progress", _spy)
+    try:
+        assert app_mod._process_one(db, jid) == "succeeded"
+        assert any(0.4 < x <= 0.6 for x in ratios)  # 50/100＝途中経過
+        assert 1.0 in ratios                         # 100/100＝完了直前
+        with get_tenant_session(db) as ts:
+            assert repo_mod.get(ts, jid).progress is None  # 完了で進捗クリア
+    finally:
+        gateway.set_chat_client(None)
+        _cleanup([str(jid)])
+        _cleanup_settings(["qwen3-swallow"])
+
+
 def test_s_tc_132_worker_bootstrap_registers_fk_targets():
     """S-TC-132(int): ai_jobs.application 単独 import で AiJob の FK 先が登録され mapper 構成が通る。
 

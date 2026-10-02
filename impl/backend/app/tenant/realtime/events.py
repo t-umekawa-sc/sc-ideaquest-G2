@@ -29,6 +29,11 @@ def chat_topic(thread_id: uuid.UUID | str) -> str:
     return f"chat:{thread_id}"
 
 
+def ai_jobs_topic(user_id: uuid.UUID | str) -> str:
+    """AIジョブ速報トピック＝`ai-jobs:{user_id}`（依頼者本人スコープ・SC-04 のライブ更新・S.1a）。"""
+    return f"ai-jobs:{user_id}"
+
+
 def publish_event(topic: str, type: str, data: dict, *, company_id: uuid.UUID | str,
                   id: str | None = None) -> None:
     """トピックへイベントを発行（best-effort・L.3）。発行元の本処理はコミット後に呼ぶ（速報）。"""

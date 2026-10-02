@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { DataTable, Progress, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
+import { realtime } from "@/lib/realtime";
 
 import { AI_JOBS_CHANGED_EVENT, cancelAiJob, fetchAiJobs, fetchAiJobsSummary, fetchRunningProgress } from "../api";
 import { STATUS_BADGE, STATUS_LABEL, TASK_LABEL } from "../types";
@@ -30,7 +31,9 @@ function progressText(r: AiJobListItem): string {
   const p = r.progress;
   if (!p) return "実行中…";
   if (typeof p.ratio === "number") return `${Math.round(p.ratio * 100)}%${p.phase ? `（${p.phase}）` : ""}`;
-  return p.phase ? `（${p.phase}）` : "実行中…";
+  // 上限未設定＝比率が出せないのでトークン数を出す（生成が進んでいる手応え・SC-04 §3）。
+  const tk = typeof p.tokens === "number" ? ` ${p.tokens} tokens` : "";
+  return p.phase ? `（${p.phase}${tk}）` : "実行中…";
 }
 
 // 完了ジョブの遷移先（ref_* → 対象画面）。無ければ null（遷移しない）。
@@ -55,6 +58,19 @@ export function AiJobsListView() {
   useEffect(() => {
     window.addEventListener(AI_JOBS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(AI_JOBS_CHANGED_EVENT, reload);
+  }, [reload]);
+
+  // WS ライブ更新（L・リロード不要）＝状態遷移（投入/開始/完了）は即時 reload／進捗は ~0.6s にスロットル。
+  // ai-jobs:{user_id} は WS ハンドシェイクで自動購読済み（本人スコープ）＝ここは type でハンドラ登録するだけ。
+  useEffect(() => {
+    realtime.start();
+    const offChanged = realtime.on("ai_job.changed", () => reload());
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const offProgress = realtime.on("ai_job.progress", () => {
+      if (pending) return; // 進捗の多発を間引く（進捗バーは最大 ~0.6s に1回更新で十分滑らか）
+      pending = setTimeout(() => { pending = null; reload(); }, 600);
+    });
+    return () => { offChanged(); offProgress(); if (pending) clearTimeout(pending); };
   }, [reload]);
 
   useEffect(() => {

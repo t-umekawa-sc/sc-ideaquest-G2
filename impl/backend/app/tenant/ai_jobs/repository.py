@@ -78,6 +78,11 @@ def get(session: Session, job_id: uuid.UUID) -> AiJob | None:
     return session.get(AiJob, job_id)
 
 
+def set_progress(session: Session, job_id: uuid.UUID, progress: dict | None) -> None:
+    """実行中ジョブの progress（ratio/phase/tokens）を更新（SC-04 進捗率の源・§5.6）。commit は呼び出し側。"""
+    session.execute(update(AiJob).where(AiJob.id == job_id).values(progress=progress))
+
+
 def cancel_queued_requested(session: Session) -> int:
     """cancel_requested の queued（未着手）を即 canceled にする（設計 §5.5）。件数を返す。"""
     now = datetime.now(timezone.utc)

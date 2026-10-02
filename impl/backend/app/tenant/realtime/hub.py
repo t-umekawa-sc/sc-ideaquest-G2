@@ -50,7 +50,7 @@ class Hub:
             return
         self._redis = aioredis.from_url(get_settings().redis_url, decode_responses=True)
         self._pubsub = self._redis.pubsub()
-        await self._pubsub.psubscribe("notifications:*", "chat:*")
+        await self._pubsub.psubscribe("notifications:*", "chat:*", "ai-jobs:*")
         await self._pubsub.subscribe(REVOKE_CHANNEL)
         self._task = asyncio.create_task(self._listen(), name="realtime-hub")
 

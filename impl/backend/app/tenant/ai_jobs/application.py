@@ -21,6 +21,7 @@ from app.tenant.ai_jobs import repository as repo
 from app.tenant.ai_jobs.orm import AiJob
 from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
+from app.tenant.realtime import events as rt_events
 
 # AiJob は ref_*（ideas/quests/strategy_documents/info_items）へ FK を張る。SQLAlchemy は mapper 構成時に
 # これら参照先テーブルが同一 metadata に登録済みであることを要求する。FastAPI は全 router 経由で各 ORM を
@@ -38,6 +39,20 @@ _FREE_RATE = {"input_rate": 0, "output_rate": 0, "currency": "JPY", "pricing_ver
 def _resolve_company(company_id: uuid.UUID) -> Company | None:
     with control_session() as s:
         return s.get(Company, company_id)
+
+
+def _company_id_for_db(db_identifier: str) -> uuid.UUID | None:
+    """db_identifier → company_id（WS 封筒の cross-tenant フィルタ用・§1.5）。worker は db しか持たないため逆引き。"""
+    with control_session() as s:
+        row = s.query(Company.id).filter(Company.db_identifier == db_identifier).first()
+    return row[0] if row else None
+
+
+def _publish_job(requester_id, company_id, type_: str, data: dict) -> None:
+    """依頼者本人の AIジョブ速報を WS へ（best-effort・L.3）＝SC-04 のライブ更新（ポーリング不要・S.1a）。"""
+    if requester_id is None or company_id is None:
+        return
+    rt_events.publish_event(rt_events.ai_jobs_topic(requester_id), type_, data, company_id=company_id)
 
 
 def _effective_enabled_keys(ts) -> set[str]:
@@ -114,7 +129,10 @@ def enqueue(account_id: uuid.UUID, company_id: uuid.UUID, *, task_type: str, inp
                               ref_quest_id=ref_quest_id, ref_strategy_document_id=ref_strategy_document_id,
                               ref_info_item_id=ref_info_item_id)
         out = {"id": str(job.id), "status": job.status}
+        _requester_id, _job_id = user.id, job.id
         ts.commit()
+    # 投入速報＝SC-04 に新規 queued 行を即時反映（リロード不要・L.3）。
+    _publish_job(_requester_id, company_id, "ai_job.changed", {"job_id": str(_job_id), "status": "queued"})
     return out
 
 
@@ -215,7 +233,9 @@ def cancel_job(account_id: uuid.UUID, company_id: uuid.UUID, job_id: str) -> dic
             raise AppError(404, "not_found")
         repo.request_cancel(ts, job)
         out = _detail(job)
+        _requester_id, _status = user.id, job.status
         ts.commit()
+    _publish_job(_requester_id, company_id, "ai_job.changed", {"job_id": job_id, "status": _status})
     return out
 
 
@@ -429,12 +449,14 @@ def process_all_companies_once() -> dict:
 def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
     """1 件を実行する＝ゲートウェイ呼び出し→成功で succeeded＋usage 記録／失敗で retry/failed。"""
     s = get_settings()
-    # 1) 実行に必要な値を読み出す（別 Tx＝running は確保済み）。
+    company_id = _company_id_for_db(db_identifier)
+    # 1) 実行に必要な値を読み出す（別 Tx＝running は確保済み）＋実行中の初期進捗を書く。
     with get_tenant_session(db_identifier) as session:
         job = repo.get(session, job_id)
         if job is None or job.status != "running":
             return "skip"
         task_type, requested_model = job.task_type, job.requested_model
+        requester = job.requested_by_id
         try:
             messages = _build_messages(job)
         except _PermanentError as exc:
@@ -443,23 +465,46 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
             job.finished_at = datetime.now(timezone.utc)
             _notify_completion(session, job, ok=False)
             session.commit()
+            _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id), "status": "failed"})
             return "failed"
-        requester = job.requested_by_id
         # 会社別の生成トークン上限（S.5・無料ティア抑制等）を解決＝当該モデルの会社設定（NULL=無制限）。
         _resolved_key = registry.resolve_key(task_type, requested_model)
         _setting = repo.get_model_setting(session, _resolved_key)
         max_output_tokens = _setting.max_output_tokens if _setting else None
+        repo.set_progress(session, job_id, {"phase": "生成中", "ratio": 0.0 if max_output_tokens else None})
+        session.commit()
+    # 実行開始＝SC-04 で「実行中・0%」を即時反映（L.3）。
+    _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id), "status": "running"})
+
+    # 進捗コールバック＝ストリーミングのトークン毎に呼ばれる。DB/WS への反映はトークン差分でスロットル（§5.6）。
+    _step = max(1, max_output_tokens // 10) if max_output_tokens else 24
+    _last = [0]
+
+    def _on_progress(tokens: int) -> None:
+        if tokens - _last[0] < _step:
+            return
+        _last[0] = tokens
+        ratio = min(1.0, tokens / max_output_tokens) if max_output_tokens else None
+        with get_tenant_session(db_identifier) as ps:
+            repo.set_progress(ps, job_id, {"phase": "生成中", "ratio": ratio, "tokens": tokens})
+            ps.commit()
+        _publish_job(requester, company_id, "ai_job.progress",
+                     {"job_id": str(job_id), "ratio": ratio, "tokens": tokens})
 
     # 2) 論理キー解決＋ゲートウェイ呼び出し（DB 接続を持たずに）。会社上限があれば max_tokens を付与。
     try:
         key = registry.resolve_key(task_type, requested_model)
         spec = registry.get(key)
         _params = {"max_tokens": max_output_tokens} if max_output_tokens and max_output_tokens > 0 else None
-        result = gateway.complete(task_type, messages, model=key, params=_params)
+        result = gateway.complete(task_type, messages, model=key, params=_params, on_progress=_on_progress)
     except gateway.LLMConfigError as exc:
-        return _fail_permanent(db_identifier, job_id, "invalid_model", str(exc))
+        r = _fail_permanent(db_identifier, job_id, "invalid_model", str(exc))
+        _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id), "status": "failed"})
+        return r
     except gateway.LLMUnavailable as exc:
-        return _fail_retryable(db_identifier, job_id, str(exc), s.llm_job_max_attempts)
+        r = _fail_retryable(db_identifier, job_id, str(exc), s.llm_job_max_attempts)
+        _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id)})
+        return r
 
     # 3) 成功＝succeeded＋result＋usage 記録（課金基礎は追記専用台帳へ）。
     now = datetime.now(timezone.utc)
@@ -476,6 +521,7 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
         job.input_tokens = result.input_tokens
         job.output_tokens = result.output_tokens
         job.cost_micros = cost_micros
+        job.progress = None  # 完了＝進捗はクリア（一覧は「—」表示に戻る）
         job.finished_at = now
         repo.record_usage(
             session,
@@ -494,6 +540,7 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
         )
         _notify_completion(session, job, ok=True)
         session.commit()
+    _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id), "status": "succeeded"})
     return "succeeded"
 
 

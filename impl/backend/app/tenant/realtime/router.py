@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import get_settings
 from app.core.security import read_session
 from app.infra.cache import get_redis
-from app.tenant.realtime.events import notifications_topic
+from app.tenant.realtime.events import ai_jobs_topic, notifications_topic
 from app.tenant.realtime.gate import can_subscribe_chat
 from app.tenant.realtime.hub import Connection, get_hub
 
@@ -47,6 +47,7 @@ async def realtime(ws: WebSocket) -> None:
                       company_id=payload["company_id"])
     hub = get_hub()
     hub.subscribe(conn, notifications_topic(user_id))  # 常時購読（本人固定・L.2）
+    hub.subscribe(conn, ai_jobs_topic(user_id))  # 本人の AIジョブ速報（SC-04 ライブ更新・自動購読）
     try:
         while True:
             msg = await ws.receive_json()

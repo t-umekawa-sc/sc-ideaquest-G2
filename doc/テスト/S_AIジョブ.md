@@ -22,6 +22,7 @@
 | S-TC-129 | int | 待ちジョブの順番待ち位置＝会社全体の queued を priority→created_at 順に並べた rn（自分の順位）＋前方件数(実行中＋rn-1)からの概算ETA（履歴あれば） | running1件＋queued複数（会社全体） | `list_jobs` の queued 行 | 先頭 queued は queue_position=1・古い順に増える／実行中があると eta は running を織り込む／完了/失敗/実行中の行は position/eta とも null | S.1／§5.3 |
 | S-TC-130 | api | 会社内 running の進捗＝`GET /ai-jobs/running` は**自分を除外**した会社内 running の `ratio` のみを処理順で返す（匿名＝依頼者/入力/タスク種別を含まない） | user1 の running1件＋user2 の running2件（ratio 各種・会社全体） | user1 で `GET /ai-jobs/running` | `{data:[{ratio}]}`＝user2 の2件のみ（user1 自身は出ない）・`ratio` は 0..1 or null・`requested_by`/`input`/`task_type` 等のキーを含まない／running 以外（queued/succeeded）は出ない | S.1a／S.0／S.7 |
 | S-TC-131 | api | 会社別の生成トークン上限＝admin が `max_output_tokens` を設定すると GET に反映・負値は 422（無料ティア抑制・実行時に max_tokens として適用） | company_account_admin | `PATCH /admin/ai-models/{key}`（max_output_tokens=256／-1） | 256=200・GET の当該キーに反映／-1=422（0 以上） | S.5／§4.2 |
+| S-TC-133 | int | ストリーミング実行の進捗＝`on_progress`（生成トークン）で `progress.ratio`（＝トークン/会社上限）が逐次更新・WS へ速報・完了で進捗クリア | 会社上限100・100トークン生成の Fake | `_process_one` 実行 | set_progress が ratio 付きで複数回（初期0.0/途中0.5/完了直前1.0）・succeeded 後 progress=null | S.1a／§5.6 |
 | S-TC-132 | int | ワーカ起動の ORM 登録＝`app.tenant.ai_jobs.application` だけを import しても AiJob の FK 先（ideas/quests/strategy_documents/info_items）が metadata に登録され mapper 構成が通る（llm_worker 単独起動の必須条件＝未登録だと全ジョブが NoReferencedTableError で落ちる回帰） | 子プロセスで ai_jobs.application のみ import | `configure_mappers()` を実行 | 例外なく完了（exit 0）・`NoReferencedTableError` を出さない | §5.2a／FR-45 |
 
 ## 2. モデル指定・ガードレール・GET /ai-models（S.2/S.3・設計 §3.4）

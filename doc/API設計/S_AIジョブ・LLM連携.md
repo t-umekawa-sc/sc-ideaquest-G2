@@ -31,6 +31,8 @@
 - **`input` は本文複製を最小化**＝可能な限り参照(ID)で持ち、ワーカーが実行直前に会社DBから読み出してプロンプト化（機微本文の滞留を減らす・§S.7）。
 - **状態機械**＝`queued→running→succeeded/failed/canceled`（実行方式に依らず共通）。実行方式(dispatcher)は `task_type`/provider で選択＝(a) queued-worker（ローカル・ポーリング・`FOR UPDATE SKIP LOCKED` で N 件〔既定1〕）／(b) immediate（外部高速API・将来・ポーリング不要）＝設計 §5.2。
 - **冪等**＝`Idempotency-Key` で同一操作の二重投入を防ぐ。**タイムアウト**超過は `failed`（`error.code='timeout'`）・**リトライ**は `attempts` 上限まで再 `queued`・**孤児回収**＝`running` のまま無更新は再 `queued`（設計 §5.4）。
+- **進捗率（ストリーミング）**＝ゲートウェイを SSE ストリーミング（`on_progress`）化し、生成トークン毎に `progress.ratio`（＝生成トークン/会社 `max_output_tokens`・上限未設定時は `tokens` のみ）を逐次更新（worker はトークン差分でスロットル）＝SC-04 の実行中%の源（§5.6）。完了で `progress` はクリア。
+- **ライブ更新（WS・L）**＝依頼者本人トピック `ai-jobs:{user_id}`（WS ハンドシェイクで自動購読・本人スコープ）へ `ai_job.changed`（投入/開始/完了・状態遷移）と `ai_job.progress`（ratio/tokens）を速報＝SC-04 はリロード不要で反映（真実は REST・速報は best-effort・L.0/L.3）。
 
 ## S.2 モデル指定・選択（論理モデルキー・GET /ai-models）
 
