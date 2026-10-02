@@ -39,6 +39,12 @@ class QuestGroupRefDTO(BaseModel):
     name: str
 
 
+class StrategyDocRefDTO(BaseModel):
+    """適用中の経営資料の軽量参照（R.1b・§5.56）＝クエスト詳細/編集プリフィル用。"""
+    id: str
+    title: str
+
+
 class QuestCardDTO(BaseModel):
     """一覧カード/行の1件（C.1・SC-10 §4.1）。"""
 
@@ -207,6 +213,8 @@ class QuestCreateRequest(BaseModel):
     # 参加部署（アクセス条件・複数部署横断・FR-38 再設計）。フラット 0..N・すべて同格・省略/空も可（0 件＝会社全体）。
     # 主グループ（quest_group_id）は廃止＝受け付けない。
     quest_group_ids: list[str] = []
+    # 適用する経営資料（0..N・R.1b/§5.56）＝整合率の母集合を作成者が手動選択（参加グループ同型・省略/空も可）。
+    strategy_document_ids: list[str] = []
     categories: list[str] = []
     deadline: date | None = None
     purpose: str | None = None
@@ -239,6 +247,8 @@ class QuestUpdateRequest(BaseModel):
     # 参加部署の「あるべき全体像」（フラット 0..N・すべて同格・FR-38 再設計）。送信時のみ差分適用。
     # 参加部署を外すのはブロックしない（409 group_in_use 廃止）＝門番の都度再判定で失効を表現（C.0/C.2）。
     quest_group_ids: list[str] | None = None
+    # 適用する経営資料の「あるべき全体像」（0..N・R.1b/§5.56）。送信時のみ差分適用＝整合率の母集合を変更。
+    strategy_document_ids: list[str] | None = None
     # 発見カタログ（SC-13）への掲載可否のトグル（FR-40・C.9.0）。送信時のみ更新（owner/quest_admin）。
     discoverable: bool | None = None
 
@@ -289,6 +299,8 @@ class QuestDetailDTO(BaseModel):
     owner: QuestOwnerDTO
     # 参加部署（0..N・すべて同格・created_at 昇順・FR-38 再設計）。0 件なら空配列（単一 quest_group は廃止）。
     quest_groups: list[QuestGroupRefDTO] = []
+    # 適用中の経営資料（0..N・R.1b/§5.56）＝整合率の母集合。編集フォームのプリフィル＋詳細表示（id+title）。
+    strategy_documents: list[StrategyDocRefDTO] = []
     my_state: str
     # 自分が持つ 6 権限（フロントの UX 出し分け・実アクションは各 EP で再検証・C.1）。
     my_permissions: list[str] = []

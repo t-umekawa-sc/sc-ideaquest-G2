@@ -6917,6 +6917,8 @@ export interface components {
             target_id: string;
             /** Target Title */
             target_title?: string | null;
+            /** Target Icon Image Url */
+            target_icon_image_url?: string | null;
             /** Kind */
             kind: string;
             /** Origin */
@@ -8079,6 +8081,11 @@ export interface components {
              */
             quest_group_ids: string[];
             /**
+             * Strategy Document Ids
+             * @default []
+             */
+            strategy_document_ids: string[];
+            /**
              * Categories
              * @default []
              */
@@ -8180,6 +8187,11 @@ export interface components {
              * @default []
              */
             quest_groups: components["schemas"]["QuestGroupRefDTO"][];
+            /**
+             * Strategy Documents
+             * @default []
+             */
+            strategy_documents: components["schemas"]["StrategyDocRefDTO"][];
             /** My State */
             my_state: string;
             /**
@@ -8844,6 +8856,8 @@ export interface components {
             members?: components["schemas"]["QuestMemberInput"][] | null;
             /** Quest Group Ids */
             quest_group_ids?: string[] | null;
+            /** Strategy Document Ids */
+            strategy_document_ids?: string[] | null;
             /** Discoverable */
             discoverable?: boolean | null;
         };
@@ -9208,6 +9222,16 @@ export interface components {
             /** Data */
             data: components["schemas"]["StrategyDocListItem"][];
             page_info: components["schemas"]["app__tenant__strategy__schemas__PageInfo"];
+        };
+        /**
+         * StrategyDocRefDTO
+         * @description 適用中の経営資料の軽量参照（R.1b・§5.56）＝クエスト詳細/編集プリフィル用。
+         */
+        StrategyDocRefDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
         };
         /**
          * StrategyDocSelectionItem

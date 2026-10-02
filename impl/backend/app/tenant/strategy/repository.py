@@ -143,6 +143,25 @@ def doc_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
     ).scalars().all())
 
 
+def reconcile_quest_docs(session: Session, quest_id: uuid.UUID, doc_ids: list[uuid.UUID]) -> bool:
+    """クエスト側から適用経営資料を『あるべき全体像』へ差分適用（quest_group_ids 同型・R.1b・§5.56）。
+
+    追加/削除があれば True（呼び出し側が整合率再計算の要否判定に使う）。順序は無視（集合）。
+    """
+    current = set(doc_ids_for_quest(session, quest_id))
+    target = set(doc_ids)
+    added, removed = target - current, current - target
+    for did in added:
+        session.add(QuestStrategyDocument(id=uuid.uuid4(), quest_id=quest_id, strategy_document_id=did))
+    if removed:
+        session.execute(
+            delete(QuestStrategyDocument)
+            .where(QuestStrategyDocument.quest_id == quest_id,
+                   QuestStrategyDocument.strategy_document_id.in_(removed))
+        )
+    return bool(added or removed)
+
+
 def quest_ids_for_doc(session: Session, doc_id: uuid.UUID) -> list[uuid.UUID]:
     """当該経営資料を適用中のクエストID（資料更新時の再計算対象・§5.56）。"""
     return list(session.execute(
@@ -221,6 +240,16 @@ def published_idea_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[
     return list(session.execute(
         select(Idea.id).where(Idea.quest_id == quest_id, Idea.deleted_at.is_(None), Idea.status == "published")
     ).scalars().all())
+
+
+def strategy_docs_for_quest(session: Session, quest_id: uuid.UUID) -> list:
+    """当該クエストが適用中の経営資料＝(id, title)（クエスト詳細/編集プリフィル用・R.1b/§5.56）。"""
+    return session.execute(
+        select(StrategyDocument.id, StrategyDocument.title)
+        .join(QuestStrategyDocument, QuestStrategyDocument.strategy_document_id == StrategyDocument.id)
+        .where(QuestStrategyDocument.quest_id == quest_id)
+        .order_by(StrategyDocument.title)
+    ).all()
 
 
 def strategy_titles_for_quest(session: Session, quest_id: uuid.UUID) -> list[str]:

@@ -169,6 +169,49 @@ def test_r_tc_108_quest_link_and_revision(client, factory, docs):
             ts.commit()
 
 
+def test_r_tc_122_quest_side_strategy_docs(client, factory, docs):
+    """R-TC-122 クエスト側から経営資料を適用＝POST/PATCH /quests の strategy_document_ids で
+    quest_strategy_documents を reconcile・詳細に strategy_documents が出る・無効IDは422（R.1b/§5.56）。"""
+    from sqlalchemy import text as _text
+
+    _admin(client, factory)  # 作成者=owner（後で掃除）
+    stamp = uuid.uuid4().hex[:6]
+    did = uuid.UUID(client.post(BASE, json=_body(f"適用_{stamp}"), headers=_csrf(client)).json()["id"]); docs.append(did)
+    did2 = uuid.UUID(client.post(BASE, json=_body(f"適用2_{stamp}"), headers=_csrf(client)).json()["id"]); docs.append(did2)
+    # クエスト作成時に strategy_document_ids を渡す（＝クエスト側導線・R.1b）。
+    qr = client.post("/api/v1/quests", headers=_csrf(client), json={
+        "title": f"適用クエスト_{stamp}", "color": "#0D9488", "quest_group_ids": [],
+        "strategy_document_ids": [str(did)], "categories": ["業務改善"],
+        "deadline": "2026-12-31", "purpose": "目的", "status": "recruiting"})
+    assert qr.status_code == 201, qr.text
+    qid = qr.json()["id"]
+    try:
+        # 詳細に strategy_documents が出る（編集プリフィル源）＋経営資料側の紐づけ一覧にも出る（双方向一致）。
+        assert [s["id"] for s in qr.json()["strategy_documents"]] == [str(did)]
+        assert any(x["id"] == qid for x in client.get(f"{BASE}/{did}/quests").json()["data"])
+        # PATCH で差分適用＝[did]→[did2]（did は外れ did2 が入る）。
+        pr = client.patch(f"/api/v1/quests/{qid}", headers=_csrf(client),
+                          json={"strategy_document_ids": [str(did2)]})
+        assert pr.status_code == 200, pr.text
+        assert [s["id"] for s in pr.json()["strategy_documents"]] == [str(did2)]
+        assert not any(x["id"] == qid for x in client.get(f"{BASE}/{did}/quests").json()["data"])
+        assert any(x["id"] == qid for x in client.get(f"{BASE}/{did2}/quests").json()["data"])
+        # 無効な経営資料IDは 422（field=strategy_document_ids）。
+        bad = client.patch(f"/api/v1/quests/{qid}", headers=_csrf(client),
+                           json={"strategy_document_ids": [str(uuid.uuid4())]})
+        assert bad.status_code == 422, bad.text
+        assert bad.json()["errors"][0]["field"] == "strategy_document_ids"
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM quest_member_permissions WHERE quest_member_id IN "
+                             "(SELECT id FROM quest_members WHERE quest_id = :q)"), {"q": qid})
+            for tbl in ("quest_strategy_documents", "quest_revisions", "quest_categories", "quest_members",
+                        "quest_group_links", "quest_decision_log", "quest_outcome_revisions"):
+                ts.execute(_text(f"DELETE FROM {tbl} WHERE quest_id = :q"), {"q": qid})
+            ts.execute(_text("DELETE FROM quests WHERE id = :q"), {"q": qid})
+            ts.commit()
+
+
 def test_r_tc_109_quest_candidates_icon_url(client, factory, docs):
     """R-TC-109 クエスト候補にアイコン署名URLを載せる（ピッカー行頭表示・未設定は null）。"""
     from app.tenant.profile.orm import User

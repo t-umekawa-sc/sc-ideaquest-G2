@@ -421,6 +421,8 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         repo.replace_categories(ts, quest.id, cats)
         # 参加部署（フラット 0..N）を確定＝候補範囲の材料（party 差分より先に書く）。
         repo.create_group_links(ts, quest.id, group_ids=group_uuids)
+        # 適用する経営資料（0..N・R.1b）を確定＝整合率の母集合（版履歴スナップ前に書く）。
+        _apply_strategy_docs(ts, quest.id, getattr(body, "strategy_document_ids", None))
         # 作成者は常にパーティー員＝owner（C.0）。差分より先に投入して保護対象にする。
         repo.add_member(ts, quest.id, user.id, permissions=_ALL_PERMISSIONS, granted_by_id=user.id)
         _apply_party_diff(ts, quest, body.members, requester=user)
@@ -477,6 +479,9 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
         if "quest_group_ids" in body.model_fields_set and body.quest_group_ids is not None:
             target = _validate_groups(ts, _parse_group_ids(body.quest_group_ids))
             repo.reconcile_group_links(ts, quest.id, target)
+        # 適用経営資料の差分（R.1b・§5.56）＝送信時のみ『あるべき全体像』へ reconcile＋整合率再計算。
+        if "strategy_document_ids" in body.model_fields_set and body.strategy_document_ids is not None:
+            _apply_strategy_docs(ts, quest.id, body.strategy_document_ids)
         removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
             removed = _apply_party_diff(ts, quest, body.members, requester=user)
@@ -1361,6 +1366,38 @@ def _validate_groups(ts, group_uuids: list[uuid.UUID]) -> list[uuid.UUID]:
     return group_uuids
 
 
+def _validate_strategy_docs(ts, raw_ids) -> list[uuid.UUID]:
+    """適用経営資料（strategy_document_ids）が会社内の active な資料であることを検証し正規化（R.1b・§5.56）。
+
+    0 件（空）はそのまま許容（資料未選択）。存在しない/archived の付与は 422。アーカイブ済みは選択候補外。
+    """
+    if not raw_ids:
+        return []
+    from app.tenant.strategy import repository as strategy_repo
+    out: list[uuid.UUID] = []
+    for sid in raw_ids:
+        did = _parse_uuid(sid, field="strategy_document_ids")
+        doc = strategy_repo.get_document(ts, did)
+        if doc is None or doc.status != "active":
+            raise AppError(422, "validation_error", detail="strategy_document_ids が不正です",
+                           errors=[{"field": "strategy_document_ids"}])
+        out.append(did)
+    return out
+
+
+def _apply_strategy_docs(ts, quest_id: uuid.UUID, raw_ids) -> None:
+    """経営資料の適用を『あるべき全体像』へ reconcile＋変化があれば配下アイデアの整合率を再計算（R.1b）。
+
+    整合率再計算は award=True（新たに母集合入りした資料で閾値超えの初回コインを付与・下げない）。
+    """
+    from app.tenant.strategy import alignment as strat_align
+    from app.tenant.strategy import repository as strategy_repo
+    doc_uuids = _validate_strategy_docs(ts, raw_ids)
+    changed = strategy_repo.reconcile_quest_docs(ts, quest_id, doc_uuids)
+    if changed:
+        strat_align.recompute_for_quest(ts, quest_id, award=True)
+
+
 def _candidate_user_ids(ts, quest) -> set[uuid.UUID] | None:
     """パーティー候補の許容 user_id 集合（C.3・FR-38 再設計＝アクセス条件と同一）。
 
@@ -1579,6 +1616,10 @@ def _build_detail(ts, quest, viewer_id) -> dict:
     )
     members = member_dtos  # member_count は有効パーティー数
     idea_count = ideas_repo.count_published_ideas_for_quests(ts, [quest.id]).get(quest.id, 0)
+    # 適用中の経営資料（R.1b・§5.56）＝編集フォームのプリフィル＋詳細表示用（id+title）。
+    from app.tenant.strategy import repository as strategy_repo
+    strategy_documents = [{"id": str(sid), "title": title}
+                          for sid, title in strategy_repo.strategy_docs_for_quest(ts, quest.id)]
     return {
         "id": str(quest.id),
         "title": quest.title,
@@ -1597,6 +1638,7 @@ def _build_detail(ts, quest, viewer_id) -> dict:
             "avatar_image_url": _image_url(owner.avatar_image_path) if owner else None,
         },
         "quest_groups": quest_groups,
+        "strategy_documents": strategy_documents,  # 適用中の経営資料（R.1b・編集プリフィル/詳細表示）
         "my_state": "draft" if quest.status == "draft" and quest.owner_id == viewer_id else "member",
         "my_permissions": my_permissions,
         "members": member_dtos,

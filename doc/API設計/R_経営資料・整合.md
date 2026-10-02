@@ -33,9 +33,9 @@
 - 検証（§4.7）＝`title` 必須・`doc_kind` はホワイトリスト（`midterm_plan`/`policy`/`strategy`/`other`）・`period_from<=period_to`・`focus_areas` は文字列配列。
 - `body_text` ＝ `intent`＋`policy_commitment`＋`strategy`＋`focus_areas`＋`objectives`＋`body_md` を連結（トークン化/検索の素材・§5.54）。
 
-## R.1b クエストへの適用資料の選択（母集合の決定・C ドメイン連携）
+## R.1b クエストへの適用資料の選択（母集合の決定・C ドメイン連携）＝実装済み（2026-10-02）
 
-- **クエスト作成/編集**（`POST/PATCH /quests`・C ドメイン）に **`strategy_document_ids[]`**（0..N）を追加＝適用する経営資料を作成者が手動選択（参加グループ `quest_group_ids[]` と同型）。中間表 `quest_strategy_documents`（§5.56）へ reconcile。
+- **クエスト作成/編集**（`POST/PATCH /quests`・C ドメイン）に **`strategy_document_ids[]`**（0..N）を追加＝適用する経営資料を作成者が手動選択（参加グループ `quest_group_ids[]` と同型）。中間表 `quest_strategy_documents`（§5.56）へ reconcile。**クエスト詳細（`GET /quests/{id}`）は適用中資料を `strategy_documents[]`（id+title）で返す**＝SC-11 編集フォームのプリフィル源。無効/archived な ID は 422（`field=strategy_document_ids`）。backend＝`quests/application._apply_strategy_docs`（validate＋`strategy_repo.reconcile_quest_docs`＋`recompute_for_quest(award=True)`）。frontend＝SC-11 QuestForm の Multiselect（`GET /strategy-documents?for=selection`・参加グループ同型）。テスト＝R-TC-122。
 - 選択元＝`GET /strategy-documents?for=selection`（active 資料の軽量一覧・クエスト作成権限者）。日付範囲による自動割当はしない（作成者が該当年度の有効資料を選ぶ）。
 - **版履歴**＝選択は**クエスト定義スナップショット**（`quest_revisions`・§3.1）に `strategy_document_ids` として含める＝**選択変更で quest_revision を1版追加**（categories／参加グループと同様）。
 - **選択変更時の再計算**＝配下アイデア × 変更後集合で `idea_alignment` を再計算（率は動く）。**コインは維持**（付与し直さない・§R.3）。

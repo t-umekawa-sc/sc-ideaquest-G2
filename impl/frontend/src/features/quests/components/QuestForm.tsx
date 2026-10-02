@@ -29,6 +29,7 @@ import {
   type QuestGroup,
   type QuestMemberInput,
 } from "../api";
+import { fetchStrategySelection } from "@/features/strategy/api";
 import "@/features/companies/companies.css";
 import "../quests.css";
 
@@ -72,7 +73,7 @@ const uiPermsToApi = (perms: Record<PermKey, boolean>): string[] =>
 // 編集の無変更判定用＝内容の正規化シグネチャ（順序非依存・デザイン標準 §14）。同値なら edit-save で API を呼ばない。
 function questContentSig(o: {
   title: string; color: string; categories: string[]; deadline: string; purpose: string;
-  deptIds: string[]; discoverable: boolean; members: { user_id: string; permissions?: string[] | null }[];
+  deptIds: string[]; strategyDocIds: string[]; discoverable: boolean; members: { user_id: string; permissions?: string[] | null }[];
 }): string {
   return JSON.stringify({
     title: o.title.trim(),
@@ -81,6 +82,7 @@ function questContentSig(o: {
     deadline: o.deadline || null,
     purpose: o.purpose.trim() || null,
     deptIds: [...o.deptIds].sort(),
+    strategyDocIds: [...o.strategyDocIds].sort(),
     discoverable: o.discoverable,
     members: o.members
       .map((m) => ({ u: m.user_id, p: [...(m.permissions ?? [])].sort() }))
@@ -174,6 +176,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             categories?: string[];
             purpose?: string;
             quest_group_ids?: string[];
+            strategy_document_ids?: string[]; // 適用経営資料（R.1b）＝複製で引き継ぐ
             // 複製で引き継ぐパーティー（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
             members?: { user_id: string; display_name: string; permissions?: string[]; group_ids?: string[] }[];
             deadline?: string;
@@ -199,6 +202,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   // 参加部署（アクセス条件・フラット 0..N・すべて同格）。主グループの概念は無い。
   const [deptIds, setDeptIds] = useState<string[]>(dup?.quest_group_ids ?? []);
   const [deptNamesPrefill, setDeptNamesPrefill] = useState<Record<string, string>>({}); // 編集時、所属外部署名の補完
+  // 適用する経営資料（R.1b・§5.56）＝整合率の母集合。選択肢は active 資料（選択用軽量一覧）。
+  const [strategyDocIds, setStrategyDocIds] = useState<string[]>(dup?.strategy_document_ids ?? []);
+  const [strategyDocNames, setStrategyDocNames] = useState<Record<string, string>>({}); // id→title（選択肢＋編集プリフィル補完）
   const [candidates, setCandidates] = useState<QuestCandidate[]>([]); // 取得済みの候補（ページ累積）
   const [candCursor, setCandCursor] = useState<string | null>(null); // 次ページカーソル（キーセット・C.4）
   const [candHasNext, setCandHasNext] = useState(false);
@@ -255,6 +261,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     };
   }, []);
 
+  // 適用経営資料の選択肢＝active な経営資料（選択用軽量一覧・R.1b）。id→title を蓄積（選択チップの表示名）。
+  useEffect(() => {
+    let alive = true;
+    const ac = new AbortController();
+    void fetchStrategySelection(undefined, ac.signal)
+      .then((docs) => { if (alive) setStrategyDocNames((prev) => ({ ...prev, ...Object.fromEntries(docs.map((d) => [d.id, d.title])) })); })
+      .catch(() => {});
+    return () => { alive = false; ac.abort(); };
+  }, []);
+
   // 作成モード＝作成者（＝自分）の所属グループを取得（チップ表示用・req2）。GET /quest-groups＝自分の有効所属。
   useEffect(() => {
     if (isEdit) return;
@@ -281,6 +297,10 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         const linked = d.quest_groups ?? [];
         setDeptIds(linked.map((g) => g.id));
         setDeptNamesPrefill(Object.fromEntries(linked.map((g) => [g.id, g.name])));
+        // 適用中の経営資料（R.1b）をプリフィル＝id と表示名の補完（アーカイブ済みで選択肢に無くても名前が出る）。
+        const sdocs = d.strategy_documents ?? [];
+        setStrategyDocIds(sdocs.map((s) => s.id));
+        setStrategyDocNames((prev) => ({ ...prev, ...Object.fromEntries(sdocs.map((s) => [s.id, s.title])) }));
         setStatus(d.status);
         setDiscoverable(d.discoverable ?? false);
         setOwnerLabel(d.owner.display_name);
@@ -305,6 +325,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         initialSigRef.current = questContentSig({
           title: d.title, color: d.color || DEFAULT_COLOR, categories: d.categories ?? [],
           deadline: d.deadline ?? "", purpose: d.purpose ?? "", deptIds: linked.map((g) => g.id),
+          strategyDocIds: sdocs.map((s) => s.id),
           discoverable: d.discoverable ?? false,
           members: (d.members ?? []).filter((m) => !m.is_creator).map((m) => ({
             user_id: m.user.user_id, permissions: uiPermsToApi(permsFromApi(m.permissions ?? [])),
@@ -405,6 +426,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const deptOptions = useMemo<MultiselectOption[]>(
     () => directory.map((g) => ({ value: g.id, label: g.name })),
     [directory],
+  );
+
+  // 適用経営資料の選択肢＝active 資料（＋編集でプリフィルした資料名）。id→title から生成（R.1b）。
+  const strategyDocOptions = useMemo<MultiselectOption[]>(
+    () => Object.entries(strategyDocNames).map(([value, label]) => ({ value, label })),
+    [strategyDocNames],
   );
 
   // グループ id → 表示名（候補の部署バッジ）。会社ディレクトリ＋編集時の補完名。
@@ -540,7 +567,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     // 編集の内容保存で無変更なら API を呼ばず info「変更はありません」（発行/公開/パーティーは対象外・デザイン標準 §14）。
     if (kind === "edit-save") {
       const sig = questContentSig({
-        title: name, color, categories, deadline, purpose: theme, deptIds, discoverable, members: buildMembers(),
+        title: name, color, categories, deadline, purpose: theme, deptIds, strategyDocIds, discoverable, members: buildMembers(),
       });
       const iconChanged = !!iconFile || iconRemoved;
       if (initialSigRef.current !== null && sig === initialSigRef.current && !iconChanged) {
@@ -558,16 +585,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         const created = await createQuest({
           ...contentPayload(),
           quest_group_ids: deptIds, // 参加部署（フラット 0..N・空も可＝全社）
+          strategy_document_ids: strategyDocIds, // 適用経営資料（R.1b・空も可）
           status: kind === "create-publish" ? "recruiting" : "draft",
           discoverable, // 発見カタログ掲載トグル（FR-40・C.9.0）
         });
         if (created) await applyIcon(created.id);
       } else if (kind === "edit-save") {
-        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: deptIds, discoverable });
+        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: deptIds, strategy_document_ids: strategyDocIds, discoverable });
         await applyIcon(questId!);
       } else {
-        // edit-publish（draft→recruiting）＝参加部署の差分を先に反映してから公開。
-        await updateQuest(questId!, { quest_group_ids: deptIds, discoverable });
+        // edit-publish（draft→recruiting）＝参加部署・経営資料の差分を先に反映してから公開。
+        await updateQuest(questId!, { quest_group_ids: deptIds, strategy_document_ids: strategyDocIds, discoverable });
         await publishQuest(questId!, contentPayload());
         await applyIcon(questId!);
       }
@@ -718,6 +746,21 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               placeholder="グループを検索…（未選択なら全社）"
               ariaLabel="参加グループ（アクセス条件）"
               emptyText="該当するグループがありません"
+            />
+          </Field>
+        )}
+
+        {/* 適用する経営資料（R.1b・§5.56）＝整合率の母集合を作成者が手動選択（参加グループ同型・任意）。 */}
+        {!frozen && (
+          <Field className="dialog-section is-quiet" id="q_strategy_docs" label="適用する経営資料（任意）" hint="このクエストに適用する中長期計画・方針資料を選びます。配下アイデアの「方針との関連度」を算出する母集合になります（未選択なら整合率は付きません）。経営資料は管理者が登録します。">
+            <Multiselect
+              id="q_strategy_docs"
+              options={strategyDocOptions}
+              value={strategyDocIds}
+              onChange={setStrategyDocIds}
+              placeholder="経営資料を検索…（任意）"
+              ariaLabel="適用する経営資料"
+              emptyText="選択できる経営資料がありません（管理者が登録します）"
             />
           </Field>
         )}
