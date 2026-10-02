@@ -6,8 +6,8 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `2e6bcc1b docs(handoff)` の上に **Step2b-2 単一ポリシー統合**（本セッション・未コミットなら要 commit/push）
-- working tree: Step2b-2 の変更あり（`access.py` 新規＋4ゲート編集＋テスト＋doc）。commit/push はユーザー承認後。
+- 最新コミット: `5fd88ead feat(contest): Step2b-2 単一ポリシー統合`（commit＋origin/main へ push 済）
+- working tree: clean（全コミット済・push 済）
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB）。ゲーミフィケーション付き。
