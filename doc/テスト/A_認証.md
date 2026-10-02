@@ -238,3 +238,18 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-113 | api | MFA 発行と検証結果を監査記録 | MFA 必須会社のアカウント | `login`→OTP メール→`mfa/verify`（誤コード→正コード） | `login` 時 `auth.mfa.issued`／誤コードで `auth.mfa.verify`(result=failure)／正コードで `auth.mfa.verify`(result=success)＋`auth.login.success`(mfa=true)。OTP はどの detail にも含まない | A.9-⑥／ADR-0004 |
 | A-TC-114 | api | logout / logout-all を監査記録 | ログイン済み | `POST /auth/logout`／別セッションで `logout-all` | `auth.logout`（account_id）／`auth.logout_all`（account_id） | A.9-⑥ |
 | A-TC-115 | api | PW 再設定リクエスト（自己サービス）を監査記録＝管理者起点と区別 | 実アカウント（active） | `POST /auth/password-setup/request` | `auth.password_setup.request`（detail に account_id・`origin=self_service`／token を含まない）。列挙耐性の 202 は不変・非適格は無記録 | A.9-⑥／A.7 |
+
+## セルフサインアップ＋公開/非公開モード（FR-48・API A.11・設計 §8）
+
+> **状態＝TC 先出し（実装未着手・FR-48）**。セルフサインアップは未認証・公開の書込口＝SEC A〜J（A.11.4）を受入条件とする。`公開/非公開モード` の外周ガードは T ドメイン（[T_アイデアコンテスト](T_アイデアコンテスト.md) §6・T-TC-150/151/201）にも関連。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-120 | api | 公開ブートストラップ＝既定会社コードの有無 | env `IQ_DEFAULT_COMPANY_CODE` 設定/未設定 | `GET /public/bootstrap`（未認証） | 設定時 `{default_company_code}` を返す／未設定は null（会社コード欄を出す）。`DEMO` をコードに焼かない | A.11.2／決定L |
+| A-TC-121 | api | 検証前にアカウントを作らない（SEC A・最重要）＝signup は pending のみ | `self_signup_enabled=true` 会社 | `POST /public/signup`（会社コード/ID/メール/PW） | 202（一律）・**accounts は未作成**（pending を otp_challenges/署名トークンで保持・PW は Argon2id）・メールへ認証コード | A.11.3／SEC A |
+| A-TC-122 | api | 検証成功で初めて accounts INSERT＝role/company/status はサーバー権威 | signup pending 済み | `POST /public/signup/verify`（正コード） | accounts 1行（role=general・company_id=解決値・status=active・email_verified）・会社DBミラー・Tier1 自動approved・管理者通知／client の role/company_id/capability は無視（SEC E） | A.11.3／決定N/G／SEC E |
+| A-TC-123 | api | 列挙耐性（SEC B）＝会社コード/重複を in-band で明かさない | 既存 login_id/email・非対象会社 | `POST /public/signup`（重複/非対象） | 一律 202（成功と区別不能）・既存メールへ out-of-band 通知・会社コード誤り/`self_signup_enabled=false` も一律 reject で区別不能 | A.11.3／SEC B |
+| A-TC-124 | api | テナント/会社コード改竄の再検証（SEC F） | `self_signup_enabled=false` 会社コードを送信 | `POST /public/signup`（private 会社コード） | 一様 reject（`private` 会社への勝手な登録を防止）・サーバーが対象会社の self_signup_enabled を再検証 | A.11.3／SEC F |
+| A-TC-125 | api | OTP ブルート耐性＋再送レート制限（SEC C） | signup pending | 誤コード連打／再送連打 | 試行回数ロック・定数時間比較・短命単回・再送レート制限（メール爆撃防止） | A.11.4／SEC C |
+| A-TC-126 | api | self_signup_enabled=false の会社は signup 不可（opt-in・決定M） | `self_signup_enabled=false` | `POST /public/signup` | 一様 reject（アカウント作られない） | §8.2／決定M |
+| A-TC-127 | api | CSRF/Origin・レート制限（SEC G） | 未認証POST | Origin 不一致／大量作成 | Origin/Sec-Fetch 検証で弾く・IP/メール単位レート制限＋時間窓上限 | A.11.4／SEC G |

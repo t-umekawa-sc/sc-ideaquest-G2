@@ -180,3 +180,45 @@ stateDiagram-v2
 
 ### 再検討の条件（将来）
 - 共有ストア無しで複数の独立サービスへトークンを持ち回る必要が出た場合、モバイル/外部 API/SSO（OIDC・現状 Could）が主体になった場合は、`Authorization: Bearer`（署名検証＋短命アクセストークン＋リフレッシュ回転＋失効リスト）を**追加**で検討（Cookie セッションは Web 向けに併存可）。
+
+## A.11 セルフサインアップ＋公開/非公開モード（FR-48・[アイデアコンテスト機能 設計](../設計ドラフト/アイデアコンテスト機能_設計.md) §8）
+
+> 公開（デモ）会社向けの**未認証・公開の書込口**＝攻撃面。本節のEPは [セキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)・[コーディング規約](../規約/コーディング規約.md) §2 と突合した**必須要件（SEC A〜J）**を満たすこと。
+
+### A.11.1 会社の公開/非公開モード（`companies.access_mode`）＝authz の権威
+- `access_mode ∈ {private, public}`（既定 `private`・データモデル §4.1）が authz/メニュー/導線の唯一の正。
+- **`public` 会社の外周ガード**＝`session.company.access_mode='public'` かつ `role=general` のリクエストは、**コンテスト系許可リスト外のEPをすべて 403**（`forbidden`）。UI 非表示に依存しない（§1.6・サーバー権威）。ミドルウェア/依存性で一元適用。
+  - 許可リスト＝ドメイン T（コンテスト）／コンテスト配下の D（アイデア/投票）・F（評価）・E（チャット）／A（認証・セッション）・K（プロフィール）・H（コンテスト関連通知）。
+  - **決定O**＝`system_admin`/`company_account_admin` は `public` でも管理系EPを保持（デモ運営）。403 は `role=general` のみ。
+- **決定P**＝`public` は SC-01 を描画せず SC-50 着地（クエスト系 `<Link>` を出さない＝UI と 403 の二重封鎖）。
+
+### A.11.2 公開ブートストラップ（会社コードの出し分け）
+
+| メソッド / パス | 概要 | 補足 |
+|---|---|---|
+| `GET /public/bootstrap`（**未認証**） | デプロイ既定会社コードの有無等 | 既定会社コードがあれば `{default_company_code}` を返す＝SC-00 の会社コード欄を非表示＋自動セット。既定は**環境変数 `IQ_DEFAULT_COMPANY_CODE`**（デモ用デプロイのみ・決定L・`DEMO` をコードに焼かない） |
+
+### A.11.3 セルフサインアップ（検証前にアカウントを作らない）
+
+| メソッド / パス | 概要 | 補足 |
+|---|---|---|
+| `POST /public/signup`（**未認証**） | アカウント作成リクエスト（`{company_code, login_id, email, password}`） | 対象会社が `self_signup_enabled=true` か検証（否は一様reject）。**アカウントは作らず** pending（署名トークン/`otp_challenges.purpose=email_verify` に束ね）で保持・PW は即 Argon2id。**一律 `202`**（列挙耐性）＝メールへ認証コード送信。既存メールには out-of-band で「既にアカウントがあります」通知 |
+| `POST /public/signup/verify`（**未認証**） | 認証コード検証 → アカウント確定 | **検証成功で初めて `accounts` INSERT**（一意性は commit 時）＝`role=general`・`company_id`=解決値・`status=active`（決定N・即 active）・`email_verified_at=now`・`password_set=true`。outbox で会社DBミラー＋Tier1 自動 `approved`（決定G）＋管理者へ新規登録通知（レート制限/ダイジェスト） |
+
+- 既存の **email_verify OTP＋MFA画面（SC-00 状態C）を再利用**（UIを増やさない）。PW は登録時入力のため `password_setup` リンク不要。
+- 許可条件（決定M）＝会社フラグ `self_signup_enabled`（既定 `false`・`public`/`private` 問わず opt-in）。現行 FR-03「管理者発行のみ」をこの opt-in で限定緩和。
+
+### A.11.4 セキュリティ必須要件（SEC A〜J・FR-48 実装の受入条件）
+
+| # | 項目 | 要件 |
+|---|---|---|
+| **A** | 検証前に作らない（構造・最重要） | 入力は pending（署名トークン/`otp_challenges`）で保持し、**コード検証成功で初めて `accounts` INSERT**（一意性は commit 時）＝login_id/email スクワッティング（DoS）・accounts 汚染を防止 |
+| **B** | 列挙耐性 | 会社コード/`self_signup_enabled`/login_id/email 重複を in-band で明かさない（一律 202・out-of-band で既存アカウント通知）。password-setup の一様応答に倣う |
+| **C** | OTP ブルートフォース | 認証コードは短命（例10分）・単回・試行回数ロック・定数時間比較・推測不可トークンに束ねる。**再送もレート制限**（メール爆撃防止） |
+| **D** | パスワード | 受領後即 Argon2id ハッシュ化（平文保持/ログ出力禁止）・最低文字数＋漏洩PW拒否・TLS 必須 |
+| **E** | マスアサインメント/権限固定 | `role=general`・`company_id`・`status`・capabilities は**サーバーが権威設定**。client の `role/company_id/is_admin/capability` は無視 |
+| **F** | テナント/会社コード改竄 | 別会社コードを送られても、**対象会社の `self_signup_enabled=true` を再検証**。否は一様reject（`private` 会社への勝手な登録を防止） |
+| **G** | CSRF/Origin・自動化 | 未認証POSTでも Origin/Sec-Fetch 検証・IP/メール単位レート制限＋新規作成の時間窓上限・public は CAPTCHA・使い捨てメールドメイン検討 |
+| **H** | 即 active の濫用面 | 新規アカウントの投稿レート制限・モデレーション・通報。管理者通知の大量化（サインアップ爆撃）をレート制限/ダイジェスト化 |
+| **I** | セッション | 自動ログインするなら新規セッション発行（固定化対策）。`email_verify` トークンで既存アカウントのセッションを取得できないよう purpose を厳格分離 |
+| **J** | ログ・監査・PII | PW/コードをログに出さない・試行を request_id/tenant 付きで監査・public はデータ保持/削除方針（デモ後クリーンアップ）・PII最小化（表示名以外を要求しない） |
