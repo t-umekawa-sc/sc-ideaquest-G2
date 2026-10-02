@@ -45,9 +45,9 @@
   - `npx playwright test --list` ＝exit 0・161 tests / 60 files（@serial 43／会社スコープ 118 に分離・@serial を含む spec はちょうど14本）。
 - **per_page 脆弱性の硬化（本セッション）**＝SC-91 会社一覧は初期 `per_page=5`。会社数が増える（N=7＝9社）と OPS 系テストが前提する「ACME-01 が無絞りの先頭ページにいる」が崩れる（backend 既定ソート＝`created_at, id`・タイブレーク依存）。対象9本（sc-91 B-TC-110／sc-92b 114,125／sc-92b2 115,178／sc-92c 116,117,179／sc-92d 169）に ACME-01 の `searchbox.fill` を前置して N 非依存化（手法は同spec B-TC-139 と同じ）。
 - **壊れているもの＝無し**。残フレークは全て既知タイミングで retry 吸収（恒久対策は §7-P5）。
-- **未確認（次回要再検証）**:
-  - **backend pytest は本セッション未実行**（前回907 passed）。今回の変更は e2e テストコードのみ＝backend 無関係のはずだが未確認。
-  - **frontend vitest は本セッション未実行**（前回218 passed）。
+- **回帰確認済み（本セッション末）**:
+  - **backend pytest＝907 passed**（クリーン N=0 DB で確認・前回同値）。**落とし穴＝iqe2e スタック(N>0)のまま pytest を回すと 408 errors**＝`env` fixture が control-plane を `login_id` だけで `.one()` 照会し、N社ぶんの同一 login_id で `MultipleResultsFound`。pytest は必ず **N=0・会社DB クリーン**な DB で（`down -v` → N=0 で `up` が確実）。
+  - **frontend vitest＝218 passed**（ホスト実行・スタック不要・前回同値）。
   - **tsc は e2e を型検査していない**（§5 の学び）。本セッションで `npx tsc --noEmit` は `src/features/info-input/api.test.ts`・`src/features/quests/joinRequests.api.test.ts` の2件で既に赤（feature track の既存エラー・本トラック変更外・未修正）。
 
 ## 5. 詰まっている点（試して失敗した / なぜ）
