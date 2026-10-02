@@ -4060,6 +4060,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/accounts/{uid}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Account Capabilities */
+        get: operations["list_account_capabilities_api_v1_admin_accounts__uid__capabilities_get"];
+        put?: never;
+        /** Grant Account Capability */
+        post: operations["grant_account_capability_api_v1_admin_accounts__uid__capabilities_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{uid}/capabilities/{capability}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Account Capability */
+        delete: operations["revoke_account_capability_api_v1_admin_accounts__uid__capabilities__capability__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Contests */
+        get: operations["list_contests_api_v1_contests_get"];
+        put?: never;
+        /** Create Contest */
+        post: operations["create_contest_api_v1_contests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contests/{contest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Contest */
+        get: operations["get_contest_api_v1_contests__contest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Contest */
+        patch: operations["update_contest_api_v1_contests__contest_id__patch"];
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -4717,6 +4788,16 @@ export interface components {
         Body_rehost_info_image_api_v1_info_items_images_post: {
             /** File */
             file: string;
+        };
+        /** CapabilityGrantRequest */
+        CapabilityGrantRequest: {
+            /** Capability */
+            capability: string;
+        };
+        /** CapabilityListResponse */
+        CapabilityListResponse: {
+            /** Capabilities */
+            capabilities: string[];
         };
         /** ChatActivityDaily */
         ChatActivityDaily: {
@@ -5725,6 +5806,112 @@ export interface components {
              * @default 0
              */
             oppose: number;
+        };
+        /** ContestCreateRequest */
+        ContestCreateRequest: {
+            /** Theme */
+            theme: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Mode
+             * @default bounded
+             */
+            mode: string;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Auto Archive Days */
+            auto_archive_days?: number | null;
+            /** Prize Config */
+            prize_config?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ContestDetail */
+        ContestDetail: {
+            /** Id */
+            id: string;
+            /** Quest Id */
+            quest_id: string;
+            /** Mode */
+            mode: string;
+            /** Status */
+            status: string;
+            /** Theme */
+            theme: string;
+            /** Description */
+            description?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Auto Archive Days */
+            auto_archive_days?: number | null;
+            /** Prize Config */
+            prize_config?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Idea Count
+             * @default 0
+             */
+            idea_count: number;
+        };
+        /** ContestListItem */
+        ContestListItem: {
+            /** Id */
+            id: string;
+            /** Mode */
+            mode: string;
+            /** Status */
+            status: string;
+            /** Theme */
+            theme: string;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ContestListResponse */
+        ContestListResponse: {
+            /** Data */
+            data: components["schemas"]["ContestListItem"][];
+        };
+        /** ContestUpdateRequest */
+        ContestUpdateRequest: {
+            /** Theme */
+            theme?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Auto Archive Days */
+            auto_archive_days?: number | null;
+            /** Prize Config */
+            prize_config?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * DirectoryItem
@@ -17879,6 +18066,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiUsageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_account_capabilities_api_v1_admin_accounts__uid__capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_account_capability_api_v1_admin_accounts__uid__capabilities_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapabilityGrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_account_capability_api_v1_admin_accounts__uid__capabilities__capability__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uid: string;
+                capability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_contests_api_v1_contests_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_contest_api_v1_contests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContestCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contest_api_v1_contests__contest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_contest_api_v1_contests__contest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContestUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestDetail"];
                 };
             };
             /** @description Validation Error */
