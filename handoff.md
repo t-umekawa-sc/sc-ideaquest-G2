@@ -37,16 +37,15 @@
 - `sc-22-quest-ref` は categories を helpers 既定（`["業務改善"]`）に寄せて positional 引数を除去。
 
 ## 4. 現在の状態
-- **移行済み＝会社スコープ 43本**（`grep -l 'from "./helpers"' impl/frontend/e2e/*.spec.ts | wc -l` ＝43 で確認）。会社スコープで helpers 未集約の spec は無し。
-- **確認済み（本セッション・iqe2e スタック N=3・workers=3 で実機実行）**:
-  - P1 代表3本（sc-25-eval/sc-30-32-balance-sync/sc-12-ideas）＝16 passed / 0 failed。
-  - P3-1 SC-22 系8本＝25 passed / 1 failed（D-TC-215）。
-  - P3-2 psql/info/csrf 9本＝23 passed / 0 failed。
-  - P3-3 会社スコープ残り23本＝61 passed / 1 failed（M-TC-013）。
-  - `npx playwright test --list` ＝exit 0・161 tests / 60 files がコンパイル（毎バッチで確認）。
-- **壊れているもの＝無し**。2件の失敗はいずれも**移行起因でない既存のタイミングフレーク**と立証済み（§5）。
-- **未確認（要注意・次回必ず明記して再検証）**:
-  - **フル e2e（N=7・全spec）は本セッション未実行**＝N=3 の移行対象バッチのみ実機確認。前回 handoff のフル実測（12 failed/5 flaky/144 passed）が現状も成立するかは未確認。
+- **移行済み＝会社スコープ 43本**（helpers 集約・前セッション）＋**P2＝control-plane 14本に @serial 付与・会社数脆弱性9本を硬化（本セッション 2026-10-02）**。
+- **フル e2e N=7 実測済み（本セッション・iqe2e スタック N=7・2パス）＝ハード失敗 0**:
+  - **bulk パス**（会社スコープ 118本・workers=7・`npm run e2e:bulk`）＝**113 passed / 5 flaky / 0 failed**。flaky5＝既知タイミング（sc-03-images/sc-18-loading/D-TC-215/sc-12-quest-detail/sc-50-info-to-quest-draft・retry 吸収）。
+  - **control パス**（@serial 43本・workers=1・`npm run e2e:control`・`MAILHOG_URL=:8125` 必須）＝**45 passed / 1 flaky / 0 failed**。flaky1＝B-TC-115（§7-P5 既知の編集反映タイミング・retry 吸収）。
+  - **合計＝158 passed / 6 flaky / 0 failed**。前回フル N=7（12 failed/5 flaky/144 passed）→ **0 failed に到達**（control-plane の並列競合を @serial 直列化で解消＋per_page 脆弱性を硬化）。
+  - `npx playwright test --list` ＝exit 0・161 tests / 60 files（@serial 43／会社スコープ 118 に分離・@serial を含む spec はちょうど14本）。
+- **per_page 脆弱性の硬化（本セッション）**＝SC-91 会社一覧は初期 `per_page=5`。会社数が増える（N=7＝9社）と OPS 系テストが前提する「ACME-01 が無絞りの先頭ページにいる」が崩れる（backend 既定ソート＝`created_at, id`・タイブレーク依存）。対象9本（sc-91 B-TC-110／sc-92b 114,125／sc-92b2 115,178／sc-92c 116,117,179／sc-92d 169）に ACME-01 の `searchbox.fill` を前置して N 非依存化（手法は同spec B-TC-139 と同じ）。
+- **壊れているもの＝無し**。残フレークは全て既知タイミングで retry 吸収（恒久対策は §7-P5）。
+- **未確認（次回要再検証）**:
   - **backend pytest は本セッション未実行**（前回907 passed）。今回の変更は e2e テストコードのみ＝backend 無関係のはずだが未確認。
   - **frontend vitest は本セッション未実行**（前回218 passed）。
   - **tsc は e2e を型検査していない**（§5 の学び）。本セッションで `npx tsc --noEmit` は `src/features/info-input/api.test.ts`・`src/features/quests/joinRequests.api.test.ts` の2件で既に赤（feature track の既存エラー・本トラック変更外・未修正）。

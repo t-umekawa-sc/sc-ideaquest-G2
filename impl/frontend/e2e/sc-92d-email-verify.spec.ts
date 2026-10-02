@@ -17,6 +17,7 @@ async function login(page: Page) {
 test("B-TC-169 unverified badge and send verification action", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
 

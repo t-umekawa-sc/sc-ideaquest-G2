@@ -26,7 +26,8 @@ test("B-TC-110 system admin sees company list", { tag: "@serial" }, async ({ pag
   // 見出しはモック準拠＝page-title「システム管理（運営）」＋ section-head「会社（テナント）」。
   await expect(page.getByRole("heading", { name: "システム管理（運営）" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "会社（テナント）" })).toBeVisible();
-  await expect(page.getByText("ACME-01")).toBeVisible();
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
+  await expect(page.getByRole("row", { name: /ACME-01/ })).toBeVisible();
 });
 
 // B-TC-111: 会社作成＝一覧に現れる（status=suspended＝「停止」バッジ）。作成は URL モーダル（intercept）。

@@ -19,6 +19,7 @@ async function login(page: Page) {
 test("B-TC-114 issue account appears in company account list", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   // ACME-01 の行の会社名リンクから詳細へ
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
@@ -45,6 +46,7 @@ test("B-TC-114 issue account appears in company account list", { tag: "@serial" 
 test("B-TC-125 company account list: search, email column, clear", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   const region = page.getByRole("region", { name: "この会社のアカウント管理" });
   await expect(region.getByRole("columnheader", { name: /メールアドレス/ })).toBeVisible();

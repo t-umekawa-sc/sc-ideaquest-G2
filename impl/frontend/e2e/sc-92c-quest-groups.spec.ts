@@ -18,6 +18,7 @@ async function login(page: Page) {
 test("B-TC-117 create dialog keeps focus while typing name", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
@@ -37,6 +38,7 @@ test("B-TC-117 create dialog keeps focus while typing name", { tag: "@serial" },
 test("B-TC-116 quest group create/rename/delete", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
@@ -77,6 +79,7 @@ test("B-TC-116 quest group create/rename/delete", { tag: "@serial" }, async ({ p
 test("B-TC-179 no-change rename shows info toast (no success)", { tag: "@serial" }, async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
+  await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
