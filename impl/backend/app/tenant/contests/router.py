@@ -1,0 +1,52 @@
+"""アイデアコンテストルータ（`/api/v1/contests`・テナントプレーン・ドメイン T・FR-46）。
+
+read（一覧/詳細）＝会社内 active ユーザー（require_me）。作成/編集＝②能力 `contest_create`（または管理者）を
+application 層で検証（二重防御）。変更系は CSRF/Origin（A.0）。参加/評価/表彰は後続ステップ（T.2/T.3）。
+"""
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, Request
+
+from app.control_plane.me.deps import require_me
+from app.core.deps import verify_csrf, verify_origin
+from app.tenant.contests import application as service
+from app.tenant.contests.schemas import (
+    ContestCreateRequest,
+    ContestDetail,
+    ContestListResponse,
+    ContestUpdateRequest,
+)
+
+router = APIRouter(prefix="/api/v1", tags=["contests"])
+
+
+@router.get("/contests", response_model=ContestListResponse)
+def list_contests(request: Request, status: str | None = None, session: dict = Depends(require_me)):
+    return service.list_contests(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), status=status)
+
+
+@router.get("/contests/{contest_id}", response_model=ContestDetail)
+def get_contest(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    return service.get_contest(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
+@router.post("/contests", response_model=ContestDetail, status_code=201,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def create_contest(body: ContestCreateRequest, request: Request, session: dict = Depends(require_me)):
+    return service.create_contest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        theme=body.theme, description=body.description, mode=body.mode, status=body.status,
+        starts_at=body.starts_at, ends_at=body.ends_at, auto_archive_days=body.auto_archive_days,
+        prize_config=body.prize_config)
+
+
+@router.patch("/contests/{contest_id}", response_model=ContestDetail,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def update_contest(contest_id: str, body: ContestUpdateRequest, request: Request,
+                   session: dict = Depends(require_me)):
+    fields = body.model_dump(exclude_unset=True, exclude={"status"})
+    return service.update_contest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id,
+        fields=fields, status=body.status)
