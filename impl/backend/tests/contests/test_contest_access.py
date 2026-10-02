@@ -93,6 +93,9 @@ def _purge_contest_idea(cid: str, iid: uuid.UUID) -> None:
         ts.execute(_text("DELETE FROM idea_participants WHERE idea_id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM follows WHERE idea_id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM activities WHERE ref_id=:i OR quest_id=:q"), {"i": i, "q": qid})
+        # 公開アイデアは版（idea_revisions）＋利害関係者を持ち得る＝ideas 削除前に掃除。
+        ts.execute(_text("DELETE FROM idea_revisions WHERE idea_id=:i"), {"i": i})
+        ts.execute(_text("DELETE FROM idea_stakeholders WHERE idea_id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM ideas WHERE id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": c})
         ts.commit()
@@ -155,6 +158,33 @@ def test_t_tc_112_vote_tier1_open_chat_tier2_approval(client, factory):
         assert rc2.status_code == 403, rc2.text
     finally:
         _purge_contest_idea(cid, iid)
+
+
+def test_t_tc_115_post_idea_open_to_tier1(client, factory):
+    """T-TC-115(api): コンテスト配下のアイデア投稿＝Tier1 参加者に開放（member/idea_create 権限は不要）・未参加は 403。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    poster = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
+    outsider = factory.make_seed_company_account(display_name=f"未参加_{uuid.uuid4().hex[:6]}")
+    payload = {"title": "応募アイデア", "value": "提案価値", "body": "本文", "status": "published"}
+    created_iid = None
+    try:
+        # Tier1 承認済み＝非クエストメンバーでも投稿可（201）。
+        _approve_tier1(cid, _user_id(poster["id"]))
+        _login(client, SEED_COMPANY_CODE, poster["login_id"], poster["password"])
+        r = client.post(f"/api/v1/quests/{qid}/ideas", json=payload, headers=_csrf(client))
+        assert r.status_code == 201, r.text
+        created_iid = r.json()["id"]
+        # 未参加（Tier1 でない）は 403。
+        _login(client, SEED_COMPANY_CODE, outsider["login_id"], outsider["password"])
+        r2 = client.post(f"/api/v1/quests/{qid}/ideas", json=payload, headers=_csrf(client))
+        assert r2.status_code == 403, r2.text
+    finally:
+        if created_iid:
+            _purge_contest_idea(cid, uuid.UUID(created_iid))
+        else:
+            _cleanup_contest(cid)
 
 
 def test_t_tc_120_evaluate_requires_contest_evaluator(client, factory):

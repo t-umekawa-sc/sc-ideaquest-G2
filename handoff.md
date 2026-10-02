@@ -26,7 +26,8 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **Step1b 能力＋ゲート** `6daaa74d`: `app/tenant/capabilities/`（repository/application/router/schemas）＝`/api/v1/admin/accounts/{uid}/capabilities` GET/POST/DELETE（管理者のみ）。`app/tenant/quests/application.py` の `create_quest` に `_can_create_quest`（管理者 OR quest_create 能力）ゲート追加＝`_is_company_admin`/`_can_create_quest` 新設。migration `0051_grant_quest_create.py`＝既存クエスト作成者へ自動付与（決定K）。seed＝`scripts/bootstrap.py` の `seed_quest_create_capabilities()`。テスト conftest に `factory.grant_capability` ＋ teardown で user_capabilities 掃除。
 - **Step2a コンテスト CRUD＋backing quest** `4a271338`(backend)/`c756ddc3`(frontend): `app/tenant/contests/`（repository/application/router/schemas）＝`GET/POST/PATCH /contests`。作成で backing quest を 1:1 生成（contests.quest_id）・状態機械 draft→open→judging→closed→archived を backing quest.status にマップ。frontend＝`src/features/contests/`（api/types/ContestListView）＋`src/app/(app)/contests/page.tsx`（SC-53）＋`src/components/layout/AppNav.tsx` に「🏆 アイデアコンテスト」。
 - **Step2b-1 参加2階層** `26f72f44`: contests repository に Tier1(contest_participants)/Tier2(idea_participants) の upsert/get/is_*/contest_by_quest。router＝`POST /contests/{id}/participation`・`PATCH /contests/{id}/participation/{uid}`（管理者）・`POST /ideas/{id}/participation`・`PATCH /ideas/{id}/participation/{uid}`（投稿者のみ）。
-- **Step2b-2 単一ポリシー統合（本セッション・未コミット）**: 新モジュール `app/tenant/contests/access.py`（`contest_of`/`can_vote`/`can_chat`/`can_evaluate`）にコンテスト配下のアクセスポリシーを集約（設計 §2.3）。コアゲート4箇所に分岐を1つずつ上乗せ＝①可視: `quests/repository.py:can_access_quest` 先頭に遅延import分岐（contest 配下なら会社全体可視 True）＝**全 read gate 約30を一括カバー**／②投票: `ideas/application.py:_guard_votable`（Tier1 `is_contest_participant`）／③チャット: `chat/application.py:_require_comment`（引数 `idea` 追加＋Tier2 `is_idea_participant`・呼出 L177）／④評価: `evaluations/application.py:_is_evaluator`（`contest_evaluator` 能力のみ・owner/投稿者でも不可）。テスト＝`tests/contests/test_contest_access.py`（T-TC-112/113/120・red→green 証跡あり）。**docs**＝`doc/テスト/T_アイデアコンテスト.md` T-TC-113 行を実装名（access.py）に整合。
+- **Step2b-2 単一ポリシー統合** `5fd88ead`: 新モジュール `app/tenant/contests/access.py`（`contest_of`/`can_vote`/`can_chat`/`can_evaluate`）にコンテスト配下のアクセスポリシーを集約（設計 §2.3）。コアゲート4箇所に分岐を1つずつ上乗せ＝①可視: `quests/repository.py:can_access_quest` 先頭に遅延import分岐（contest 配下なら会社全体可視 True）＝**全 read gate 約30を一括カバー**／②投票: `ideas/application.py:_guard_votable`（Tier1 `is_contest_participant`）／③チャット: `chat/application.py:_require_comment`（引数 `idea` 追加＋Tier2 `is_idea_participant`・呼出 L177）／④評価: `evaluations/application.py:_is_evaluator`（`contest_evaluator` 能力のみ・owner/投稿者でも不可）。テスト＝`tests/contests/test_contest_access.py`（T-TC-112/113/120・red→green 証跡あり）。**docs**＝`doc/テスト/T_アイデアコンテスト.md` T-TC-113 行を実装名（access.py）に整合。
+- **Step2b-2b Tier1 アイデア投稿開放（本セッション・未コミット）**: `access.py` に `can_post_idea`（Tier1）追加。`ideas/application.py:create_idea` の作成権限ゲートにコンテスト分岐＝contest 配下なら Tier1 参加者に投稿を開放（member/`idea_create` 権限を置換・§5.1「自分のアイデア投稿」）。通常クエストは従来の `idea_create` ゲート据え置き。TC＝T-TC-115（md 追記＋テスト・red→green 証跡あり）。
 
 ### B. FR-44 経営資料の仕上げ（コンテスト着手前・同一セッション）
 - R.1b クエスト側から経営資料を適用 `759152f1`＝`app/tenant/quests/`（QuestCreate/Update に strategy_document_ids・`_apply_strategy_docs`）＋QuestDetail に strategy_documents＋SC-11 QuestForm に Multiselect。R-TC-122。
@@ -40,9 +41,9 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 4. 現在の状態
 - **動いている**: backend/frontend は再ビルド済で稼働。コンテスト Step2a/2b-1 の API は dev 反映済。SC-53（`/contests`・ナビ「🏆 アイデアコンテスト」）表示・作成可（管理者 or contest_create）。
 - **テスト通過状況（確認済・2026-10-03 Step2b-2 後）**:
-  - **全backend 927 passed**（Step2b-2 後にフル再実行・回帰ゼロ。2b-1 時点の 924 ＋新規3）。
-  - `tests/contests` 10 passed＝従来7（T-TC-101/101b/102/103/105/110/111）＋**新規3（T-TC-112/113/120）**。
-  - traceability `python3 scripts/check_tc_traceability.py`＝✅（code 951 件すべて md 記載）。
+  - **全backend 928 passed**（Step2b-2b 後にフル再実行・回帰ゼロ。2b-1 時点の 924 ＋新規4）。
+  - `tests/contests` 11 passed＝従来7（T-TC-101/101b/102/103/105/110/111）＋**新規4（T-TC-112/113/115/120）**。
+  - traceability `python3 scripts/check_tc_traceability.py`＝✅（code 952 件すべて md 記載）。
   - red→green 証跡: 4ゲート編集のみ `git stash` して新3本が red（投票=403/評価=404/可視=False）→ pop で green を確認。
 - **未確認**: コンテスト画面（SC-53）の**ブラウザ目視は未実施**（ビルド green のみ）。Step2b-2 は backend ゲートのみ＝**フロントからの体感確認は SC-54 詳細（Step2b-3）実装後**が自然。
 - **壊れているもの**: 既知なし。
@@ -54,7 +55,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **conftest teardown の FK 違反**（user_capabilities が users 削除を阻害）→ teardown に user_capabilities(user_id/granted_by_id) 掃除を追加（`tests/conftest.py`）。
 - **（過去）worker が全 AIジョブを NoReferencedTableError で落とす**→ `ai_jobs/application.py` で FK 先 ORM を side-effect import（解決済・S-TC-132）。
 - **（過去）本番既定モデル qwen3-swallow は Ollama で pull 不可**（hf.co realm 不一致・GGUF 無）→ dev は qwen2.5:0.5b を override（§8）。
-- ~~**2b-2（単一ポリシーのコアゲート統合）は未着手**~~→ **完了（本セッション・§3A Step2b-2）**。可視分岐は `can_access_quest` 中央集約（ユーザー承認の方針）＝最もDRY。**アイデア投稿（create_idea）の Tier1 開放は本ステップのスコープ外**（先出しTC無し・投稿フローと一緒に後続で：現状コンテスト配下でも投稿は従来 member+idea_create 権限ゲートのまま＝非メンバーは 403・回帰ではなく未開放）。
+- ~~**2b-2（単一ポリシーのコアゲート統合）は未着手**~~→ **完了（本セッション・§3A Step2b-2/2b-2b）**。可視分岐は `can_access_quest` 中央集約（ユーザー承認の方針）＝最もDRY。**アイデア投稿（create_idea）の Tier1 開放も対応済**（§3A Step2b-2b・T-TC-115）。
 
 ## 6. 決定事項と根拠（採用しなかった案も）
 - **クエストを器に再利用（B案）**＝contests.quest_id が backing quest を 1:1 で指す。ideas/votes/evaluations/chat は無改修共有。A案（ideas.quest_id を nullable 化）はアクセス制御総取替で影響大のため不採用。
@@ -68,8 +69,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - コミット/push は main 直（本プロジェクトの慣習・ユーザー指示で都度 commit&push）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-0. **（済）Step2b-2 単一ポリシー統合** → §3A・§5 参照（access.py＋4ゲート分岐・全927 green・未コミットなら commit/push）。
-   - **残フォロー（任意・投稿フローと一緒に）**: コンテスト配下での **Tier1 アイデア投稿開放**。現状 `ideas/application.py:create_idea`（L260 付近）はコンテスト配下でも従来 `can_access_quest`→member+`idea_create` ゲートのまま＝Tier1 参加者（非クエストメンバー）は 403。設計 §5.1 の「Tier1=閲覧＋自分のアイデア投稿」を満たすには create_idea にもコンテスト分岐（Tier1 参加者なら投稿可）が要る。先出しTC無し＝新規採番（例 T-TC-115）して追加。
+0. **（済）Step2b-2 単一ポリシー統合＋2b-2b Tier1 投稿開放** → §3A・§5 参照（access.py＋5ゲート分岐＝可視/投稿/投票/チャット/評価・全928 green）。
 1. **Step2b-3 SC-54 コンテスト詳細（frontend）**＝`src/features/contests/components/ContestDetailView.tsx`＋`src/app/(app)/contests/[contestId]/page.tsx`。SC-12 クエスト詳細を流用＝アイデア一覧タブ（応募中/入賞/殿堂入り/お蔵入り＝`contest_idea_flags`＋is_selected 導出）＋Tier1/Tier2 参加導線。codegen 要（`npm run codegen`・backend 起動中）。
 3. **Step2c 表彰**＝`POST /contests/{id}/finalize`（T.1・Idempotency・上位N へ ledger.grant 冪等 reason='contest_award'＋入賞実績＋is_selected＋通知）＋`GET /contests/{id}/ranking`（T.3）。TC＝T-TC-120/130/131/132。
 4. **Step3 公開/非公開モード**＝access_mode 外周ガード（README §1.6・A §A.11.1＝public×general はコンテスト系以外 403）＋`GET /public/bootstrap`。TC＝T-TC-150/151/201＋T-TC-114（public 自動承認）。

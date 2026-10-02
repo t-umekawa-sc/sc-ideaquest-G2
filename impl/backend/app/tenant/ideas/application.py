@@ -261,10 +261,17 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
             raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
         member = quests_repo.get_active_member(ts, qid, user.id)
         _guard_not_completed(quest)
-        # 作成権限＝idea_create（owner は全権限）。作成者は別格でメンバー行が無くても可。
-        perms = quests_repo.get_permissions(ts, member.id) if member else []
-        if user.id != quest.owner_id and "idea_create" not in perms:
-            raise AppError(403, "forbidden", detail="アイデア作成の権限がありません")
+        # 作成権限: コンテスト配下は Tier1 参加者に開放（§5.1・単一ポリシー §2.3）／通常は idea_create 権限（owner は全権限）。
+        from app.tenant.contests import access as contest_access
+        contest = contest_access.contest_of(ts, qid)
+        if contest is not None:
+            if not contest_access.can_post_idea(ts, contest, user.id):
+                raise AppError(403, "forbidden", detail="アイデア投稿にはコンテストへの参加（承認）が必要です")
+        else:
+            # 作成者は別格でメンバー行が無くても可。
+            perms = quests_repo.get_permissions(ts, member.id) if member else []
+            if user.id != quest.owner_id and "idea_create" not in perms:
+                raise AppError(403, "forbidden", detail="アイデア作成の権限がありません")
         if body.status == "published":
             _validate_publishable(title=body.title, value=body.value, body_text=body.body)
         idea = repo.create_idea(
