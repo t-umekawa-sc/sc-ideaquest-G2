@@ -41,6 +41,9 @@ class Quest(CompanyBase):
     # 発見公開フラグ（掲示板 SC-13 に出すか・per-quest opt-in・既定 OFF・FR-40／§5.6）。
     # ON でも中身は非公開＝メタのみ（発見門番 can_discover_quest）。
     discoverable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # アイデア→クエスト昇格（FR-47・決定H）の由来参照。コンテストの有望アイデアを独立業務クエストへ種継ぎした
+    # 際に由来を保持（トレーサビリティ）。通常作成は NULL。コンテストの backing quest（contests.quest_id）とは別物。
+    origin_idea_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ideas.id"), nullable=True)
     # 論理削除（トゥームストーン）。NULL＝有効。値あり＝削除済み（一覧/参照から除外・§5.6）。
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(

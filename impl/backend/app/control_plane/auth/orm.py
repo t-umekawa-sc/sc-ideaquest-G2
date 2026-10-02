@@ -43,6 +43,11 @@ class Company(ControlBase):
     # 経営資料整合の類似度方式（会社別・FR-44・SC-92・A-2）。keyword=キーワード一致／embedding=意味（埋め込み）／
     # hybrid=両者の加重（式は config・会社UIには出さない）。既定 keyword（検証後に切替）。変更で整合率を全再計算。
     alignment_method: Mapped[str] = mapped_column(String(16), nullable=False, default="keyword", server_default="keyword")
+    # 公開/非公開モード（FR-48・設計 §8.0）。private=従来＋コンテスト／public(デモ)=role=general はコンテスト系以外 403・
+    # SC-53 着地（SC-01 非表示）。管理者は例外（決定O）。authz/メニュー/導線の権威。既定 private。
+    access_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="private", server_default="private")
+    # セルフサインアップ許可（FR-48・決定M）。true の会社のみ公開サインアップ可（public/private 問わず opt-in）。既定 false。
+    self_signup_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
