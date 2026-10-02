@@ -1,19 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-93 会社アカウント管理者（自社アカウント管理・doc/テスト/B §13・API設計 B.2.1）。
 // company_account_admin 専用＋system_admin 上位互換。e2e は OPS system_admin（上位互換）で /admin/accounts を検証。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 const GENERAL = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page, c: { company: string; loginId: string; password: string }) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(c.company);
-  await page.locator("#login_id").fill(c.loginId);
-  await page.locator("#password").fill(c.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 async function csrfHeaders(page: Page): Promise<Record<string, string>> {
   const cookies = await page.context().cookies();
@@ -23,7 +14,7 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
 
 // B-TC-117: /admin/accounts（自社固定）で発行→一覧に現れる。
 test("B-TC-117 own-company account issue appears", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/accounts");
   await expect(page.getByRole("heading", { name: "会社アカウント管理" })).toBeVisible();
 
@@ -43,7 +34,7 @@ test("B-TC-117 own-company account issue appears", { tag: "@serial" }, async ({ 
 
 // B-TC-118: 一般ユーザーは SC-93 に入れない（サーバーガード）。
 test("B-TC-118 general user cannot access SC-93", { tag: "@serial" }, async ({ page }) => {
-  await login(page, GENERAL);
+  await formLogin(page, GENERAL);
   await page.goto("/admin/accounts");
   await expect(page).toHaveURL(/\/$/);
 });
@@ -51,7 +42,7 @@ test("B-TC-118 general user cannot access SC-93", { tag: "@serial" }, async ({ p
 // B-TC-124: SC-93 一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
 test("B-TC-124 own-account list: search, email column, clear", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/accounts");
   const region = page.getByRole("region", { name: "自社アカウント管理" });
   await expect(region.getByRole("columnheader", { name: /メールアドレス/ })).toBeVisible();
@@ -85,7 +76,7 @@ test("B-TC-124 own-account list: search, email column, clear", { tag: "@serial" 
 
 // B-TC-122: 自社グループ一覧 EP（/admin/company-quest-groups）で所属ピッカーが機能し、所属付きで発行できる。
 test("B-TC-122 self issue with membership picker", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   const headers = await csrfHeaders(page);
   const stamp = Date.now().toString().slice(-8);
 

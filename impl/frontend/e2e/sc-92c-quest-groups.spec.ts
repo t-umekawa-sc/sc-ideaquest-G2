@@ -1,22 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-92 クエストグループ CRUD（doc/テスト/B §12・API設計 B.3.1）。system_admin 専用。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(OPS.company);
-  await page.locator("#login_id").fill(OPS.loginId);
-  await page.locator("#password").fill(OPS.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
 // B-TC-117: 作成ダイアログのフォーカス保持（Modal の初期フォーカス effect が入力のたびに再実行され
 // 先頭フィールドへ飛ぶバグの回帰）。コード入力後、グループ名に文字入力してもフォーカスが名前に残る。
 test("B-TC-117 create dialog keeps focus while typing name", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
@@ -36,7 +27,7 @@ test("B-TC-117 create dialog keeps focus while typing name", { tag: "@serial" },
 
 // B-TC-116: グループ作成→リネーム→削除（空グループ）の縦通し。
 test("B-TC-116 quest group create/rename/delete", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
@@ -77,7 +68,7 @@ test("B-TC-116 quest group create/rename/delete", { tag: "@serial" }, async ({ p
 
 // B-TC-179: グループ名の無変更保存＝rename API を呼ばず info「変更はありません」（無音にしない・デザイン標準 §14）。
 test("B-TC-179 no-change rename shows info toast (no success)", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1

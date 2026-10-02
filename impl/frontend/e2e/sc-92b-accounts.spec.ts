@@ -1,23 +1,14 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-92 アカウント & 所属（この会社）＝system_admin（doc/テスト/B §9・API設計 B.2/B.5）。
 // 一覧は DataTable（client モード）＝ライブ検索（検索ボタンなし）・件数は list-count「N 件」・
 // 発行/編集後は reload で DataTable が再マウントされ検索欄がクリアされ得るため fill→確認を toPass で再試行。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(OPS.company);
-  await page.locator("#login_id").fill(OPS.loginId);
-  await page.locator("#password").fill(OPS.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
 // B-TC-114: ACME-01 の会社詳細でアカウント発行→一覧に現れる（発行 EP＋一覧）。
 test("B-TC-114 issue account appears in company account list", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   // ACME-01 の行の会社名リンクから詳細へ
@@ -44,7 +35,7 @@ test("B-TC-114 issue account appears in company account list", { tag: "@serial" 
 // B-TC-125: SC-92 会社アカウント一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
 test("B-TC-125 company account list: search, email column, clear", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）

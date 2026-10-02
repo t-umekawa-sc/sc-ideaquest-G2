@@ -1,19 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-91 システム管理（会社一覧）＝system_admin 専用（doc/テスト/B §8・API設計 B.1）。
 // OPS 運営テナントの system_admin（bootstrap seed）でログインして操作する。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 const GENERAL = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page, c: { company: string; loginId: string; password: string }) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(c.company);
-  await page.locator("#login_id").fill(c.loginId);
-  await page.locator("#password").fill(c.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 // ページ遷移（/admin/companies のドキュメント要求）ではなく API fetch（/api/v1/...）に限定して捕捉。
 const isCompaniesApi = (r: { url(): string; method(): string }) =>
@@ -21,7 +12,7 @@ const isCompaniesApi = (r: { url(): string; method(): string }) =>
 
 // B-TC-110: system_admin が会社一覧を表示＝seed 会社（ACME-01）が見える。
 test("B-TC-110 system admin sees company list", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   // 見出しはモック準拠＝page-title「システム管理（運営）」＋ section-head「会社（テナント）」。
   await expect(page.getByRole("heading", { name: "システム管理（運営）" })).toBeVisible();
@@ -32,7 +23,7 @@ test("B-TC-110 system admin sees company list", { tag: "@serial" }, async ({ pag
 
 // B-TC-111: 会社作成＝一覧に現れる（status=suspended＝「停止」バッジ）。作成は URL モーダル（intercept）。
 test("B-TC-111 create company appears in list", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   const code = `E2E-${Date.now().toString().slice(-8)}`;
   await page.getByRole("link", { name: "＋ 会社を作成" }).click(); // トリガは URL モーダルへの Link
@@ -50,7 +41,7 @@ test("B-TC-111 create company appears in list", { tag: "@serial" }, async ({ pag
 // B-TC-160: 会社作成ダイアログは URL 付きモーダル（Parallel@modal＋Intercept・§112）。
 // 一覧からのソフト遷移＝URL が /new になりモーダルが差し込まれ背景の一覧は維持／直アクセス＝フルページ・フォールバック。
 test("B-TC-160 create dialog is a URL modal (intercept) with full-page fallback", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("link", { name: "＋ 会社を作成" }).click();
   await expect(page).toHaveURL(/\/admin\/companies\/new$/); // URL を持つ
@@ -67,7 +58,7 @@ test("B-TC-160 create dialog is a URL modal (intercept) with full-page fallback"
 
 // B-TC-112: 非 system_admin（general）は SC-91 に入れない（サーバーガード＝/ へリダイレクト）。
 test("B-TC-112 general user cannot access SC-91", { tag: "@serial" }, async ({ page }) => {
-  await login(page, GENERAL);
+  await formLogin(page, GENERAL);
   await page.goto("/admin/companies");
   await expect(page).toHaveURL(/\/$/); // ダッシュボードへ差し戻し
 });
@@ -76,7 +67,7 @@ test("B-TC-112 general user cannot access SC-91", { tag: "@serial" }, async ({ p
 // 初期取得は per_page=5（CompanyList の perPage を転送）／会社名ヘッダ click で sort=name が飛ぶ／
 // 件数バッジ（.list-count）が表示される（page_info.total 由来）。並び/件数はサーバーが確定する。
 test("B-TC-137 server mode: initial per_page and sort=name query", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   // ページ遷移（/admin/companies のドキュメント要求）ではなく API fetch（/api/v1/...）に限定して捕捉。
   const isList = (r: { url(): string; method(): string }) =>
     r.url().includes("/api/v1/admin/companies") && r.method() === "GET";
@@ -100,7 +91,7 @@ test("B-TC-137 server mode: initial per_page and sort=name query", { tag: "@seri
 // B-TC-138: 項目別フィルタ（§1.8.1②）がサーバー委譲される。状態=停止 を適用→ status=suspended が飛び、
 // 適用中チップ「状態: 停止」が出る（絞込はサーバーが確定＝backend の enum ホワイトリスト）。
 test("B-TC-138 server mode: status filter issues status= query", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
   await page.getByRole("button", { name: /絞り込み/ }).click();
   await page.getByRole("checkbox", { name: "停止" }).check();
@@ -115,7 +106,7 @@ test("B-TC-138 server mode: status filter issues status= query", { tag: "@serial
 // B-TC-139: 行固定（ピン）のページ跨ぎ（§1.8.1④）。ACME-01 を固定→状態=停止 で絞ると母集合（data）からは
 // 外れるが、pin_ids でサーバーが解決して pinned に返すため固定セクションに残り続ける（絞込非依存）。
 test("B-TC-139 server mode: pinned row survives an excluding filter", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
   // ACME-01（active）を検索で出して固定する。
   await page.getByRole("searchbox").fill("ACME-01");
@@ -140,7 +131,7 @@ test("B-TC-139 server mode: pinned row survives an excluding filter", { tag: "@s
 // B-TC-140: CSV エクスポート（§1.8.1③）。エクスポート押下→同一 EP の ?format=csv でダウンロード（companies.csv）。
 // 生成/BOM/監査は backend（B-TC-131/132）。ここではフロントが正しく委譲しダウンロードが発火することを検証。
 test("B-TC-140 server mode: export downloads companies.csv", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -152,7 +143,7 @@ test("B-TC-140 server mode: export downloads companies.csv", { tag: "@serial" },
 // B-TC-161: カード形式の ⋯「複製」が誤遷移しない（回帰）。RowMenu を body へ portal＝最前面化し、
 // メニューのクリックがカードの onRowClick（会社詳細へ遷移）を誘発しないことを担保。
 test("B-TC-161 card view: 複製 opens create(dup) modal, not company detail", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await expect(page.getByRole("heading", { name: /システム管理/ })).toBeVisible();
 

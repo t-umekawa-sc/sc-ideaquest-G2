@@ -1,22 +1,13 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // K プロフィール編集（doc/テスト/K_プロフィール.md §2・API設計 K.1/K.2）。
 // ヘッダーメニュー名に依存するテスト（sc-00 の ACME-01 ユーザー）を壊さないよう、本人編集は OPS 管理者で検証。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(OPS.company);
-  await page.locator("#login_id").fill(OPS.loginId);
-  await page.locator("#password").fill(OPS.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
 // K-TC-006: 自分のプロフィール（表示名）を編集→保存→GET /me で永続。
 test("K-TC-006 edit own profile persists", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "プロフィール", exact: true })).toBeVisible();
   await expect(page.locator("#p_name")).toBeVisible(); // GET /me が読み込めている
@@ -33,7 +24,7 @@ test("K-TC-006 edit own profile persists", { tag: "@serial" }, async ({ page }) 
 // K-TC-026: 無変更で保存＝更新 API を呼ばず info「変更はありません」（成功通知を誤発火しない・デザイン標準 §14）。
 // 何も編集しないので OPS の値は変わらない＝共有資格情報を壊さない。
 test("K-TC-026 no-change save shows info toast (no success)", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/profile");
   await expect(page.locator("#p_name")).toBeVisible(); // GET /me 読込済＝スナップショット確定
 
@@ -46,7 +37,7 @@ test("K-TC-026 no-change save shows info toast (no success)", { tag: "@serial" }
 // K-TC-009: PW変更の error-path（確認不一致＝クライアント／現在PW不一致＝403 reauth_failed）。
 // 共有 OPS の資格情報を壊さないため成功パスは踏まない（happy path は backend K-TC-007 が担保）。
 test("K-TC-009 password change error paths (no mutation)", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/profile");
   // 確認用が不一致＝クライアント側で弾く（サーバーに送らない）
   await page.locator("#cur_pw").fill("Passw0rd!");
@@ -66,7 +57,7 @@ test("K-TC-009 password change error paths (no mutation)", { tag: "@serial" }, a
 // 要求成功（202）は OPS の email/PW を変えず pending_email を立てるだけ＝確定は踏まないので共有資格情報は壊れない。
 // 確定（confirm）の happy は backend K-TC-010 が担保。
 test("K-TC-009 email change request paths (double opt-in)", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/profile");
   // 現在PW不一致＝403 reauth_failed（未反映）
   await page.locator("#new_email").fill(`e2e-${Date.now()}@ops.example`);

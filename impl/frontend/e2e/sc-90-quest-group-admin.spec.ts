@@ -1,18 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-90 QG管理者（doc/テスト/B §14・API設計 B.4）。認可は per-group（当該グループの admin 所属）。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 const GENERAL = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page, c: { company: string; loginId: string; password: string }) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(c.company);
-  await page.locator("#login_id").fill(c.loginId);
-  await page.locator("#password").fill(c.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
 
 async function csrfHeaders(page: Page): Promise<Record<string, string>> {
   const cookies = await page.context().cookies();
@@ -22,21 +13,21 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
 
 // B-TC-119: admin 所属を持たない一般ユーザーは SC-90 で「管理グループなし」（403 graceful）。
 test("B-TC-119 non-admin sees no managed groups", { tag: "@serial" }, async ({ page }) => {
-  await login(page, GENERAL);
+  await formLogin(page, GENERAL);
   await page.goto("/admin/quest-groups");
   await expect(page.getByText(/管理するクエストグループはありません/)).toBeVisible();
 });
 
 // B-TC-123: QG管理者でない一般ユーザーには「クエストグループ管理」ナビが出ない（session.is_qg_admin=false）。
 test("B-TC-123 non-qg-admin does not see quest-group nav", { tag: "@serial" }, async ({ page }) => {
-  await login(page, GENERAL);
+  await formLogin(page, GENERAL);
   await page.getByRole("button", { name: /テスト 太郎/ }).click(); // ユーザーメニューを開く
   await expect(page.getByRole("menuitem", { name: "クエストグループ管理" })).toHaveCount(0);
 });
 
 // B-TC-120: OPS を編集（直接適用）で当該グループの admin にし、SC-90 で参加追加→メンバーに現れる。
 test("B-TC-120 qg admin adds member from directory", { tag: "@serial" }, async ({ page }) => {
-  await login(page, OPS);
+  await formLogin(page, OPS);
   const headers = await csrfHeaders(page);
   const stamp = Date.now().toString().slice(-8);
 

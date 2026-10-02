@@ -1,21 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { formLogin } from "./helpers";
 
 // SC-92 メールアドレス確認（ADR-0009）＝未確認バッジ＋⋯「確認メールを送信」（B-TC-169）。
 // 根拠＝doc/テスト/B_会社・アカウント.md §20・screens/SC-92。OPS system_admin（上位互換）で検証。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 
-async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(OPS.company);
-  await page.locator("#login_id").fill(OPS.loginId);
-  await page.locator("#password").fill(OPS.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
 test("B-TC-169 unverified badge and send verification action", { tag: "@serial" }, async ({ page }) => {
-  await login(page);
+  await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
