@@ -38,11 +38,14 @@ test("M-TC-013 dashboard restores scroll after a push-style back link (and no fa
   await expect(back).toBeVisible();
   await back.click();
   await page.waitForURL((u) => u.pathname === "/");
+  // 復元前にコンテンツ実寸が戻る（scrollHeight 安定）まで待つ＝N=7 密集時に非同期カードの遅延で
+  // ページが一時的に低くなり savedY へ届かないフレーク（Received 146>80）を断つ。
+  await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
 
   // restore-after-load＝ready 後に復元。先頭(0)ではなく savedY 近傍へ着地する。
   // 復元は非同期（レイアウト確定後）＝単発読みだと着地前の値を拾い得るため、近傍(±80)に収まるまで poll で待つ。
   await expect
-    .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - savedY), { timeout: 6000 })
+    .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - savedY), { timeout: 12000 })
     .toBeLessThanOrEqual(80);
 });
 

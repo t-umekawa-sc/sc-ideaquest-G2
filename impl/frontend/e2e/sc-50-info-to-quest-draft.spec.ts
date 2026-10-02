@@ -36,7 +36,7 @@ test("N-TC-226/227 create quest-from-info → closes back to info detail dialog 
     await page.waitForURL(/\/info-items\/[0-9a-f-]{8,}$/, { timeout: 8000 });
     const infoDetailUrl = page.url(); // 呼び元の情報詳細ダイアログ URL
     await page.getByRole("button", { name: /この情報からクエストを作成/ }).click();
-    await expect(page.locator("#qfi-name")).toBeVisible();
+    await expect(page.locator("#qfi-name")).toBeVisible({ timeout: 10000 }); // intercept モーダル開が N=7 密集時に5sを超えるフレーク対策
 
     // 件名入力→「下書きを作成」
     await page.locator("#qfi-name").fill(title);

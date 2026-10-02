@@ -17,12 +17,12 @@ test.describe("reduce-motion #18", () => {
     await gotoAuthed(page);
     // ランキング取得を遅延させ、取得中スピナー（.iq-spinner__coin）を可視のまま観測する。
     await page.route("**/api/v1/rankings**", async (route) => {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 3000)); // N=7 密集時も取得中スピナーを確実に観測できるよう窓を広げる（1500→3000）
       await route.continue();
     });
     await page.goto("/ranking");
     const coin = page.locator(".iq-spinner__coin");
-    await expect(coin).toBeVisible(); // 取得中はコインスピナーが出る（素の文字ではない）
+    await expect(coin).toBeVisible({ timeout: 10000 }); // 取得中はコインスピナーが出る（素の文字ではない）
     await expect(coin).toHaveText("◆");
     // reduce ではコインの回転（iq-coinspin）が無効＝animationName は none。
     await expect.poll(() => coin.first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");

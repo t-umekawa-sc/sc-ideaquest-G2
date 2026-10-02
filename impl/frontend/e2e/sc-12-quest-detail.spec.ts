@@ -17,7 +17,7 @@ test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page 
   const id = await createRecruiting(page, title);
   try {
     await page.goto(`/quests/${id}`);
-    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15000 }); // N=7 密集時の詳細ページロード遅延を吸収（既定5s→15s）
     // 参加部署（FR-38 再設計）＝作成に使った先頭グループ名が「🗂 参加部署: …」に出る（旧「グループ: デモグループ」から変更）。
     const groupName = (await page.request.get("/api/v1/quest-groups").then((r) => r.json())).data[0].name;
     await expect(page.getByText(new RegExp(`参加部署: .*${groupName}`))).toBeVisible();
@@ -36,13 +36,15 @@ test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page 
 
 // 状態遷移（recruiting→in_progress）と削除（→一覧へ）。owner のみの ⋯ アクション。
 test("C-TC-206 SC-12 transition forward then delete", async ({ page }) => {
+  // 注：N=7 密集時に主フロー（遷移→削除）が稀にストールする残存フレーク。test.slow() は救済にならず
+  // （90s を使い切ってから retry するだけ）flake 回復を遅くするため付けない＝30s で早く落として retries:2 で吸収。
   await gotoAuthed(page);
   const title = `E2E遷移_${Date.now().toString().slice(-8)}`;
   const id = await createRecruiting(page, title);
   let deleted = false;
   try {
     await page.goto(`/quests/${id}`);
-    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15000 }); // N=7 密集時の詳細ページロード遅延を吸収（既定5s→15s）
 
     // ⋯ → ステータスを進める（→ 進行中）→ 確認 OK。
     await page.getByRole("button", { name: "操作" }).click();

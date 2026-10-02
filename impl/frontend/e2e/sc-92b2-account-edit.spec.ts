@@ -6,6 +6,9 @@ const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!
 
 // B-TC-115: 発行したアカウントを編集して氏名を変更→一覧に反映（PATCH）。
 test("B-TC-115 edit account display name", { tag: "@serial" }, async ({ page }) => {
+  // 注：N=7 密集時に編集モーダルの「保存する」出現や保存反映が稀にストールする残存フレーク。
+  // test.slow() は救済にならず（90s 使い切ってから retry）flake 回復を遅らせるため付けない＝30s で早く
+  // 落として retries:2 で吸収。保存反映の検索 churn レースには下の「保存完了トースト待ち」で対処済み。
   await formLogin(page, OPS);
   await page.goto("/admin/companies");
   await page.getByRole("searchbox").fill("ACME-01"); // per_page=5：会社数増で ACME-01 が先頭ページから外れ得るため検索で絞る（N非依存化・手法は B-TC-139 と同じ）
@@ -32,6 +35,10 @@ test("B-TC-115 edit account display name", { tag: "@serial" }, async ({ page }) 
   await page.getByRole("menuitem", { name: "所属・編集" }).click();
   await page.locator("#a_name").fill(after);
   await page.getByRole("button", { name: "保存する" }).click();
+  // 保存完了（PATCH コミット＝成功トースト）を待ってから検証に入る。これを待たずに検索すると、
+  // N=7 密集時は保存→一覧 reload の再マウント churn 中に検索が空振りし続け、toPass が規定時間を
+  // 使い切るフレーク（旧 B-TC-115）になる。完了を先に確定させて行動レースを断つ。
+  await expect(page.getByText("アカウントを更新しました")).toBeVisible({ timeout: 15000 });
 
   // 保存後 reload で検索欄がクリアされる＝再度 loginId で絞って新氏名を確認（toPass）
   await expect(async () => {

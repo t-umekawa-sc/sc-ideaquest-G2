@@ -20,8 +20,11 @@ test("SC-03 avatar icon upload and delete", async ({ page }) => {
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "プロフィール編集" })).toBeVisible();
 
-  await page.setInputFiles('.icon-field input[type=file]', { name: "a.png", mimeType: "image/png", buffer: PNG });
-  const img = page.locator(".icon-field .quest-icon__img");
+  // プロフィールには .icon-field が2つ（アイコン欄＝初期字／アイデア用＝💡）。アバター欄＝先頭に限定し、
+  // アイデアアイコンの有無で .quest-icon__char/__img が2要素に増える strict 違反（＝N=7 密集時のフレーク）を断つ。
+  const avatarField = page.locator(".icon-field").first();
+  await avatarField.locator('input[type=file]').setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
+  const img = avatarField.locator(".quest-icon__img");
   await expect(img).toBeVisible({ timeout: 8000 });
   await expect(img).toHaveAttribute("src", /\/avatars\//);       // 署名URL（MinIO）
   // GET /me もアイコン署名URL を返す（接続の証明）。
@@ -32,7 +35,7 @@ test("SC-03 avatar icon upload and delete", async ({ page }) => {
 
   // 削除＝既定（頭文字）へ戻る。ヘッダーも頭文字に戻る。
   await page.getByRole("button", { name: "削除（既定に戻す）" }).click();
-  await expect(page.locator(".icon-field .quest-icon__char")).toBeVisible({ timeout: 8000 });
+  await expect(avatarField.locator(".quest-icon__char")).toBeVisible({ timeout: 8000 });
   await expect(page.locator(".usermenu__trigger .avatar__img.placeholder")).toBeVisible({ timeout: 8000 });
 });
 

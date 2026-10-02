@@ -73,7 +73,10 @@
    - 検証済み（iqe2e・**N=7 フル2パス**）＝合計 **158 passed / 6 flaky / 0 failed**（§4 詳細）。`MAILHOG_URL=http://localhost:8125` 必須（未付与だと sc-00 メール2本が 8025 で ECONNREFUSED＝§8 に追記済）。per_page 脆弱性9本も硬化済み（§4）。
    - **P2 follow-up＝完了**＝control-plane 12本のローカル `login`/`loginAs` を全廃し `helpers.formLogin(page, creds)` に集約（creds＝各 spec の OPS/GENERAL/CREDS/USER/LOGOUT_ALL_CREDS 定数を opts で渡す）。未使用 `type Page` import も除去（csrfHeaders/createOwnedQuest を持つ sc-90/93/01 は保持）。net −113行。control パス実機＝46 passed / 0 failed で挙動不変を確認。残は sc-00-mfa/password-setup（ローカル login 無し・メール系ヘルパ別）。
 2. ~~**P4＝テスト規約に 2系統モデルを明文化**~~ ＝**完了（`36e4faac`）**。`doc/規約/テスト規約.md §4.2` を新設（会社スコープ隔離／control-plane @serial・2パス運用・分類指針・static import ガード・per_page 非依存・既知フレーク）。
-3. **P5＝残タイミングフレークの恒久対策（別件・費用対効果で判断）**＝`D-TC-215`（投稿後ナビの `toHaveURL` timeout を延長）・`M-TC-013`（scroll 判定の待ち強化）・`B-TC-115`（編集反映）・`sc-03-images`/`sc-18-loading`/`sc-12-quest-detail`/`sc-50-info-to-quest-draft`。現状は `retries:2` で吸収（N=7 フルで 6 flaky）。受容 or 個別硬化を判断。
+3. ~~**P5＝残タイミングフレークの恒久対策**~~ ＝**一次対応完了（2026-10-02）**。N=7 フルで観測した8件を個別硬化：
+   - **根本修正（再現しない）**＝`sc-03-images`（`.icon-field` が2つ＝アバター欄を `.first()` にスコープし strict 違反を断つ）・`M-TC-013`（復元前に「すべての通知」リンク可視＝コンテンツ実寸安定を待ち＋poll 6→12s）。
+   - **待ち延長（負荷吸収）**＝`D-TC-215`（投稿後 `toHaveURL` 5→15s）・`sc-50 N-TC-226/227`（モーダル `#qfi-name` 5→10s）・`C-TC-205`/`C-TC-206`（詳細見出し 5→15s）・`sc-18 G-TC-174`（スピナー窓 route 遅延 1500→3000ms）・`D-TC-218`（保存トースト 5→15s＋`test.slow`）・`B-TC-115`（保存完了トースト待ちを前置＝検索 churn レース対策）。
+   - **残存2件（retries:2 で吸収・0 hard failed）**＝`C-TC-206`・`B-TC-115` は N=7 密集時に「初回UI操作が稀に~90s ストール→retry は数秒でクリーン」の病的パターン。単一レースに特定できず、`test.slow()` は救済にならず flake 回復を遅らせるため**付けない**（30s で早く落として retry 吸収）方針に統一。最終 N=7 フル＝**bulk 117 passed/1 flaky・control 45 passed/1 flaky・両パス 0 hard failed**。次段の恒久策候補＝共有 backend/DB の並列負荷低減 or 当該2本の操作分解。
 4. **（節目タスク）backend pytest・frontend vitest の再実行**＝本セッション未実行（前回 907 / 218 passed）。今回の変更は e2e のみ＝無関係のはずだが節目で回す。
 
 ## 8. 再開に必要な環境情報

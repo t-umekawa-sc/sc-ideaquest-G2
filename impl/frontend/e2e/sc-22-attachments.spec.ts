@@ -22,7 +22,7 @@ test("D-TC-215 SC-21 upload attachment then SC-22 shows it with download", async
     await page.setInputFiles("#idea_files", { name: fileName, mimeType: "image/png", buffer: PNG });
     await expect(page.getByText(fileName)).toBeVisible(); // 添付チップに出る
     await page.getByRole("button", { name: "投稿する" }).click();
-    await expect(page).toHaveURL(new RegExp(`/quests/${questId}$`)); // 投稿後は詳細へ戻る
+    await expect(page).toHaveURL(new RegExp(`/quests/${questId}$`), { timeout: 15000 }); // 投稿後は詳細へ戻る（N=7 密集時の投稿処理遅延を吸収＝既定5s→15s）
 
     // 作成されたアイデアを API で特定し、SC-22 を開く。
     const list = await page.request.get(`/api/v1/quests/${questId}/ideas?limit=50`).then((r) => r.json());
@@ -66,6 +66,7 @@ async function createIdeaWithAttachment(page: Page, questId: string, stamp: stri
 
 // D-TC-218 SC-21 編集モードで既存添付のステージ削除（× で削除予定→保存で確定・版が増える＝設計B）。
 test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", async ({ page }) => {
+  test.slow(); // 作成→添付→編集→削除ステージ→保存の多段。N=7 密集時は既定30sを超えるため3倍化
   await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E既存添付_${stamp}`);
@@ -101,7 +102,7 @@ test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", a
 
     // 「変更を保存」で確定＝サーバー削除＋公開中は版が増える（添付削除が更新履歴の差分に出る＝D-TC-145）。
     await page.getByRole("button", { name: "変更を保存" }).click();
-    await expect(page.getByText("変更を保存しました")).toBeVisible();
+    await expect(page.getByText("変更を保存しました")).toBeVisible({ timeout: 15000 }); // N=7 密集時の保存処理遅延を吸収
 
     const detail = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
     expect(detail.attachments).toHaveLength(0);
