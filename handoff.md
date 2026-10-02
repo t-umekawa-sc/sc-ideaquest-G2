@@ -5,15 +5,15 @@
 > **体制**＝2トラック。**本トラック＝テストコード改修（e2e 信頼性基盤）**／**別セッション＝機能実装**。並行時は取り決め md を必読。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: 2026-10-01（セッション末）
-- ブランチ: `main`（作業ツリー clean）。本 handoff コミットを push 予定。
-- 最新コミット（新しい順・本 handoff の直前）:
-  - `c20fc030` test(e2e): P3 段階移行＝会社スコープ残り23本を helpers へ集約（login/psql/createRecruiting）
-  - `f6725ec4` test(e2e): P3 段階移行＝psql／createInfoItem／csrfOf クラスタを helpers へ集約（9本）
-  - `8dc6194e` test(e2e): P3 段階移行＝SC-22 アイデア系＋sc-99-gamemode を helpers へ集約（8本）
-  - `b6f2b383` test(e2e): 共有ヘルパ helpers.ts 新設＋代表3本を移行（P1・2系統モデル横断層）
-  - `ee2a6cef` docs(handoff): 前セッション末（会社スコープ隔離完了＋2系統モデル確定）
-- iqe2e スタックはセッション末に `down -v` で撤去済み（下記 §8 手順）。worktree は本セッションでは未使用（main 直接作業）。
+- 最終更新: 2026-10-02（P2＝control-plane @serial 完了・フル N=7 実測 0 failed・P4 規約明文化まで）
+- ブランチ: `main`（作業ツリー clean）。本セッションのコミットは push 済み。
+- 最新コミット（新しい順）:
+  - `36e4faac` docs(規約): テスト規約 §4.2「2系統モデル」を新設（P4）
+  - `fc7a9bec` test(e2e): control-plane 9本を会社数非依存に硬化＋フルN=7実測を handoff 反映
+  - `fdd1eecc` test(e2e): P2 着手＝control-plane 14本に @serial タグ＋2パス scripts
+  - `502cfdfb` docs(handoff): 前セッション末（helpers.ts 新設＋会社スコープ43本集約）
+  - `c20fc030` test(e2e): P3 段階移行＝会社スコープ残り23本を helpers へ集約
+- iqe2e スタックは本 handoff 時点で **N=7 で起動したまま**（撤去する場合は §8 の `down -v`）。worktree は未使用（main 直接作業）。
 
 ## 2. ゴール
 社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発をゲーム感UIで一気通貫。本トラックの本命＝**肥大化しても安定する e2e テスト基盤の確立**（2系統モデル＝§6）。
@@ -70,11 +70,11 @@
 > いずれも iqe2e スタックで検証（§8）。着手前に `doc/セッション調整/並行開発の取り決め.md` を読む。
 1. **P2＝control-plane/認証 spec に `@serial` タグ＋2パス実行**（本命・**実装完了＝2026-10-02**）。
    - 完了内容＝対象14本（`sc-90-quest-group-admin`・`sc-91-companies`・`sc-92-company-detail`・`sc-92b-accounts`・`sc-92b2-account-edit`・`sc-92c-quest-groups`・`sc-92d-email-verify`・`sc-93-own-accounts`・`sc-00-login`・`sc-00-mfa`・`sc-00-password-setup`・`sc-00-session-expiry`・`k-profile`・`sc-01-dashboard`）の全 `test()`/`test.describe()` 計44箇所に Playwright 1.49 の `{ tag: "@serial" }` を付与。`package.json` に `e2e:bulk`（`--grep-invert @serial`）／`e2e:control`（`--grep @serial --workers=1`）／`e2e:all`（bulk→control）を追加。
-   - 検証済み（iqe2e・N=3）＝control パス **46/46 green**（`MAILHOG_URL=http://localhost:8125` 付与時。未付与だと sc-00 メール2本が 8025 で ECONNREFUSED＝§8 に追記済）。`--list` で分離確認＝@serial 43本／会社スコープ 118本（計161）。@serial を含む spec はちょうど14本のみ。
-   - **残（P2 の follow-up）**＝①form login を `helpers.formLogin` に寄せて DRY 化（OPS/admin creds は opts）。②2パスの恒久ゲート化（CI/本番前）は scripts 追加済み・運用手順の明文化は P4 で。
-2. **P4＝テスト規約 `doc/規約/テスト規約.md §4.x` に 2系統モデルを明文化**（分類＝会社スコープ隔離／control-plane @serial・helpers 使用・static import ガードの運用・既知フレークの扱い）。前版 handoff §6 の不採用理由も規約へ移すと git 履歴以外に恒久保存される。
-3. **P5＝残タイミングフレークの恒久対策（別件・費用対効果で判断）**＝`D-TC-215`（投稿後ナビの `toHaveURL` timeout を延長）・`M-TC-013`（scroll 判定の待ち強化）・`B-TC-115`（編集反映）・`SC-00`（mail/OTP）。retries 吸収で受容 or 個別硬化。
-4. **（検証タスク）フル e2e N=7 の再実測**＝本セッションは N=3 の対象バッチのみ。helpers 集約後にフル実測し、前版の 144 passed 相当が維持されているか確認（§8 のフル手順）。backend pytest・frontend vitest も未実行なので節目で回す。
+   - 検証済み（iqe2e・**N=7 フル2パス**）＝合計 **158 passed / 6 flaky / 0 failed**（§4 詳細）。`MAILHOG_URL=http://localhost:8125` 必須（未付与だと sc-00 メール2本が 8025 で ECONNREFUSED＝§8 に追記済）。per_page 脆弱性9本も硬化済み（§4）。
+   - **残（P2 の follow-up・未着手）**＝form login を `helpers.formLogin` に寄せて DRY 化（OPS/admin creds は opts）。control-plane 14本は現状まだ各 spec にローカル `login` 関数を温存。
+2. ~~**P4＝テスト規約に 2系統モデルを明文化**~~ ＝**完了（`36e4faac`）**。`doc/規約/テスト規約.md §4.2` を新設（会社スコープ隔離／control-plane @serial・2パス運用・分類指針・static import ガード・per_page 非依存・既知フレーク）。
+3. **P5＝残タイミングフレークの恒久対策（別件・費用対効果で判断）**＝`D-TC-215`（投稿後ナビの `toHaveURL` timeout を延長）・`M-TC-013`（scroll 判定の待ち強化）・`B-TC-115`（編集反映）・`sc-03-images`/`sc-18-loading`/`sc-12-quest-detail`/`sc-50-info-to-quest-draft`。現状は `retries:2` で吸収（N=7 フルで 6 flaky）。受容 or 個別硬化を判断。
+4. **（節目タスク）backend pytest・frontend vitest の再実行**＝本セッション未実行（前回 907 / 218 passed）。今回の変更は e2e のみ＝無関係のはずだが節目で回す。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝リポジトリ直下。実装は `impl/`。**コマンドは絶対パス**（シェル cd 不持続）。
