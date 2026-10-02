@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { QuestIcon } from "@/components/layout/QuestIcon";
 import { useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -551,7 +552,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                 <ul className="link-list">
                   {activeLinks.map((l) => (
                     <li key={l.id} className="link-item">
-                      <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                      <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[l.target_type]}</span>
+                      {(l.target_type === "ideas" || l.target_type === "quests") && <QuestIcon name={l.target_title || l.target_id} imageUrl={l.target_icon_image_url} size="xs" />}
                       <span className="link-item__title">{l.target_title ?? <span className="muted">（対象未解決）</span>}</span>
                       <span className={`badge ${LINK_KIND_LABEL[l.kind][1]}`}>{LINK_KIND_LABEL[l.kind][0]}</span>
                       <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
@@ -574,14 +576,16 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
               <ul className="link-list">
                 {r.links.map((l) => l.rejected ? (
                   <li key={l.id} className="link-item is-rejected">
-                    <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                    <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[l.target_type]}</span>
+                    {(l.target_type === "ideas" || l.target_type === "quests") && <QuestIcon name={l.target_title || l.target_id} imageUrl={l.target_icon_image_url} size="xs" />}
                     <span className="link-item__title" style={{ textDecoration: "line-through", color: "var(--color-text-subtle)" }}>{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">棄却済み・再リンクされません</span>
                     <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id), "関連リンクを戻しました（保存前に反映済み）")}>戻す</button>
                   </li>
                 ) : (
                   <li key={l.id} className={`link-item${l.disposition && l.disposition !== "pending" ? " is-locked" : ""}`}>
-                    <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                    <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[l.target_type]}</span>
+                    {(l.target_type === "ideas" || l.target_type === "quests") && <QuestIcon name={l.target_title || l.target_id} imageUrl={l.target_icon_image_url} size="xs" />}
                     <span className="link-item__title">{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
                     {l.disposition && l.disposition !== "pending" ? (

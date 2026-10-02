@@ -192,6 +192,7 @@ class InfoLinkDTO(BaseModel):
     target_type: str
     target_id: str
     target_title: str | None = None  # ideas/quests から解決（未実装ドメイン/不在は None）
+    target_icon_image_url: str | None = None  # 対象アイコン（署名URL・ideas 個別→作成者既定/quests）。null は頭文字タイル
     kind: str
     origin: str
     score: float | None = None

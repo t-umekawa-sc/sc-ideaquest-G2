@@ -592,6 +592,34 @@ def resolve_link_titles(session: Session, links: list[InfoLink]) -> dict[uuid.UU
     return out
 
 
+def resolve_link_icons(session: Session, links: list[InfoLink]) -> dict[uuid.UUID, str]:
+    """関連リンクの target アイコンパス（署名前）を解決＝ideas（個別→作成者既定）/quests。他種別/未設定は含めない。
+
+    候補ピッカーの `_icon_path` 解決（search_link_candidates）と同方針＝アイコンは application 層で署名URL 化。
+    """
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+    out: dict[uuid.UUID, str] = {}
+    idea_ids = [l.target_id for l in links if l.target_type == "ideas"]
+    quest_ids = [l.target_id for l in links if l.target_type == "quests"]
+    if idea_ids:
+        for iid, icon, author_icon in session.execute(
+            select(Idea.id, Idea.icon_image_path, User.idea_icon_image_path)
+            .join(User, User.id == Idea.author_id).where(Idea.id.in_(idea_ids))
+        ).all():
+            path = icon or author_icon  # 個別アイコン→作成者既定アイコン
+            if path:
+                out[iid] = path
+    if quest_ids:
+        for qid, icon in session.execute(
+            select(Quest.id, Quest.icon_image_path).where(Quest.id.in_(quest_ids))
+        ).all():
+            if icon:
+                out[qid] = icon
+    return out
+
+
 def follow_up_items(session: Session, info_id: uuid.UUID) -> list[InfoItem]:
     """続報（子）の情報を時系列（created_at 昇順）で（§12-1）。"""
     return list(session.execute(

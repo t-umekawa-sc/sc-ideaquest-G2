@@ -166,11 +166,13 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
     else if (e.key === "Backspace" && !focusInput && focus.length) setFocus((f) => f.slice(0, -1));
   };
 
-  // 主要語プレビュー＝構造化項目＋補足を連結して抽出（保存時の entity_tokens〔janome〕の目安・情報登録と同一UI）。
-  const runCloud = () => {
+  // 主要語は入力から自動抽出＝ボタンを押さずに表示（編集時は読込済み内容で即・以後は入力に追従／400ms デバウンス）。
+  // 連結＝構造化項目＋補足（保存時の entity_tokens〔janome〕の目安・整合率の関連度に効く）。
+  useEffect(() => {
     const text = [title, intent, policy, strategy, objectives, focus.join(" "), bodyMd].filter(Boolean).join(" ").trim();
-    setCloud(text ? cloudTokens(text) : []);
-  };
+    const t = setTimeout(() => setCloud(text ? cloudTokens(text) : []), 400);
+    return () => clearTimeout(t);
+  }, [title, intent, policy, strategy, objectives, focus, bodyMd]);
 
   const validate = useCallback((): string[] => {
     const errs: string[] = [];
@@ -349,17 +351,12 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
           <textarea className="input" id="sd-body" rows={5} value={bodyMd} onChange={(e) => setBodyMd(e.target.value)} />
         </Field>
 
-        {/* この資料の主要語（情報登録ダイアログと同一 UI＝キーワード抽出＋ワードクラウド）。保存時に entity_tokens〔janome〕へ。 */}
+        {/* この資料の主要語＝入力から自動抽出して表示（ボタン不要・入力に追従）。保存時に entity_tokens〔janome〕へ。 */}
         <div className="field dialog-section is-quiet">
-          {/* ラベルと抽出ボタンは同一行・ボタンは右寄せ（ユーザー指摘 2026-09-30）。 */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-            <label style={{ margin: 0 }}>この資料の主要語</label>
-            <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
-          </div>
           <div className="wc-preview">
             <div className="dialog-label">☁️ この資料の主要語（ワードクラウド）</div>
             {cloud === null ? (
-              <span className="hint">「🔑 キーワードを抽出」を押すと、入力内容から主要語を抽出して表示します（整合率の関連度に効きます）。</span>
+              <span className="hint">入力内容から主要語を自動抽出して表示します（整合率の関連度に効きます）。</span>
             ) : cloud.length ? (
               <div className="wc-mini">
                 {cloud.map(([w, c]) => {

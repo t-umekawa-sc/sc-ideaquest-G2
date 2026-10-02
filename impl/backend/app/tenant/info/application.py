@@ -292,7 +292,8 @@ def _attachment_dto(att, uploader) -> dict:
     }
 
 
-def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, attachments, can, content_revisions) -> dict:
+def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, attachments, can, content_revisions, icon_url_map=None) -> dict:
+    icon_url_map = icon_url_map or {}
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
@@ -320,6 +321,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
         "links": [{
             "id": str(l.id), "target_type": l.target_type, "target_id": str(l.target_id),
             "target_title": title_map.get(l.target_id),
+            "target_icon_image_url": icon_url_map.get(l.target_id),  # 種別アイコンのフォールバックは frontend（QuestIcon）
             "kind": l.kind, "origin": l.origin,
             "score": float(l.score) if l.score is not None else None,
             "rejected": l.rejected_at is not None,
@@ -356,6 +358,10 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         categories = repo.categories_for_items(ts, [item.id]).get(item.id, [])
         links = repo.links_for_item(ts, item.id)
         title_map = repo.resolve_link_titles(ts, links)
+        # 関連リンクの対象アイコン（ideas 個別→作成者既定／quests）を署名URL 化（候補ピッカーと同一方針）。
+        _storage = get_storage()
+        _icon_paths = repo.resolve_link_icons(ts, links)
+        icon_url_map = {tid: _storage.presigned_get(p) for tid, p in _icon_paths.items()}
         # 続報スレッドは「根」基準で組む（続報を開いても 根→続報1→続報2… の全体を返す・SC-50 §80）。
         # 続報はフラット（通常 depth-1）だが安全に上限付きで根を辿る。
         root = item
@@ -391,7 +397,8 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         }
         return _detail_dto(item, categories=categories, links=links, title_map=title_map,
                            parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens,
-                           attachments=attachments, can=can, content_revisions=content_revisions)
+                           attachments=attachments, can=can, content_revisions=content_revisions,
+                           icon_url_map=icon_url_map)
 
 
 def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:

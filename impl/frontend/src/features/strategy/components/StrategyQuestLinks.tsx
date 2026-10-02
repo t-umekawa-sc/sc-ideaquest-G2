@@ -89,6 +89,7 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
         <ul className="link-list">
           {value.map((qt) => (
             <li key={qt.id} className="link-item">
+              <QuestIcon name={qt.title} imageUrl={qt.icon_image_url} size="xs" />
               <span className="link-item__title">{qt.title}</span>
               <span className="badge badge-muted">{questStatusLabel(qt.status)}</span>
               <button type="button" className="link-item__rm" aria-label={`${qt.title} の紐づけを解除`} title="解除" onClick={() => void remove(qt.id)}>✕</button>

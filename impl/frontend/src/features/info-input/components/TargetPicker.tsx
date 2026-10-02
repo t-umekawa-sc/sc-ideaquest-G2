@@ -34,7 +34,7 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
   open: boolean; onClose: () => void; onConfirm: (selected: InfoLinkCandidate[], kind: InfoLinkKind) => void;
   // 呼び元で既に関連付け済みの対象（結果から除外＋折り畳みで一覧表示）＝重複追加（409）を防ぐ。
   // 棄却済み（rejected）も UNIQUE 制約で再追加不可（409）＝除外対象に含める（復活は詳細の「戻す」）。
-  existing?: { target_type: InfoLinkTarget; target_id: string; target_title?: string | null; rejected?: boolean }[];
+  existing?: { target_type: InfoLinkTarget; target_id: string; target_title?: string | null; target_icon_image_url?: string | null; rejected?: boolean }[];
 }) {
   const [types, setTypes] = useState<InfoLinkTarget[]>(["ideas", "concepts", "assumptions", "quests"]);
   const [q, setQ] = useState("");
@@ -139,6 +139,7 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
                 {existing.map((e) => (
                   <li key={`${e.target_type}:${e.target_id}`} className="pick-existing__item">
                     <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[e.target_type]}</span>
+                    {(e.target_type === "ideas" || e.target_type === "quests") && <QuestIcon name={e.target_title || e.target_id} imageUrl={e.target_icon_image_url} size="xs" />}
                     <span className="pick-existing__title">{e.target_title || e.target_id}</span>
                     {e.rejected ? <span className="badge badge-muted">棄却済み・詳細の「戻す」で復活</span> : null}
                   </li>
