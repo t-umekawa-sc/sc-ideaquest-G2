@@ -20,6 +20,7 @@
 | R-TC-108 | api | 経営資料←→クエストの紐づけ（候補検索/追加/解除）＋クエスト版履歴に記録・authz | admin で資料＋クエスト作成 | `GET /quest-candidates`／`POST /{id}/quests`／`GET /{id}/quests`／`DELETE /{id}/quests/{qid}`／一般で `GET /{id}/quests` | 候補に出る／追加で linked に出る／版履歴（quest_revisions）の changes に `strategy_documents`（資料タイトル）が載る／解除で消える／一般は 403 | R.1b／§5.56／§3.1 |
 | R-TC-109 | api | クエスト候補にアイコンURLを載せる（ピッカー行頭表示・未設定は null＝頭文字タイルへフォールバック） | admin でアイコン設定済クエスト1件＋未設定クエスト1件 | `GET /quest-candidates` | アイコン設定クエストの行は `icon_image_url` が非 null（署名URL）／未設定クエストは `icon_image_url` が null | R.1b／§5.56 |
 | R-TC-122 | api | **クエスト側から経営資料を適用**＝`POST/PATCH /quests` の `strategy_document_ids[]` で `quest_strategy_documents` を reconcile・詳細に `strategy_documents` が出る（双方向一致）・無効IDは422 | admin で資料2件＋クエスト作成 | `POST /quests`（strategy_document_ids=[did]）→`GET /strategy-documents/{did}/quests`→`PATCH /quests`（[did2]）→無効ID PATCH | 作成で適用＝詳細に strategy_documents＋資料側 linked に出る／PATCH で差分（did 外れ did2 入る・双方向一致）／無効ID は 422（field=strategy_document_ids） | R.1b／§5.56 |
+| R-TC-123 | api | **クエスト×適用資料のマッチ度**＝`GET /quests/{id}/strategy-match` が公開アイデアの整合率（既存 `idea_alignment`）を資料ごとに集計（平均 match_rate・整合〔≥50%〕件数・効いた上位語）・門番 | admin で資料＋クエスト作成（適用）＋公開アイデア2件（整合 0.80/0.20）を seed | `GET /quests/{qid}/strategy-match` | `idea_count=2`／当該資料の `match_rate≈0.5`（平均）・`aligned_count=1`（≥0.5 は1件）・`top_tokens` に効いた語 | R.1b／R.2／SC-12 |
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 

@@ -31,6 +31,7 @@ import {
   getQuest,
   getQuestActivity,
   getQuestWordCloud,
+  getQuestStrategyMatch,
   listCompanyGroupDirectory,
   listJoinRequests,
   QUESTS_CHANGED_EVENT,
@@ -39,6 +40,7 @@ import {
   type QuestActivity,
   type QuestDetail,
   type QuestWordCloud,
+  type QuestStrategyMatch,
 } from "../api";
 import { deleteIdea, IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
@@ -169,6 +171,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const [quest, setQuest] = useState<QuestDetail | null>(null);
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（SC-12・日次スパーク）
   const [wordCloud, setWordCloud] = useState<QuestWordCloud | null>(null); // 議論の主題＝配下アイデア横断の語像（SC-12・設計§7②）
+  const [strategyMatch, setStrategyMatch] = useState<QuestStrategyMatch | null>(null); // 経営資料とのマッチ度（R.1b/R.2・SC-12）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1/§3.2）
@@ -256,6 +259,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // 議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。取得失敗/空は非表示。
   useEffect(() => {
     void getQuestWordCloud(questId).then(setWordCloud).catch(() => setWordCloud(null));
+  }, [questId]);
+
+  // 経営資料とのマッチ度（R.1b/R.2＝活動×適用資料の整合）。適用資料が無ければ空配列（非表示）。
+  useEffect(() => {
+    void getQuestStrategyMatch(questId).then(setStrategyMatch).catch(() => setStrategyMatch(null));
   }, [questId]);
 
   // アイデアタブ（D.1）＝マウント時に一覧取得。SC-21 の投稿/下書き/編集・削除成功で発火する
@@ -699,6 +707,34 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               ))}
             </div>
             <p className="hint" style={{ margin: "6px 0 0" }}>このクエストの公開アイデアに現れる語を集約したものです（決定的・キーワードベース）。</p>
+          </section>
+        )}
+
+        {/* 📐 経営資料とのマッチ度（R.1b/R.2＝活動×適用資料の整合）。適用資料があるときのみ表示。 */}
+        {strategyMatch && strategyMatch.docs.length > 0 && (
+          <section className="card quest-strategy-match" aria-label="経営資料とのマッチ度">
+            <div className="section-head">
+              <h2 className="unread-panel__title">📐 経営資料とのマッチ度（公開アイデア {strategyMatch.idea_count} 件の活動）</h2>
+            </div>
+            <ul className="qsm-list">
+              {strategyMatch.docs.map((d) => {
+                const pct = Math.round(d.match_rate * 100);
+                return (
+                  <li key={d.id} className="qsm-item">
+                    <div className="qsm-head">
+                      <span className="qsm-title">🎯 {d.title}</span>
+                      <span className="qsm-pct">{pct}%</span>
+                    </div>
+                    <div className="qsm-bar"><span className="qsm-bar__fill" style={{ width: `${pct}%` }} /></div>
+                    <div className="qsm-meta">
+                      <span>整合（50%以上）{d.aligned_count}/{strategyMatch.idea_count} 件</span>
+                      {d.top_tokens.length > 0 && <span className="qsm-tokens">効いた語：{d.top_tokens.join("・")}</span>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="hint" style={{ margin: "6px 0 0" }}>このクエストの活動（公開アイデア）が、選ばれた経営資料（方針）とどれだけ整合しているか（キーワードベース・決定的）。資料の選択やアイデアの更新で変わります。適用する経営資料はクエスト編集で選べます。</p>
           </section>
         )}
 

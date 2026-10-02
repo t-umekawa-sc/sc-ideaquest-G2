@@ -47,6 +47,7 @@ from app.tenant.quests.schemas import (
     QuestPublishRequest,
     QuestTransitionRequest,
     QuestUpdateRequest,
+    QuestStrategyMatchResponse,
     QuestWordCloudResponse,
 )
 
@@ -215,6 +216,13 @@ def get_quest(
 def get_quest_word_cloud(quest_id: str, request: Request, session: dict = Depends(require_me)):
     """議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。可視性はサーバー強制。読取専用。"""
     return quest_service.word_cloud(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+
+
+@router.get("/quests/{quest_id}/strategy-match", response_model=QuestStrategyMatchResponse)
+def get_quest_strategy_match(quest_id: str, request: Request, session: dict = Depends(require_me)):
+    """クエストの活動（公開アイデア）× 適用経営資料のマッチ度（SC-12・R.1b/R.2）。可視性はサーバー強制。読取専用。"""
+    return quest_service.strategy_match(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
 
 

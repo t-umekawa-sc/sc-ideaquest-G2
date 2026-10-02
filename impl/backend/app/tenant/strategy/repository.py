@@ -143,6 +143,35 @@ def doc_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
     ).scalars().all())
 
 
+def quest_match_by_doc(session: Session, idea_ids: list[uuid.UUID], doc_ids: list[uuid.UUID]) -> dict:
+    """クエストの公開アイデア × 適用資料の整合率集計（既存 `idea_alignment` キャッシュ・R.2）。
+
+    doc_id → {avg（平均整合率 0..1）, aligned（≥0.5 の整合アイデア数）, count（整合行数）, top_tokens（効いた上位語）}。
+    """
+    if not idea_ids or not doc_ids:
+        return {}
+    rows = session.execute(
+        select(IdeaAlignment.strategy_document_id, IdeaAlignment.score, IdeaAlignment.matched_tokens)
+        .where(IdeaAlignment.idea_id.in_(idea_ids), IdeaAlignment.strategy_document_id.in_(doc_ids))
+    ).all()
+    by_doc: dict = {}
+    for did, score, matched in rows:
+        d = by_doc.setdefault(did, {"scores": [], "tokens": {}})
+        d["scores"].append(float(score))
+        for t in (matched if isinstance(matched, list) else []):
+            d["tokens"][t] = d["tokens"].get(t, 0) + 1
+    out: dict = {}
+    for did, d in by_doc.items():
+        scores = d["scores"]
+        out[did] = {
+            "avg": round(sum(scores) / len(scores), 3) if scores else 0.0,
+            "aligned": sum(1 for s in scores if s >= 0.5),
+            "count": len(scores),
+            "top_tokens": [t for t, _ in sorted(d["tokens"].items(), key=lambda kv: (-kv[1], kv[0]))[:8]],
+        }
+    return out
+
+
 def reconcile_quest_docs(session: Session, quest_id: uuid.UUID, doc_ids: list[uuid.UUID]) -> bool:
     """クエスト側から適用経営資料を『あるべき全体像』へ差分適用（quest_group_ids 同型・R.1b・§5.56）。
 

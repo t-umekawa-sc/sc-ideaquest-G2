@@ -212,6 +212,55 @@ def test_r_tc_122_quest_side_strategy_docs(client, factory, docs):
             ts.commit()
 
 
+def test_r_tc_123_quest_strategy_match(client, factory, docs):
+    """R-TC-123 クエスト×適用資料のマッチ度＝GET /quests/{id}/strategy-match が公開アイデアの整合率を
+    資料ごとに集計（平均・整合〔≥50%〕件数・効いた語）・門番（R.1b/R.2・SC-12）。"""
+    from sqlalchemy import select as _select
+    from sqlalchemy import text as _text
+
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest
+
+    _admin(client, factory)
+    stamp = uuid.uuid4().hex[:6]
+    did = uuid.UUID(client.post(BASE, json=_body(f"マッチ_{stamp}"), headers=_csrf(client)).json()["id"]); docs.append(did)
+    qr = client.post("/api/v1/quests", headers=_csrf(client), json={
+        "title": f"マッチクエスト_{stamp}", "color": "#0D9488", "quest_group_ids": [],
+        "strategy_document_ids": [str(did)], "categories": ["業務改善"],
+        "deadline": "2026-12-31", "purpose": "目的", "status": "recruiting"})
+    assert qr.status_code == 201, qr.text
+    qid = qr.json()["id"]
+    i1, i2 = uuid.uuid4(), uuid.uuid4()
+    try:
+        with get_tenant_session(_seed_db()) as ts:
+            owner = ts.execute(_select(Quest.owner_id).where(Quest.id == uuid.UUID(qid))).scalar_one()
+            ts.add(Idea(id=i1, quest_id=uuid.UUID(qid), author_id=owner, title="整合アイデア", body="b", value="v", status="published"))
+            ts.add(Idea(id=i2, quest_id=uuid.UUID(qid), author_id=owner, title="薄いアイデア", body="b", value="v", status="published"))
+            ts.flush()
+            ts.add(IdeaAlignment(idea_id=i1, strategy_document_id=did, score=0.80, method="keyword", matched_tokens=["脱炭素", "地域"]))
+            ts.add(IdeaAlignment(idea_id=i2, strategy_document_id=did, score=0.20, method="keyword", matched_tokens=["脱炭素"]))
+            ts.commit()
+        r = client.get(f"/api/v1/quests/{qid}/strategy-match")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["idea_count"] == 2
+        d = next(x for x in body["docs"] if x["id"] == str(did))
+        assert abs(d["match_rate"] - 0.5) < 0.01   # (0.8+0.2)/2
+        assert d["aligned_count"] == 1             # 0.8 のみ ≥0.5
+        assert "脱炭素" in d["top_tokens"]          # 効いた語（出現頻度順）
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(IdeaAlignment.__table__.delete().where(IdeaAlignment.strategy_document_id == did))
+            ts.execute(Idea.__table__.delete().where(Idea.id.in_([i1, i2])))
+            ts.execute(_text("DELETE FROM quest_member_permissions WHERE quest_member_id IN "
+                             "(SELECT id FROM quest_members WHERE quest_id = :q)"), {"q": qid})
+            for tbl in ("quest_strategy_documents", "quest_revisions", "quest_categories", "quest_members",
+                        "quest_group_links", "quest_decision_log", "quest_outcome_revisions"):
+                ts.execute(_text(f"DELETE FROM {tbl} WHERE quest_id = :q"), {"q": qid})
+            ts.execute(_text("DELETE FROM quests WHERE id = :q"), {"q": qid})
+            ts.commit()
+
+
 def test_r_tc_109_quest_candidates_icon_url(client, factory, docs):
     """R-TC-109 クエスト候補にアイコン署名URLを載せる（ピッカー行頭表示・未設定は null）。"""
     from app.tenant.profile.orm import User

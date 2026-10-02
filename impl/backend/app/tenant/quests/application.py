@@ -326,6 +326,46 @@ def word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, l
         return {"tokens": tokens, "idea_count": len(idea_ids)}
 
 
+def strategy_match(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """クエストの活動（配下公開アイデア）× 適用経営資料のマッチ度（SC-12・R.1b/R.2）。門番＝get_quest_detail と同一。
+
+    適用中の各経営資料について、公開アイデアの整合率（既存 `idea_alignment` キャッシュ）を集計＝平均マッチ度
+    ＋整合（≥50%）アイデア数＋効いた上位トークン。下書き/削除アイデアは対象外。資料0/アイデア0 は空配列。
+    """
+    from app.tenant.strategy import repository as strategy_repo
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.status == "draft":
+            if quest.owner_id != user.id:
+                raise AppError(404, "not_found")  # 下書きは本人だけ（存在秘匿）
+        elif not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # 公開系は C.0 門番
+
+        docs = strategy_repo.strategy_docs_for_quest(ts, qid)  # [(id, title)]
+        idea_ids = [i.id for i in ideas_repo.list_published_ideas_for_quest(ts, qid)]
+        agg = strategy_repo.quest_match_by_doc(ts, idea_ids, [d[0] for d in docs])
+        out_docs = []
+        for did, title in docs:
+            a = agg.get(did)
+            out_docs.append({
+                "id": str(did), "title": title,
+                "match_rate": a["avg"] if a else 0.0,
+                "aligned_count": a["aligned"] if a else 0,
+                "top_tokens": a["top_tokens"] if a else [],
+            })
+        return {"idea_count": len(idea_ids), "docs": out_docs}
+
+
 def get_quest_related_info(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str,
                            *, limit: int = 50) -> dict:
     """クエストの関連情報（C.8b・SC-12 上部ストリップ・FR-41）。門番＝`get_quest_detail` と同一（範囲外 404）。

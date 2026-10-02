@@ -187,6 +187,11 @@ export function getQuestWordCloud(questId: string): Promise<QuestWordCloud | nul
   return apiFetch<QuestWordCloud>(`/quests/${questId}/word-cloud`);
 }
 
+export type QuestStrategyMatch = components["schemas"]["QuestStrategyMatchResponse"];
+export function getQuestStrategyMatch(questId: string): Promise<QuestStrategyMatch | null> {
+  return apiFetch<QuestStrategyMatch>(`/quests/${questId}/strategy-match`);
+}
+
 // クエスト作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
 export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });

@@ -54,6 +54,7 @@
   - `alignment = {best_score, best_strategy:{id,title}, matched_tokens[], tier, coins_awarded}`。
   - **複数経営資料時は最大採用**＋`matched_tokens`（効いた方針の上位語）で「どの方針に効いたか」を提示。
   - **ラベルは「方針との関連度（キーワードベース）」と正直表記**（厳密な意味的整合ではない旨・過信防止）。
+- **read（クエスト詳細／SC-12 マッチ度パネル）＝実装済み（2026-10-02）**＝`GET /quests/{id}/strategy-match`（門番＝クエスト詳細と同一・読取専用）が、クエストの**活動（配下公開アイデア）× 適用経営資料**のマッチ度を資料ごとに集計＝`{idea_count, docs:[{id,title,match_rate(平均整合率0..1),aligned_count(≥50%件数),top_tokens[]}]}`。既存 `idea_alignment` キャッシュの集計（再計算なし・決定的）。未適用/アイデア0は空。backend＝`quests/application.strategy_match`＋`strategy_repo.quest_match_by_doc`。frontend＝SC-12 の「📐 経営資料とのマッチ度」パネル。テスト＝R-TC-123。
 
 ## R.3 整合率→コイン（ゲーミフィケーション・§G 連携）
 

@@ -577,3 +577,18 @@ class QuestWordCloudResponse(BaseModel):
     """議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。トークン化済みアイデア本文の頻度集約。"""
     tokens: list[QuestWordCloudToken]
     idea_count: int  # 集約に使った公開アイデア件数
+
+
+class QuestStrategyMatchItem(BaseModel):
+    """適用経営資料1件 × クエスト活動のマッチ度（R.1b/R.2・SC-12）。"""
+    id: str
+    title: str
+    match_rate: float       # 公開アイデアの平均整合率（0..1・%表示）
+    aligned_count: int      # 整合（≥50%）アイデア数
+    top_tokens: list[str]   # 効いた上位トークン（keyword 時・説明用）
+
+
+class QuestStrategyMatchResponse(BaseModel):
+    """クエストの活動（公開アイデア）× 適用経営資料のマッチ度（SC-12・R.1b/R.2・読取専用）。"""
+    idea_count: int                      # 活動量＝公開アイデア件数（マッチ度の分母）
+    docs: list[QuestStrategyMatchItem]   # 適用中の経営資料ごとのマッチ度（未適用は空配列）

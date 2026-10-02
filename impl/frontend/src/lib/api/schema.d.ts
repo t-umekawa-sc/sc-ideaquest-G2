@@ -1181,6 +1181,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/strategy-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Strategy Match
+         * @description クエストの活動（公開アイデア）× 適用経営資料のマッチ度（SC-12・R.1b/R.2）。可視性はサーバー強制。読取専用。
+         */
+        get: operations["get_quest_strategy_match_api_v1_quests__quest_id__strategy_match_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/related-info": {
         parameters: {
             query?: never;
@@ -8826,6 +8846,32 @@ export interface components {
             page_info: components["schemas"]["QuestRevisionCursorPageInfo"];
         };
         /**
+         * QuestStrategyMatchItem
+         * @description 適用経営資料1件 × クエスト活動のマッチ度（R.1b/R.2・SC-12）。
+         */
+        QuestStrategyMatchItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Match Rate */
+            match_rate: number;
+            /** Aligned Count */
+            aligned_count: number;
+            /** Top Tokens */
+            top_tokens: string[];
+        };
+        /**
+         * QuestStrategyMatchResponse
+         * @description クエストの活動（公開アイデア）× 適用経営資料のマッチ度（SC-12・R.1b/R.2・読取専用）。
+         */
+        QuestStrategyMatchResponse: {
+            /** Idea Count */
+            idea_count: number;
+            /** Docs */
+            docs: components["schemas"]["QuestStrategyMatchItem"][];
+        };
+        /**
          * QuestTransitionRequest
          * @description POST /quests/{id}/transition（C.5）＝前進のみの状態遷移。
          */
@@ -11911,6 +11957,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestWordCloudResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_strategy_match_api_v1_quests__quest_id__strategy_match_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestStrategyMatchResponse"];
                 };
             };
             /** @description Validation Error */
