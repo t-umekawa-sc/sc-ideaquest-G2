@@ -137,6 +137,19 @@ def list_jobs(account_id: uuid.UUID, company_id: uuid.UUID, *, status=None, task
                               "has_next": page * per_page < total}}
 
 
+def list_running(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """SC-04 上部＝会社内 running の進捗率のみ（自分を除外・匿名・S.1a）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        ratios = repo.running_progress(ts, exclude_requester_id=user.id)
+        return {"data": [{"ratio": r} for r in ratios]}
+
+
 def summary(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
     company = _resolve_company(company_id)
     if company is None:

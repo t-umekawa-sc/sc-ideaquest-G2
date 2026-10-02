@@ -54,6 +54,15 @@ class AiJobListResponse(BaseModel):
     page_info: PageInfo
 
 
+class RunningJobItem(BaseModel):
+    # SC-04 上部の「他ユーザ含む会社内 running」＝進捗率のみ（匿名）。依頼者/入力/タスク種別は出さない（S.1a/S.7）。
+    ratio: float | None = None
+
+
+class RunningListResponse(BaseModel):
+    data: list[RunningJobItem]
+
+
 class AiJobSummary(BaseModel):
     queued: int
     running: int

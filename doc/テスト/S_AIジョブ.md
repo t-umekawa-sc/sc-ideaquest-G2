@@ -20,6 +20,7 @@
 | S-TC-108 | api | 認可＝他人のジョブは見えない（404） | user2 のジョブ | user1 で `GET /ai-jobs/{id}` | 404（存在秘匿・requested_by スコープ） | S.0 |
 | S-TC-109 | api | summary＝待ち/実行中/直近完了・失敗の件数 | queued/running/succeeded/failed を各種 | `GET /ai-jobs/summary` | `{queued,running,recent_done,recent_failed}` が状態と一致 | S.1 |
 | S-TC-129 | int | 待ちジョブの順番待ち位置＝会社全体の queued を priority→created_at 順に並べた rn（自分の順位）＋前方件数(実行中＋rn-1)からの概算ETA（履歴あれば） | running1件＋queued複数（会社全体） | `list_jobs` の queued 行 | 先頭 queued は queue_position=1・古い順に増える／実行中があると eta は running を織り込む／完了/失敗/実行中の行は position/eta とも null | S.1／§5.3 |
+| S-TC-130 | api | 会社内 running の進捗＝`GET /ai-jobs/running` は**自分を除外**した会社内 running の `ratio` のみを処理順で返す（匿名＝依頼者/入力/タスク種別を含まない） | user1 の running1件＋user2 の running2件（ratio 各種・会社全体） | user1 で `GET /ai-jobs/running` | `{data:[{ratio}]}`＝user2 の2件のみ（user1 自身は出ない）・`ratio` は 0..1 or null・`requested_by`/`input`/`task_type` 等のキーを含まない／running 以外（queued/succeeded）は出ない | S.1a／S.0／S.7 |
 
 ## 2. モデル指定・ガードレール・GET /ai-models（S.2/S.3・設計 §3.4）
 
@@ -44,6 +45,9 @@
 | S-TC-117 | api | queued キャンセル＝即 canceled | queued ジョブ | `POST /ai-jobs/{id}/cancel` | status=canceled・finished_at 記録・ワーカーは取り出さない | S.4／§5.5 |
 | S-TC-118 | int | running 協調キャンセル＝フラグ→次トークン境界で停止 | running ジョブ（ストリーム Fake） | cancel→worker が境界でフラグ確認 | cancel_requested=true→status=canceled（強制 kill せず他ジョブに影響なし） | §5.5 |
 | S-TC-119 | e2e | SC-04＝実行中に進捗バー・行キャンセル・完了で対象へ遷移 | 自分のジョブ（実行中→完了） | SC-04 で進捗確認→キャンセル別ジョブ→完了行クリック | 進捗バー表示／キャンセルで canceled 反映／完了行の ref_* で対象画面へ | SC-04／S.1/S.4 |
+| S-TC-207 | e2e | SC-04 上部＝他ユーザの実行中ジョブの進捗率が匿名で出る（自分の running は上部に出ない＝下の一覧） | user2 の running（進捗あり）＋user1 の running | user1 で SC-04 を開く | 上部セクションに user2 の実行中が進捗率付きで表示・依頼者名/内容は出ない／user1 自身の running は上部に出ず一覧側に出る | SC-04 §3／S.1a |
+| S-TC-208 | e2e | SC-04 待機行＝「前に N 件待機」を表示し、見込み時間（約M分後）は出さない | 会社全体で自分の前に queued が複数・自分も queued | user で SC-04 を開く | 自分の待機行に「前に N 件待機」（N=queue_position−1）が出る／「約◯分後」等の ETA 時間表記は出ない | SC-04 §3/§4.1 |
+| S-TC-209 | e2e | 共通ヘッダーに AIジョブ導線＝`/ai-jobs` へのリンク＋自分の active（queued+running）件数バッジ | 自分の active ジョブ>0 | 任意画面でヘッダーを見る→導線クリック | ベル近傍に AIジョブ導線があり件数バッジが出る／クリックで `/ai-jobs`（SC-04）へ遷移 | SC-04 §1/§5 |
 
 ## 4. 会社 ON/OFF・課金メータリング・予算上限（S.5・§4.2・データモデル §5.58/§5.59）
 

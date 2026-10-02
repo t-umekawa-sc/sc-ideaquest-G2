@@ -3,7 +3,7 @@
 import type { QueryState } from "@/components/ui";
 import { apiFetch } from "@/lib/api/client";
 
-import type { AiJobDetail, AiJobListResult, AiJobSummary } from "./types";
+import type { AiJobDetail, AiJobListResult, AiJobSummary, RunningJobItem } from "./types";
 
 export const AI_JOBS_CHANGED_EVENT = "ai-jobs-changed";
 
@@ -34,6 +34,11 @@ export function fetchAiJobs(state: QueryState, signal?: AbortSignal): Promise<Ai
 
 export function fetchAiJobsSummary(signal?: AbortSignal): Promise<AiJobSummary | null> {
   return apiFetch<AiJobSummary>("/ai-jobs/summary", { signal });
+}
+
+// SC-04 上部＝会社内 running の進捗率のみ（自分除外・匿名・S.1a）。
+export function fetchRunningProgress(signal?: AbortSignal): Promise<RunningJobItem[]> {
+  return apiFetch<{ data: RunningJobItem[] }>("/ai-jobs/running", { signal }).then((r) => r?.data ?? []);
 }
 
 export function getAiJob(id: string, signal?: AbortSignal): Promise<AiJobDetail | null> {

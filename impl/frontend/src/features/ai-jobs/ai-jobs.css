@@ -14,6 +14,28 @@
   flex-wrap: wrap;
 }
 
+/* 上部＝他ユーザの実行中（進捗率のみ・匿名・SC-04 §3・S.1a）。占有スロットの可視化。 */
+.ai-others {
+  margin: var(--space-4) 0 var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-2, 10px);
+  background: var(--color-surface-muted, #f9fafb);
+}
+
+.ai-others__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm, .875rem);
+  font-weight: 700;
+  color: var(--color-text-muted, #4b5563);
+}
+
+.ai-others__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* 詳細（読み取り専用）の結果/エラー本文＝改行を保持して読ませる。 */
 .ai-job-detail__result {
   white-space: pre-wrap;

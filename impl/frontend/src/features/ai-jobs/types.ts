@@ -30,6 +30,11 @@ export interface AiJobSummary {
   recent_failed: number;
 }
 
+// SC-04 上部＝他ユーザ含む会社内 running の進捗率のみ（匿名・S.1a）。依頼者/入力/種別は持たない。
+export interface RunningJobItem {
+  ratio: number | null;
+}
+
 export interface AiJobDetail {
   id: string;
   task_type: string;

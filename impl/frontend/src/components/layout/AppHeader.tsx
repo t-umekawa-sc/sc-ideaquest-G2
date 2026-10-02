@@ -17,6 +17,8 @@ type Props = {
   user: { display_name: string; avatar_url?: string | null };
   balance?: { level: number; coin: number; sp: number; xpPct?: number };
   unreadCount?: number;
+  // AIジョブ（SC-04）の自分の active 件数（queued+running）。>0 でヘッダー導線にバッジ表示。
+  aiActive?: number;
   // ゲームモード実効値（レビュー#2・§4.11）。false でゲーム層UI（残高チップ Lv/コイン/SP・レベル円環・
   // ナビのゲーム群）を非表示にする。アバター画像は本人識別のため残す。既定 true（現行挙動）。
   gameEnabled?: boolean;
@@ -25,7 +27,7 @@ type Props = {
   children: React.ReactNode; // .usermenu__list の中身（<li>…</li>）
 };
 
-export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, admin, children }: Props) {
+export function AppHeader({ user, balance, unreadCount = 0, aiActive = 0, gameEnabled = true, admin, children }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -100,6 +102,10 @@ export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, 
               </Link>
             </>
           )}
+          {/* AIジョブ導線（SC-04・ベルと同型の pill）＝実行中/待ちがあれば件数バッジ。狭幅は .bell と同様 usermenu に畳む。 */}
+          <Link className="bell ai-jobs-link" href="/ai-jobs" aria-label={`AI処理状況${aiActive > 0 ? `（実行中・待ち ${aiActive}件）` : ""}`}>
+            <span className="bell__icon" aria-hidden>🤖</span>{aiActive > 0 && <span className="bell__badge">{aiActive}</span>}
+          </Link>
           <Link className="bell" href="/notifications" aria-label={`通知（未読${unreadCount}件）`} data-has-unread={unreadCount > 0 ? "true" : undefined} data-arrived={bellPulse ? "true" : undefined}>
             <span className="bell__icon" aria-hidden>🔔</span>{unreadCount > 0 && <span className="bell__badge">{unreadCount}</span>}
           </Link>
@@ -147,6 +153,9 @@ export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, 
               )}
               <li className="usermenu__m" role="none">
                 <Link role="menuitem" href="/notifications">🔔 通知{unreadCount > 0 ? `（未読${unreadCount}件）` : ""}</Link>
+              </li>
+              <li className="usermenu__m" role="none">
+                <Link role="menuitem" href="/ai-jobs">🤖 AI処理状況{aiActive > 0 ? `（${aiActive}件）` : ""}</Link>
               </li>
               <li className="usermenu__m" role="none"><div className="usermenu__sep" /></li>
               {children}

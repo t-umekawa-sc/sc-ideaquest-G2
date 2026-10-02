@@ -5,11 +5,15 @@ FakeChat（conftest autouse）で外部未接続。作成したジョブは fina
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import select
 
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.ai_jobs.orm import AiJob, CompanyAiModelSetting
+from app.tenant.profile.orm import User
 from tests.admin.test_admin_accounts import _login
 from tests.admin.test_admin_issue import _csrf
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
@@ -196,3 +200,43 @@ def test_s_tc_125_admin_usage_shape(client, factory):
     r = client.get("/api/v1/admin/ai-usage", params={"period_ym": 202609})
     assert r.status_code == 200, r.text
     assert isinstance(r.json()["data"], list)
+
+
+def _two_user_ids(db: str) -> tuple[uuid.UUID, uuid.UUID]:
+    """(自分=SEED_LOGIN の user.id, 他ユーザの user.id) を返す。"""
+    with get_tenant_session(db) as ts:
+        self_u = ts.execute(select(User).where(User.login_id == SEED_LOGIN)).scalars().first()
+        other_u = ts.execute(select(User).where(User.id != self_u.id).limit(1)).scalars().first()
+        return self_u.id, other_u.id
+
+
+def _insert_running(db: str, requester_id: uuid.UUID, ratio: float | None) -> str:
+    """会社DBに running の AiJob を直接 insert（他ユーザの実行中を再現）。"""
+    with get_tenant_session(db) as ts:
+        j = AiJob(task_type="info_summarize", status="running", requested_by_id=requester_id,
+                  input={"text": "x"}, progress=({"ratio": ratio} if ratio is not None else None),
+                  started_at=datetime.now(timezone.utc))
+        ts.add(j)
+        ts.commit()
+        return str(j.id)
+
+
+def test_s_tc_130_running_excludes_self_ratio_only(client):
+    """S-TC-130(api): GET /ai-jobs/running＝会社 running で自分を除外・ratio のみ匿名（S.1a/S.0/S.7）。"""
+    _make(client)
+    db = _db()
+    self_id, other_id = _two_user_ids(db)
+    ids = []
+    try:
+        ids.append(_insert_running(db, other_id, 0.61))
+        ids.append(_insert_running(db, other_id, 0.21))
+        ids.append(_insert_running(db, self_id, 0.91))  # 自分＝除外されるべき
+        r = client.get(f"{BASE}/running")
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        ratios = [d["ratio"] for d in data]
+        assert 0.61 in ratios and 0.21 in ratios  # 他ユーザの running は進捗率で出る
+        assert 0.91 not in ratios                  # 自分の running は上部に出ない
+        assert all(set(d.keys()) == {"ratio"} for d in data)  # 匿名＝ratio のみ（依頼者/入力/種別なし）
+    finally:
+        _cleanup(ids)

@@ -30,40 +30,43 @@ export function AiJobDetailPanel({ jobId, onClose }: { jobId: string; onClose: (
     return () => ac.abort();
   }, [jobId]);
 
-  if (loading) return <p className="hint">読み込み中…</p>;
-  if (!job) return <p className="hint">ジョブが見つかりませんでした。</p>;
+  if (loading) return <div className="modal__body"><p className="hint">読み込み中…</p></div>;
+  if (!job) return <div className="modal__body"><p className="hint">ジョブが見つかりませんでした。</p></div>;
 
   const href = targetHref(job);
+  // 標準構造＝本文は .modal__body（共有 Modal の padding・情報詳細 SC-52 と同じ）／フッターは兄弟の .modal__footer。
   return (
-    <div className="ai-job-detail">
-      <div className="dialog-subject">
-        <span className="card-title">{TASK_LABEL[job.task_type] ?? job.task_type}</span>
-        <span className={`badge ${STATUS_BADGE[job.status]}`}>{STATUS_LABEL[job.status]}</span>
-      </div>
-
-      {job.status === "succeeded" && job.result?.text && (
-        <div className="dialog-section">
-          <div className="dialog-label">結果</div>
-          <p className="ai-job-detail__result">{job.result.text}</p>
+    <>
+      <div className="modal__body ai-job-detail">
+        <div className="dialog-subject">
+          <span className="card-title">{TASK_LABEL[job.task_type] ?? job.task_type}</span>
+          <span className={`badge ${STATUS_BADGE[job.status]}`}>{STATUS_LABEL[job.status]}</span>
         </div>
-      )}
-      {job.status === "failed" && job.error && (
-        <div className="dialog-section">
-          <div className="dialog-label">エラー</div>
-          <p className="ai-job-detail__error">{job.error.detail || job.error.code || "不明なエラー"}</p>
-        </div>
-      )}
 
-      <div className="dialog-section">
-        <div className="dialog-label">実行情報</div>
-        <dl className="dialog-grid">
-          <dt>モデル（指定）</dt><dd>{job.requested_model ?? "（既定）"}</dd>
-          <dt>モデル（実行）</dt><dd>{job.model ? `${job.model}${job.provider ? `（${job.provider}）` : ""}` : "—"}</dd>
-          <dt>利用トークン</dt><dd>{job.input_tokens != null || job.output_tokens != null ? `入力 ${job.input_tokens ?? 0} / 出力 ${job.output_tokens ?? 0}` : "—"}</dd>
-          <dt>依頼時刻</dt><dd>{ts(job.created_at)}</dd>
-          <dt>開始時刻</dt><dd>{ts(job.started_at)}</dd>
-          <dt>完了時刻</dt><dd>{ts(job.finished_at)}</dd>
-        </dl>
+        {job.status === "succeeded" && job.result?.text && (
+          <div className="dialog-section">
+            <div className="dialog-label">結果</div>
+            <p className="ai-job-detail__result">{job.result.text}</p>
+          </div>
+        )}
+        {job.status === "failed" && job.error && (
+          <div className="dialog-section">
+            <div className="dialog-label">エラー</div>
+            <p className="ai-job-detail__error">{job.error.detail || job.error.code || "不明なエラー"}</p>
+          </div>
+        )}
+
+        <div className="dialog-section">
+          <div className="dialog-label">実行情報</div>
+          <dl className="dialog-grid">
+            <dt>モデル（指定）</dt><dd>{job.requested_model ?? "（既定）"}</dd>
+            <dt>モデル（実行）</dt><dd>{job.model ? `${job.model}${job.provider ? `（${job.provider}）` : ""}` : "—"}</dd>
+            <dt>利用トークン</dt><dd>{job.input_tokens != null || job.output_tokens != null ? `入力 ${job.input_tokens ?? 0} / 出力 ${job.output_tokens ?? 0}` : "—"}</dd>
+            <dt>依頼時刻</dt><dd>{ts(job.created_at)}</dd>
+            <dt>開始時刻</dt><dd>{ts(job.started_at)}</dd>
+            <dt>完了時刻</dt><dd>{ts(job.finished_at)}</dd>
+          </dl>
+        </div>
       </div>
 
       <div className="modal__footer">
@@ -73,6 +76,6 @@ export function AiJobDetailPanel({ jobId, onClose }: { jobId: string; onClose: (
           <Link className="btn btn-primary" href={href}>内容を参照する →</Link>
         )}
       </div>
-    </div>
+    </>
   );
 }

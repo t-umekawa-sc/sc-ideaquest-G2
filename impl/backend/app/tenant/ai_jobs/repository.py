@@ -189,6 +189,26 @@ def summary(session: Session, requester_id: uuid.UUID, *, recent_days: int = 7) 
     }
 
 
+def running_progress(session: Session, *, exclude_requester_id: uuid.UUID) -> list[float | None]:
+    """会社内 running の進捗 ratio のみを処理順で返す（S.1a・SC-04 上部）。
+
+    **自分（exclude_requester_id）は除外**し、依頼者/入力/タスク種別は読まない＝占有スロットの
+    可視化に限定（匿名・§S.7）。順序＝処理順（priority DESC, started_at ASC）。ratio は progress.jsonb
+    の `ratio`（開始直後で未設定なら None）。
+    """
+    rows = session.execute(
+        select(AiJob.progress)
+        .where(AiJob.status == "running", AiJob.deleted_at.is_(None),
+               AiJob.requested_by_id != exclude_requester_id)
+        .order_by(AiJob.priority.desc(), AiJob.started_at.asc(), AiJob.id.asc())
+    ).scalars().all()
+    out: list[float | None] = []
+    for p in rows:
+        r = p.get("ratio") if isinstance(p, dict) else None
+        out.append(float(r) if isinstance(r, (int, float)) else None)
+    return out
+
+
 def queue_info(session: Session, queued_ids: list[uuid.UUID], concurrency: int,
                *, avg_window_days: int = 7) -> dict[uuid.UUID, dict]:
     """queued ジョブの順番待ち位置＋概算 ETA（S.1・§5.3）。

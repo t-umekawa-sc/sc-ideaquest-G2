@@ -3,35 +3,28 @@
 // SC-04 AI処理状況（ドメイン S・FR-45）。自分の AIジョブ（LLM 要約/生成）の待ち/実行中/完了・失敗を1画面で。
 // サーバー委譲（GET /ai-jobs・DataTable §1.8.1）＋状態サマリ（GET /ai-jobs/summary）。実行中はキャンセル可、
 // 完了は対象画面へ遷移（ref_*）。踏襲＝SC-02 通知＋共有 DataTable（新規UIを作らない）。
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { DataTable, Progress, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 
-import { AI_JOBS_CHANGED_EVENT, cancelAiJob, fetchAiJobs, fetchAiJobsSummary } from "../api";
+import { AI_JOBS_CHANGED_EVENT, cancelAiJob, fetchAiJobs, fetchAiJobsSummary, fetchRunningProgress } from "../api";
 import { STATUS_BADGE, STATUS_LABEL, TASK_LABEL } from "../types";
-import type { AiJobListItem, AiJobStatus, AiJobSummary } from "../types";
+import type { AiJobListItem, AiJobStatus, AiJobSummary, RunningJobItem } from "../types";
 import "../ai-jobs.css";
 
 const taskLabel = (t: string) => TASK_LABEL[t] ?? t;
 const statusBadge = (s: AiJobStatus) => <span className={`badge ${STATUS_BADGE[s]}`}>{STATUS_LABEL[s]}</span>;
 
-// 概算 ETA を「約N分後 / 約N時間M分後」に整形（0=まもなく）。
-function fmtEta(sec: number): string {
-  if (sec <= 0) return "まもなく";
-  if (sec < 3600) return `約${Math.max(1, Math.ceil(sec / 60))}分後`;
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  return m > 0 ? `約${h}時間${m}分後` : `約${h}時間後`;
-}
-
-// 進捗列＝実行中は %、待ちは「N番目（・約M分後）」、その他は —。
+// 進捗・待ち列＝実行中は進捗率、待機は「前に N 件待機」（会社全体キュー基準＝queue_position−1）、その他は —。
+// ※見込み時間（ETA）は処理内容で大きく変動し誤認を招くため表示しない（SC-04 §3・決定 2026-10-02）。
 function progressText(r: AiJobListItem): string {
   if (r.status === "queued") {
     if (r.queue_position == null) return "待ち";
-    const pos = `${r.queue_position}番目`;
-    return r.eta_seconds == null ? pos : `${pos}・${fmtEta(r.eta_seconds)}`;
+    const ahead = Math.max(0, r.queue_position - 1); // 自分より前に待っている件数
+    return ahead === 0 ? "次に実行" : `前に ${ahead} 件待機`;
   }
   if (r.status !== "running") return "—";
   const p = r.progress;
@@ -55,6 +48,7 @@ export function AiJobsListView() {
   const snack = useSnackbar();
   const [refreshToken, setRefreshToken] = useState(0);
   const [summary, setSummary] = useState<AiJobSummary | null>(null);
+  const [others, setOthers] = useState<RunningJobItem[]>([]); // 他ユーザの実行中（進捗率のみ・匿名）
 
   const reload = useCallback(() => setRefreshToken((n) => n + 1), []);
 
@@ -66,6 +60,7 @@ export function AiJobsListView() {
   useEffect(() => {
     const ac = new AbortController();
     fetchAiJobsSummary(ac.signal).then((s) => s && setSummary(s)).catch(() => {});
+    fetchRunningProgress(ac.signal).then(setOthers).catch(() => {});
     return () => ac.abort();
   }, [refreshToken]);
 
@@ -80,16 +75,16 @@ export function AiJobsListView() {
 
   // メニュー順＝標準（デザイン標準§4.5＝主要/参照 → … → 破壊的は最後）＝詳細を開く → 内容を参照する → キャンセル。
   const menuItems = useCallback((r: AiJobListItem): RowMenuItem[] => {
-    const list: RowMenuItem[] = [
-      { label: "詳細を開く", onClick: () => router.push(`/ai-jobs/${r.id}`) },
-    ];
-    const href = targetHref(r);
-    if (r.status === "succeeded" && href) {
-      list.push({ label: "内容を参照する", onClick: () => router.push(href) });
-    }
+    const detail: RowMenuItem = { label: "詳細を開く", onClick: () => router.push(`/ai-jobs/${r.id}`) };
+    // 処理済み（succeeded）かつ関連画面（ref_*）あり＝「結果を見る」が主要アクション→メニュー先頭（§4.5）。
+    const href = r.status === "succeeded" ? targetHref(r) : null;
+    const list: RowMenuItem[] = href
+      ? [{ label: "結果を見る", onClick: () => router.push(href) }, detail]
+      : [detail];
     if (r.status === "queued" || r.status === "running") {
       list.push({
         label: "キャンセル",
+        danger: true, // 否定的/注意アクション＝赤（.is-danger）。RowMenu は中立/赤の2状態（黄色は非対応）＝削除系と統一・§4.5。
         onClick: async () => {
           const ok = await confirm({ title: "キャンセル", msg: "このAI処理をキャンセルしますか？" });
           if (!ok) return;
@@ -117,6 +112,8 @@ export function AiJobsListView() {
 
   return (
     <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)" }}>
+      {/* 画面上部のフローティング戻るピル（§4.10）。DataTable の floatHead がこのピル高を検知して列見出しを下に固定＝重ならない。 */}
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <div className="ai-jobs-head">
         <h1>AI処理状況</h1>
         {summary && (
@@ -131,12 +128,27 @@ export function AiJobsListView() {
       <p className="hint" style={{ maxWidth: 720 }}>
         あなたが依頼した AI 処理（要約・生成など）の状況です。実行中はキャンセルでき、完了したら操作メニューから対象画面を参照できます。
       </p>
+      {others.length > 0 && (
+        <section className="ai-others" aria-label="他の実行中のAI処理">
+          <h2 className="ai-others__title">他の実行中のAI処理（{others.length}）</h2>
+          <div className="ai-others__list">
+            {others.map((o, i) => (
+              <Progress key={i} value={o.ratio != null ? o.ratio * 100 : undefined} label={`実行中 #${i + 1}`} variant="xp" />
+            ))}
+          </div>
+          <p className="hint">あなたの依頼より先に処理されている他ユーザの実行中です（内容は非表示）。これが進むほど、あなたの順番が近づきます。</p>
+        </section>
+      )}
       <DataTable<AiJobListItem>
         storageKey="ai-jobs"
         server={{ query: serverQuery }}
         refreshToken={refreshToken}
         columns={columns}
-        onRowClick={(r) => router.push(`/ai-jobs/${r.id}`)}
+        onRowClick={(r) => {
+          // 処理済み（succeeded）＋関連画面あり＝関連画面へ（「結果を見る」と同じ）。それ以外＝詳細モーダル。
+          const h = r.status === "succeeded" ? targetHref(r) : null;
+          router.push(h ?? `/ai-jobs/${r.id}`);
+        }}
         pins={false}
         emptyText="現在 AI 処理はありません。"
         defaultView="list"

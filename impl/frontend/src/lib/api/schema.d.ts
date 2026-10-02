@@ -3904,6 +3904,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-jobs/running": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai Jobs Running */
+        get: operations["ai_jobs_running_api_v1_ai_jobs_running_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai-jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -8944,6 +8961,16 @@ export interface components {
              * @default []
              */
             data: components["schemas"]["RelatedInfoItemDTO"][];
+        };
+        /** RunningJobItem */
+        RunningJobItem: {
+            /** Ratio */
+            ratio?: number | null;
+        };
+        /** RunningListResponse */
+        RunningListResponse: {
+            /** Data */
+            data: components["schemas"]["RunningJobItem"][];
         };
         /**
          * Session
@@ -17471,6 +17498,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiJobSummary"];
+                };
+            };
+        };
+    };
+    ai_jobs_running_api_v1_ai_jobs_running_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunningListResponse"];
                 };
             };
         };

@@ -9,6 +9,7 @@
 | 操作 | 権限 | 補足 |
 | --- | --- | --- |
 | ジョブ enqueue / 一覧 / 詳細 / summary / cancel | **依頼者本人**（＋運用向けに `system_admin`） | 他人のジョブは見えない（存在秘匿の 404）。`requested_by_id` スコープ |
+| 会社内 running の進捗（`GET /ai-jobs/running`・S.1a） | 認証済みユーザー | **会社内**の実行中ジョブの**進捗率のみ**を返す（**自分は除外**・匿名）。依頼者・入力・タスク種別は返さない＝占有スロットの可視化に限定（§S.7 データ主権と整合） |
 | モデル一覧（`GET /ai-models`） | 認証済みユーザー | **その会社で有効な**論理キーのみ返す（会社 ON/OFF・ポリシー・`enabled` で絞込済＝候補1件のこともある） |
 | 会社のモデル ON/OFF・予算（`/admin/ai-models`） | **`company_account_admin` / `system_admin`** | `paid` を ON＝**課金合意**（確認ダイアログ）＋`external` の外部送信解禁も同操作（§S.7） |
 | 会社の利用量/コスト（`GET /admin/ai-usage`） | company_account_admin / system_admin | 会社×モデル×月の集計（請求元数値の可視化） |
@@ -23,6 +24,7 @@
 | `POST /ai-jobs` | ジョブ投入（汎用口＝管理/デバッグ・通常は各機能 EP が内部 enqueue） | `{task_type, input, model?, ref?}`＋`Idempotency-Key`（§1.9） | 202＋`{id, status:"queued"}`。`model`＝論理キー（省略時 task_type 既定・§S.2） |
 | `GET /ai-jobs` | 自分のジョブ一覧（AI処理状況画面 SC-04 の主データ） | DataTable 契約（§1.8.1）＝`status`/`task_type`/`sort`/`page`/`per_page` | `{data:[AiJobListItem], page_info}`（新着降順） |
 | `GET /ai-jobs/summary` | 待ち/実行中/完了の件数（ヘッダーバッジ用の軽量集計） | — | `{queued, running, recent_done, recent_failed}`（`notifications/unread-count` と同発想） |
+| `GET /ai-jobs/running`（S.1a） | **他ユーザ含む会社内 running の進捗**（SC-04 上部＝同時実行の占有スロット可視化・決定 2026-10-02） | — | `{data:[{ratio}]}`＝**自分を除外**・**進捗率のみ**（依頼者/入力/タスク種別は出さない＝匿名・§S.0/§S.7）。`ratio`＝0..1 or null（開始直後）・処理順 |
 | `GET /ai-jobs/{id}` | ジョブ詳細 | パス: `id` | `AiJobDetail`＝`{status, progress, result?, error?, requested_model?, provider?, model?, usage:{input_tokens,output_tokens,cost_micros}, ref, started_at, finished_at}` |
 | `POST /ai-jobs/{id}/cancel` | キャンセル | — | 200。`queued` は即 `canceled`／`running` は**協調キャンセル**（§S.4） |
 

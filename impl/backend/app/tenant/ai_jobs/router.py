@@ -24,6 +24,7 @@ from app.tenant.ai_jobs.schemas import (
     AiJobSummary,
     AiModelListResponse,
     AiUsageResponse,
+    RunningListResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["ai-jobs"])
@@ -50,6 +51,12 @@ def list_ai_jobs(request: Request, status: str | None = None, task_type: str | N
 @router.get("/ai-jobs/summary", response_model=AiJobSummary)
 def ai_jobs_summary(request: Request, session: dict = Depends(require_me)):
     return service.summary(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.get("/ai-jobs/running", response_model=RunningListResponse)
+def ai_jobs_running(request: Request, session: dict = Depends(require_me)):
+    # SC-04 上部＝会社内 running の進捗率のみ（自分除外・匿名・S.1a）。`/ai-jobs/{job_id}` より前に登録。
+    return service.list_running(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
 
 
 @router.get("/ai-jobs/{job_id}", response_model=AiJobDetail)
