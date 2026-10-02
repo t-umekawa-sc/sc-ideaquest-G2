@@ -21,7 +21,7 @@
 | T-TC-110 | api | Tier1 参加リクエスト→管理者承認で投票可（案X） | contest open・一般ユーザー | `POST /contests/{id}/participation`→管理者 `PATCH .../{uid}`（approved） | `contest_participants` requested→approved／承認後にコンテスト配下アイデアへ投票可（既存 D の投票EP）・未承認は 403 | T.2／§5.1／§6.1 |
 | T-TC-111 | api | Tier2 参加リクエスト→**アイデア投稿者**承認でチャット可 | Tier1 承認済み・対象アイデアあり | `POST /ideas/{id}/participation`→投稿者 `PATCH .../{uid}`（approved） | `idea_participants` requested→approved／承認後にチャット可（既存 E）・投稿者以外の承認は 403 | T.2／§5.1 |
 | T-TC-112 | api | 投票ゲート＝Tier1 開放・チャットゲート＝Tier2 承認（案X の分岐） | Tier1 のみ承認（Tier2 未） | コンテスト配下アイデアへ投票／チャット投稿 | 投票=可（Tier1）・チャット=403（Tier2 未承認） | §5.1／§2.3 |
-| T-TC-113 | int | 単一ポリシー解決＝コンテスト配下は会社全体可視・通常クエストは従来ゲート | contest-backed quest／通常 quest | `resolve_idea_access(quest,user)` | コンテスト配下=会社全員可視＋Tier/審査員ゲート／通常=パーティー＋部署ゲート（分岐が1関数） | §2.3 |
+| T-TC-113 | int | 単一ポリシー解決＝コンテスト配下は会社全体可視・通常クエストは従来ゲート | contest-backed quest／通常 quest | `contests/access.py`（`contest_of`/`can_vote`/`can_chat`/`can_evaluate`）＋`quests/repository.can_access_quest` 中央分岐 | コンテスト配下=会社全員可視（非パーティー員でも可）＋Tier/審査員ゲート／通常=`contest_of`=None で従来パーティー＋部署ゲート（分岐が1モジュール） | §2.3 |
 | T-TC-114 | api | public/DEMO の Tier1 自動 approved（決定G） | `access_mode=public`・サインアップ直後 | `POST /contests/{id}/participation` | 即 `approved`（閲覧＋投稿＋投票がすぐ可） | §8.2／決定G |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）

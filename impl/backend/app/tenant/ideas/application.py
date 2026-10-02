@@ -427,6 +427,13 @@ def _guard_votable(ts, idea, quest, user) -> None:
     _guard_not_completed(quest)
     if quest is not None and quest.deadline is not None and quest.deadline < date.today():
         raise AppError(409, "conflict", detail="締切後は投票できません", extra={"errors": [{"reason": "invalid_state"}]})
+    # コンテスト配下は投票＝Tier1 参加者（案X・単一ポリシー §2.3）＝従来の member/vote 権限を置換。
+    from app.tenant.contests import access as contest_access
+    contest = contest_access.contest_of(ts, idea.quest_id) if quest is not None else None
+    if contest is not None:
+        if not contest_access.can_vote(ts, contest, user.id):
+            raise AppError(403, "forbidden", detail="投票するにはコンテストへの参加（承認）が必要です")
+        return
     if quest is not None and quest.owner_id == user.id:
         return
     member = quests_repo.get_active_member(ts, idea.quest_id, user.id)

@@ -266,7 +266,13 @@ def can_access_quest(session: Session, quest: Quest, user_id: uuid.UUID) -> bool
       「参加部署条件（`quest_group_links` が 0 件なら条件なし／1 件以上なら現在いずれかに有効所属）」。
     **アクセスの都度、現在の所属で再判定**する（異動で全参加部署を外れたら失効＝§5.6b）。呼び出し側は
     draft の可視性（本人のみ）を別途判定する（本関数は参加部署×パーティーのアクセス条件のみ）。
+
+    **コンテスト配下（backing quest）は可視＝会社全体**（テナント内なら誰でも・パーティー/部署非依存）＝
+    単一ポリシー解決に委譲（設計 §2.3）。投票/チャット/評価のゲートは各ドメインの guard 側で Tier/審査員に分岐。
     """
+    from app.tenant.contests import access as contest_access  # 遅延 import（quests→contests 逆依存を作らない）
+    if contest_access.contest_of(session, quest.id) is not None:
+        return True  # コンテスト配下＝会社全体可視（§2.3・案X）
     if quest.owner_id == user_id:
         return True
     if get_active_member(session, quest.id, user_id) is None:

@@ -252,7 +252,15 @@ def _is_owner(quest, user) -> bool:
 
 
 def _is_evaluator(ts, quest, user) -> bool:
-    """評価者＝クエスト作成者（owner）＋`evaluator` 権限保持者（F.0/§5.21）。"""
+    """評価者＝クエスト作成者（owner）＋`evaluator` 権限保持者（F.0/§5.21）。
+
+    **コンテスト配下は `contest_evaluator`（運営指名の審査員）保持者のみ**（偏り防止・§5.2）＝
+    owner/author でも非保持は不可（単一ポリシー §2.3 に委譲）。
+    """
+    from app.tenant.contests import access as contest_access
+    contest = contest_access.contest_of(ts, quest.id) if quest is not None else None
+    if contest is not None:
+        return contest_access.can_evaluate(ts, user.id)
     return _is_owner(quest, user) or "evaluator" in _perms_of(ts, quest, user)
 
 

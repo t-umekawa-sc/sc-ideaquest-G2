@@ -174,7 +174,7 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
             raise AppError(401, "unauthenticated")
         idea, quest = _resolve_chat_idea(ts, iid, user)
         _guard_not_completed(quest)
-        _require_comment(ts, quest, user)
+        _require_comment(ts, quest, user, idea)
         cg = repo.ensure_chat_group(ts, idea.id)
         thread = repo.ensure_chat_thread(ts, "idea", cg.id)
         msg, _mentions = _create_message_core(ts, thread, quest, user, body=body,
@@ -497,7 +497,15 @@ def _perms_of(ts, quest, user) -> list[str]:
     return quests_repo.get_permissions(ts, member.id) if member is not None else []
 
 
-def _require_comment(ts, quest, user) -> None:
+def _require_comment(ts, quest, user, idea=None) -> None:
+    # コンテスト配下のアイデアチャットは Tier2 承認者のみ（投稿者承認・単一ポリシー §2.3）＝従来の comment 権限を置換。
+    if idea is not None and quest is not None:
+        from app.tenant.contests import access as contest_access
+        contest = contest_access.contest_of(ts, quest.id)
+        if contest is not None:
+            if not contest_access.can_chat(ts, idea.id, user.id):
+                raise AppError(403, "forbidden", detail="チャットにはアイデアへの参加（投稿者の承認）が必要です")
+            return
     if quest is not None and quest.owner_id == user.id:
         return
     if "comment" not in _perms_of(ts, quest, user):
