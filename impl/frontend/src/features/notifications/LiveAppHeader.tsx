@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { AppHeader, type AdminFlags } from "@/components/layout";
 import { AI_JOBS_CHANGED_EVENT, fetchAiJobsSummary } from "@/features/ai-jobs";
+import { realtime } from "@/lib/realtime";
 
 import { useRealtimeUnread } from "./RealtimeProvider";
 
@@ -21,7 +22,8 @@ type Props = {
 export function LiveAppHeader({ user, balance, initialUnread = 0, gameEnabled = true, admin, children }: Props) {
   const live = useRealtimeUnread();
   // AIジョブの自分の active 件数（queued+running）＝ヘッダー導線バッジ用。マウント時取得＋
-  // AI_JOBS_CHANGED_EVENT（enqueue/cancel）で更新（完全ライブ WS 購読は後追い拡張）。
+  // AI_JOBS_CHANGED_EVENT（クライアント操作＝enqueue/cancel）＋WS `ai_job.changed`（投入/開始/完了/
+  // キャンセル＝backend 発）で再取得＝**完了でバッジが減る**（L・リロード不要・S.1a）。
   const [aiActive, setAiActive] = useState(0);
   useEffect(() => {
     let alive = true;
@@ -29,7 +31,9 @@ export function LiveAppHeader({ user, balance, initialUnread = 0, gameEnabled = 
       fetchAiJobsSummary().then((s) => { if (alive && s) setAiActive(s.queued + s.running); }).catch(() => {});
     load();
     window.addEventListener(AI_JOBS_CHANGED_EVENT, load);
-    return () => { alive = false; window.removeEventListener(AI_JOBS_CHANGED_EVENT, load); };
+    realtime.start();
+    const off = realtime.on("ai_job.changed", load); // 完了/失敗/開始/投入で再取得（本人スコープ・自動購読）
+    return () => { alive = false; window.removeEventListener(AI_JOBS_CHANGED_EVENT, load); off(); };
   }, []);
   return (
     <AppHeader user={user} balance={balance} unreadCount={live ?? initialUnread} aiActive={aiActive} gameEnabled={gameEnabled} admin={admin}>
