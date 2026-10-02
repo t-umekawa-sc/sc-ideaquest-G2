@@ -17,6 +17,8 @@ from app.tenant.contests.schemas import (
     ContestDetail,
     ContestListResponse,
     ContestUpdateRequest,
+    ParticipationDecideRequest,
+    ParticipationResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["contests"])
@@ -50,3 +52,35 @@ def update_contest(contest_id: str, body: ContestUpdateRequest, request: Request
     return service.update_contest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id,
         fields=fields, status=body.status)
+
+
+# ---- 参加 2階層（T.2・§5.1） ----
+
+@router.post("/contests/{contest_id}/participation", response_model=ParticipationResponse,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def request_contest_participation(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    return service.request_contest_participation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
+@router.patch("/contests/{contest_id}/participation/{uid}", response_model=ParticipationResponse,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def decide_contest_participation(contest_id: str, uid: str, body: ParticipationDecideRequest,
+                                 request: Request, session: dict = Depends(require_me)):
+    return service.decide_contest_participation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, uid, body.status)
+
+
+@router.post("/ideas/{idea_id}/participation", response_model=ParticipationResponse,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def request_idea_participation(idea_id: str, request: Request, session: dict = Depends(require_me)):
+    return service.request_idea_participation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id)
+
+
+@router.patch("/ideas/{idea_id}/participation/{uid}", response_model=ParticipationResponse,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def decide_idea_participation(idea_id: str, uid: str, body: ParticipationDecideRequest,
+                              request: Request, session: dict = Depends(require_me)):
+    return service.decide_idea_participation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, uid, body.status)

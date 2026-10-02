@@ -45,6 +45,16 @@ class ContestListResponse(BaseModel):
     data: list[ContestListItem]
 
 
+class ParticipationResponse(BaseModel):
+    status: str  # requested | approved | rejected | left
+
+
+class ParticipationDecideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(pattern="^(approved|rejected)$")
+
+
 class ContestDetail(BaseModel):
     id: str
     quest_id: str                    # backing quest（アイデア/投票/評価/チャットの接続先）

@@ -133,3 +133,73 @@ def test_t_tc_105_no_visibility_param(client, factory):
     _admin(client, factory)
     r = client.post(BASE, json=_body(visibility="public"), headers=_csrf(client))
     assert r.status_code == 422, r.text
+
+
+def _user_id(account_id: str):
+    from app.tenant.profile import repository as profile_repo
+    import uuid as _uuid
+    with get_tenant_session(_seed_db()) as ts:
+        return profile_repo.get_user_by_account(ts, _uuid.UUID(str(account_id))).id
+
+
+def test_t_tc_110_tier1_participation_request_and_approve(client, factory):
+    """T-TC-110: Tier1 参加リクエスト（本人）→ 管理者承認（private 会社＝requested→approved）。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"参加者_{uuid.uuid4().hex[:6]}")
+    puid = _user_id(part["id"])
+    try:
+        # 本人がリクエスト＝requested（private 会社なので自動承認はされない）。
+        _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+        r = client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        assert r.status_code == 200 and r.json()["status"] == "requested", r.text
+        # 管理者が承認＝approved。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        d = client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "approved"}, headers=_csrf(client))
+        assert d.status_code == 200 and d.json()["status"] == "approved", d.text
+        # 一般ユーザーは承認できない（403）。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "rejected"},
+                            headers=_csrf(client)).status_code == 403
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
+def test_t_tc_111_tier2_participation_author_approves(client, factory):
+    """T-TC-111: Tier2 参加リクエスト→**アイデア投稿者**が承認（投稿者以外は 403）。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    detail = client.get(f"{BASE}/{cid}").json()
+    author = factory.make_seed_company_account(display_name=f"投稿者_{uuid.uuid4().hex[:6]}")
+    auid = _user_id(author["id"])
+    iid = uuid.uuid4()
+    try:
+        # コンテストの backing quest にアイデアを seed（投稿者=author）。
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("INSERT INTO ideas (id, quest_id, author_id, title, body, value, status, created_at, updated_at) "
+                             "VALUES (:i, :q, :a, 'アイデア', 'b', 'v', 'published', now(), now())"),
+                       {"i": str(iid), "q": detail["quest_id"], "a": str(auid)})
+            ts.commit()
+        # 参加希望者がリクエスト。
+        req = factory.make_seed_company_account(display_name=f"議論希望_{uuid.uuid4().hex[:6]}")
+        ruid = _user_id(req["id"])
+        _login(client, SEED_COMPANY_CODE, req["login_id"], req["password"])
+        r = client.post(f"/api/v1/ideas/{iid}/participation", headers=_csrf(client))
+        assert r.status_code == 200 and r.json()["status"] == "requested", r.text
+        # 投稿者以外（admin）は承認不可（403）。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.patch(f"/api/v1/ideas/{iid}/participation/{ruid}", json={"status": "approved"},
+                            headers=_csrf(client)).status_code == 403
+        # 投稿者は承認可（approved）。
+        _login(client, SEED_COMPANY_CODE, author["login_id"], author["password"])
+        d = client.patch(f"/api/v1/ideas/{iid}/participation/{ruid}", json={"status": "approved"}, headers=_csrf(client))
+        assert d.status_code == 200 and d.json()["status"] == "approved", d.text
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM idea_participants WHERE idea_id = :i"), {"i": str(iid)})
+            ts.execute(_text("DELETE FROM ideas WHERE id = :i"), {"i": str(iid)})
+            ts.commit()
+        _cleanup_contest(cid)

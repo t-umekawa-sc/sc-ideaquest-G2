@@ -146,3 +146,97 @@ def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str
         out = _detail(c)
         ts.commit()
     return out
+
+
+# ---- 参加 2階層（T.2・§5.1） ----
+
+def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
+    """Tier1 参加リクエスト（本人）。public/DEMO は自動 `approved`（決定G）、それ以外は `requested`。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        auto = company.access_mode == "public"  # DEMO はサインアップ即参加（閲覧+投稿+投票）
+        row = repo.upsert_contest_participation(ts, c.id, user.id,
+                                                status="approved" if auto else "requested",
+                                                decided_by_id=user.id if auto else None)
+        out = {"status": row.status}
+        ts.commit()
+    return out
+
+
+def decide_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
+                                 target_user_id: str, status: str) -> dict:
+    """Tier1 承認/却下（管理者）。"""
+    if status not in ("approved", "rejected"):
+        raise AppError(422, "validation_error", detail="status が不正です", errors=[{"field": "status"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        if not _is_company_admin(account_id):
+            raise AppError(403, "forbidden", detail="Tier1 参加の承認は管理者のみです")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        row = repo.upsert_contest_participation(ts, c.id, uuid.UUID(target_user_id),
+                                                status=status, decided_by_id=actor.id)
+        out = {"status": row.status}
+        ts.commit()
+    return out
+
+
+def request_idea_participation(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str) -> dict:
+    """Tier2 参加リクエスト（本人・チャット希望）。コンテスト配下アイデアのみ。"""
+    from app.tenant.ideas import repository as ideas_repo
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = ideas_repo.get_idea(ts, uuid.UUID(idea_id))
+        if idea is None:
+            raise AppError(404, "not_found")
+        if repo.contest_by_quest(ts, idea.quest_id) is None:
+            raise AppError(422, "validation_error", detail="コンテストのアイデアではありません",
+                           errors=[{"field": "idea_id"}])
+        row = repo.upsert_idea_participation(ts, idea.id, user.id, status="requested")
+        out = {"status": row.status}
+        ts.commit()
+    return out
+
+
+def decide_idea_participation(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str,
+                              target_user_id: str, status: str) -> dict:
+    """Tier2 承認/却下＝**そのアイデアの投稿者のみ**（荒れ対策・心理的安全性）。"""
+    from app.tenant.ideas import repository as ideas_repo
+    if status not in ("approved", "rejected"):
+        raise AppError(422, "validation_error", detail="status が不正です", errors=[{"field": "status"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        idea = ideas_repo.get_idea(ts, uuid.UUID(idea_id))
+        if idea is None:
+            raise AppError(404, "not_found")
+        if idea.author_id != actor.id:
+            raise AppError(403, "forbidden", detail="このアイデアの参加承認は投稿者のみ可能です")
+        row = repo.upsert_idea_participation(ts, idea.id, uuid.UUID(target_user_id),
+                                             status=status, decided_by_id=actor.id)
+        out = {"status": row.status}
+        ts.commit()
+    return out
