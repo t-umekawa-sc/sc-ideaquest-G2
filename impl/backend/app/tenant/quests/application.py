@@ -123,6 +123,20 @@ def _resolve_company(company_id: uuid.UUID) -> Company | None:
         return s.get(Company, company_id)
 
 
+def _is_company_admin(account_id: uuid.UUID) -> bool:
+    """当該アカウントが会社管理者/運営か（権威＝control DB の Account.system_role）。"""
+    from app.control_plane.auth.orm import Account
+    with control_session() as s:
+        acc = s.get(Account, account_id)
+    return acc is not None and acc.system_role in ("company_account_admin", "system_admin")
+
+
+def _can_create_quest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
+    """クエスト作成可否（FR-47・決定K）＝管理者は常時可、一般は②能力 `quest_create` 保持者のみ。"""
+    from app.tenant.capabilities import application as caps_app
+    return _is_company_admin(account_id) or caps_app.user_has_capability(ts, user_id, "quest_create")
+
+
 def get_quests(
     account_id: uuid.UUID,
     company_id: uuid.UUID,
@@ -448,6 +462,11 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
+        # クエスト作成権限ゲート（②会社レベル能力 `quest_create`・FR-47・決定K）＝管理者は常時可、
+        # 一般は能力保持者のみ。移行で既存クエスト作成者は自動付与済み（migration 0051）。
+        if not _can_create_quest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="クエストを作成する権限がありません",
+                           extra={"errors": [{"code": "capability_required", "capability": "quest_create"}]})
         # 参加部署は会社内の有効グループのみ許容（0..N・作成者の所属は不問＝別格・FR-38 再設計）。
         group_uuids = _validate_groups(ts, group_uuids)
         if body.status == "recruiting":

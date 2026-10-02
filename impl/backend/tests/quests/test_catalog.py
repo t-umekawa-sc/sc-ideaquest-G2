@@ -265,6 +265,7 @@ def test_c_tc_265_catalog_detail_activity(client, env):
 def _make_owner(env, factory):
     """ACME-01 の実アカウント owner を1人作り (account, user_id) を返す（承認/却下のログイン用）。"""
     acc = factory.make_seed_company_account()
+    factory.grant_capability(acc["id"], "quest_create")  # FR-47＝API で quest を作る owner に作成権限を付与
     with get_tenant_session(env.db) as ts:
         ouid = get_user_by_account(ts, acc["id"]).id
     return acc, ouid

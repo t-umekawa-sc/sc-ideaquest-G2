@@ -34,6 +34,7 @@ from app.tenant.search.router import router as search_router
 from app.tenant.info.router import router as info_router
 from app.tenant.strategy.router import router as strategy_router
 from app.tenant.ai_jobs.router import router as ai_jobs_router
+from app.tenant.capabilities.router import router as capabilities_router
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -108,6 +109,7 @@ app.include_router(search_router)  # テナントプレーン（ドメイン J�
 app.include_router(info_router)  # テナントプレーン（ドメイン N・情報インプット一覧/ワードクラウド SC-50）
 app.include_router(strategy_router)  # テナントプレーン（ドメイン R・経営資料/整合 SC-80/81/82・FR-44）
 app.include_router(ai_jobs_router)  # テナントプレーン（ドメイン S・AIジョブ/LLM連携 SC-04/94・FR-45）
+app.include_router(capabilities_router)  # テナントプレーン（②会社レベル能力 user_capabilities・FR-47・T.4）
 
 
 # 冪等キー（§1.9）＝add_request_id の内側（request_id 設定後）に置く。header 無し POST は素通し。

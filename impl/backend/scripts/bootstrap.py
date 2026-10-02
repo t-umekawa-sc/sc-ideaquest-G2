@@ -308,6 +308,25 @@ def seed_company_users() -> None:
                 print(f"[bootstrap] seeded user mirror for {account.login_id} in {company.db_identifier}")
 
 
+def seed_quest_create_capabilities() -> None:
+    """seed ユーザに quest_create 能力を付与（FR-47・決定K・冪等）。
+
+    クエスト作成を②会社レベル能力 `quest_create` でゲートするため、デモ/e2e の seed 一般ユーザが
+    従来どおりクエストを作れるよう明示付与（migration 0051 は既存クエスト作成者を自動付与するが、まだ
+    作っていない seed ユーザ向けにここで補完＝「作れていた人は作れ続ける」をデモでも担保）。管理者は
+    アプリ側ゲートで常時可のため付与不要。運営テナント（OPS）は対象外。
+    """
+    from app.tenant.capabilities import repository as caps_repo
+    with control_session() as session:
+        db_ids = [c.db_identifier for c in session.query(Company).filter(Company.company_code != "OPS").all()]
+    for db_id in db_ids:
+        with get_tenant_session(db_id) as ts:
+            for user in ts.query(User).all():
+                caps_repo.grant(ts, user.id, "quest_create", granted_by_id=None)
+            ts.commit()
+    print("[bootstrap] seeded quest_create capabilities for seed users")
+
+
 # 発見カタログ（SC-13・FR-40）デモ用の固定 seed（非prod のみ）。固定 UUID＝冪等・DB リセットでも安定再現。
 # ゼロ部署＝全社公開（`can_discover_quest` は 0 部署を全社として可視）＝seed 一般ユーザーが非メンバーで発見できる。
 # owner は合成ユーザー（seed 一般ユーザーとは別）＝seed ユーザーの `my_state=none`。公開アイデア＋直近チャットで活発度スパークを見せる。
@@ -640,6 +659,7 @@ def main() -> None:
         create_database(db_identifier)
         migrate_company(db_identifier)
     seed_company_users()
+    seed_quest_create_capabilities()  # FR-47＝seed ユーザに quest_create 付与（e2e createRecruiting 等が前提・冪等）
     seed_demo_quest_group()  # クエストグループのデモ（e2e createRecruiting 等が前提・非prod・冪等。内部で ACME-01＋ワーカ会社をループ）
     # 発見カタログ（SC-13）／情報インプット（SC-50・ドメイン N）デモを ACME-01 ＋（有効なら）ワーカ会社の
     # 各会社DBへ seed（冪等）。info の InfoLink は同一会社DBの discovery を指すため discovery を先に呼ぶ。

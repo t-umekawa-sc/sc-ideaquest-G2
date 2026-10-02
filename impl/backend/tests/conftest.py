@@ -306,12 +306,24 @@ def factory():
         created_challenges.append(cid)
         return tok
 
+    def grant_capability(account_id, capability: str, company=None) -> None:
+        """テスト用＝対象アカウントのユーザーに②会社レベル能力を付与（会社DB・user_capabilities・FR-47）。"""
+        from app.tenant.capabilities import repository as caps_repo
+        from app.tenant.profile import repository as profile_repo
+        comp = company or _seed_company()
+        db_id = comp.db_identifier if hasattr(comp, "db_identifier") else comp["db_identifier"]
+        with get_tenant_session(db_id) as ts:
+            user = profile_repo.get_user_by_account(ts, uuid.UUID(str(account_id)))
+            caps_repo.grant(ts, user.id, capability, granted_by_id=None)
+            ts.commit()
+
     yield SimpleNamespace(
         make_company=make_company,
         make_account=make_account,
         make_seed_company_account=make_seed_company_account,
         make_seed_mfa_account=make_seed_mfa_account,
         make_password_setup_challenge=make_password_setup_challenge,
+        grant_capability=grant_capability,
     )
 
     with control_session() as s:
@@ -347,9 +359,14 @@ def factory():
                 from app.tenant.shop.orm import UserItem as _UserItem
                 from app.tenant.achievements.orm import UserAchievement as _UserAch
                 from app.tenant.notifications.orm import Notification as _Notif
+                from app.tenant.capabilities.orm import UserCapability as _UserCap
                 ts.query(_UserSpell).filter_by(user_id=user.id).delete()
                 ts.query(_UserItem).filter_by(user_id=user.id).delete()
                 ts.query(_UserAch).filter_by(user_id=user.id).delete()
                 ts.query(_Notif).filter_by(recipient_id=user.id).delete()
+                # ②能力（FR-47・user_id/granted_by_id の両 FK→users）を user 削除前に掃除
+                ts.query(_UserCap).filter(
+                    (_UserCap.user_id == user.id) | (_UserCap.granted_by_id == user.id)
+                ).delete(synchronize_session=False)
             ts.query(User).filter_by(account_id=aid).delete()
             ts.commit()
