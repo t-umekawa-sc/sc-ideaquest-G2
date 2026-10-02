@@ -48,6 +48,9 @@
 
 /* 「この情報の主要語」プレビュー（情報登録ダイアログと同一UI＝info-input.css から移植）。 */
 .wc-preview { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); min-height: 60px; }
+/* 抽出ボタン行を撤去し自動表示化（R.1b期）＝主要語の箱が節の先頭に来るため、節の padding-top と
+   wc-preview の margin-top が二重取りで空きすぎる。先頭時は margin-top を殺し、節の padding だけで間隔を取る。 */
+.dialog-section > .wc-preview:first-child { margin-top: 0; }
 .wc-mini { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); }
 

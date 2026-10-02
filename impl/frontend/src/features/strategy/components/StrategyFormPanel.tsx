@@ -227,76 +227,6 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
           <p style={{ margin: 0 }}>会社の中長期計画・方針・戦略を ISO 56001 の項目立てで登録します。ここで登録した資料を<strong>クエストで選ぶ</strong>と、配下アイデアの「方針との関連度（キーワードベース）」を算出します。各項目のラベル横 ⓘ に入力のヒントがあります。</p>
         </ScreenPurpose>
 
-        {/* 情報の影響サマリ（R.4・編集時のみ・read 集計＝決定的）。この方針に「効いている」判定済情報の量と機会/脅威の内訳。 */}
-        {editing && impact && (
-          <div className="dialog-section is-quiet impact-card">
-            <div className="dialog-label">📊 この方針への情報の影響（判定済情報 {impact.info_total} 件中 {impact.related_count} 件が関連）</div>
-            {impact.related_count > 0 ? (
-              <>
-                <div className="impact-rates">
-                  <span className="impact-rate">影響率 <strong>{Math.round(impact.impact_rate * 100)}%</strong></span>
-                  <span className="impact-rate is-opp">機会率 <strong>{Math.round(impact.opportunity_rate * 100)}%</strong>（{impact.opportunity_count} 件）</span>
-                  <span className="impact-rate is-threat">脅威率 <strong>{Math.round(impact.threat_rate * 100)}%</strong>（{impact.threat_count} 件）</span>
-                </div>
-                <span className="hint">関連度しきい値 {impact.threshold} 以上でキーワードが効いている判定済情報を母集団に集計（決定的）。機会/脅威は情報の分類（人手トリアージ）由来。</span>
-              </>
-            ) : (
-              <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている判定済情報はまだありません。</span>
-            )}
-          </div>
-        )}
-
-        {/* この方針まわりの語像（R.4b・編集時のみ・設計§7＝集約でのみ UI 化）。関連情報＋アイデア＋コンセプトの語を集約。 */}
-        {editing && surround && surround.related_count > 0 && surround.tokens.length > 0 && (
-          <div className="dialog-section is-quiet surround-wc">
-            <div className="dialog-label">☁️ この方針まわりの語像（関連 {surround.related_count} 件＝情報・アイデア・コンセプト）</div>
-            <div className="wc-mini">
-              {surround.tokens.map((t) => (
-                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + t.weight * 0.9).toFixed(2)}rem` }} title={`${t.token}（${t.count}）`}>{t.token}</span>
-              ))}
-            </div>
-            <span className="hint">この方針に関連する情報・アイデア・コンセプトに現れる語を集約したものです（決定的・キーワードベース）。</span>
-          </div>
-        )}
-
-        {/* AI 用 Markdown エクスポート（R.5・編集時のみ・外部送信しない）。関連アイデア/情報/コンセプトを束ねて出力。 */}
-        {editing && (
-          <div className="dialog-section is-quiet export-md">
-            <div className="dialog-label">🤖 AI 用にエクスポート</div>
-            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連アイデア/情報/コンセプトを構造化 Markdown で出力します。ChatGPT 等に貼って意図/戦略の下書きにご利用ください（本アプリは外部送信しません）。</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("copy")}>📋 コピー</button>
-              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("download")}>⬇ ダウンロード（.md）</button>
-            </div>
-          </div>
-        )}
-
-        {/* アプリ内 AI 生成（R.6・FR-45 基盤・編集時のみ）＝自社ホスト LLM で ISO たたき台を生成し、人が確定。外部送信なし。 */}
-        {editing && (
-          <div className="dialog-section is-quiet gen-iso">
-            <div className="dialog-label">🤖 AI で下書きを生成（ISO56001 §6）</div>
-            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連を基に、意図/戦略/方針のたたき台を<strong>アプリ内の自社ホスト LLM</strong>で生成します（外部送信しません）。生成されたら内容を確認し、各項目へ反映してください。</p>
-            <button type="button" className="btn btn-outline btn-sm" disabled={generating || generation?.status === "queued" || generation?.status === "running"} onClick={runGenerate}>
-              {generation?.status === "queued" || generation?.status === "running" ? "生成中…" : "✨ AI で生成する"}
-            </button>
-            {(generation?.status === "queued" || generation?.status === "running") && (
-              <p className="hint" style={{ marginBottom: 0 }}>生成中です。完了するとここに下書きが表示されます（AI処理状況でも確認できます）。</p>
-            )}
-            {generation?.status === "failed" && (
-              <p className="form-error" role="alert" style={{ marginBottom: 0 }}>生成に失敗しました{generation.error ? `：${generation.error}` : ""}。LLM の稼働状況をご確認ください。</p>
-            )}
-            {generation?.status === "succeeded" && generation.result_text && (
-              <div className="gen-iso__result">
-                <div className="gen-iso__head">
-                  <span className="dialog-label" style={{ margin: 0 }}>生成された下書き（たたき台・要確認）</span>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { void navigator.clipboard.writeText(generation.result_text ?? ""); snack({ type: "success", title: "コピーしました" }); }}>📋 コピー</button>
-                </div>
-                <pre className="gen-iso__text">{generation.result_text}</pre>
-              </div>
-            )}
-          </div>
-        )}
-
         <Field className="dialog-section is-quiet" id="sd-title" label="タイトル" required error={titleErr}>
           <input className="input" id="sd-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）2027-2029 中期経営計画" />
         </Field>
@@ -372,6 +302,78 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
 
         {/* 紐づくクエスト（登録＝ステージ／編集＝API即時・R.1b）。他項目と同じ .field dialog-section で間隔/見出しを統一。 */}
         <StrategyQuestLinks docId={docId} value={questLinks} onChange={setQuestLinks} />
+
+        {/* --- ここから下は「編集項目のあと」に出す補助パネル（読み取り/派生/AI・編集時のみ・ユーザー指摘 2026-10-02） --- */}
+
+        {/* 情報の影響サマリ（R.4・編集時のみ・read 集計＝決定的）。この方針に「効いている」判定済情報の量と機会/脅威の内訳。 */}
+        {editing && impact && (
+          <div className="dialog-section is-quiet impact-card">
+            <div className="dialog-label">📊 この方針への情報の影響（判定済情報 {impact.info_total} 件中 {impact.related_count} 件が関連）</div>
+            {impact.related_count > 0 ? (
+              <>
+                <div className="impact-rates">
+                  <span className="impact-rate">影響率 <strong>{Math.round(impact.impact_rate * 100)}%</strong></span>
+                  <span className="impact-rate is-opp">機会率 <strong>{Math.round(impact.opportunity_rate * 100)}%</strong>（{impact.opportunity_count} 件）</span>
+                  <span className="impact-rate is-threat">脅威率 <strong>{Math.round(impact.threat_rate * 100)}%</strong>（{impact.threat_count} 件）</span>
+                </div>
+                <span className="hint">関連度しきい値 {impact.threshold} 以上でキーワードが効いている判定済情報を母集団に集計（決定的）。機会/脅威は情報の分類（人手トリアージ）由来。</span>
+              </>
+            ) : (
+              <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている判定済情報はまだありません。</span>
+            )}
+          </div>
+        )}
+
+        {/* この方針まわりの語像（R.4b・編集時のみ・設計§7＝集約でのみ UI 化）。関連情報＋アイデア＋コンセプトの語を集約。 */}
+        {editing && surround && surround.related_count > 0 && surround.tokens.length > 0 && (
+          <div className="dialog-section is-quiet surround-wc">
+            <div className="dialog-label">☁️ この方針まわりの語像（関連 {surround.related_count} 件＝情報・アイデア・コンセプト）</div>
+            <div className="wc-mini">
+              {surround.tokens.map((t) => (
+                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + t.weight * 0.9).toFixed(2)}rem` }} title={`${t.token}（${t.count}）`}>{t.token}</span>
+              ))}
+            </div>
+            <span className="hint">この方針に関連する情報・アイデア・コンセプトに現れる語を集約したものです（決定的・キーワードベース）。</span>
+          </div>
+        )}
+
+        {/* AI 用 Markdown エクスポート（R.5・編集時のみ・外部送信しない）。関連アイデア/情報/コンセプトを束ねて出力。 */}
+        {editing && (
+          <div className="dialog-section is-quiet export-md">
+            <div className="dialog-label">🤖 AI 用にエクスポート</div>
+            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連アイデア/情報/コンセプトを構造化 Markdown で出力します。ChatGPT 等に貼って意図/戦略の下書きにご利用ください（本アプリは外部送信しません）。</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("copy")}>📋 コピー</button>
+              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("download")}>⬇ ダウンロード（.md）</button>
+            </div>
+          </div>
+        )}
+
+        {/* アプリ内 AI 生成（R.6・FR-45 基盤・編集時のみ）＝自社ホスト LLM で ISO たたき台を生成し、人が確定。外部送信なし。 */}
+        {editing && (
+          <div className="dialog-section is-quiet gen-iso">
+            <div className="dialog-label">🤖 AI で下書きを生成（ISO56001 §6）</div>
+            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連を基に、意図/戦略/方針のたたき台を<strong>アプリ内の自社ホスト LLM</strong>で生成します（外部送信しません）。生成されたら内容を確認し、各項目へ反映してください。</p>
+            <button type="button" className="btn btn-outline btn-sm" disabled={generating || generation?.status === "queued" || generation?.status === "running"} onClick={runGenerate}>
+              {generation?.status === "queued" || generation?.status === "running" ? "生成中…" : "✨ AI で生成する"}
+            </button>
+            {(generation?.status === "queued" || generation?.status === "running") && (
+              <p className="hint" style={{ marginBottom: 0 }}>生成中です。完了するとここに下書きが表示されます（AI処理状況でも確認できます）。</p>
+            )}
+            {generation?.status === "failed" && (
+              <p className="form-error" role="alert" style={{ marginBottom: 0 }}>生成に失敗しました{generation.error ? `：${generation.error}` : ""}。LLM の稼働状況をご確認ください。</p>
+            )}
+            {generation?.status === "succeeded" && generation.result_text && (
+              <div className="gen-iso__result">
+                <div className="gen-iso__head">
+                  <span className="dialog-label" style={{ margin: 0 }}>生成された下書き（たたき台・要確認）</span>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { void navigator.clipboard.writeText(generation.result_text ?? ""); snack({ type: "success", title: "コピーしました" }); }}>📋 コピー</button>
+                </div>
+                <pre className="gen-iso__text">{generation.result_text}</pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="modal__footer">
         {/* フッター順＝閉じる（左・.dialog-close-left）→副→主要（右）＝デザイン標準§ダイアログ内コンテンツ（2026-09-18）。 */}
