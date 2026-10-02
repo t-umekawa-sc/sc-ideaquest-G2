@@ -189,6 +189,21 @@ def summary(session: Session, requester_id: uuid.UUID, *, recent_days: int = 7) 
     }
 
 
+def latest_by_ref(session: Session, *, task_type: str, ref_strategy_document_id: uuid.UUID) -> AiJob | None:
+    """この経営資料に対する最新の task_type ジョブ（S.1a 類・strategy の生成表示用）。
+
+    対象＝共有リソース（経営資料）に紐づくジョブゆえ依頼者で絞らない（呼び出し EP が管理者ガード）。
+    """
+    return session.execute(
+        select(AiJob)
+        .where(AiJob.task_type == task_type,
+               AiJob.ref_strategy_document_id == ref_strategy_document_id,
+               AiJob.deleted_at.is_(None))
+        .order_by(AiJob.created_at.desc())
+        .limit(1)
+    ).scalars().first()
+
+
 def running_progress(session: Session, *, exclude_requester_id: uuid.UUID) -> list[float | None]:
     """会社内 running の進捗 ratio のみを処理順で返す（S.1a・SC-04 上部）。
 
@@ -273,8 +288,9 @@ def get_model_setting(session: Session, model_key: str) -> CompanyAiModelSetting
 
 
 def upsert_model_setting(session: Session, model_key: str, *, enabled: bool | None,
-                         monthly_budget_micros: int | None, actor_id: uuid.UUID) -> CompanyAiModelSetting:
-    """会社のモデル設定を作成/更新（enabled/予算）。enabled=True 化時に enabled_by/at を記録（課金合意・§4.2）。"""
+                         monthly_budget_micros: int | None, max_output_tokens: int | None = None,
+                         actor_id: uuid.UUID) -> CompanyAiModelSetting:
+    """会社のモデル設定を作成/更新（enabled/予算/出力上限）。enabled=True 化時に enabled_by/at を記録（課金合意・§4.2）。"""
     row = get_model_setting(session, model_key)
     if row is None:
         row = CompanyAiModelSetting(model_key=model_key, enabled=False)
@@ -286,6 +302,8 @@ def upsert_model_setting(session: Session, model_key: str, *, enabled: bool | No
         row.enabled = enabled
     if monthly_budget_micros is not None:
         row.monthly_budget_micros = monthly_budget_micros
+    if max_output_tokens is not None:
+        row.max_output_tokens = max_output_tokens
     session.flush()
     return row
 

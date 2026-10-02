@@ -16,6 +16,8 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.strategy import application as service
 from app.tenant.strategy.schemas import (
+    GenerationEnqueueResponse,
+    GenerationStatusResponse,
     QuestLinkAddRequest,
     QuestLinkListResponse,
     StrategyDocCreateRequest,
@@ -82,6 +84,20 @@ def export_strategy_document_markdown(doc_id: str, request: Request,
     md = service.export_markdown(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
     return Response(content=md, media_type="text/markdown; charset=utf-8",
                     headers={"Content-Disposition": f'inline; filename="strategy-{doc_id}.md"'})
+
+
+@router.post("/strategy-documents/{doc_id}/generate", response_model=GenerationEnqueueResponse, status_code=202,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def generate_strategy_iso(doc_id: str, request: Request,
+                          session: dict = Depends(require_company_account_admin)):
+    # Phase2 in-app 生成（iso_generate・FR-44 Phase2）＝AIジョブ基盤へ投入。結果は GET /generation で参照。
+    return service.generate_iso(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+
+
+@router.get("/strategy-documents/{doc_id}/generation", response_model=GenerationStatusResponse | None)
+def get_strategy_generation(doc_id: str, request: Request,
+                            session: dict = Depends(require_company_account_admin)):
+    return service.latest_generation(uuid.UUID(session["company_id"]), doc_id)
 
 
 @router.post("/strategy-documents", response_model=StrategyDocDetail, status_code=201,

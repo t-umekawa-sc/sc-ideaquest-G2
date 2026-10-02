@@ -53,6 +53,22 @@ export function AiSettingsView() {
     }
   }
 
+  async function saveMaxTokens(m: AdminModelItem, raw: string) {
+    const trimmed = raw.trim();
+    const val = trimmed === "" ? null : Math.round(Number(trimmed));
+    if (val != null && (!Number.isFinite(val) || val < 0)) {
+      snack({ type: "error", title: "出力トークン上限は 0 以上の数値で入力してください。" });
+      return;
+    }
+    if (val === (m.max_output_tokens ?? null)) return; // 変更なしは送らない
+    try {
+      setModels(await patchAdminModel(m.key, { max_output_tokens: val }));
+      snack({ type: "success", title: "出力トークン上限を更新しました" });
+    } catch {
+      snack({ type: "error", title: "更新に失敗しました" });
+    }
+  }
+
   async function saveBudget(m: AdminModelItem, raw: string) {
     const trimmed = raw.trim();
     const micros = trimmed === "" ? null : Math.round(Number(trimmed) * 1_000_000);
@@ -118,6 +134,15 @@ export function AiSettingsView() {
                   当月：{cm.tokens.toLocaleString()} トークン ／ {yen(cm.cost_micros)}
                   {budgetPct != null && <>（予算 {yen(m.monthly_budget_micros!)}・消化 {budgetPct}%）</>}
                 </div>
+                <label className="ai-settings__budget">
+                  出力トークン上限（空＝無制限）：
+                  <input
+                    type="number"
+                    min={0}
+                    defaultValue={m.max_output_tokens ?? ""}
+                    onBlur={(e) => saveMaxTokens(m, e.target.value)}
+                  />
+                </label>
                 {paid && (
                   <label className="ai-settings__budget">
                     月次予算（円・空＝無制限）：

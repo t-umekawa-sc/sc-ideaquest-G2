@@ -45,7 +45,7 @@
 
 ## S.3 モデル指定なしの既定挙動（後方互換）
 
-- `model` 省略＝`task_type` 既定キー（設計 §3.3・§4.1）で実行。**初版の最初の task_type＝`info_summarize`**（既定 `qwen3-light`）／`iso_generate`（既定 `qwen3-swallow`）は2本目。
+- `model` 省略＝`task_type` 既定キー（設計 §3.3・§4.1）で実行。**初版の最初の task_type＝`info_summarize`**（既定 `qwen3-light`）／2本目 **`iso_generate`（既定 `qwen3-swallow`・実装済 2026-10-02）**＝経営資料の Markdown から ISO56001 §6 のたたき台を生成（R ドメイン R.5a が内部 enqueue・dev ライブ完走確認済）。
 - registry（論理キー→{provider, model, params, external, billing, enabled}）は**システム全体のカタログ＝コード/設定側**。dev/prod の物理差は設定で吸収し、キー名は同一に保つ（アプリ無改修で載せ替え・設計 §3.2）。
 
 ## S.4 進捗・キャンセル（リアルタイム連携・§L）
@@ -58,8 +58,8 @@
 
 | メソッド / パス | 説明 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /admin/ai-models` | カタログ＋自社設定一覧 | — | registry 全キー＋`{enabled, billing, monthly_budget_micros, current_month:{tokens, cost_micros}}` |
-| `PATCH /admin/ai-models/{key}` | ON/OFF・予算変更 | `{enabled?, monthly_budget_micros?}` | 200。**`paid` を ON＝課金合意**（確認ダイアログ・§S.7）。`enabled_by`/`enabled_at` を記録 |
+| `GET /admin/ai-models` | カタログ＋自社設定一覧 | — | registry 全キー＋`{enabled, billing, monthly_budget_micros, max_output_tokens, current_month:{tokens, cost_micros}}` |
+| `PATCH /admin/ai-models/{key}` | ON/OFF・予算・**生成トークン上限**変更 | `{enabled?, monthly_budget_micros?, max_output_tokens?}` | 200。**`paid` を ON＝課金合意**（確認ダイアログ・§S.7）。`enabled_by`/`enabled_at` を記録。`max_output_tokens`＝**会社別の生成上限**（NULL=無制限・負値は 422・実行時に `max_tokens` として適用＝無料ティア抑制） |
 | `GET /admin/ai-usage` | 会社の利用量/コスト | `?period_ym=`/`?model_key=`（任意） | 会社×モデル×月の集計（`ai_usage_events` の read 集計・§5.59）＋予算消化率 |
 
 - **2階層**＝カタログ（registry・システム全体）× 会社の有効化（`company_ai_model_settings`・§5.58）。**`free` 既定 ON／`paid` 既定 OFF**（勝手に課金が始まらない安全側）。未登録キーは registry 既定にフォールバック。

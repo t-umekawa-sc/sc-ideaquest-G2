@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://ollama:11434/v1"     # OpenAI 互換 chat のベースURL
     llm_api_key: str = ""                            # 認証が要る基盤向け（Ollama は不要＝空）
     llm_timeout_seconds: float = 120.0               # 生成は数分許容（Phase1 バックグラウンド）
+    llm_max_tokens: int = 0                           # 生成トークンのグローバル上限（0=無制限・会社別上限 S.5 が無い時の技術ガード。env 可変）
     llm_model_light: str = "qwen3:4b"                # 論理キー qwen3-light の物理（軽量・info_summarize 既定）
     llm_model_swallow: str = "hf.co/tokyotech-llm/Llama-3.1-Swallow-8B"  # 論理キー qwen3-swallow の物理（高品質日本語・iso_generate）
     # AIジョブ・ワーカー（tenant/ai_jobs・llm_worker.py・FR-45・設計 §5）

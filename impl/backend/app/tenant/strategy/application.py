@@ -226,6 +226,36 @@ def export_markdown(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -
         return export_mod.build_markdown(ts, doc, company, related)
 
 
+def generate_iso(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
+    """Phase2 in-app 生成（FR-44 Phase2・設計 §8）＝経営資料＋関連の構造化 Markdown を文脈に
+    AIジョブ基盤（FR-45）へ `iso_generate` を投入。文脈は本層（strategy）で用意し input に載せる
+    （worker は strategy 非依存のまま・LLM 物理は基盤に閉じる＝データ主権）。202＝{id, status}。"""
+    from app.tenant.ai_jobs import application as ai_jobs
+    from app.tenant.strategy import export as export_mod
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    did = _parse_uuid(doc_id)
+    with get_tenant_session(company.db_identifier) as ts:
+        doc = repo.get_document(ts, did)
+        if doc is None:
+            raise AppError(404, "not_found")
+        related, _total, _threshold = _related_curated_info(ts, doc, company)
+        context_md = export_mod.build_markdown(ts, doc, company, related)
+    return ai_jobs.enqueue(account_id, company_id, task_type="iso_generate",
+                           input={"context_md": context_md, "strategy_document_id": str(did)},
+                           ref_strategy_document_id=did)
+
+
+def latest_generation(company_id: uuid.UUID, doc_id: str) -> dict | None:
+    """この経営資料の最新 iso_generate ジョブ（状態＋生成テキスト）。SC-81 の生成表示用。"""
+    from app.tenant.ai_jobs import application as ai_jobs
+
+    return ai_jobs.latest_generation(company_id, task_type="iso_generate",
+                                     ref_strategy_document_id=_parse_uuid(doc_id))
+
+
 def update_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *, body) -> dict:
     company = _resolve_company(company_id)
     if company is None:

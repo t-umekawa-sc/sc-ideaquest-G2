@@ -3,7 +3,7 @@
 import type { QueryState } from "@/components/ui";
 import { apiFetch } from "@/lib/api/client";
 
-import type { QuestLinkItem, StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyListResult, StrategyWordCloud } from "./types";
+import type { QuestLinkItem, StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyGeneration, StrategyListResult, StrategyWordCloud } from "./types";
 
 export const STRATEGY_CHANGED_EVENT = "strategy-documents-changed";
 
@@ -57,6 +57,16 @@ export async function exportStrategyMarkdown(id: string, signal?: AbortSignal): 
   const res = await fetch(`/api/v1/strategy-documents/${id}/export.md`, { credentials: "include", signal });
   if (!res.ok) throw new Error(`export failed: ${res.status}`);
   return res.text();
+}
+
+// Phase2 in-app 生成（iso_generate・FR-44 Phase2）＝AIジョブ基盤へ投入（202）。結果は fetchStrategyGeneration で参照。
+export function generateStrategyIso(id: string): Promise<{ id: string; status: string } | null> {
+  return apiFetch<{ id: string; status: string }>(`/strategy-documents/${id}/generate`, { method: "POST" });
+}
+
+// この経営資料の最新生成ジョブの状態＋ドラフト（無ければ null）。
+export function fetchStrategyGeneration(id: string, signal?: AbortSignal): Promise<StrategyGeneration | null> {
+  return apiFetch<StrategyGeneration>(`/strategy-documents/${id}/generation`, { signal });
 }
 
 export function createStrategyDoc(input: StrategyDocInput): Promise<StrategyDocDetail | null> {

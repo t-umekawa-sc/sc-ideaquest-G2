@@ -57,6 +57,11 @@
 
 
 
+## 5. Phase2 in-app 生成（iso_generate・R.6・FR-44 Phase2・設計 §8）
+
+> `POST /strategy-documents/{id}/generate`（管理者）＝経営資料＋関連の構造化 Markdown（export 再利用）を文脈に **AIジョブ基盤（FR-45）へ `iso_generate` を投入**（文脈は strategy 層で用意し input に載せる＝worker は strategy 非依存・LLM 物理は基盤に閉じる＝データ主権）。`GET /{id}/generation`＝最新生成の状態＋ドラフト。LLM は FakeChat（決定的）。
+
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| _（Step5 で追加）_ | | | | | | |
+| R-TC-120 | int | 生成縦1本＝資料→`iso_generate` 投入→worker(FakeChat)→succeeded→生成取得 | company_account_admin・資料1件 | `POST /{id}/generate`→`process_ai_jobs_once`→`GET /{id}/generation` | generate=202・queued／生成前は generation.status=queued・result_text=null／worker後 succeeded≥1／generation.status=succeeded・result_text 非空 | R.6／FR-45／設計§8 |
+| R-TC-121 | api | 生成は管理者のみ（一般は 403） | 資料1件・一般ユーザー | 一般で `POST /{id}/generate` | 403（require_company_account_admin） | R.6／R.0 |

@@ -117,6 +117,7 @@ class AdminModelItem(BaseModel):
     billing: str
     enabled: bool
     monthly_budget_micros: int | None = None
+    max_output_tokens: int | None = None   # 会社別の生成トークン上限（NULL=無制限・S.5）
     current_month: AdminModelCurrentMonth
 
 
@@ -129,6 +130,7 @@ class AdminModelPatchRequest(BaseModel):
 
     enabled: bool | None = None
     monthly_budget_micros: int | None = None
+    max_output_tokens: int | None = None   # 会社別の生成トークン上限（NULL=無制限・S.5）
 
 
 class AiUsageRow(BaseModel):

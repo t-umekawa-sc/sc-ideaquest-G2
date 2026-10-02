@@ -60,6 +60,7 @@ class CompanyAiModelSetting(CompanyBase):
     model_key: Mapped[str] = mapped_column(Text, nullable=False)                 # registry の論理キー（§4.1）
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")  # free 既定ON/paid 既定OFF は app 層で
     monthly_budget_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # paid 暴走防止（NULL=無制限）
+    max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 会社別の生成トークン上限（NULL=無制限・無料ティア抑制等・S.5）
     enabled_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # 課金合意の記録
     enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

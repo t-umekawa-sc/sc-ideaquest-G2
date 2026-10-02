@@ -144,3 +144,17 @@ class QuestLinkListResponse(BaseModel):
 class QuestLinkAddRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     quest_ids: list[str] = Field(min_length=1)
+
+
+# Phase2 in-app 生成（iso_generate・FR-44 Phase2・設計 §8）。
+class GenerationEnqueueResponse(BaseModel):
+    id: str
+    status: str
+
+
+class GenerationStatusResponse(BaseModel):
+    job_id: str
+    status: str                         # queued/running/succeeded/failed/canceled
+    result_text: str | None = None      # succeeded のみ＝生成ドラフト
+    error: str | None = None            # failed のみ
+    finished_at: str | None = None

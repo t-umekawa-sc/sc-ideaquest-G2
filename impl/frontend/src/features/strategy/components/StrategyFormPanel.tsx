@@ -7,11 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
+import { emitAiJobsChanged } from "@/features/ai-jobs";
 import { cloudTokens } from "@/features/info-input/wordcloud";
 
-import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, fetchStrategyWordCloud, getStrategyDoc, updateStrategyDoc } from "../api";
+import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, fetchStrategyGeneration, fetchStrategyWordCloud, generateStrategyIso, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
-import type { ImpactRates, QuestLinkItem, StrategyWordCloud } from "../types";
+import type { ImpactRates, QuestLinkItem, StrategyGeneration, StrategyWordCloud } from "../types";
 import type { StrategyDocInput } from "../types";
 import { StrategyQuestLinks } from "./StrategyQuestLinks";
 import "../strategy.css";
@@ -84,8 +85,35 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false); // AI 用 Markdown エクスポート中（R.5）
+  const [generation, setGeneration] = useState<StrategyGeneration | null>(null); // Phase2 in-app 生成（最新ジョブ・R.6）
+  const [generating, setGenerating] = useState(false);
   const { summaryRef, notify } = useFormErrorNotice();
   const snack = useSnackbar();
+
+  // Phase2 in-app 生成（iso_generate・FR-45 基盤へ投入）＝たたき台を生成し人が確定（外部送信しない＝自社ホスト LLM）。
+  const runGenerate = async () => {
+    if (!docId) return;
+    setGenerating(true);
+    try {
+      await generateStrategyIso(docId);
+      emitAiJobsChanged(); // ヘッダーの AIジョブ件数バッジを更新
+      setGeneration({ job_id: "", status: "queued", result_text: null, error: null, finished_at: null });
+      snack({ type: "success", title: "生成を開始しました", msg: "完了まで少し待ちます（AI処理状況でも確認できます）。" });
+    } catch {
+      snack({ type: "error", title: "生成の開始に失敗しました" });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // 生成中（queued/running）は結果が出るまで軽くポーリングして状態を更新する。
+  useEffect(() => {
+    if (!docId || !generation || (generation.status !== "queued" && generation.status !== "running")) return;
+    const t = setInterval(() => {
+      fetchStrategyGeneration(docId).then((g) => g && setGeneration(g)).catch(() => {});
+    }, 3000);
+    return () => clearInterval(t);
+  }, [docId, generation]);
 
   // AI 用 Markdown をコピー/ダウンロード（R.5・外部送信しない＝生テキストをローカルで扱うだけ）。
   const runExport = async (mode: "copy" | "download") => {
@@ -122,6 +150,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
       setBodyMd(d.body_md ?? ""); setPeriodFrom(d.period_from ?? ""); setPeriodTo(d.period_to ?? "");
       if (!fromId) setImpact(d.impact ?? null); // 影響サマリは編集時のみ（複製は元資料の値なので出さない）
       if (!fromId) fetchStrategyWordCloud(sourceId, ac.signal).then(setSurround).catch(() => {}); // 方針まわりの語像（R.4b）
+      if (!fromId) fetchStrategyGeneration(sourceId, ac.signal).then(setGeneration).catch(() => {}); // 最新の AI 生成（R.6）
       setLoaded(true);
     }).catch(() => setLoaded(true));
     return () => ac.abort();
@@ -237,6 +266,32 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
               <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("copy")}>📋 コピー</button>
               <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("download")}>⬇ ダウンロード（.md）</button>
             </div>
+          </div>
+        )}
+
+        {/* アプリ内 AI 生成（R.6・FR-45 基盤・編集時のみ）＝自社ホスト LLM で ISO たたき台を生成し、人が確定。外部送信なし。 */}
+        {editing && (
+          <div className="dialog-section is-quiet gen-iso">
+            <div className="dialog-label">🤖 AI で下書きを生成（ISO56001 §6）</div>
+            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連を基に、意図/戦略/方針のたたき台を<strong>アプリ内の自社ホスト LLM</strong>で生成します（外部送信しません）。生成されたら内容を確認し、各項目へ反映してください。</p>
+            <button type="button" className="btn btn-outline btn-sm" disabled={generating || generation?.status === "queued" || generation?.status === "running"} onClick={runGenerate}>
+              {generation?.status === "queued" || generation?.status === "running" ? "生成中…" : "✨ AI で生成する"}
+            </button>
+            {(generation?.status === "queued" || generation?.status === "running") && (
+              <p className="hint" style={{ marginBottom: 0 }}>生成中です。完了するとここに下書きが表示されます（AI処理状況でも確認できます）。</p>
+            )}
+            {generation?.status === "failed" && (
+              <p className="form-error" role="alert" style={{ marginBottom: 0 }}>生成に失敗しました{generation.error ? `：${generation.error}` : ""}。LLM の稼働状況をご確認ください。</p>
+            )}
+            {generation?.status === "succeeded" && generation.result_text && (
+              <div className="gen-iso__result">
+                <div className="gen-iso__head">
+                  <span className="dialog-label" style={{ margin: 0 }}>生成された下書き（たたき台・要確認）</span>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { void navigator.clipboard.writeText(generation.result_text ?? ""); snack({ type: "success", title: "コピーしました" }); }}>📋 コピー</button>
+                </div>
+                <pre className="gen-iso__text">{generation.result_text}</pre>
+              </div>
+            )}
           </div>
         )}
 

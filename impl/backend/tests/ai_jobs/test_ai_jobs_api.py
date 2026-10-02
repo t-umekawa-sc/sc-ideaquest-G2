@@ -202,6 +202,22 @@ def test_s_tc_125_admin_usage_shape(client, factory):
     assert isinstance(r.json()["data"], list)
 
 
+def test_s_tc_131_admin_max_output_tokens(client, factory):
+    """S-TC-131: 会社別の生成トークン上限を PATCH で設定＝GET に反映・負値は 422（S.5・無料ティア抑制）。"""
+    _admin(client, factory)
+    try:
+        r = client.patch("/api/v1/admin/ai-models/qwen3-swallow",
+                         json={"max_output_tokens": 256}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        data = {m["key"]: m for m in r.json()["data"]}
+        assert data["qwen3-swallow"]["max_output_tokens"] == 256  # 会社別上限が反映
+        # 負値は 422。
+        assert client.patch("/api/v1/admin/ai-models/qwen3-swallow",
+                            json={"max_output_tokens": -1}, headers=_csrf(client)).status_code == 422
+    finally:
+        _cleanup_settings(["qwen3-swallow"])
+
+
 def _two_user_ids(db: str) -> tuple[uuid.UUID, uuid.UUID]:
     """(自分=SEED_LOGIN の user.id, 他ユーザの user.id) を返す。"""
     with get_tenant_session(db) as ts:
@@ -219,6 +235,29 @@ def _insert_running(db: str, requester_id: uuid.UUID, ratio: float | None) -> st
         ts.add(j)
         ts.commit()
         return str(j.id)
+
+
+def test_s_tc_132_worker_bootstrap_registers_fk_targets():
+    """S-TC-132(int): ai_jobs.application 単独 import で AiJob の FK 先が登録され mapper 構成が通る。
+
+    llm_worker は本モジュールだけを import して常駐する。AiJob は ideas/quests/strategy_documents/
+    info_items へ FK を張るため、これら ORM が同一 metadata に未登録だと `configure_mappers()` が
+    `NoReferencedTableError` で落ち、全ジョブが処理不能になる（実際に dev で発生した回帰）。conftest は
+    全 ORM を読むため本テスト内では再現できない＝**子プロセスでワーカ相当の最小 import を再現**して検証する。
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "import app.tenant.ai_jobs.application\n"
+        "from sqlalchemy.orm import configure_mappers\n"
+        "configure_mappers()\n"
+        "print('MAPPER_OK')\n"
+    )
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "MAPPER_OK" in r.stdout
+    assert "NoReferencedTableError" not in r.stderr
 
 
 def test_s_tc_130_running_excludes_self_ratio_only(client):

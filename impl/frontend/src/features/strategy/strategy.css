@@ -1,3 +1,19 @@
+/* アプリ内 AI 生成（R.6・FR-45・編集時のみ）＝生成ドラフトの表示。 */
+.gen-iso__result { margin-top: var(--space-3); }
+.gen-iso__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.gen-iso__text {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius, 8px);
+  background: var(--color-surface, #fff);
+  max-height: 24rem;
+  overflow: auto;
+  font-family: inherit;
+}
+
 /* 経営資料（ドメイン R・FR-44）＝一覧ヘッダ／登録フォームのレイアウト補助。 */
 .strategy-list-head {
   display: flex;

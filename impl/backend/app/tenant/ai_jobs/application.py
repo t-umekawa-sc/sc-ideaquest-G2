@@ -22,6 +22,15 @@ from app.tenant.ai_jobs.orm import AiJob
 from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
 
+# AiJob は ref_*（ideas/quests/strategy_documents/info_items）へ FK を張る。SQLAlchemy は mapper 構成時に
+# これら参照先テーブルが同一 metadata に登録済みであることを要求する。FastAPI は全 router 経由で各 ORM を
+# 読み込むが、llm_worker は本モジュールだけを import するため、ここで FK 先 ORM を side-effect import して
+# 登録しないと NoReferencedTableError で全ジョブの処理が落ちる（worker 単独起動の必須条件・§5.2a）。
+from app.tenant.ideas import orm as _ideas_orm  # noqa: F401
+from app.tenant.info import orm as _info_orm  # noqa: F401
+from app.tenant.quests import orm as _quests_orm  # noqa: F401
+from app.tenant.strategy import orm as _strategy_orm  # noqa: F401
+
 # free 論理キーの単価スナップショット（自社ホスト＝従量課金なし・§4.2/§5.59）。
 _FREE_RATE = {"input_rate": 0, "output_rate": 0, "currency": "JPY", "pricing_version": "phase1-free"}
 
@@ -150,6 +159,24 @@ def list_running(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         return {"data": [{"ratio": r} for r in ratios]}
 
 
+def latest_generation(company_id: uuid.UUID, *, task_type: str, ref_strategy_document_id: uuid.UUID) -> dict | None:
+    """経営資料に紐づく最新生成ジョブの状態＋結果（strategy の生成表示用・管理者スコープは呼び出し側）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        job = repo.latest_by_ref(ts, task_type=task_type, ref_strategy_document_id=ref_strategy_document_id)
+        if job is None:
+            return None
+        return {
+            "job_id": str(job.id),
+            "status": job.status,
+            "result_text": (job.result or {}).get("text") if job.status == "succeeded" else None,
+            "error": (job.error or {}).get("detail") if job.status == "failed" else None,
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+        }
+
+
 def summary(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
     company = _resolve_company(company_id)
     if company is None:
@@ -227,26 +254,31 @@ def admin_list_models(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
             data.append({
                 "key": key, "billing": bill, "enabled": key in effective,
                 "monthly_budget_micros": row.monthly_budget_micros if row else None,
+                "max_output_tokens": row.max_output_tokens if row else None,
                 "current_month": {"tokens": u["input_tokens"] + u["output_tokens"], "cost_micros": u["cost_micros"]},
             })
     return {"data": data}
 
 
 def admin_patch_model(account_id: uuid.UUID, company_id: uuid.UUID, key: str, *,
-                      enabled: bool | None, monthly_budget_micros: int | None) -> dict:
-    """会社モデルの ON/OFF・予算変更（PATCH /admin/ai-models/{key}）。paid ON＝課金合意（enabled_by/at 記録）。"""
+                      enabled: bool | None, monthly_budget_micros: int | None,
+                      max_output_tokens: int | None = None) -> dict:
+    """会社モデルの ON/OFF・予算・出力上限変更（PATCH /admin/ai-models/{key}）。paid ON＝課金合意（enabled_by/at 記録）。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
     if key not in registry.catalog_billing():  # 未知キーは 422
         raise AppError(422, "validation_error", detail="不明なモデルキー",
                        errors=[{"field": "key", "code": "invalid_model"}])
+    if max_output_tokens is not None and max_output_tokens < 0:
+        raise AppError(422, "validation_error", detail="出力トークン上限は0以上",
+                       errors=[{"field": "max_output_tokens", "code": "invalid_range"}])
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
         repo.upsert_model_setting(ts, key, enabled=enabled, monthly_budget_micros=monthly_budget_micros,
-                                  actor_id=user.id)
+                                  max_output_tokens=max_output_tokens, actor_id=user.id)
         ts.commit()
     return admin_list_models(account_id, company_id)
 
@@ -298,7 +330,7 @@ def enqueue_ai_job(
 
 
 def _build_messages(job: AiJob) -> list[dict]:
-    """task_type ごとにプロンプトを組む（Phase1 は info_summarize のみ）。"""
+    """task_type ごとにプロンプトを組む。文脈は enqueue 側ドメインが input に用意済み（本層は汎用のまま）。"""
     if job.task_type == "info_summarize":
         text = (job.input or {}).get("text", "")
         if not text:
@@ -306,6 +338,23 @@ def _build_messages(job: AiJob) -> list[dict]:
         return [
             {"role": "system", "content": "次の文章を日本語で簡潔に要約してください。"},
             {"role": "user", "content": str(text)},
+        ]
+    if job.task_type == "iso_generate":
+        # 経営資料整合 Phase2（FR-44/FR-45・設計 §8）＝経営資料＋関連の構造化 Markdown（enqueue 時に
+        # strategy ドメインが export で用意）を基に ISO56001 §6 のたたき台を生成。本層は strategy に非依存。
+        context = (job.input or {}).get("context_md", "")
+        if not context:
+            raise _PermanentError("input.context_md is required for iso_generate")
+        system = (
+            "あなたは ISO56001（イノベーションマネジメント）に詳しい社内のファシリテーターです。"
+            "以下の会社の経営資料と、関連する現場のアイデア・情報・コンセプトを基に、"
+            "ISO56001 §6（計画）の『意図（ビジョン）』『戦略・方向性』『イノベーション方針』の"
+            "たたき台を日本語で生成してください。各項目を見出し付きで簡潔にまとめ、"
+            "経営資料に無い事実は創作しないでください。最後に人による確定が前提です。"
+        )
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": str(context)},
         ]
     raise _PermanentError(f"unsupported task_type: {job.task_type}")
 
@@ -396,12 +445,17 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
             session.commit()
             return "failed"
         requester = job.requested_by_id
+        # 会社別の生成トークン上限（S.5・無料ティア抑制等）を解決＝当該モデルの会社設定（NULL=無制限）。
+        _resolved_key = registry.resolve_key(task_type, requested_model)
+        _setting = repo.get_model_setting(session, _resolved_key)
+        max_output_tokens = _setting.max_output_tokens if _setting else None
 
-    # 2) 論理キー解決＋ゲートウェイ呼び出し（DB 接続を持たずに）。
+    # 2) 論理キー解決＋ゲートウェイ呼び出し（DB 接続を持たずに）。会社上限があれば max_tokens を付与。
     try:
         key = registry.resolve_key(task_type, requested_model)
         spec = registry.get(key)
-        result = gateway.complete(task_type, messages, model=key)
+        _params = {"max_tokens": max_output_tokens} if max_output_tokens and max_output_tokens > 0 else None
+        result = gateway.complete(task_type, messages, model=key, params=_params)
     except gateway.LLMConfigError as exc:
         return _fail_permanent(db_identifier, job_id, "invalid_model", str(exc))
     except gateway.LLMUnavailable as exc:

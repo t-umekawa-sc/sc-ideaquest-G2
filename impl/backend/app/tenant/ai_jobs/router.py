@@ -94,7 +94,8 @@ def admin_list_ai_models(request: Request, session: dict = Depends(require_compa
 def admin_patch_ai_model(key: str, body: AdminModelPatchRequest, request: Request,
                          session: dict = Depends(require_company_account_admin)):
     return service.admin_patch_model(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-                                     key, enabled=body.enabled, monthly_budget_micros=body.monthly_budget_micros)
+                                     key, enabled=body.enabled, monthly_budget_micros=body.monthly_budget_micros,
+                                     max_output_tokens=body.max_output_tokens)
 
 
 @router.get("/admin/ai-usage", response_model=AiUsageResponse)

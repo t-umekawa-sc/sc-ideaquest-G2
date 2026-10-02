@@ -53,10 +53,11 @@ class LLMConfigError(ValueError):
 class OpenAICompatibleChat:
     """OpenAI 互換 `/chat/completions`（Ollama・vLLM・その他）を叩く実クライアント。"""
 
-    def __init__(self, *, base_url: str, api_key: str = "", timeout: float = 120.0) -> None:
+    def __init__(self, *, base_url: str, api_key: str = "", timeout: float = 120.0, max_tokens: int = 0) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout
+        self._max_tokens = max_tokens  # >0 で生成トークン上限を付与（暴走抑止・dev 完走用。既定0=無制限）
 
     def complete(
         self,
@@ -74,6 +75,9 @@ class OpenAICompatibleChat:
         body = {"model": model, "messages": messages, "stream": False}
         if params:
             body.update(params)
+        # 会社別 max_tokens（params）が無ければグローバル上限を技術ガードとして付与（>0 のときのみ）。
+        if self._max_tokens > 0 and "max_tokens" not in body:
+            body["max_tokens"] = self._max_tokens
         try:
             resp = httpx.post(
                 f"{self._base_url}/chat/completions",
@@ -143,7 +147,8 @@ def get_chat_client() -> ChatClient:
     if _client is None:
         s = get_settings()
         _client = OpenAICompatibleChat(
-            base_url=s.llm_base_url, api_key=s.llm_api_key, timeout=s.llm_timeout_seconds
+            base_url=s.llm_base_url, api_key=s.llm_api_key, timeout=s.llm_timeout_seconds,
+            max_tokens=s.llm_max_tokens,
         )
     return _client
 

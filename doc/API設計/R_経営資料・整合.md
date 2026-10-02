@@ -2,7 +2,7 @@
 
 > 横断規約＝[API設計 README](README.md)（§1.x＝認可 §1.8・カーソル §1.8・DataTable §1.8.1・Idempotency §1.9・画像 §1.10）。データモデル＝[§5.54 strategy_documents](../データモデル.md)・[§5.55 idea_alignment](../データモデル.md)・[§5.36b entity_tokens](../データモデル.md)。設計元＝[経営資料整合・自動関連付け 設計](../設計ドラフト/経営資料整合・自動関連付け_設計.md)。画面＝SC-80（一覧）/SC-81（登録・編集）/SC-82（詳細）・SC-22（整合バッジ）。
 >
-> **状態＝整合率は `SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2 実装済 2026-09-29）**。意味方式は**LLM 基盤の embeddings 経由**（モデルは基盤側＝backend 非焼込・データ主権）＝方式 B（LLM 判定・生成）は別要件（横断 LLM ゲートウェイ）。生成（ISO意図/方針）は**構造化 Markdown エクスポート**のみ（外部委譲・自動送信なし・R.5）。
+> **状態＝整合率は `SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2 実装済 2026-09-29）**。意味方式は**LLM 基盤の embeddings 経由**（モデルは基盤側＝backend 非焼込・データ主権）＝方式 B（LLM 判定・生成）は別要件（横断 LLM ゲートウェイ）。生成（ISO意図/方針）は**構造化 Markdown エクスポート**（R.5・外部委譲）に加え、**in-app 生成（`iso_generate`・自社ホスト LLM・R.5a 実装済 2026-10-02）**＝経営資料を外部に出さずドラフト生成（人が確定）。
 
 ## R.0 アクター・認可スコープ
 
@@ -92,7 +92,19 @@
 - **利用者の明示操作でのみ生成**（自動外部送信しない・§10）。生成（意図/戦略/方針のたたき台）は利用者が任意の LLM に貼って行う＝データ主権を保持。
 - 出力構成＝(1) 経営資料本体（意図/方針/戦略/重点領域/目標＝ISO 4/5.1・5.2・6.1・6.2／未記入は「（未記入）」・補足は本文がある時のみ）／(2) 関連度上位のアイデア（`idea_alignment` の score 降順・上位10）／(3) 関連情報（R.4 母集団＝機会/脅威ラベル付き・score 降順・上位20）／(4) 関連コンセプト（トークン重なり≥閾値・score 降順・上位10）。テーブルセルはパイプをエスケープ。**決定的**（整合率キャッシュ＋トークン重なり）。
 - backend＝`app/tenant/strategy/export.py`（`build_markdown`）＋`application.export_markdown`。frontend＝SC-81 編集画面の「🤖 AI 用にエクスポート」（📋 コピー／⬇ ダウンロード .md・編集時のみ）。テスト＝R-TC-112（api）/113（int）。
-- **in-app 生成（プロバイダ差し替え式・オンプレ無料 LLM 既定）は Phase2**（横断 LLM ゲートウェイ）。
+## R.5a in-app 生成（ISO56001 §6 たたき台・FR-45 基盤）＝実装済（2026-10-02・Phase2）
+
+> **位置づけ**＝R.5 の Markdown を**自社ホスト LLM（オンプレ無料・既定 `qwen3-swallow`）で要約生成**し、意図/重点領域のたたき台を**読み取り専用ドラフト**として返す。生成は**横断 LLM ゲートウェイ＋AIジョブ基盤（S ドメイン）**に委譲＝物理モデルは基盤側に閉じ、経営資料は**外部へ出さない**（データ主権）。たたき台は**人が最終確定**（自動反映しない）。
+
+| メソッド/パス | 概要 | 返却 |
+|---|---|---|
+| `POST /strategy-documents/{id}/generate`（管理者スコープ） | ISO56001 §6（意図/方針/重点領域）のたたき台生成を**非同期投入**＝R.5 の Markdown を context として `iso_generate` ジョブを enqueue（`ref_strategy_document_id={id}`） | 202＋`{id, status:"queued"}`（ジョブID・§S.1） |
+| `GET /strategy-documents/{id}/generation`（管理者スコープ） | 当該資料の**最新**生成ジョブの状態＝SC-81 がポーリング | `{job_id, status, result_text?（succeeded 時のドラフト本文）, error?, finished_at?}` |
+
+- **task_type＝`iso_generate`**（S ドメイン・既定キー `qwen3-swallow`）。context は enqueue 時に `export.build_markdown` で確定＝ジョブ入力 `input.context_md` に焼く（実行時に資料を再読込しない＝決定性/機微の露出面を絞る）。
+- **会社別の生成トークン上限**（`company_ai_model_settings.max_output_tokens`・§S.5）を実行時に `max_tokens` として適用＝無料ティアの暴走抑止。NULL=無制限。
+- 最新ジョブは**資料スコープ**（依頼者スコープではない＝共有資源）＝`repository.latest_by_ref(task_type, ref_strategy_document_id)` で `created_at` 降順の先頭。
+- backend＝`application.generate_iso`/`latest_generation`（S ドメイン `ai_jobs` へ委譲）＋`ai_jobs.application._build_messages` の `iso_generate` 分岐。frontend＝SC-81 編集画面「✨ AI で生成する」（生成→ポーリング→ドラフト表示／📋 コピー・編集時のみ）。テスト＝R-TC-120（int・縦1本）/121（api・管理者のみ 403）。
 
 ## R.6 セキュリティ / データ保護
 

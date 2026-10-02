@@ -38,6 +38,15 @@ export interface StrategyWordCloud {
   related_count: number;
 }
 
+// Phase2 in-app 生成（iso_generate・FR-44 Phase2）＝最新生成ジョブの状態＋ドラフト。
+export interface StrategyGeneration {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "canceled";
+  result_text: string | null;
+  error: string | null;
+  finished_at: string | null;
+}
+
 export interface StrategyDocDetail {
   id: string;
   title: string;
