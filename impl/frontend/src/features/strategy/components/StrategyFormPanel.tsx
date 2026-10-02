@@ -326,7 +326,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
 
         {/* この方針まわりの語像（R.4b・編集時のみ・設計§7＝集約でのみ UI 化）。関連情報＋アイデア＋コンセプトの語を集約。 */}
         {editing && surround && surround.related_count > 0 && surround.tokens.length > 0 && (
-          <div className="dialog-section surround-wc">
+          <div className="dialog-section is-quiet surround-wc">
             <div className="dialog-label">☁️ この方針まわりの語像（関連 {surround.related_count} 件＝情報・アイデア・コンセプト）</div>
             <div className="wc-mini">
               {surround.tokens.map((t) => (
