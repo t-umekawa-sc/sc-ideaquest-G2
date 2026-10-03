@@ -5,9 +5,9 @@
 // 認可はサーバー権威（参加/確定は権限が無ければ 403＝スナックバーで案内・UIは非表示に依存しない）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { ActivitySpark, Button, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Button, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
 import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
@@ -54,9 +54,13 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
   const [view, setView] = useState("ideas");       // 上位タブ: ideas | search | party
-  const [ftq, setFtq] = useState("");              // 全文検索クエリ
+  const [ftq, setFtq] = useState("");              // 全文検索クエリ（SC-12 と同一 UI）
+  const [ftScope, setFtScope] = useState("");      // 検索対象（すべて/idea/chat/attachment）
   const [ftRows, setFtRows] = useState<SearchRow[]>([]);
+  const [ftTotal, setFtTotal] = useState(0);
+  const [ftPage, setFtPage] = useState(1);
   const [ftLoading, setFtLoading] = useState(false);
+  const ftPerPage = 20;
   const [participants, setParticipants] = useState<ContestParticipant[] | null>(null);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -95,18 +99,23 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     [ideas, myIdeaSet],
   );
 
-  // 🔍 全文検索（backing quest の既存 J＝GET /quests/{id}/search を流用・デバウンス）。
+  // クエリ/対象の変更でページを先頭へ戻す（SC-12 と同一）。
+  useEffect(() => { setFtPage(1); }, [ftq, ftScope]);
+  // 🔍 全文検索（backing quest の既存 J＝GET /quests/{id}/search を流用・デバウンス・SC-12 と同一挙動）。
   useEffect(() => {
     const term = ftq.trim();
-    if (view !== "search" || !term || !questId) { setFtRows([]); return; }
+    if (view !== "search" || !term || !questId) { setFtRows([]); setFtTotal(0); return; }
     setFtLoading(true);
     const timer = setTimeout(async () => {
-      const res = await searchQuest(questId, { q: term, perPage: 50 }).catch(() => null);
+      const res = await searchQuest(questId, {
+        q: term, types: (ftScope || undefined) as SearchType | undefined, page: ftPage, perPage: ftPerPage,
+      }).catch(() => null);
       setFtRows(res?.data ?? []);
+      setFtTotal(res?.page_info.total ?? 0);
       setFtLoading(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [ftq, view, questId]);
+  }, [ftq, ftScope, ftPage, view, questId]);
 
   // 👥 パーティ（Tier1 参加者）＝運営がタブを開いたら取得（承認待ちを先頭）。
   useEffect(() => {
@@ -403,64 +412,126 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         </>
       )}
 
+      {/* 全文検索（J・実接続＝GET /quests/{id}/search・PGroonga）＝SC-12 クエスト詳細と同一 UI。 */}
       {view === "search" && (
-        <section aria-label="全文検索" style={{ marginTop: "var(--space-3)" }}>
-          <input className="input" type="search" value={ftq} onChange={(e) => setFtq(e.target.value)}
-                 placeholder="キーワードで全文検索（このコンテストのアイデア・チャット・添付ファイル名）" aria-label="全文検索" />
+        <section aria-label="全文検索">
+          <div className="list-toolbar">
+            <div className="filters" data-sp-host>
+              <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
+              <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
+                <option value="">対象: すべて</option>
+                <option value="idea">アイデア</option>
+                <option value="chat">チャット</option>
+                <option value="attachment">添付ファイル名</option>
+              </select>
+              <ScreenPurpose
+                summary="対象ごとの検索項目：アイデア＝タイトル・本文・価値・補足／チャット＝メッセージ本文／添付ファイル名＝ファイル名。「すべて」は3種を横断。"
+                dialogTitle="全文検索の対象について"
+              >
+                <div className="dialog-section"><div className="dialog-label">対象＝すべて</div><p style={{ margin: 0 }}>下記3種を横断して検索します（このコンテスト内・公開アイデアのみ）。</p></div>
+                <div className="dialog-section"><div className="dialog-label">アイデア</div><p style={{ margin: 0 }}>タイトル・本文・狙う価値・補足（note）を対象に検索します。</p></div>
+                <div className="dialog-section"><div className="dialog-label">チャット</div><p style={{ margin: 0 }}>アイデアの議論チャットの<strong>メッセージ本文</strong>を対象に検索します。</p></div>
+                <div className="dialog-section"><div className="dialog-label">添付ファイル名</div><p style={{ margin: 0 }}>アイデア／チャットに添付されたファイルの<strong>ファイル名</strong>を対象に検索します（ファイルの中身は対象外）。</p></div>
+              </ScreenPurpose>
+            </div>
+            {ftq.trim() && <span className="list-count">{ftTotal} 件</span>}
+          </div>
           {!ftq.trim() ? (
-            <p className="hint" style={{ marginTop: "var(--space-3)" }}>キーワードを入力してください。</p>
+            <div className="list-empty">キーワードを入力してください（このコンテスト内のアイデア・チャット・添付ファイル名を検索）。</div>
           ) : ftLoading && ftRows.length === 0 ? (
-            <p className="hint" style={{ marginTop: "var(--space-3)" }}>検索中…</p>
+            <div className="list-empty">検索中…</div>
           ) : ftRows.length === 0 ? (
-            <p className="hint" style={{ marginTop: "var(--space-3)" }}>「{ftq}」に一致する結果がありません。</p>
+            <div className="list-empty">「{ftq}」に一致する結果がありません。</div>
           ) : (
-            <ul className="contest-ideas" style={{ marginTop: "var(--space-3)" }}>
+            <div className="stack">
               {ftRows.map((r, i) => (
-                <li key={`${r.type}-${r.chat_message_id ?? r.attachment_id ?? r.idea_id ?? i}`} className="card contest-idea">
-                  <Link className="contest-idea__title"
-                        href={r.idea_id ? (r.type === "idea" ? `/ideas/${r.idea_id}` : `/ideas/${r.idea_id}/chat`) : "#"}>
-                    <span className="badge badge-muted" style={{ marginRight: 8 }}>{FT_TYPE_LABEL[r.type] ?? r.type}</span>
-                    {r.idea_title}
-                  </Link>
-                  <p className="contest-idea__value">
-                    {parseSnippet(r.snippet_html).map((s, j) => s.hit ? <mark key={j}>{s.text}</mark> : <span key={j}>{s.text}</span>)}
-                  </p>
-                </li>
+                <Link
+                  key={`${r.type}-${r.attachment_id ?? r.chat_message_id ?? r.idea_id ?? i}`}
+                  className="card card-accent ft-result"
+                  href={r.idea_id ? (r.type === "idea" ? `/ideas/${r.idea_id}` : `/ideas/${r.idea_id}/chat`) : "#"}
+                >
+                  <div className="ft-result__head"><span className="badge badge-muted">{FT_TYPE_LABEL[r.type]}</span><span className="ft-result__ctx">{r.idea_title}</span></div>
+                  <p className="ft-result__snippet">{renderSnippet(r.snippet_html)}</p>
+                </Link>
               ))}
-            </ul>
+              {ftTotal > ftPerPage && (
+                <div className="row-center" style={{ gap: "var(--space-3)", justifyContent: "center" }}>
+                  <button type="button" className="btn btn-outline btn-sm" disabled={ftPage <= 1 || ftLoading} onClick={() => setFtPage((p) => Math.max(1, p - 1))}>← 前へ</button>
+                  <span className="muted text-sm">{ftPage} / {Math.max(1, Math.ceil(ftTotal / ftPerPage))}</span>
+                  <button type="button" className="btn btn-outline btn-sm" disabled={ftPage >= Math.ceil(ftTotal / ftPerPage) || ftLoading} onClick={() => setFtPage((p) => p + 1)}>次へ →</button>
+                </div>
+              )}
+            </div>
           )}
         </section>
       )}
 
-      {view === "party" && contest.can_manage && (
-        <section aria-label="パーティ（参加者）" style={{ marginTop: "var(--space-3)" }}>
-          {participants == null ? (
-            <p className="hint">読み込み中…</p>
-          ) : participants.length === 0 ? (
-            <p className="hint">まだ参加者はいません。</p>
-          ) : (
-            <ul className="contest-ideas">
-              {participants.map((p) => (
-                <li key={p.user_id} className="card contest-idea">
-                  <div className="contest-idea__meta" style={{ marginTop: 0, justifyContent: "space-between" }}>
-                    <span>👤 {p.display_name ?? "（不明）"} <span className={`badge ${PART_BADGE[p.status] ?? "badge-muted"}`}>{PART_LABEL[p.status] ?? p.status}</span></span>
-                    {p.status === "requested" && (
-                      <span style={{ display: "flex", gap: "var(--space-2)" }}>
-                        <Button variant="primary" size="sm" onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>承認</Button>
-                        <button className="btn btn-outline btn-sm" type="button" onClick={() => void decideParticipation(p.user_id, "rejected")} disabled={busy}>却下</button>
-                      </span>
+      {/* パーティ（Tier1 参加者）＝SC-12 クエスト詳細のパーティタブと同じ構造（参加リクエスト＋メンバー一覧）。運営のみ。 */}
+      {view === "party" && contest.can_manage && (() => {
+        const list = participants ?? [];
+        const pending = list.filter((p) => p.status === "requested");
+        const members = list.filter((p) => p.status === "approved");
+        return (
+          <section aria-label="パーティ">
+            <div className="list-toolbar">
+              <div className="muted text-sm">コンテストの参加者（運営が承認/却下を管理）</div>
+            </div>
+            {participants == null ? (
+              <p className="admin-muted">読み込み中…</p>
+            ) : (
+              <>
+                {/* 参加リクエスト（承認待ち・上位）＝運営のみ。行で承認/却下。 */}
+                {pending.length > 0 && (
+                  <div className="join-req-block">
+                    <h3 className="join-req-title">📩 参加リクエスト<span className="tab-count">{pending.length}</span></h3>
+                    <div className="card" style={{ padding: 0 }}>
+                      <ul className="member-list">
+                        {pending.map((p) => (
+                          <li key={p.user_id} className="member-row join-req-row">
+                            <Avatar name={p.display_name ?? "?"} />
+                            <span className="member-name">{p.display_name ?? "（不明）"}</span>
+                            <span style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
+                              <Button variant="primary" size="sm" onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>承認</Button>
+                              <button className="btn btn-outline btn-sm" type="button" onClick={() => void decideParticipation(p.user_id, "rejected")} disabled={busy}>却下</button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                {/* 参加中メンバー一覧。 */}
+                <div className="join-req-block">
+                  <h3 className="join-req-title">👥 参加中<span className="tab-count">{members.length}</span></h3>
+                  <div className="card" style={{ padding: 0 }}>
+                    {members.length === 0 ? (
+                      <p className="admin-muted" style={{ padding: "var(--space-3)" }}>参加中のメンバーはいません。</p>
+                    ) : (
+                      <ul className="member-list">
+                        {members.map((p) => (
+                          <li key={p.user_id} className="member-row">
+                            <Avatar name={p.display_name ?? "?"} />
+                            <span className="member-name">{p.display_name ?? "（不明）"}</span>
+                            <span className="badge badge-success" style={{ marginLeft: "auto" }}>参加中</span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+                </div>
+              </>
+            )}
+          </section>
+        );
+      })()}
     </section>
   );
 }
 
 const FT_TYPE_LABEL: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
-const PART_LABEL: Record<string, string> = { requested: "承認待ち", approved: "参加中", rejected: "却下", left: "退出" };
-const PART_BADGE: Record<string, string> = { requested: "badge-danger", approved: "badge-success", rejected: "badge-muted", left: "badge-muted" };
+// スニペットは keyword のみ <mark>、他はテキストとして React 描画（dangerouslySetInnerHTML 不使用・SC-12 と同一）。
+function renderSnippet(html: string): ReactNode {
+  return parseSnippet(html).map((seg, i) =>
+    seg.hit ? <mark key={i} className="keyword">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
+  );
+}
