@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `5fd88ead feat(contest): Step2b-2 単一ポリシー統合`（commit＋origin/main へ push 済）
+- 最新コミット: `0b5cb828 feat(contest): Step2c 表彰確定・ランキング・恒久フラグ`（commit＋origin/main へ push 済）
 - working tree: clean（全コミット済・push 済）
 
 ## 2. プロジェクトのゴール
