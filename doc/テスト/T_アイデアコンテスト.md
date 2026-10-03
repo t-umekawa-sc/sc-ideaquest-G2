@@ -38,9 +38,9 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-TC-130 | api | ランキング軸＝賛成投票数/平均評価点/活動貢献（会期スコープ） | 会期内に投票/評価/活動 | `GET /contests/{id}/ranking?axis=` | 各軸が会期内データで集計（既存 aggregate_ranking を backing quest で流用）・新テーブル不要 | T.3／§6.1 |
-| T-TC-131 | int | 表彰確定＝上位N へ XP/コイン付与（冪等 reason='contest_award'）＋入賞実績＋is_selected＋通知 | judging の contest＋prize_config | `POST /contests/{id}/finalize`（Idempotency） | 上位N へ `ledger.grant`（二重付与なし）・achievements（bronze/silver/gold）・`ideas.is_selected=true`・通知／再実行で重複付与しない | T.1／§6.2／§1.9 |
-| T-TC-132 | int | 殿堂入り/お蔵入り＝`contest_idea_flags`（ideas 無改修）・rolling は自動お蔵入り | rolling contest＋期限超過アイデア | 自動アーカイブ処理 | `shelved` 自動付与・タブ導出が変わる・`ideas` スキーマ不変 | §4.2／§5.64 |
+| T-TC-130 | api | ランキング軸＝賛成投票数/平均評価点/活動貢献（会期スコープ） | 会期内に投票/評価/活動 | `GET /contests/{id}/ranking?axis=` | 各軸が backing quest×[starts_at,ends_at) で集計（`repo.rank_approve_votes`/`rank_avg_score`/`rank_contribution`＝votes/evaluation_scores/activities を直接集計）・成果軸は idea_id＋投稿者/貢献軸は user_id・新テーブル不要・不正 axis は 422 | T.3／§6.1 |
+| T-TC-131 | int | 表彰確定＝上位N へ XP/コイン付与（冪等 reason='contest_award'）＋入賞実績＋is_selected＋殿堂入り＋通知 | judging の contest＋prize_config | `POST /contests/{id}/finalize`（Idempotency） | judging→closed・XP/コインはユーザー単位で軸横断合算し1回ずつ（`grant_exists_by_ref` 冪等・ref=(contests,id)）・入賞バッジ＝順位→tier（1位gold/2位silver/3位bronze＝`contest_award_{tier}`・migration 0052）・成果軸1位は `hall_of_fame`・`ideas.is_selected=true`・通知／再実行は `granted_now=0`（二重付与なし） | T.1／§6.2／§1.9 |
+| T-TC-132 | int | 殿堂入り/お蔵入り＝`contest_idea_flags`（ideas 無改修）・rolling は自動お蔵入り | rolling contest＋期限超過アイデア | `contest_app.auto_shelve_expired`（自動アーカイブ・スケジューラ後追いの明示トリガ） | rolling×`auto_archive_days` 超過の公開アイデアに `shelved` 冪等付与・`ideas` スキーマ不変・bounded/未設定は no-op | §4.2／§5.64 |
 
 ## 5. アイデア→クエスト昇格（T.5・§7・データモデル quests.origin_idea_id）
 

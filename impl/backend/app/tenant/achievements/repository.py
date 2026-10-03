@@ -13,6 +13,11 @@ def list_achievements(session: Session) -> list[Achievement]:
     return list(session.execute(select(Achievement).order_by(Achievement.sort_order)).scalars().all())
 
 
+def get_by_code(session: Session, code: str) -> Achievement | None:
+    """実績コードで1件取得（コンテスト表彰など直接解除する用途・不在は None）。"""
+    return session.execute(select(Achievement).where(Achievement.code == code)).scalars().first()
+
+
 def get_user_achievement(session: Session, user_id: uuid.UUID, achievement_id: uuid.UUID) -> UserAchievement | None:
     return session.execute(
         select(UserAchievement).where(UserAchievement.user_id == user_id, UserAchievement.achievement_id == achievement_id)

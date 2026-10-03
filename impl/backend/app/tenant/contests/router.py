@@ -17,8 +17,10 @@ from app.tenant.contests.schemas import (
     ContestDetail,
     ContestListResponse,
     ContestUpdateRequest,
+    FinalizeResponse,
     ParticipationDecideRequest,
     ParticipationResponse,
+    RankingResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["contests"])
@@ -52,6 +54,22 @@ def update_contest(contest_id: str, body: ContestUpdateRequest, request: Request
     return service.update_contest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id,
         fields=fields, status=body.status)
+
+
+# ---- 表彰・ランキング（T.3/T.1 finalize・§6） ----
+
+@router.get("/contests/{contest_id}/ranking", response_model=RankingResponse)
+def contest_ranking(contest_id: str, request: Request, axis: str = "approve_votes",
+                    session: dict = Depends(require_me)):
+    return service.ranking(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                           contest_id, axis=axis)
+
+
+@router.post("/contests/{contest_id}/finalize", response_model=FinalizeResponse,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def finalize_contest(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    """表彰確定（管理者・冪等＝Idempotency-Key 推奨・§1.9）。judging→closed・上位N へ付与。"""
+    return service.finalize(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
 
 
 # ---- 参加 2階層（T.2・§5.1） ----

@@ -64,11 +64,12 @@ def test_g_tc_501_list_and_secret_hidden(client, factory):
     r = client.get(ACH)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["summary"]["total"] == 12 and body["summary"]["unlocked"] == 0
+    # 進捗型12＋コンテスト入賞バッジ3（gold/silver/bronze・migration 0052・finalize で付与）＝15。
+    assert body["summary"]["total"] == 15 and body["summary"]["unlocked"] == 0
     by_id = {d["id"]: d for d in body["data"]}
     secret = next(d for d in body["data"] if d.get("is_secret") and not d["unlocked"])
     assert secret["name"] == "？？？" and secret["tier"] is None
-    assert len(by_id) == 12
+    assert len(by_id) == 15
 
 
 def test_g_tc_502_auto_unlock_via_ledger_hook(client, factory):

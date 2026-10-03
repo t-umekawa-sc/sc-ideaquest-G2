@@ -240,3 +240,190 @@ def decide_idea_participation(account_id: uuid.UUID, company_id: uuid.UUID, idea
         out = {"status": row.status}
         ts.commit()
     return out
+
+
+# ---- 表彰・ランキング（T.3/T.1 finalize・設計 §6・既存基盤の再利用） ----
+
+_AXES = ("approve_votes", "avg_score", "contribution")
+# 順位→入賞バッジのティア（1位=gold/2位=silver/3位=bronze・軸横断で再利用・migration 0052）。
+_TIER_BY_RANK = {0: "gold", 1: "silver", 2: "bronze"}
+
+
+def _name_of(users: dict, uid) -> str | None:
+    u = users.get(uid)
+    return u.display_name if u is not None else None
+
+
+def ranking(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *, axis: str) -> dict:
+    """会期スコープのランキング（T.3・§6.1）＝賛成投票数/平均評価点/活動貢献。backing quest×[starts_at,ends_at)。"""
+    if axis not in _AXES:
+        raise AppError(422, "validation_error", detail="axis が不正です", errors=[{"field": "axis"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        start, end = c.starts_at, c.ends_at
+        data: list[dict] = []
+        if axis == "contribution":
+            rows = repo.rank_contribution(ts, c.quest_id, start=start, end=end)
+            users = quests_repo.get_users_by_ids(ts, {uid for uid, _ in rows})
+            data = [{"rank": i + 1, "user_id": str(uid), "display_name": _name_of(users, uid),
+                     "idea_id": None, "metric": float(n)} for i, (uid, n) in enumerate(rows)]
+        else:
+            rows = (repo.rank_approve_votes(ts, c.quest_id, start=start, end=end) if axis == "approve_votes"
+                    else repo.rank_avg_score(ts, c.quest_id, start=start, end=end))
+            users = quests_repo.get_users_by_ids(ts, {aid for _, aid, _ in rows})
+            data = [{"rank": i + 1, "user_id": str(aid), "display_name": _name_of(users, aid),
+                     "idea_id": str(iid), "metric": float(m)} for i, (iid, aid, m) in enumerate(rows)]
+        return {"axis": axis, "data": data}
+
+
+def finalize(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
+    """表彰確定（T.1・§6.2・冪等）＝各軸上位N へ XP/コイン付与＋入賞バッジ＋is_selected＋殿堂入り＋通知。
+
+    状態＝`judging`→`closed`。付与は `ledger.grant`（reason='contest_award'・ref=(contests, id)）＝ユーザー単位で
+    XP/コインを1回ずつ（軸横断で合算）＝再実行しても `grant_exists_by_ref` で二重付与しない（§1.9）。
+    """
+    from app.tenant.achievements import engine as ach_engine
+    from app.tenant.achievements import repository as ach_repo
+    from app.tenant.gamification import ledger
+    from app.tenant.gamification import repository as gami_repo
+    from app.tenant.ideas import repository as ideas_repo
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="表彰を確定する権限がありません")
+        if c.status not in ("judging", "closed"):  # judging で確定／closed は冪等再実行（no-op）
+            raise AppError(409, "conflict", detail="表彰確定は審査中（judging）に実行してください",
+                           extra={"errors": [{"reason": "invalid_state"}]})
+
+        start, end = c.starts_at, c.ends_at
+        axes = (c.prize_config or {}).get("axes", []) or []
+        user_xp: dict[uuid.UUID, int] = {}
+        user_coin: dict[uuid.UUID, int] = {}
+        user_tiers: dict[uuid.UUID, set] = {}
+        selected_ids: set = set()
+        hof_ids: set = set()
+        for ax in axes:
+            key = ax.get("key")
+            top = int(ax.get("top", 0) or 0)
+            xp_list = ax.get("xp", []) or []
+            coin_list = ax.get("coin", []) or []
+            if key == "approve_votes":
+                rows, idea_based = repo.rank_approve_votes(ts, c.quest_id, start=start, end=end), True
+            elif key == "avg_score":
+                rows, idea_based = repo.rank_avg_score(ts, c.quest_id, start=start, end=end), True
+            elif key == "contribution":
+                rows, idea_based = repo.rank_contribution(ts, c.quest_id, start=start, end=end), False
+            else:
+                continue
+            for rank, row in enumerate(rows[:top]):
+                if idea_based:
+                    iid, beneficiary, _metric = row
+                    selected_ids.add(iid)
+                    if rank == 0:
+                        hof_ids.add(iid)  # 各成果軸の1位は殿堂入り
+                else:
+                    beneficiary, _metric = row
+                user_xp[beneficiary] = user_xp.get(beneficiary, 0) + (xp_list[rank] if rank < len(xp_list) else 0)
+                user_coin[beneficiary] = user_coin.get(beneficiary, 0) + (coin_list[rank] if rank < len(coin_list) else 0)
+                tier = _TIER_BY_RANK.get(rank)
+                if tier is not None:
+                    user_tiers.setdefault(beneficiary, set()).add(tier)
+
+        granted_now = 0
+        winners = set(user_xp) | set(user_coin) | set(user_tiers)
+        users = quests_repo.get_users_by_ids(ts, winners)
+        # XP/コインはユーザー単位で1回ずつ（軸横断合算・冪等）。
+        for uid in winners:
+            u = users.get(uid)
+            if u is None:
+                continue
+            xp = user_xp.get(uid, 0)
+            if xp > 0 and not gami_repo.grant_exists_by_ref(ts, uid, kind=ledger.XP_GAIN, reason="contest_award",
+                                                            ref_type="contests", ref_id=c.id):
+                ledger.grant(ts, u, kind=ledger.XP_GAIN, amount=xp, reason="contest_award",
+                             ref_type="contests", ref_id=c.id, quest_id=c.quest_id)
+                granted_now += 1
+            coin = user_coin.get(uid, 0)
+            if coin > 0 and not gami_repo.grant_exists_by_ref(ts, uid, kind=ledger.COIN_GAIN, reason="contest_award",
+                                                              ref_type="contests", ref_id=c.id):
+                ledger.grant(ts, u, kind=ledger.COIN_GAIN, amount=coin, reason="contest_award",
+                             ref_type="contests", ref_id=c.id, quest_id=c.quest_id)
+                granted_now += 1
+            # 入賞バッジ（得た最上位ティアを解除・冪等）＝migration 0052 の contest_award_{tier}。
+            for tier in user_tiers.get(uid, set()):
+                ach = ach_repo.get_by_code(ts, f"contest_award_{tier}")
+                if ach is None:
+                    continue
+                ua = ach_repo.upsert_user_achievement(ts, uid, ach.id, current=1, target=None)
+                if ua.unlocked_at is None:
+                    ua.unlocked_at = datetime.now(timezone.utc)
+                    ach_engine._notify_achievement(ts, u, ach)
+                    granted_now += 1
+
+        # 入賞アイデアに is_selected＋殿堂入りフラグ（いずれも冪等）。
+        for iid in selected_ids:
+            idea = ideas_repo.get_idea(ts, iid)
+            if idea is not None and not idea.is_selected:
+                idea.is_selected = True
+        for iid in hof_ids:
+            repo.set_idea_flag(ts, contest_id=c.id, idea_id=iid, flag="hall_of_fame", granted_by_id=user.id)
+
+        if c.status == "judging":
+            c.status = "closed"
+            quest = ts.get(Quest, c.quest_id)
+            if quest is not None:
+                quest.status = _QUEST_STATUS["closed"]
+        out = {"status": c.status, "awarded_users": len(winners),
+               "selected_ideas": len(selected_ids), "granted_now": granted_now}
+        ts.commit()
+    return out
+
+
+def auto_shelve_expired(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
+    """rolling コンテストの期限超過アイデアに「お蔵入り（shelved）」を自動付与（T-TC-132・§4.2）。
+
+    `auto_archive_days` 経過（公開アイデアの created_at 基準）で `contest_idea_flags(shelved)` を冪等付与。
+    MVP は明示トリガ（スケジューラ後追い＝設計 §6.2）。bounded/未設定は no-op。
+    """
+    from datetime import timedelta
+    from app.tenant.ideas import repository as ideas_repo
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="自動アーカイブを実行する権限がありません")
+        shelved = 0
+        if c.mode == "rolling" and c.auto_archive_days:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=int(c.auto_archive_days))
+            for idea in ideas_repo.list_published_ideas_for_quest(ts, c.quest_id):
+                if idea.created_at < cutoff and repo.get_idea_flag(ts, idea.id, "shelved") is None:
+                    repo.set_idea_flag(ts, contest_id=c.id, idea_id=idea.id, flag="shelved", granted_by_id=user.id)
+                    shelved += 1
+        out = {"shelved": shelved}
+        ts.commit()
+    return out

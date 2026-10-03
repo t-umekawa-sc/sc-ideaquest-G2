@@ -8,10 +8,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.tenant.contests.orm import Contest, ContestParticipant, IdeaParticipant
+from app.tenant.contests.orm import Contest, ContestIdeaFlag, ContestParticipant, IdeaParticipant
 
 
 def create(session: Session, *, quest_id: uuid.UUID, theme: str, description: str | None,
@@ -114,3 +114,83 @@ def contest_by_quest(session: Session, quest_id: uuid.UUID) -> Contest | None:
     c = session.execute(select(Contest).where(Contest.quest_id == quest_id,
                                               Contest.deleted_at.is_(None))).scalars().first()
     return c
+
+
+# ---- 表彰・ランキング集計（会期スコープ＝backing quest×[starts_at, ends_at)・T.3/§6.1） ----
+# いずれも既存テーブル（votes/evaluations/evaluation_scores/activities）を会期×backing quest で集計＝新テーブル不要。
+# 遅延 import（contests→ideas/evaluations/gamification の読取・循環は実行時に解消）。
+
+def rank_approve_votes(session: Session, quest_id: uuid.UUID, *, start, end) -> list[tuple]:
+    """賛成投票数ランキング（アイデア単位・会期内）。返り値＝[(idea_id, author_id, count)] 降順（タイブレーク=初投票昇順）。"""
+    from app.tenant.ideas.orm import Idea, Vote
+    n = func.count().label("n")
+    stmt = (select(Vote.idea_id, Idea.author_id, n)
+            .join(Idea, Idea.id == Vote.idea_id)
+            .where(Idea.quest_id == quest_id, Idea.status == "published", Vote.type == "approve")
+            .group_by(Vote.idea_id, Idea.author_id)
+            .order_by(n.desc(), func.min(Vote.voted_at).asc()))
+    if start is not None:
+        stmt = stmt.where(Vote.voted_at >= start)
+    if end is not None:
+        stmt = stmt.where(Vote.voted_at < end)
+    return [(iid, aid, int(c)) for iid, aid, c in session.execute(stmt).all()]
+
+
+def rank_avg_score(session: Session, quest_id: uuid.UUID, *, start, end) -> list[tuple]:
+    """平均評価点ランキング（アイデア単位・submitted・会期内）。返り値＝[(idea_id, author_id, avg)] 降順。"""
+    from app.tenant.evaluations.orm import Evaluation, EvaluationScore
+    from app.tenant.ideas.orm import Idea
+    avg = func.avg(EvaluationScore.score).label("avg")
+    stmt = (select(Evaluation.idea_id, Idea.author_id, avg)
+            .join(Idea, Idea.id == Evaluation.idea_id)
+            .join(EvaluationScore, EvaluationScore.evaluation_id == Evaluation.id)
+            .where(Idea.quest_id == quest_id, Idea.status == "published", Evaluation.status == "submitted")
+            .group_by(Evaluation.idea_id, Idea.author_id)
+            .order_by(avg.desc(), func.min(Evaluation.submitted_at).asc()))
+    if start is not None:
+        stmt = stmt.where(Evaluation.submitted_at >= start)
+    if end is not None:
+        stmt = stmt.where(Evaluation.submitted_at < end)
+    return [(iid, aid, float(a)) for iid, aid, a in session.execute(stmt).all()]
+
+
+def rank_contribution(session: Session, quest_id: uuid.UUID, *, start, end) -> list[tuple]:
+    """活動貢献ランキング（ユーザー単位・reason∈{chat,evaluation,vote}・会期内）。返り値＝[(user_id, count)] 降順。"""
+    from app.tenant.gamification.orm import Activity
+    n = func.count().label("n")
+    stmt = (select(Activity.user_id, n)
+            .where(Activity.quest_id == quest_id, Activity.reason.in_(("chat", "evaluation", "vote")))
+            .group_by(Activity.user_id)
+            .order_by(n.desc(), func.min(Activity.created_at).asc()))
+    if start is not None:
+        stmt = stmt.where(Activity.created_at >= start)
+    if end is not None:
+        stmt = stmt.where(Activity.created_at < end)
+    return [(uid, int(c)) for uid, c in session.execute(stmt).all()]
+
+
+# ---- 恒久ステータス（殿堂入り/お蔵入り・contest_idea_flags・§5.64・T.1） ----
+
+def get_idea_flag(session: Session, idea_id: uuid.UUID, flag: str) -> ContestIdeaFlag | None:
+    return session.execute(
+        select(ContestIdeaFlag).where(ContestIdeaFlag.idea_id == idea_id, ContestIdeaFlag.flag == flag)
+    ).scalars().first()
+
+
+def set_idea_flag(session: Session, *, contest_id: uuid.UUID, idea_id: uuid.UUID, flag: str,
+                  granted_by_id: uuid.UUID | None = None) -> ContestIdeaFlag:
+    """殿堂入り/お蔵入りを付与（冪等・UNIQUE(idea_id,flag)）。既存ならそのまま返す。"""
+    row = get_idea_flag(session, idea_id, flag)
+    if row is not None:
+        return row
+    row = ContestIdeaFlag(id=uuid.uuid4(), contest_id=contest_id, idea_id=idea_id, flag=flag,
+                          granted_by_id=granted_by_id)
+    session.add(row)
+    session.flush()
+    return row
+
+
+def list_flags_for_contest(session: Session, contest_id: uuid.UUID) -> list[ContestIdeaFlag]:
+    return list(session.execute(
+        select(ContestIdeaFlag).where(ContestIdeaFlag.contest_id == contest_id)
+    ).scalars().all())

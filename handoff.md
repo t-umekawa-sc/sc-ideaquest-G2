@@ -27,7 +27,8 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **Step2a コンテスト CRUD＋backing quest** `4a271338`(backend)/`c756ddc3`(frontend): `app/tenant/contests/`（repository/application/router/schemas）＝`GET/POST/PATCH /contests`。作成で backing quest を 1:1 生成（contests.quest_id）・状態機械 draft→open→judging→closed→archived を backing quest.status にマップ。frontend＝`src/features/contests/`（api/types/ContestListView）＋`src/app/(app)/contests/page.tsx`（SC-53）＋`src/components/layout/AppNav.tsx` に「🏆 アイデアコンテスト」。
 - **Step2b-1 参加2階層** `26f72f44`: contests repository に Tier1(contest_participants)/Tier2(idea_participants) の upsert/get/is_*/contest_by_quest。router＝`POST /contests/{id}/participation`・`PATCH /contests/{id}/participation/{uid}`（管理者）・`POST /ideas/{id}/participation`・`PATCH /ideas/{id}/participation/{uid}`（投稿者のみ）。
 - **Step2b-2 単一ポリシー統合** `5fd88ead`: 新モジュール `app/tenant/contests/access.py`（`contest_of`/`can_vote`/`can_chat`/`can_evaluate`）にコンテスト配下のアクセスポリシーを集約（設計 §2.3）。コアゲート4箇所に分岐を1つずつ上乗せ＝①可視: `quests/repository.py:can_access_quest` 先頭に遅延import分岐（contest 配下なら会社全体可視 True）＝**全 read gate 約30を一括カバー**／②投票: `ideas/application.py:_guard_votable`（Tier1 `is_contest_participant`）／③チャット: `chat/application.py:_require_comment`（引数 `idea` 追加＋Tier2 `is_idea_participant`・呼出 L177）／④評価: `evaluations/application.py:_is_evaluator`（`contest_evaluator` 能力のみ・owner/投稿者でも不可）。テスト＝`tests/contests/test_contest_access.py`（T-TC-112/113/120・red→green 証跡あり）。**docs**＝`doc/テスト/T_アイデアコンテスト.md` T-TC-113 行を実装名（access.py）に整合。
-- **Step2b-2b Tier1 アイデア投稿開放（本セッション・未コミット）**: `access.py` に `can_post_idea`（Tier1）追加。`ideas/application.py:create_idea` の作成権限ゲートにコンテスト分岐＝contest 配下なら Tier1 参加者に投稿を開放（member/`idea_create` 権限を置換・§5.1「自分のアイデア投稿」）。通常クエストは従来の `idea_create` ゲート据え置き。TC＝T-TC-115（md 追記＋テスト・red→green 証跡あり）。
+- **Step2b-2b Tier1 アイデア投稿開放** `ae2b135f`: `access.py` に `can_post_idea`（Tier1）追加。`ideas/application.py:create_idea` の作成権限ゲートにコンテスト分岐＝contest 配下なら Tier1 参加者に投稿を開放（member/`idea_create` 権限を置換・§5.1「自分のアイデア投稿」）。通常クエストは従来の `idea_create` ゲート据え置き。TC＝T-TC-115（md 追記＋テスト・red→green 証跡あり）。
+- **Step2c 表彰・ランキング・恒久フラグ（本セッション・未コミット）**: ①`GET /contests/{id}/ranking?axis=`（T.3・T-TC-130）＝`repo.rank_approve_votes`/`rank_avg_score`/`rank_contribution`（votes/evaluation_scores/activities を backing quest×[starts_at,ends_at) で直接集計・新テーブル不要）。②`POST /contests/{id}/finalize`（T.1・T-TC-131・冪等）＝judging→closed・各軸上位N の XP/コインをユーザー単位で軸横断合算し1回ずつ付与（reason='contest_award'・`grant_exists_by_ref` 冪等）・入賞バッジ（順位→tier＝`contest_award_{tier}`）・成果軸1位は `hall_of_fame`・`is_selected=true`・通知。③`contest_app.auto_shelve_expired`（T-TC-132・rolling の期限超過に `shelved` 冪等付与・スケジューラ後追いの明示トリガ）。新規＝`contests/repository.py`（rank_*/flag CRUD）・`application.py`（ranking/finalize/auto_shelve）・schemas（Ranking/Finalize）・router（ranking GET/finalize POST）・migration `0052_contest_achievements.py`（入賞バッジ gold/silver/bronze・condition=manual・coin_reward=0＝報酬は prize_config 側）・`achievements/repository.get_by_code`。**副作用**＝実績カタログが12→15（`tests/achievements/test_api.py:test_g_tc_501` の件数を15に更新）。TC＝T-TC-130/131/132（red→green 証跡あり）。
 
 ### B. FR-44 経営資料の仕上げ（コンテスト着手前・同一セッション）
 - R.1b クエスト側から経営資料を適用 `759152f1`＝`app/tenant/quests/`（QuestCreate/Update に strategy_document_ids・`_apply_strategy_docs`）＋QuestDetail に strategy_documents＋SC-11 QuestForm に Multiselect。R-TC-122。
@@ -41,14 +42,14 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 4. 現在の状態
 - **動いている**: backend/frontend は再ビルド済で稼働。コンテスト Step2a/2b-1 の API は dev 反映済。SC-53（`/contests`・ナビ「🏆 アイデアコンテスト」）表示・作成可（管理者 or contest_create）。
 - **テスト通過状況（確認済・2026-10-03 Step2b-2 後）**:
-  - **全backend 928 passed**（Step2b-2b 後にフル再実行・回帰ゼロ。2b-1 時点の 924 ＋新規4）。
+  - **全backend 931 passed**（Step2c 後にフル再実行・回帰ゼロ。新規3＝T-TC-130/131/132＋g_tc_501 件数更新）。
   - `tests/contests` 11 passed＝従来7（T-TC-101/101b/102/103/105/110/111）＋**新規4（T-TC-112/113/115/120）**。
-  - traceability `python3 scripts/check_tc_traceability.py`＝✅（code 952 件すべて md 記載）。
+  - traceability `python3 scripts/check_tc_traceability.py`＝✅（code 955 件すべて md 記載）。
   - red→green 証跡: 4ゲート編集のみ `git stash` して新3本が red（投票=403/評価=404/可視=False）→ pop で green を確認。
 - **未確認**: コンテスト画面（SC-53）の**ブラウザ目視は未実施**（ビルド green のみ）。Step2b-2 は backend ゲートのみ＝**フロントからの体感確認は SC-54 詳細（Step2b-3）実装後**が自然。
 - **壊れているもの**: 既知なし。
 - **dev スタックの非標準状態（重要）**: 通常 `llm-worker` を**停止**し、代わりに `iq-livefix-worker`（AI生成テスト用・`LLM_MODEL_SWALLOW=qwen2.5:0.5b`・source mount・`--name iq-livefix-worker`）が稼働中。`ollama` も起動中（qwen2.5:0.5b/qwen3:4b/bge-m3 pull 済）。AI生成を試さないなら復旧推奨（§7-末尾）。
-- alembic heads: control=`0019_company_access_mode` / company=`0051_grant_quest_create`。
+- alembic heads: control=`0019_company_access_mode` / company=`0052_contest_achievements`。
 
 ## 5. 詰まっている点（試して失敗 → 対処）
 - **quest_create ゲートが既存クエスト作成テストを壊す懸念**→ 実際に影響するのは API 経由 `POST /api/v1/quests` の非管理者作成のみ（`tests/quests/test_catalog.py` の `_make_owner`）。対処＝`_make_owner` に `factory.grant_capability(acc["id"], "quest_create")`、bootstrap に seed ユーザ付与、migration 0051 で既存作成者自動付与。他の `client.post(".../quests/{qid}/...")` はサブリソースでゲート非該当。
@@ -70,7 +71,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
 0. **（済）Step2b-2 単一ポリシー統合＋2b-2b Tier1 投稿開放** → §3A・§5 参照（access.py＋5ゲート分岐＝可視/投稿/投票/チャット/評価・全928 green）。
-1. **Step2b-3 SC-54 コンテスト詳細（frontend）**＝`src/features/contests/components/ContestDetailView.tsx`＋`src/app/(app)/contests/[contestId]/page.tsx`。SC-12 クエスト詳細を流用＝アイデア一覧タブ（応募中/入賞/殿堂入り/お蔵入り＝`contest_idea_flags`＋is_selected 導出）＋Tier1/Tier2 参加導線。codegen 要（`npm run codegen`・backend 起動中）。
+1. **Step2b-3 SC-54 コンテスト詳細（frontend・Step2c 完了で前提そろった）**＝`src/features/contests/components/ContestDetailView.tsx`＋`src/app/(app)/contests/[contestId]/page.tsx`。SC-12 クエスト詳細を流用＝アイデア一覧タブ（応募中/入賞/殿堂入り/お蔵入り＝`contest_idea_flags`＋is_selected 導出）＋ランキング/表彰台（`GET /contests/{id}/ranking?axis=`）＋Tier1/Tier2 参加導線＋管理者の確定ボタン（`POST /contests/{id}/finalize`）。**codegen 要**（`npm run codegen`・backend 起動中＝ranking/finalize のスキーマ反映）。フロント実装フロー規約＝モック先行（SC-54 モック未作成）＋画面単位の受入ゲート。
 3. **Step2c 表彰**＝`POST /contests/{id}/finalize`（T.1・Idempotency・上位N へ ledger.grant 冪等 reason='contest_award'＋入賞実績＋is_selected＋通知）＋`GET /contests/{id}/ranking`（T.3）。TC＝T-TC-120/130/131/132。
 4. **Step3 公開/非公開モード**＝access_mode 外周ガード（README §1.6・A §A.11.1＝public×general はコンテスト系以外 403）＋`GET /public/bootstrap`。TC＝T-TC-150/151/201＋T-TC-114（public 自動承認）。
 5. **Step4 セルフサインアップ（FR-48・SEC 重）**＝SC-05＋`POST /public/signup`・`/public/signup/verify`。A-TC-120〜127。

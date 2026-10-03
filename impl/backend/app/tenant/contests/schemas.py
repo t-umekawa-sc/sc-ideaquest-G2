@@ -68,3 +68,25 @@ class ContestDetail(BaseModel):
     prize_config: dict | None = None
     created_at: datetime
     idea_count: int = 0
+
+
+class RankingEntry(BaseModel):
+    """ランキング1件。軸により idea_id（成果軸）or user_id（貢献軸）のいずれかが主体。"""
+    rank: int
+    user_id: str                     # 受益者（成果軸=アイデア投稿者／貢献軸=本人）
+    display_name: str | None = None
+    idea_id: str | None = None       # 成果軸（approve_votes/avg_score）のみ
+    metric: float                    # 集計値（投票数・平均点・活動件数）
+
+
+class RankingResponse(BaseModel):
+    axis: str                        # approve_votes | avg_score | contribution
+    data: list[RankingEntry]
+
+
+class FinalizeResponse(BaseModel):
+    """表彰確定の結果サマリ（冪等・再実行で件数は同じ・新規付与は0になる）。"""
+    status: str                      # closed
+    awarded_users: int               # 受賞ユーザー数（延べでなくユニーク）
+    selected_ideas: int              # is_selected を立てたアイデア数
+    granted_now: int                 # 本実行で新規に付与した台帳件数（再実行は0）
