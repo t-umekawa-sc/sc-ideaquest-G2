@@ -229,12 +229,19 @@ def set_idea_status(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: st
         idea = ideas_repo.get_idea(ts, uuid.UUID(idea_id))
         if idea is None or idea.quest_id != c.quest_id:
             raise AppError(404, "not_found")  # このコンテストのアイデアではない
-        if flag == "selected":
-            idea.is_selected = on
-        elif on:
-            repo.set_idea_flag(ts, contest_id=c.id, idea_id=idea.id, flag=flag, granted_by_id=actor.id)
+        # 入賞/殿堂入り/お蔵入りは**排他**（1アイデアは1状態）＝ON にしたら他を解除。OFF は当該だけ解除（＝応募中へ戻る）。
+        if on:
+            idea.is_selected = (flag == "selected")
+            for other in ("hall_of_fame", "shelved"):
+                if other != flag:
+                    repo.remove_idea_flag(ts, idea.id, other)
+            if flag in ("hall_of_fame", "shelved"):
+                repo.set_idea_flag(ts, contest_id=c.id, idea_id=idea.id, flag=flag, granted_by_id=actor.id)
         else:
-            repo.remove_idea_flag(ts, idea.id, flag)
+            if flag == "selected":
+                idea.is_selected = False
+            else:
+                repo.remove_idea_flag(ts, idea.id, flag)
         ts.commit()
     return {"flag": flag, "on": on}
 

@@ -96,6 +96,7 @@ def _purge_contest_idea(cid: str, iid: uuid.UUID) -> None:
         # 公開アイデアは版（idea_revisions）＋利害関係者を持ち得る＝ideas 削除前に掃除。
         ts.execute(_text("DELETE FROM idea_revisions WHERE idea_id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM idea_stakeholders WHERE idea_id=:i"), {"i": i})
+        ts.execute(_text("DELETE FROM contest_idea_flags WHERE idea_id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM ideas WHERE id=:i"), {"i": i})
         ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": c})
         ts.commit()
@@ -223,12 +224,14 @@ def test_t_tc_126_manual_idea_flags(client, factory):
         # 殿堂入り 付与→詳細 flags に反映。
         assert client.patch(FLAGS, json={"flag": "hall_of_fame", "on": True}, headers=_csrf(client)).status_code == 200
         assert any(f["idea_id"] == str(iid) and f["flag"] == "hall_of_fame" for f in client.get(f"{BASE}/{cid}").json()["flags"])
-        # 殿堂入り 解除→消える。
-        client.patch(FLAGS, json={"flag": "hall_of_fame", "on": False}, headers=_csrf(client))
-        assert not any(f["flag"] == "hall_of_fame" for f in client.get(f"{BASE}/{cid}").json()["flags"])
-        # 入賞（selected）→ ideas.is_selected。
+        # 排他＝入賞（selected）を ON にすると殿堂入りは自動解除される（1アイデア1状態）。
         assert client.patch(FLAGS, json={"flag": "selected", "on": True}, headers=_csrf(client)).status_code == 200
         assert client.get(f"/api/v1/ideas/{iid}").json()["is_selected"] is True
+        assert not any(f["flag"] == "hall_of_fame" for f in client.get(f"{BASE}/{cid}").json()["flags"])
+        # さらにお蔵入り ON で入賞（is_selected）も解除される。
+        assert client.patch(FLAGS, json={"flag": "shelved", "on": True}, headers=_csrf(client)).status_code == 200
+        assert client.get(f"/api/v1/ideas/{iid}").json()["is_selected"] is False
+        assert any(f["flag"] == "shelved" for f in client.get(f"{BASE}/{cid}").json()["flags"])
         # 一般は403。
         _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
         assert client.patch(FLAGS, json={"flag": "shelved", "on": True}, headers=_csrf(client)).status_code == 403

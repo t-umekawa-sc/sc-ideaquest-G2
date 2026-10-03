@@ -233,19 +233,16 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     return { shelvedIds: shelved, hofIds: hof };
   }, [contest]);
 
-  const tabIdeas = useMemo(() => {
-    if (tab === "selected") return ideas.filter((i) => i.is_selected);
-    if (tab === "hall_of_fame") return ideas.filter((i) => hofIds.has(i.id));
-    if (tab === "shelved") return ideas.filter((i) => shelvedIds.has(i.id));
-    return ideas.filter((i) => !shelvedIds.has(i.id)); // 応募中＝お蔵入り以外
-  }, [tab, ideas, hofIds, shelvedIds]);
+  // アイデアの状態は**排他**＝優先度 お蔵入り > 殿堂入り > 入賞 > 応募中（1アイデアは1タブだけに出る）。
+  const ideaTabOf = useCallback((i: IdeaCard) => {
+    if (shelvedIds.has(i.id)) return "shelved";
+    if (hofIds.has(i.id)) return "hall_of_fame";
+    if (i.is_selected) return "selected";
+    return "entries";
+  }, [hofIds, shelvedIds]);
 
-  const tabCount = useCallback((key: string) => {
-    if (key === "selected") return ideas.filter((i) => i.is_selected).length;
-    if (key === "hall_of_fame") return ideas.filter((i) => hofIds.has(i.id)).length;
-    if (key === "shelved") return ideas.filter((i) => shelvedIds.has(i.id)).length;
-    return ideas.filter((i) => !shelvedIds.has(i.id)).length;
-  }, [ideas, hofIds, shelvedIds]);
+  const tabIdeas = useMemo(() => ideas.filter((i) => ideaTabOf(i) === tab), [tab, ideas, ideaTabOf]);
+  const tabCount = useCallback((key: string) => ideas.filter((i) => ideaTabOf(i) === key).length, [ideas, ideaTabOf]);
 
   // アイデア一覧ビュー（SC-12 と同一列の DataTable に渡す）。
   const ideaViews = useMemo(() => tabIdeas.map(toIdeaView), [tabIdeas]);
@@ -266,13 +263,18 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     try {
       const r = await setContestIdeaFlag(contestId, ideaId, flag, on);
       if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
-      // 楽観更新＝全体リロードを避けてタブ/カウントに即反映。
-      if (flag === "selected") {
-        setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, is_selected: on } : i)));
+      // 楽観更新（排他）＝全体リロードを避けてタブ/カウントに即反映。ON は他状態を解除。
+      if (on) {
+        setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, is_selected: flag === "selected" } : i)));
+        setContest((c) => {
+          if (!c) return c;
+          const kept = (c.flags ?? []).filter((f) => f.idea_id !== ideaId || (f.flag !== "hall_of_fame" && f.flag !== "shelved"));
+          return { ...c, flags: (flag === "hall_of_fame" || flag === "shelved") ? [...kept, { idea_id: ideaId, flag }] : kept };
+        });
+      } else if (flag === "selected") {
+        setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, is_selected: false } : i)));
       } else {
-        setContest((c) => c ? { ...c, flags: on
-          ? [...(c.flags ?? []), { idea_id: ideaId, flag }]
-          : (c.flags ?? []).filter((f) => !(f.idea_id === ideaId && f.flag === flag)) } : c);
+        setContest((c) => c ? { ...c, flags: (c.flags ?? []).filter((f) => !(f.idea_id === ideaId && f.flag === flag)) } : c);
       }
       const label = flag === "selected" ? "入賞" : flag === "hall_of_fame" ? "殿堂入り" : "お蔵入り";
       snack({ type: "success", title: on ? `${label}に設定しました` : `${label}を解除しました` });
