@@ -15,13 +15,17 @@
 /* SC-54 詳細 */
 .contest-detail .backlink { display: inline-block; margin-bottom: var(--space-3); }
 .contest-head { padding: var(--space-4); }
-.contest-head__top { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+/* タイトル/メタ（左）とアクション（右上）を両端に＝クエスト詳細 .quest-head__top と同配置。 */
+.contest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.contest-head__main { min-width: 0; flex: 1 1 auto; }
+.contest-head__titles { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.contest-head__titles .page-title { margin: 0; }
 .contest-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-subtle); }
 .contest-meta { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: var(--space-3) 0 0; }
 .contest-meta div { display: flex; flex-direction: column; gap: 2px; }
 .contest-meta dt { font-size: var(--text-xs); color: var(--color-text-subtle); }
 .contest-meta dd { margin: 0; font-size: var(--text-sm); font-weight: 600; }
-.contest-head__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
+.contest-head__actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 
 .contest-podium {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

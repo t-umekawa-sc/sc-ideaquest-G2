@@ -191,33 +191,37 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
 
       <header className="card contest-head">
         <div className="contest-head__top">
-          <h1 className="page-title">{contest.theme}</h1>
-          <span className={`badge ${CONTEST_STATUS_BADGE[contest.status] ?? "badge-muted"}`}>
-            {contestStatusLabel(contest.status)}
-          </span>
-        </div>
-        {contest.description && <p className="contest-head__desc">{contest.description}</p>}
-        <dl className="contest-meta">
-          <div><dt>種別</dt><dd>{CONTEST_MODE_LABEL[contest.mode] ?? contest.mode}</dd></div>
-          <div><dt>会期</dt><dd>{period}</dd></div>
-          <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
-        </dl>
-        <div className="contest-head__actions">
-          {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
-          {/* 運営操作（ステータス進める/戻す・削除）＝クエスト詳細と同じ ⋯ メニュー。権限が無ければサーバーが 403。 */}
-          {(() => {
-            const idx = STATUS_ORDER.indexOf(contest.status);
-            const next = idx >= 0 && idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : undefined;
-            const prev = idx >= 1 ? STATUS_ORDER[idx - 1] : undefined;
-            const fwdLabel = next === "closed" ? "🏆 表彰を確定する" : next ? `ステータスを進める（→ ${contestStatusLabel(next)}）` : "";
-            return (
-              <RowMenu items={[
-                ...(next ? [{ label: fwdLabel, onClick: () => void changeStatus(next) }] : []),
-                ...(prev ? [{ label: `ステータスを戻す（→ ${contestStatusLabel(prev)}）`, onClick: () => void changeStatus(prev) }] : []),
-                { label: "コンテストを削除", danger: true, onClick: () => void onDelete() },
-              ]} />
-            );
-          })()}
+          <div className="contest-head__main">
+            <div className="contest-head__titles">
+              <h1 className="page-title">{contest.theme}</h1>
+              <span className={`badge ${CONTEST_STATUS_BADGE[contest.status] ?? "badge-muted"}`}>
+                {contestStatusLabel(contest.status)}
+              </span>
+            </div>
+            {contest.description && <p className="contest-head__desc">{contest.description}</p>}
+            <dl className="contest-meta">
+              <div><dt>種別</dt><dd>{CONTEST_MODE_LABEL[contest.mode] ?? contest.mode}</dd></div>
+              <div><dt>会期</dt><dd>{period}</dd></div>
+              <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
+            </dl>
+          </div>
+          {/* ボタン＋運営メニューはパネル右上（クエスト詳細 .quest-actions と同配置）。権限が無ければサーバーが 403。 */}
+          <div className="contest-head__actions">
+            {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
+            {(() => {
+              const idx = STATUS_ORDER.indexOf(contest.status);
+              const next = idx >= 0 && idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : undefined;
+              const prev = idx >= 1 ? STATUS_ORDER[idx - 1] : undefined;
+              const fwdLabel = next === "closed" ? "🏆 表彰を確定する" : next ? `ステータスを進める（→ ${contestStatusLabel(next)}）` : "";
+              return (
+                <RowMenu items={[
+                  ...(next ? [{ label: fwdLabel, onClick: () => void changeStatus(next) }] : []),
+                  ...(prev ? [{ label: `ステータスを戻す（→ ${contestStatusLabel(prev)}）`, onClick: () => void changeStatus(prev) }] : []),
+                  { label: "コンテストを削除", danger: true, onClick: () => void onDelete() },
+                ]} />
+              );
+            })()}
+          </div>
         </div>
       </header>
 

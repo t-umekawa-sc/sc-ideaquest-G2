@@ -2,7 +2,8 @@
    通知は「読ませる一覧」なのでクリーン不透明（ゲーム層のガラスは使わない）。各通知はクリックで参照先へ遷移。
    共通クラス（.list-toolbar/.filters/.tools/.select/.list-count/.badge）は design-system.css。ここは SC-02 固有のみ。 */
 
-.notif-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+/* 業務層の見出し＝ビジネス用フォント（ピクセル体はゲーム要素専用・ユーザー方針 2026-10-03）。 */
+.notif-title { font-family: var(--font-base); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
 
 .notif-group { margin-bottom: var(--space-5); }
 .notif-group__label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-2); }
