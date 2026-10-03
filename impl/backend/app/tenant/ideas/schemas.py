@@ -234,6 +234,7 @@ class IdeaDetailDTO(BaseModel):
     note: str | None = None
     status: str
     is_selected: bool
+    is_contest: bool = False            # コンテスト配下のアイデアか（SC-22 で関連情報パネルを非表示・FR-46）
     current_revision: int
     author: IdeaAuthorDTO
     icon_image_url: str | None = None  # 表示用に解決したアイデアアイコン（個別→作成者既定→null）。

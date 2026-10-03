@@ -6749,6 +6749,11 @@ export interface components {
             status: string;
             /** Is Selected */
             is_selected: boolean;
+            /**
+             * Is Contest
+             * @default false
+             */
+            is_contest: boolean;
             /** Current Revision */
             current_revision: number;
             author: components["schemas"]["IdeaAuthorDTO"];

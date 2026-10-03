@@ -458,8 +458,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         </div>
       </section>
 
-      {/* 関連情報ストリップ＝概要の直下・全幅（クエスト詳細 SC-12 と同じ strip 配置・FR-41 Phase1 slice②） */}
-      <RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="strip" />
+      {/* 関連情報ストリップ＝概要の直下・全幅（クエスト詳細 SC-12 と同じ strip 配置・FR-41 Phase1 slice②）。
+          コンテスト配下のアイデアでは非表示（FR-46・ユーザー方針）。 */}
+      {!idea.is_contest && <RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="strip" />}
 
       {/* ============ メイン＋右レール ============ */}
       <div className="idea-layout">

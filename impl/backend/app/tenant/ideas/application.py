@@ -845,6 +845,9 @@ def _build_detail(ts, idea, viewer_id) -> dict:
     member = quests_repo.get_active_member(ts, idea.quest_id, viewer_id)
     if member is not None:
         my_permissions = quests_repo.get_permissions(ts, member.id)
+    # コンテスト配下か（SC-22 で関連情報パネルを出さない等の出し分け用・FR-46）。
+    from app.tenant.contests import access as contest_access
+    is_contest = contest_access.contest_of(ts, idea.quest_id) is not None
     # クエスト参照（SC-22 の「クエストへ戻る」導線・カテゴリーバッジ・凍結〔completed〕判定・D.1）。
     quest = quests_repo.get_quest(ts, idea.quest_id)
     quest_cats = [c.label for c in quests_repo.list_categories(ts, idea.quest_id)]
@@ -867,6 +870,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "note": idea.note,
         "status": idea.status,
         "is_selected": idea.is_selected,
+        "is_contest": is_contest,            # コンテスト配下＝SC-22 で関連情報を非表示（FR-46）
         "current_revision": idea.current_revision,
         "author": _author_dto(author, idea.author_id),
         # アイデアアイコン＝① アイデア個別（Phase 3）→ ② 作成者の既定（Phase 2）→ None（件名先頭1文字タイル）。

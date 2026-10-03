@@ -211,6 +211,30 @@ def test_t_tc_117_detail_my_participating_idea_ids(client, factory):
         _purge_contest_idea(cid, iid)
 
 
+def test_t_tc_125_idea_detail_is_contest_flag(client, factory):
+    """T-TC-125: コンテスト配下アイデアの詳細は is_contest=true（SC-22 で関連情報非表示）・通常は false。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
+    iid = _seed_published_idea(qid, _user_id(author["id"]))
+    try:
+        # コンテスト配下＝is_contest true（管理者は会社全体可視で参照可）。
+        d = client.get(f"/api/v1/ideas/{iid}")
+        assert d.status_code == 200 and d.json()["is_contest"] is True, d.text
+        # 通常クエストのアイデア（非コンテスト）＝false。seed データから1件取得。
+        with get_tenant_session(_seed_db()) as ts:
+            row = ts.execute(_text(
+                "SELECT i.id FROM ideas i WHERE i.status='published' AND i.quest_id NOT IN "
+                "(SELECT quest_id FROM contests) LIMIT 1")).scalar()
+        if row is not None:
+            d2 = client.get(f"/api/v1/ideas/{row}")
+            if d2.status_code == 200:
+                assert d2.json()["is_contest"] is False, d2.text
+    finally:
+        _purge_contest_idea(cid, iid)
+
+
 def test_t_tc_120_evaluate_requires_contest_evaluator(client, factory):
     """T-TC-120(api): 評価は `contest_evaluator` 保持者のみ・投稿者でも非保持は 403（運営指名のみ）。"""
     _admin(client, factory)
