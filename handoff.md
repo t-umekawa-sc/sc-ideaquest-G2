@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `922a4122 fix(contest): パーティ操作のちらつき解消＋排除→退出＋追加ダイアログ維持＋候補もっと見る`（commit＋origin/main へ push 済）
+- 最新コミット: `f7f863ae feat(contest): Tier2 議論参加の導線（SC-22）＝リクエスト→投稿者承認 UI`（commit＋origin/main へ push 済）
 - working tree: clean（全コミット済・push 済）。※`doc/セキュリティ検証/DAST_ZAP検証手順.md` は別セッションで作業中（本セッション対象外・ユーザー確認済）。
 - alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`。
 - **SC-54 受入ポリッシュ第2弾（本セッション・全 push 済）**: 4パネル（概要/コンテスト内アクティビティ/新着の議論/活発さ・`355a278d`）＋新着の議論を本人参加アイデアに限定（my_participating_idea_ids・T-TC-117）／チェックボックス標準化（.checkbox）／「パーティー→パーティ」UI全面統一（`fd10fd5d`・35ファイル）／**上位タブ 💡アイデア・🔍全文検索・👥パーティ**（`5ea2ce51`・パーティは運営のみ=can_manage・`GET /contests/{id}/participants`・T-TC-118）。全backend 936 passed・traceability ✅（960件）。
@@ -79,7 +79,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
 0. **（済）Step2b-2/2b-2b/2c/2b-3** → §3A 参照（単一ポリシー5ゲート・Tier1投稿・表彰/ランキング/フラグ backend・SC-54 frontend）。全 931 green・SC-54 目視検証済。
-1. **Step2b-3 残フォロー（任意・SC-54 の作り込み）**＝①Tier2 チャット参加導線（アイデア詳細 SC-22 側にリクエスト/承認 UI）／②参加状態・権限に応じた CTA 出し分け（現状は「参加する」常時表示＋backend 403→snackbar）／③ランキング軸の会期日付が未設定（starts_at/ends_at=null）だと全期間集計になる点の UI 明示／④SC-54 の正式モック（`doc/画面設計/mocks`）と screens/SC-54 md の起票（現状は遷移図のみが仕様源）。
+1. **Step2b-3 残フォロー（任意）**＝（①Tier2 チャット参加導線＝**済 f7f863ae**）②参加状態・権限に応じた CTA 出し分け（現状は「参加する」常時表示＋backend 403→snackbar）／③ランキング軸の会期日付が未設定（starts_at/ends_at=null）だと全期間集計になる点の UI 明示／④SC-54 の正式モック（`doc/画面設計/mocks`）と screens/SC-54 md の起票（現状は遷移図のみが仕様源）。
 2. **Step3 公開/非公開モード**＝access_mode 外周ガード（README §1.6・A §A.11.1＝public×general はコンテスト系以外 403）＋`GET /public/bootstrap`。TC＝T-TC-150/151/201＋T-TC-114（public 自動承認）。
 3. **Step4 セルフサインアップ（FR-48・SEC 重）**＝SC-05＋`POST /public/signup`・`/public/signup/verify`。A-TC-120〜127。
 4. **Step5 アイデア→クエスト昇格（FR-47・T.5）**＝`POST /ideas/{id}/promote-to-quest`（要 quest_create・内容コピー＋origin_idea_id）。T-TC-140。
