@@ -92,10 +92,10 @@ def list_contest_participants(contest_id: str, request: Request, session: dict =
 
 @router.get("/contests/{contest_id}/participant-candidates", response_model=ContestCandidatesResponse)
 def contest_participant_candidates(contest_id: str, request: Request, q: str | None = None,
-                                   session: dict = Depends(require_me)):
-    """パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ）。"""
+                                   cursor: str | None = None, session: dict = Depends(require_me)):
+    """パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ・カーソルページング）。"""
     return service.participant_candidates(
-        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, q)
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, q, cursor)
 
 
 @router.patch("/contests/{contest_id}/participants/{uid}/evaluator", response_model=dict,

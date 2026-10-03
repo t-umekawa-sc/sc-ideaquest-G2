@@ -4201,7 +4201,7 @@ export interface paths {
         };
         /**
          * Contest Participant Candidates
-         * @description パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ）。
+         * @description パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ・カーソルページング）。
          */
         get: operations["contest_participant_candidates_api_v1_contests__contest_id__participant_candidates_get"];
         put?: never;
@@ -5990,6 +5990,13 @@ export interface components {
         ContestCandidatesResponse: {
             /** Data */
             data: components["schemas"]["ContestCandidateDTO"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
         };
         /** ContestCreateRequest */
         ContestCreateRequest: {
@@ -18738,6 +18745,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                cursor?: string | null;
             };
             header?: never;
             path: {

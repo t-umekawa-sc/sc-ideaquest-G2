@@ -68,7 +68,10 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [addOpen, setAddOpen] = useState(false);          // パーティ追加ピッカー
   const [candQ, setCandQ] = useState("");
   const [candidates, setCandidates] = useState<ContestCandidate[]>([]);
+  const [candCursor, setCandCursor] = useState<string | null>(null);  // 「もっと見る」カーソル（null=これ以上なし）
+  const [candMore, setCandMore] = useState(false);                    // もっと見る追加読込中
   const [reload, setReload] = useState(0);
+  const [partyReload, setPartyReload] = useState(0);  // パーティ/候補だけ再取得（全体 load を回さない＝ちらつき回避）
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -129,15 +132,15 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     const ac = new AbortController();
     getContestParticipants(contestId, ac.signal).then(setParticipants).catch(() => setParticipants([]));
     return () => ac.abort();
-  }, [view, contest?.can_manage, contestId, reload]);
+  }, [view, contest?.can_manage, contestId, partyReload]);
 
   async function decideParticipation(userId: string, status: "approved" | "rejected") {
     setBusy(true);
     try {
       const r = await decideContestParticipation(contestId, userId, status);
       if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
-      snack({ type: "success", title: status === "approved" ? "参加を承認しました" : "参加を却下しました" });
-      setReload((n) => n + 1);
+      snack({ type: "success", title: status === "approved" ? "参加を承認しました" : "参加を退出にしました" });
+      setPartyReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "更新に失敗しました" });
     } finally {
@@ -148,8 +151,8 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   async function removeMember(userId: string, name: string) {
     const ok = await confirm({
       variant: "danger",
-      title: "参加者を排除",
-      msg: `「${name}」をこのコンテストから排除しますか？ 投稿・投票・チャットができなくなります（再参加には再申請が必要）。投稿済みのアイデア等は監査のため残ります。`,
+      title: "参加者を退出",
+      msg: `「${name}」をこのコンテストから退出させますか？ 投稿・投票・チャットができなくなります（復帰は再承認／再申請）。投稿済みのアイデア等は監査のため残ります。`,
     });
     if (!ok) return;
     await decideParticipation(userId, "rejected");
@@ -161,7 +164,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       const r = await setContestEvaluator(contestId, userId, granted);
       if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
       snack({ type: "success", title: granted ? "審査員に設定しました" : "審査員を解除しました" });
-      setReload((n) => n + 1);
+      setPartyReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "更新に失敗しました" });
     } finally {
@@ -169,16 +172,31 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
-  // パーティ追加ピッカー＝会社ユーザー候補をデバウンス取得（運営のみ）。
+  // パーティ追加ピッカー＝会社ユーザー候補の1ページ目をデバウンス取得（運営のみ・以降は「もっと見る」）。
   useEffect(() => {
     if (!addOpen) return;
     const ac = new AbortController();
     const timer = setTimeout(() => {
-      getParticipantCandidates(contestId, candQ.trim() || undefined, ac.signal)
-        .then(setCandidates).catch(() => setCandidates([]));
+      getParticipantCandidates(contestId, { q: candQ.trim() || undefined }, ac.signal)
+        .then((res) => { setCandidates(res?.data ?? []); setCandCursor(res?.next_cursor ?? null); })
+        .catch(() => { setCandidates([]); setCandCursor(null); });
     }, 250);
     return () => { clearTimeout(timer); ac.abort(); };
-  }, [addOpen, candQ, contestId, reload]);
+  }, [addOpen, candQ, contestId, partyReload]);
+
+  async function loadMoreCandidates() {
+    if (!candCursor) return;
+    setCandMore(true);
+    try {
+      const res = await getParticipantCandidates(contestId, { q: candQ.trim() || undefined, cursor: candCursor });
+      setCandidates((cs) => [...cs, ...(res?.data ?? [])]);
+      setCandCursor(res?.next_cursor ?? null);
+    } catch {
+      snack({ type: "error", title: "候補の取得に失敗しました" });
+    } finally {
+      setCandMore(false);
+    }
+  }
 
   async function addMember(userId: string) {
     setBusy(true);
@@ -187,7 +205,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       if (!r) { snack({ type: "error", title: "追加できませんでした（権限が必要です）" }); return; }
       snack({ type: "success", title: "参加者に追加しました" });
       setCandidates((cs) => cs.filter((c) => c.user_id !== userId));
-      setReload((n) => n + 1);
+      setPartyReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "追加に失敗しました" });
     } finally {
@@ -531,7 +549,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         return (
           <section aria-label="パーティ">
             <div className="list-toolbar">
-              <div className="muted text-sm">コンテストの参加者（運営が承認/排除・審査員を管理）</div>
+              <div className="muted text-sm">コンテストの参加者（運営が承認/退出・審査員を管理）</div>
               <Button variant="primary" size="sm" onClick={() => { setCandQ(""); setAddOpen(true); }}>＋ メンバーを追加</Button>
             </div>
             {/* 主催者（所有者）＝クエスト詳細のパーティと同じく先頭に表示。 */}
@@ -573,7 +591,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                     </div>
                   </div>
                 )}
-                {/* 参加中メンバー一覧＝審査員トグル＋排除（論理削除）。 */}
+                {/* 参加中メンバー一覧＝審査員トグル＋退出（論理削除）。 */}
                 <div className="join-req-block">
                   <h3 className="join-req-title">👥 参加中<span className="tab-count">{members.length}</span></h3>
                   <div className="card" style={{ padding: 0 }}>
@@ -595,7 +613,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                                 審査員
                               </label>
                               <button className="btn btn-outline btn-sm" type="button"
-                                      onClick={() => void removeMember(p.user_id, p.display_name ?? "（不明）")} disabled={busy}>排除</button>
+                                      onClick={() => void removeMember(p.user_id, p.display_name ?? "（不明）")} disabled={busy}>退出</button>
                             </span>
                           </li>
                         ))}
@@ -603,10 +621,10 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                     )}
                   </div>
                 </div>
-                {/* 排除済み（rejected/left）＝履歴として表示。再承認で参加に戻せる。 */}
+                {/* 退出済み（rejected/left）＝履歴として表示。再承認で復帰可。 */}
                 {excluded.length > 0 && (
                   <div className="join-req-block">
-                    <h3 className="join-req-title">🚫 排除済み<span className="tab-count">{excluded.length}</span></h3>
+                    <h3 className="join-req-title">🚫 退出済み<span className="tab-count">{excluded.length}</span></h3>
                     <div className="card" style={{ padding: 0 }}>
                       <ul className="member-list">
                         {excluded.map((p) => (
@@ -614,7 +632,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                             <Avatar name={p.display_name ?? "?"} />
                             <span className="member-name">{p.display_name ?? "（不明）"}</span>
                             <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                              <span className="badge badge-muted">{p.status === "left" ? "退出" : "排除済み"}</span>
+                              <span className="badge badge-muted">退出</span>
                               <button className="btn btn-outline btn-sm" type="button"
                                       onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>再承認</button>
                             </span>
@@ -650,6 +668,13 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                   </li>
                 ))}
               </ul>
+            )}
+            {candCursor && (
+              <div className="row-center" style={{ justifyContent: "center", marginTop: "var(--space-3)" }}>
+                <button className="btn btn-outline btn-sm" type="button" onClick={() => void loadMoreCandidates()} disabled={candMore}>
+                  {candMore ? "読み込み中…" : "もっと見る"}
+                </button>
+              </div>
             )}
           </div>
           <div className="modal__footer">

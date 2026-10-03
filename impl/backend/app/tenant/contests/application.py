@@ -159,11 +159,25 @@ def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: 
 
 
 def participant_candidates(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
-                           q: str | None = None) -> dict:
-    """パーティ追加の候補＝会社の有効ユーザー（既参加〔approved/requested〕・主催者は除外）。運営のみ。
+                           q: str | None = None, cursor: str | None = None) -> dict:
+    """パーティ追加の候補＝会社の有効ユーザー（既参加〔approved/requested〕・主催者は除外）。運営のみ・カーソルページング。
 
     会社全体スコープ＝`list_cross_group_candidates(group_ids=[])`（部署絞りなし）を流用（FR-38 候補基盤）。
+    「もっと見る」＝keyset カーソル（display_name,id の昇順）。
     """
+    import base64
+    _LIMIT = 20
+
+    def _dec(cur: str):
+        try:
+            name, sid = base64.urlsafe_b64decode(cur.encode()).decode().split("\x1f", 1)
+            return (name, uuid.UUID(sid))
+        except Exception:
+            return None
+
+    def _enc(u) -> str:
+        return base64.urlsafe_b64encode(f"{u.display_name}\x1f{u.id}".encode()).decode()
+
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
@@ -181,8 +195,14 @@ def participant_candidates(account_id: uuid.UUID, company_id: uuid.UUID, contest
         for p in repo.list_contest_participants(ts, c.id):
             if p.status in ("approved", "requested"):
                 exclude.add(p.user_id)
-        rows = quests_repo.list_cross_group_candidates(ts, [], q=q, exclude_user_ids=list(exclude), limit=20)
-        return {"data": [{"user_id": str(u.id), "display_name": u.display_name} for u in rows]}
+        rows = quests_repo.list_cross_group_candidates(
+            ts, [], q=q, exclude_user_ids=list(exclude),
+            cursor=(_dec(cursor) if cursor else None), limit=_LIMIT + 1)
+        has_next = len(rows) > _LIMIT
+        rows = rows[:_LIMIT]
+        next_cursor = _enc(rows[-1]) if (has_next and rows) else None
+        return {"data": [{"user_id": str(u.id), "display_name": u.display_name} for u in rows],
+                "next_cursor": next_cursor, "has_next": has_next}
 
 
 def set_participant_evaluator(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,

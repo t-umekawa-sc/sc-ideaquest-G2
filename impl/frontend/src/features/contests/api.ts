@@ -78,10 +78,13 @@ export function setContestEvaluator(id: string, userId: string, granted: boolean
 }
 
 export type ContestCandidate = components["schemas"]["ContestCandidateDTO"];
+export type ContestCandidates = components["schemas"]["ContestCandidatesResponse"];
 
-// パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ）。
-export async function getParticipantCandidates(id: string, q?: string, signal?: AbortSignal): Promise<ContestCandidate[]> {
-  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
-  const res = await apiFetch<{ data: ContestCandidate[] }>(`/contests/${id}/participant-candidates${qs}`, { signal });
-  return res?.data ?? [];
+// パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ・カーソルページング）。
+export function getParticipantCandidates(id: string, opts?: { q?: string; cursor?: string | null }, signal?: AbortSignal): Promise<ContestCandidates | null> {
+  const p = new URLSearchParams();
+  if (opts?.q) p.set("q", opts.q);
+  if (opts?.cursor) p.set("cursor", opts.cursor);
+  const qs = p.toString() ? `?${p.toString()}` : "";
+  return apiFetch<ContestCandidates>(`/contests/${id}/participant-candidates${qs}`, { signal });
 }

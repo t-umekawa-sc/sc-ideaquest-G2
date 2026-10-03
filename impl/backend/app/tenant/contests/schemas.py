@@ -111,6 +111,8 @@ class ContestCandidateDTO(BaseModel):
 
 class ContestCandidatesResponse(BaseModel):
     data: list[ContestCandidateDTO]
+    next_cursor: str | None = None         # 「もっと見る」用カーソル（keyset・なければ null）
+    has_next: bool = False
 
 
 class ContestRankingEntry(BaseModel):
