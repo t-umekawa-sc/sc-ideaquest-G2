@@ -44,13 +44,13 @@ def _can_create_contest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
     return _is_company_admin(account_id) or caps_app.user_has_capability(ts, user_id, "contest_create")
 
 
-def _detail(c, *, idea_count: int = 0) -> dict:
+def _detail(c, *, idea_count: int = 0, flags: list | None = None) -> dict:
     return {
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
         "starts_at": c.starts_at, "ends_at": c.ends_at,
         "auto_archive_days": c.auto_archive_days, "prize_config": c.prize_config,
-        "created_at": c.created_at, "idea_count": idea_count,
+        "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
     }
 
 
@@ -111,7 +111,8 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         c = repo.get(ts, uuid.UUID(contest_id))
         if c is None:
             raise AppError(404, "not_found")
-        return _detail(c)
+        flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
+        return _detail(c, flags=flags)
 
 
 def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *,

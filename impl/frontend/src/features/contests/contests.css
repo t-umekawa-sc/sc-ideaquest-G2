@@ -8,3 +8,34 @@
 .contest-table th { color: var(--color-text-subtle); font-weight: 600; }
 .contest-table tbody tr:hover { background: var(--color-surface-muted, rgba(0, 0, 0, 0.02)); }
 .contest-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--space-3) 0; }
+.contest-tabs .tab-count { margin-left: 6px; font-size: var(--text-xs); opacity: 0.8; }
+
+/* SC-54 詳細 */
+.contest-detail { max-width: 960px; }
+.contest-detail .backlink { display: inline-block; margin-bottom: var(--space-3); }
+.contest-head { padding: var(--space-4); }
+.contest-head__top { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.contest-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-subtle); }
+.contest-meta { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: var(--space-3) 0 0; }
+.contest-meta div { display: flex; flex-direction: column; gap: 2px; }
+.contest-meta dt { font-size: var(--text-xs); color: var(--color-text-subtle); }
+.contest-meta dd { margin: 0; font-size: var(--text-sm); font-weight: 600; }
+.contest-head__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
+
+.contest-podium {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3); margin-top: var(--space-5);
+}
+.contest-rank { padding: var(--space-3); }
+.contest-rank__title { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.contest-rank__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.contest-rank__list li { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+.contest-rank__medal { width: 1.4em; text-align: center; }
+.contest-rank__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contest-rank__metric { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.contest-ideas { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.contest-idea { padding: var(--space-3); }
+.contest-idea__title { font-weight: 700; }
+.contest-idea__value { margin: 4px 0 0; color: var(--color-text-subtle); font-size: var(--text-sm); }
+.contest-idea__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); font-size: var(--text-sm); }

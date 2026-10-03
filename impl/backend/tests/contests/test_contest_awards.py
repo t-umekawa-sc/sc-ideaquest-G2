@@ -181,6 +181,9 @@ def test_t_tc_131_finalize_awards_idempotent(client, factory):
                                      "WHERE ua.user_id=:u AND a.code=:code AND ua.unlocked_at IS NOT NULL"),
                                {"u": str(uid), "code": f"contest_award_{tier}"}).scalar()
                 assert n == 1, f"{tier} バッジ未解除"
+        # GET 詳細に殿堂入りフラグが露出（SC-54 タブ導出用）。
+        detail = client.get(f"{BASE}/{cid}").json()
+        assert any(f["idea_id"] == str(i1) and f["flag"] == "hall_of_fame" for f in detail["flags"])
         # 再実行（closed）は冪等＝新規付与0・XP は増えない。
         r2 = client.post(f"{BASE}/{cid}/finalize", headers=_csrf(client))
         assert r2.status_code == 200 and r2.json()["granted_now"] == 0, r2.text
@@ -211,6 +214,9 @@ def test_t_tc_132_rolling_auto_shelve(client, factory):
             flags = ts.execute(_text("SELECT idea_id FROM contest_idea_flags WHERE contest_id=:c AND flag='shelved'"),
                                {"c": cid}).scalars().all()
             assert [str(x) for x in flags] == [str(old_i)]  # 超過アイデアのみ
+        # GET 詳細に shelved フラグが露出（SC-54 お蔵入りタブ導出用）。
+        detail = client.get(f"{BASE}/{cid}").json()
+        assert any(f["idea_id"] == str(old_i) and f["flag"] == "shelved" for f in detail["flags"])
         # 冪等＝再実行で追加0。
         out2 = contest_app.auto_shelve_expired(uuid.UUID(str(admin["id"])), uuid.UUID(_company_id()), cid)
         assert out2["shelved"] == 0

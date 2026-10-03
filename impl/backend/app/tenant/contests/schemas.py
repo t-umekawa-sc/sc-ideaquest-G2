@@ -55,6 +55,11 @@ class ParticipationDecideRequest(BaseModel):
     status: str = Field(pattern="^(approved|rejected)$")
 
 
+class ContestIdeaFlagDTO(BaseModel):
+    idea_id: str
+    flag: str                        # hall_of_fame | shelved
+
+
 class ContestDetail(BaseModel):
     id: str
     quest_id: str                    # backing quest（アイデア/投票/評価/チャットの接続先）
@@ -68,9 +73,10 @@ class ContestDetail(BaseModel):
     prize_config: dict | None = None
     created_at: datetime
     idea_count: int = 0
+    flags: list[ContestIdeaFlagDTO] = []   # 殿堂入り/お蔵入り（SC-54 タブ導出・入賞は ideas.is_selected）
 
 
-class RankingEntry(BaseModel):
+class ContestRankingEntry(BaseModel):
     """ランキング1件。軸により idea_id（成果軸）or user_id（貢献軸）のいずれかが主体。"""
     rank: int
     user_id: str                     # 受益者（成果軸=アイデア投稿者／貢献軸=本人）
@@ -79,12 +85,12 @@ class RankingEntry(BaseModel):
     metric: float                    # 集計値（投票数・平均点・活動件数）
 
 
-class RankingResponse(BaseModel):
+class ContestRankingResponse(BaseModel):
     axis: str                        # approve_votes | avg_score | contribution
-    data: list[RankingEntry]
+    data: list[ContestRankingEntry]
 
 
-class FinalizeResponse(BaseModel):
+class ContestFinalizeResponse(BaseModel):
     """表彰確定の結果サマリ（冪等・再実行で件数は同じ・新規付与は0になる）。"""
     status: str                      # closed
     awarded_users: int               # 受賞ユーザー数（延べでなくユニーク）

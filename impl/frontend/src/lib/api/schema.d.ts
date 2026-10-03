@@ -4131,6 +4131,111 @@ export interface paths {
         patch: operations["update_contest_api_v1_contests__contest_id__patch"];
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contest Ranking */
+        get: operations["contest_ranking_api_v1_contests__contest_id__ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contests/{contest_id}/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finalize Contest
+         * @description 表彰確定（管理者・冪等＝Idempotency-Key 推奨・§1.9）。judging→closed・上位N へ付与。
+         */
+        post: operations["finalize_contest_api_v1_contests__contest_id__finalize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contests/{contest_id}/participation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request Contest Participation */
+        post: operations["request_contest_participation_api_v1_contests__contest_id__participation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contests/{contest_id}/participation/{uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Decide Contest Participation */
+        patch: operations["decide_contest_participation_api_v1_contests__contest_id__participation__uid__patch"];
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/participation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request Idea Participation */
+        post: operations["request_idea_participation_api_v1_ideas__idea_id__participation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/participation/{uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Decide Idea Participation */
+        patch: operations["decide_idea_participation_api_v1_ideas__idea_id__participation__uid__patch"];
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -5868,6 +5973,32 @@ export interface components {
              * @default 0
              */
             idea_count: number;
+            /**
+             * Flags
+             * @default []
+             */
+            flags: components["schemas"]["ContestIdeaFlagDTO"][];
+        };
+        /**
+         * ContestFinalizeResponse
+         * @description 表彰確定の結果サマリ（冪等・再実行で件数は同じ・新規付与は0になる）。
+         */
+        ContestFinalizeResponse: {
+            /** Status */
+            status: string;
+            /** Awarded Users */
+            awarded_users: number;
+            /** Selected Ideas */
+            selected_ideas: number;
+            /** Granted Now */
+            granted_now: number;
+        };
+        /** ContestIdeaFlagDTO */
+        ContestIdeaFlagDTO: {
+            /** Idea Id */
+            idea_id: string;
+            /** Flag */
+            flag: string;
         };
         /** ContestListItem */
         ContestListItem: {
@@ -5893,6 +6024,29 @@ export interface components {
         ContestListResponse: {
             /** Data */
             data: components["schemas"]["ContestListItem"][];
+        };
+        /**
+         * ContestRankingEntry
+         * @description ランキング1件。軸により idea_id（成果軸）or user_id（貢献軸）のいずれかが主体。
+         */
+        ContestRankingEntry: {
+            /** Rank */
+            rank: number;
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Idea Id */
+            idea_id?: string | null;
+            /** Metric */
+            metric: number;
+        };
+        /** ContestRankingResponse */
+        ContestRankingResponse: {
+            /** Axis */
+            axis: string;
+            /** Data */
+            data: components["schemas"]["ContestRankingEntry"][];
         };
         /** ContestUpdateRequest */
         ContestUpdateRequest: {
@@ -7897,6 +8051,16 @@ export interface components {
              * Status
              * @default ok
              */
+            status: string;
+        };
+        /** ParticipationDecideRequest */
+        ParticipationDecideRequest: {
+            /** Status */
+            status: string;
+        };
+        /** ParticipationResponse */
+        ParticipationResponse: {
+            /** Status */
             status: string;
         };
         /**
@@ -18294,6 +18458,204 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contest_ranking_api_v1_contests__contest_id__ranking_get: {
+        parameters: {
+            query?: {
+                axis?: string;
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestRankingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finalize_contest_api_v1_contests__contest_id__finalize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestFinalizeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_contest_participation_api_v1_contests__contest_id__participation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_contest_participation_api_v1_contests__contest_id__participation__uid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipationDecideRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_idea_participation_api_v1_ideas__idea_id__participation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_idea_participation_api_v1_ideas__idea_id__participation__uid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipationDecideRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
                 };
             };
             /** @description Validation Error */
