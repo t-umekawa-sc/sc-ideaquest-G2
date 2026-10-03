@@ -4,12 +4,14 @@
 // （応募中/入賞/殿堂入り/お蔵入り）＋表彰台（ランキング3軸）＋Tier1 参加導線＋管理者の表彰確定。
 // 認可はサーバー権威（参加/確定は権限が無ければ 403＝スナックバーで案内・UIは非表示に依存しない）。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button, useConfirm, useSnackbar } from "@/components/ui";
+import { Button, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import { listIdeas, type IdeaCard } from "@/features/ideas/api";
 
 import {
+  deleteContest,
   finalizeContest,
   getContest,
   getContestRanking,
@@ -29,8 +31,11 @@ import "../contests.css";
 
 const fmtDate = (v: string | null | undefined) => (v ? v.slice(0, 10) : "—");
 const MEDAL = ["🥇", "🥈", "🥉"];
+// 会期の状態順（隣接1段で前進・後退とも可・§4.1）。
+const STATUS_ORDER = ["draft", "open", "judging", "closed", "archived"];
 
 export function ContestDetailView({ contestId }: { contestId: string }) {
+  const router = useRouter();
   const snack = useSnackbar();
   const confirm = useConfirm();
   const [contest, setContest] = useState<ContestDetail | null>(null);
@@ -125,19 +130,45 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
-  // 会期の前進遷移（運営操作・forward-only・§4.1）。judging→closed は finalize（表彰付与）が担うため別扱い。
-  async function advanceStatus(to: string, label: string) {
-    const ok = await confirm({ title: `${label}しますか？`, confirmLabel: label });
+  // 会期の遷移（運営操作・隣接1段で前進/後退とも可・§4.1）。judging→closed の前進のみ finalize（表彰付与）が担う。
+  async function changeStatus(to: string) {
+    if (!contest) return;
+    const forwardToClosed = contest.status === "judging" && to === "closed";
+    if (forwardToClosed) { await finalize(); return; }  // 表彰確定は専用フロー（付与＋確認）
+    const dir = STATUS_ORDER.indexOf(to) > STATUS_ORDER.indexOf(contest.status) ? "進める" : "戻す";
+    const ok = await confirm({
+      title: `ステータスを${dir}`,
+      msg: `「${contestStatusLabel(contest.status)}」→「${contestStatusLabel(to)}」に${dir}ます。よろしいですか？（隣接1段）`,
+    });
     if (!ok) return;
     setBusy(true);
     try {
       const r = await updateContest(contestId, { status: to });
       if (!r) { snack({ type: "error", title: "変更できませんでした（権限が必要です）" }); return; }
-      snack({ type: "success", title: `${label}しました` });
+      snack({ type: "success", title: "ステータスを更新しました", msg: `${contestStatusLabel(to)} にしました。` });
       setReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "状態の変更に失敗しました" });
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete() {
+    if (!contest) return;
+    const ok = await confirm({
+      variant: "danger",
+      title: "コンテストを削除",
+      msg: `「${contest.theme}」を削除しますか？ 一覧・詳細から見えなくなります（投稿されたアイデア等は監査のため保持されます）。`,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteContest(contestId);
+      snack({ type: "success", title: "コンテストを削除しました" });
+      router.push("/contests");
+    } catch {
+      snack({ type: "error", title: "削除できませんでした（権限が必要な場合があります）" });
       setBusy(false);
     }
   }
@@ -173,19 +204,20 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         </dl>
         <div className="contest-head__actions">
           {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
-          {/* 運営操作＝会期の前進（権限が無ければサーバーが 403）。 */}
-          {contest.status === "draft" && (
-            <button className="btn btn-primary" type="button" onClick={() => advanceStatus("open", "公募を開始")} disabled={busy}>▶ 公募を開始</button>
-          )}
-          {contest.status === "open" && (
-            <button className="btn btn-outline" type="button" onClick={() => advanceStatus("judging", "審査に進む")} disabled={busy}>審査に進む →</button>
-          )}
-          {contest.status === "judging" && (
-            <button className="btn btn-primary" type="button" onClick={finalize} disabled={busy}>🏆 表彰を確定</button>
-          )}
-          {contest.status === "closed" && (
-            <button className="btn btn-outline" type="button" onClick={() => advanceStatus("archived", "アーカイブ")} disabled={busy}>アーカイブ</button>
-          )}
+          {/* 運営操作（ステータス進める/戻す・削除）＝クエスト詳細と同じ ⋯ メニュー。権限が無ければサーバーが 403。 */}
+          {(() => {
+            const idx = STATUS_ORDER.indexOf(contest.status);
+            const next = idx >= 0 && idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : undefined;
+            const prev = idx >= 1 ? STATUS_ORDER[idx - 1] : undefined;
+            const fwdLabel = next === "closed" ? "🏆 表彰を確定する" : next ? `ステータスを進める（→ ${contestStatusLabel(next)}）` : "";
+            return (
+              <RowMenu items={[
+                ...(next ? [{ label: fwdLabel, onClick: () => void changeStatus(next) }] : []),
+                ...(prev ? [{ label: `ステータスを戻す（→ ${contestStatusLabel(prev)}）`, onClick: () => void changeStatus(prev) }] : []),
+                { label: "コンテストを削除", danger: true, onClick: () => void onDelete() },
+              ]} />
+            );
+          })()}
         </div>
       </header>
 

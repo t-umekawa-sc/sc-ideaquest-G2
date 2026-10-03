@@ -157,6 +157,25 @@ def test_t_tc_106_delete_requires_capability_and_soft_deletes(client, factory):
         _cleanup_contest(cid)
 
 
+def test_t_tc_107_status_can_revert_adjacent(client, factory):
+    """T-TC-107: 状態は隣接1段で前進・後退とも可／非隣接は409。backing quest.status も同期。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    try:
+        # open→judging（前進）→ open（後退）→ draft（後退）。
+        assert client.patch(f"{BASE}/{cid}", json={"status": "judging"}, headers=_csrf(client)).status_code == 200
+        r = client.patch(f"{BASE}/{cid}", json={"status": "open"}, headers=_csrf(client))
+        assert r.status_code == 200 and r.json()["status"] == "open", r.text
+        with get_tenant_session(_seed_db()) as ts:
+            qid = ts.execute(_text("SELECT quest_id FROM contests WHERE id=:c"), {"c": cid}).scalar()
+            assert ts.execute(_text("SELECT status FROM quests WHERE id=:q"), {"q": qid}).scalar() == "recruiting"
+        assert client.patch(f"{BASE}/{cid}", json={"status": "draft"}, headers=_csrf(client)).status_code == 200
+        # 非隣接の後退（draft→judging 等）は 409。
+        assert client.patch(f"{BASE}/{cid}", json={"status": "judging"}, headers=_csrf(client)).status_code == 409
+    finally:
+        _cleanup_contest(cid)
+
+
 def _user_id(account_id: str):
     from app.tenant.profile import repository as profile_repo
     import uuid as _uuid

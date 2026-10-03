@@ -20,9 +20,16 @@ from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest
 
 # コンテスト状態機械（設計 §4.1）と backing quest.status へのマップ。
+# 隣接1段の**前進・後退とも可**（運営がやり直せるように・クエストの status 遷移と同方針）。
+# 後退で closed→judging に戻しても、確定済みの表彰（contest_award ledger/実績）は取り消さない（冪等・監査保持）。
 _CONTEST_STATUS = ("draft", "open", "judging", "closed", "archived")
-_CONTEST_FLOW = {"draft": {"open"}, "open": {"judging"}, "judging": {"closed"},
-                 "closed": {"archived"}, "archived": set()}
+_CONTEST_FLOW = {
+    "draft": {"open"},
+    "open": {"draft", "judging"},
+    "judging": {"open", "closed"},
+    "closed": {"judging", "archived"},
+    "archived": {"closed"},
+}
 _QUEST_STATUS = {"draft": "draft", "open": "recruiting", "judging": "evaluating",
                  "closed": "completed", "archived": "completed"}
 _MODES = ("bounded", "rolling")

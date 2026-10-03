@@ -14,6 +14,7 @@
 | T-TC-104 | api | 詳細＝アイデアタブ（応募中/入賞/殿堂入り/お蔵入り）を導出 | contest＋アイデア（is_selected/flags 各種） | `GET /contests/{id}` | タブが `contest_idea_flags`＋`is_selected` から正しく導出 | T.1／§4.2／§5.64 |
 | T-TC-105 | api | 公開性は `access_mode` 一本化＝contest に visibility パラメータ無し | — | `POST /contests` に visibility 送信 | 無視/422（extra forbid）・公開性は会社設定のみ | §8.0／§3.1 |
 | T-TC-106 | api | 削除＝`contest_create`/管理者のみ・論理削除（contest＋backing quest）／一般は403 | 作成済み | `DELETE /contests/{id}` | 管理者=204・一覧/詳細から消える（deleted_at）・子データは監査保持・一般は403 | T.1／§5.60 |
+| T-TC-107 | api | 状態は隣接1段で**前進・後退とも可**（運営がやり直せる）・非隣接は409 | 作成済み（open 等） | `PATCH /contests/{id}`（status 後退） | open→draft／judging→open など隣接後退は200＋backing quest.status も同期・非隣接（judging→draft 等）は409 | T.1／§4.1 |
 
 ## 2. 参加の2階層（Tier1/Tier2）・単一ポリシー解決のゲート（T.2・§2.3・§5.1・データモデル §5.61/5.62）
 
