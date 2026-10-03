@@ -13,6 +13,7 @@
 | T-TC-103 | api | 一覧＝会期タブ（開催中/予定/終了）・DataTable 契約 | 複数 contest（状態各種） | `GET /contests`（status 絞り込み/カーソル） | status 別に出る・§1.8 契約準拠 | T.1／§1.8 |
 | T-TC-104 | api | 詳細＝アイデアタブ（応募中/入賞/殿堂入り/お蔵入り）を導出 | contest＋アイデア（is_selected/flags 各種） | `GET /contests/{id}` | タブが `contest_idea_flags`＋`is_selected` から正しく導出 | T.1／§4.2／§5.64 |
 | T-TC-105 | api | 公開性は `access_mode` 一本化＝contest に visibility パラメータ無し | — | `POST /contests` に visibility 送信 | 無視/422（extra forbid）・公開性は会社設定のみ | §8.0／§3.1 |
+| T-TC-106 | api | 削除＝`contest_create`/管理者のみ・論理削除（contest＋backing quest）／一般は403 | 作成済み | `DELETE /contests/{id}` | 管理者=204・一覧/詳細から消える（deleted_at）・子データは監査保持・一般は403 | T.1／§5.60 |
 
 ## 2. 参加の2階層（Tier1/Tier2）・単一ポリシー解決のゲート（T.2・§2.3・§5.1・データモデル §5.61/5.62）
 

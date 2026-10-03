@@ -29,6 +29,11 @@ export function updateContest(id: string, input: ContestUpdateInput): Promise<Co
   return apiFetch<ContestDetail>(`/contests/${id}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
+// 論理削除（管理者/contest_create・backing quest も論理削除・子データは監査保持）。CSRF は apiFetch が付与。
+export function deleteContest(id: string): Promise<null> {
+  return apiFetch<null>(`/contests/${id}`, { method: "DELETE" });
+}
+
 // 会期スコープのランキング（T.3）。axis＝approve_votes/avg_score/contribution。
 export function getContestRanking(
   id: string, axis: string, signal?: AbortSignal,

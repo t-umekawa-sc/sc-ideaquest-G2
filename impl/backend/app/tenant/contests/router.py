@@ -56,6 +56,13 @@ def update_contest(contest_id: str, body: ContestUpdateRequest, request: Request
         fields=fields, status=body.status)
 
 
+@router.delete("/contests/{contest_id}", status_code=204,
+               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def delete_contest(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    """コンテストを論理削除（管理者/contest_create）。backing quest も論理削除・子データは監査保持。"""
+    service.delete_contest(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
 # ---- 表彰・ランキング（T.3/T.1 finalize・§6） ----
 
 @router.get("/contests/{contest_id}/ranking", response_model=ContestRankingResponse)

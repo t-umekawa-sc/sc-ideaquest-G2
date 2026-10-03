@@ -149,6 +149,31 @@ def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str
     return out
 
 
+def delete_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> None:
+    """コンテストを論理削除（T.1）＝contests.deleted_at＋backing quest.deleted_at。要 `contest_create`（または管理者）。
+
+    子データ（アイデア/投票/評価/チャット）は監査のため保持（quests 削除と同方針）。一覧/詳細から見えなくなる。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="コンテストを削除する権限がありません")
+        now = datetime.now(timezone.utc)
+        c.deleted_at = now
+        quest = ts.get(Quest, c.quest_id)
+        if quest is not None:
+            quest.deleted_at = now
+        ts.commit()
+
+
 # ---- 参加 2階層（T.2・§5.1） ----
 
 def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:

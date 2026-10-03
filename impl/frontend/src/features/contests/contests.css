@@ -1,17 +1,14 @@
-/* アイデアコンテスト一覧（SC-53・FR-46）。MVP の軽量テーブル＋会期タブ。詳細は SC-54。 */
-.contest-list { max-width: 960px; }
-.contest-table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); }
-.contest-table th, .contest-table td {
-  text-align: left; padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border); font-size: var(--text-sm);
-}
-.contest-table th { color: var(--color-text-subtle); font-weight: 600; }
-.contest-table tbody tr:hover { background: var(--color-surface-muted, rgba(0, 0, 0, 0.02)); }
-.contest-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--space-3) 0; }
-.contest-tabs .tab-count { margin-left: 6px; font-size: var(--text-xs); opacity: 0.8; }
+/* アイデアコンテスト（SC-53 一覧 / SC-54 詳細・FR-46）。一覧は SC-10 クエスト一覧（DataTable）を踏襲し、
+   会期/アイデアの切り替えは SC-12 アイデア一覧と同じセグメントスイッチ（.segmented）を流用する。 */
+
+/* セグメントスイッチ内の件数（.segmented のラベル右に小さく）。選択中は白地に合わせて色を継承。 */
+.seg-n { font-size: var(--text-xs); opacity: 0.75; margin-left: 2px; }
+.segmented > label:has(input:checked) .seg-n { opacity: 0.9; }
+
+/* 一覧カード表示（DataTable card）。 */
+.contest-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-subtle); }
 
 /* SC-54 詳細 */
-.contest-detail { max-width: 960px; }
 .contest-detail .backlink { display: inline-block; margin-bottom: var(--space-3); }
 .contest-head { padding: var(--space-4); }
 .contest-head__top { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }

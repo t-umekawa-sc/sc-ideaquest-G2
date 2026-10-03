@@ -124,21 +124,21 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
-  if (loading) return <main className="container contest-detail"><p className="hint">読み込み中…</p></main>;
+  if (loading) return <section className="contest-detail"><p className="hint">読み込み中…</p></section>;
   if (notFound || !contest) {
     return (
-      <main className="container contest-detail">
+      <section className="contest-detail">
         <Link className="backlink" href="/contests">← アイデアコンテスト一覧</Link>
         <p className="hint">コンテストが見つかりませんでした。</p>
-      </main>
+      </section>
     );
   }
 
   const period = `${fmtDate(contest.starts_at)} 〜 ${fmtDate(contest.ends_at)}`;
 
   return (
-    <main className="container contest-detail" style={{ paddingBlock: "var(--space-6) var(--space-16)" }}>
-      <Link className="backlink" href="/contests">← アイデアコンテスト一覧</Link>
+    <section className="contest-detail">
+      <Link className="backlink backlink--float" href="/contests">← アイデアコンテスト一覧</Link>
 
       <header className="card contest-head">
         <div className="contest-head__top">
@@ -154,7 +154,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
         </dl>
         <div className="contest-head__actions">
-          <Button onClick={join} disabled={busy}>参加する</Button>
+          <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>
           {contest.status === "judging" && (
             <button className="btn btn-primary" type="button" onClick={finalize} disabled={busy}>🏆 表彰を確定</button>
           )}
@@ -185,13 +185,12 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         })}
       </section>
 
-      <div className="contest-tabs" role="tablist" style={{ marginTop: "var(--space-6)" }}>
+      <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み" style={{ marginTop: "var(--space-6)" }}>
         {CONTEST_IDEA_TABS.map((t) => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key}
-                  className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-outline"}`}
-                  onClick={() => setTab(t.key)}>
-            {t.label}<span className="tab-count">{tabCount(t.key)}</span>
-          </button>
+          <label key={t.key}>
+            <input type="radio" name="contest-idea-tab" checked={tab === t.key} onChange={() => setTab(t.key)} />
+            {t.label} <span className="seg-n">{tabCount(t.key)}</span>
+          </label>
         ))}
       </div>
 
@@ -214,6 +213,6 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           ))}
         </ul>
       )}
-    </main>
+    </section>
   );
 }

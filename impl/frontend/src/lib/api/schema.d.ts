@@ -4124,7 +4124,11 @@ export interface paths {
         get: operations["get_contest_api_v1_contests__contest_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Contest
+         * @description コンテストを論理削除（管理者/contest_create）。backing quest も論理削除・子データは監査保持。
+         */
+        delete: operations["delete_contest_api_v1_contests__contest_id__delete"];
         options?: never;
         head?: never;
         /** Update Contest */
@@ -18424,6 +18428,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ContestDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_contest_api_v1_contests__contest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -135,6 +135,28 @@ def test_t_tc_105_no_visibility_param(client, factory):
     assert r.status_code == 422, r.text
 
 
+def test_t_tc_106_delete_requires_capability_and_soft_deletes(client, factory):
+    """T-TC-106: 削除は contest_create/管理者のみ・論理削除（一覧/詳細から消える）／一般は403。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    try:
+        # 一般（能力なし）は 403。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.delete(f"{BASE}/{cid}", headers=_csrf(client)).status_code == 403
+        # 管理者は 204＝論理削除。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.delete(f"{BASE}/{cid}", headers=_csrf(client)).status_code == 204
+        # 一覧・詳細から消える（deleted_at）＝backing quest も論理削除。
+        assert client.get(f"{BASE}/{cid}").status_code == 404
+        assert not any(c["id"] == cid for c in client.get(BASE).json()["data"])
+        with get_tenant_session(_seed_db()) as ts:
+            qdel = ts.execute(_text("SELECT q.deleted_at FROM quests q JOIN contests c ON c.quest_id=q.id "
+                                    "WHERE c.id=:c"), {"c": cid}).scalar()
+            assert qdel is not None  # backing quest も論理削除
+    finally:
+        _cleanup_contest(cid)
+
+
 def _user_id(account_id: str):
     from app.tenant.profile import repository as profile_repo
     import uuid as _uuid
