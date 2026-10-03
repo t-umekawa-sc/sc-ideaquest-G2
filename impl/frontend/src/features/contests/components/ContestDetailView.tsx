@@ -7,11 +7,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { ActivitySpark, Avatar, Button, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
 import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
-import { listIdeas, type IdeaCard } from "@/features/ideas/api";
+import { followIdea, listIdeas, unfollowIdea, type IdeaCard } from "@/features/ideas/api";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 
@@ -244,6 +246,48 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     return ideas.filter((i) => !shelvedIds.has(i.id)).length;
   }, [ideas, hofIds, shelvedIds]);
 
+  // アイデア一覧ビュー（SC-12 と同一列の DataTable に渡す）。
+  const ideaViews = useMemo(() => tabIdeas.map(toIdeaView), [tabIdeas]);
+
+  async function toggleFollow(ideaId: string, following: boolean) {
+    // 楽観更新（ideas state を書き換え）→ API。失敗時は元に戻す。
+    setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, following: !following } : i)));
+    try {
+      await (following ? unfollowIdea(ideaId) : followIdea(ideaId));
+    } catch {
+      setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, following } : i)));
+      snack({ type: "error", title: "フォローの更新に失敗しました" });
+    }
+  }
+
+  const ideaMenu = (r: IdeaView): RowMenuItem[] => [
+    { label: "詳細を開く", onClick: () => router.push(`/ideas/${r.id}`) },
+    ...(r.draft ? [] : [{ label: "💬 チャットで議論", onClick: () => router.push(`/ideas/${r.id}/chat`) }]),
+  ];
+
+  // SC-12 クエスト詳細のアイデア列を踏襲（件名/提案価値/あなた/フォロー/賛成反対/💬/評価/操作）。
+  const ideaColumns: DataTableColumn<IdeaView>[] = [
+    { key: "title", label: "件名", locked: true, width: 320, sortable: true, filter: { type: "text" },
+      sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.value}`, csvVal: (r) => r.title,
+      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}><QuestIcon name={r.title} imageUrl={r.iconUrl ?? undefined} size="xs" /><span className="idea-title" title={r.title}>{r.title}</span>{r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}</span> },
+    { key: "value", label: "提案価値", width: 460, searchVal: (r) => r.value, csvVal: (r) => r.value,
+      render: (r) => <span className="idea-value-cell" title={r.value}>{r.value}</span> },
+    { key: "you", label: "あなた", width: 100, sortable: true, sortVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
+      render: (r) => <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span> },
+    { key: "follow", label: "フォロー", width: 96, sortable: true, sortVal: (r) => (r.following ? 1 : 0), csvVal: (r) => (r.following ? "フォロー中" : ""),
+      render: (r) => r.draft ? ideaDash : <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button> },
+    { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),
+      render: (r) => r.draft ? ideaDash : <><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></> },
+    { key: "comments", label: "💬", width: 96, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)),
+      render: (r) => r.draft ? ideaDash : <span className="idea-chat-cell">{r.comments}{r.unreadChat > 0 && <span className="badge badge-danger idea-unread" title={`未読 ${r.unreadChat} 件`}>+{r.unreadChat}</span>}</span> },
+    { key: "eval", label: "評価", width: 110, sortable: true, filter: { type: "enum", options: [["pending", "評価待ち"], ["done", "評価済"]] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate,
+      csvVal: (r) => (r.draft ? "" : r.evalstate === "done" ? (r.ev >= 0 ? `${r.ev}/5` : "評価済") : "評価待ち"),
+      render: (r) => r.draft ? ideaDash : (r.evalstate === "done"
+        ? (r.ev >= 0 ? <span className={`badge ${r.ev >= 4 ? "badge-success" : "badge-muted"}`}>{r.ev}/5</span> : <span className="badge badge-muted">評価済</span>)
+        : <span className="badge">評価待ち</span>) },
+    { key: "act", label: "操作", actions: true, width: 64, csvVal: () => "", render: (r) => <RowMenu items={ideaMenu(r)} /> },
+  ];
+
   async function join() {
     setBusy(true);
     try {
@@ -456,33 +500,50 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
 
       {view === "ideas" && (
         <>
-          <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み" style={{ marginTop: "var(--space-3)" }}>
-            {CONTEST_IDEA_TABS.map((t) => (
-              <label key={t.key}>
-                <input type="radio" name="contest-idea-tab" checked={tab === t.key} onChange={() => setTab(t.key)} />
-                {t.label} <span className="seg-n">{tabCount(t.key)}</span>
-              </label>
-            ))}
-          </div>
-          {tabIdeas.length === 0 ? (
-            <p className="hint">このタブに該当するアイデアはありません。</p>
-          ) : (
-            <ul className="contest-ideas">
-              {tabIdeas.map((i) => (
-                <li key={i.id} className="card contest-idea">
-                  <Link href={`/ideas/${i.id}`} className="contest-idea__title">{i.title}</Link>
-                  <p className="contest-idea__value">{i.value}</p>
-                  <div className="contest-idea__meta">
-                    <span>👤 {i.author.display_name}</span>
-                    <span>🗳️ {i.vote_summary.approve}</span>
-                    {i.is_selected && <span className="badge badge-success">入賞</span>}
-                    {hofIds.has(i.id) && <span className="badge badge-muted">🏆 殿堂入り</span>}
-                    {shelvedIds.has(i.id) && <span className="badge badge-muted">📦 お蔵入り</span>}
-                  </div>
-                </li>
+          <div className="ideas-tab-toolbar" style={{ marginTop: "var(--space-3)" }}>
+            <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み">
+              {CONTEST_IDEA_TABS.map((t) => (
+                <label key={t.key}>
+                  <input type="radio" name="contest-idea-tab" checked={tab === t.key} onChange={() => setTab(t.key)} />
+                  {t.label} <span className="seg-n">{tabCount(t.key)}</span>
+                </label>
               ))}
-            </ul>
-          )}
+            </div>
+            {questId && (
+              <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>
+                ＋ アイデアを追加
+              </button>
+            )}
+          </div>
+          <DataTable<IdeaView>
+            storageKey="sc54-contest-ideas"
+            data={ideaViews}
+            columns={ideaColumns}
+            rowId={(r) => r.id}
+            unit="件"
+            perPage={20}
+            searchFields="件名・提案価値"
+            exportName="コンテストのアイデア一覧"
+            emptyText="このタブに該当するアイデアはありません。"
+            onRowClick={(r) => router.push(`/ideas/${r.id}`)}
+            card={(r) => (
+              <>
+                <div className="between">
+                  <span className="row-center" style={{ gap: 6, minWidth: 0 }}>
+                    <QuestIcon name={r.title} imageUrl={r.iconUrl ?? undefined} size="sm" />
+                    <span className="card-title">{r.title}</span>
+                  </span>
+                  <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
+                </div>
+                {r.value && <p className="idea-value-cell" style={{ marginTop: 4 }}>{r.value}</p>}
+                <div className="contest-idea__meta">
+                  <span className="poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">{r.poster}</span></span>
+                  {!r.draft && <span><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></span>}
+                  {!r.draft && <span>💬 {r.comments}</span>}
+                </div>
+              </>
+            )}
+          />
         </>
       )}
 
@@ -685,6 +746,28 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     </section>
   );
 }
+
+// アイデア一覧ビュー（SC-12 クエスト詳細と同一列・コンテストにはクエスト色が無いので QuestIcon は既定色）。
+type IdeaView = {
+  id: string; title: string; value: string; poster: string; posterAvatar: string | null; iconUrl: string | null;
+  agree: number; disagree: number; comments: number; ev: number; evalstate: "pending" | "done";
+  mystate: "unvoted" | "voted" | "mine" | "draft"; following: boolean; revision: number;
+  draft: boolean; unreadChat: number;
+};
+function toIdeaView(c: IdeaCard): IdeaView {
+  const isDraft = c.status === "draft";
+  const myVote = (c.my_vote === "approve" || c.my_vote === "oppose") ? c.my_vote : null;
+  const name = c.author.display_name || "?";
+  return {
+    id: c.id, title: c.title, value: c.value, poster: name, posterAvatar: c.author.avatar_image_url ?? null,
+    iconUrl: c.icon_image_url ?? null, agree: c.vote_summary.approve, disagree: c.vote_summary.oppose,
+    comments: c.comment_count, ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
+    mystate: isDraft ? "draft" : myVote ? "voted" : "unvoted", following: c.following, revision: c.current_revision,
+    draft: isDraft, unreadChat: c.unread_chat_count ?? 0,
+  };
+}
+const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
+const ideaDash = <span className="muted">—</span>;
 
 const FT_TYPE_LABEL: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
 // スニペットは keyword のみ <mark>、他はテキストとして React 描画（dangerouslySetInnerHTML 不使用・SC-12 と同一）。
