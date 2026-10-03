@@ -14,6 +14,14 @@
 
 /* SC-54 詳細 */
 .contest-detail .backlink { display: inline-block; margin-bottom: var(--space-3); }
+
+/* 上位タブ（アイデア/全文検索/パーティ）＝SC-12 クエスト詳細 .tabs/.tab と同一・feature スコープのため複製。 */
+.contest-detail .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.contest-detail .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; transition: background .12s, color .12s; }
+.contest-detail .tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.contest-detail .tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
+.contest-detail .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+.contest-detail .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
 /* 概要＋アクティビティ（2段組）／新着の議論＋活発さ（2段組）＝クエスト詳細 .quest-top と同構成。 */
 .contest-top { display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--space-4); align-items: start; }
 .contest-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); }
