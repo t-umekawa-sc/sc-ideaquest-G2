@@ -20,7 +20,7 @@ import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav"
 
 import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
-import { IdeaParticipationPanel } from "@/features/contests/components/IdeaParticipationPanel";
+import { decideIdeaParticipation, getIdeaParticipation, requestIdeaParticipation, type IdeaParticipationContext } from "@/features/contests/api";
 import { RelatedInfoPanel } from "@/features/info-input";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
@@ -103,6 +103,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
+  // Tier2 議論参加（コンテスト配下アイデアのみ・SC-22 チャットカードの導線）。
+  const [partCtx, setPartCtx] = useState<IdeaParticipationContext | null>(null);
+  const [partBusy, setPartBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   // 投票/フォローは楽観更新のためローカル state で保持（load 時に DTO から同期）。
@@ -143,6 +146,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         });
         setFollowing(!!d.following);
         setSelected(!!d.is_selected);
+        // Tier2 議論参加の文脈（コンテスト配下のみ・チャットカードの導線）。
+        if (d.is_contest) void getIdeaParticipation(ideaId).then(setPartCtx).catch(() => setPartCtx(null));
+        else setPartCtx(null);
         // 評価結果の集計（F.1）＝非致命（取得失敗/権限なしは「評価待ち」表示）。
         setEvalAgg(await getEvaluationAggregate(ideaId).catch(() => null));
         // チャット（E）＝活発度集計＋直近3件プレビュー（非致命）。
@@ -162,6 +168,29 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   }, [ideaId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Tier2 参加の操作（リクエスト／投稿者の承認・却下）。成功で文脈を再取得。
+  const reloadPart = useCallback(() => {
+    void getIdeaParticipation(ideaId).then(setPartCtx).catch(() => {});
+  }, [ideaId]);
+  async function requestPart() {
+    setPartBusy(true);
+    try {
+      const r = await requestIdeaParticipation(ideaId);
+      if (!r) { snack({ type: "error", title: "リクエストできませんでした（コンテストへの参加が必要な場合があります）" }); return; }
+      snack({ type: "success", title: r.status === "approved" ? "参加しました" : "参加をリクエストしました（投稿者の承認待ち）" });
+      reloadPart();
+    } catch { snack({ type: "error", title: "リクエストに失敗しました" }); } finally { setPartBusy(false); }
+  }
+  async function decidePart(userId: string, status: "approved" | "rejected") {
+    setPartBusy(true);
+    try {
+      const r = await decideIdeaParticipation(ideaId, userId, status);
+      if (!r) { snack({ type: "error", title: "更新できませんでした" }); return; }
+      snack({ type: "success", title: status === "approved" ? "参加を承認しました" : "参加を却下しました" });
+      reloadPart();
+    } catch { snack({ type: "error", title: "更新に失敗しました" }); } finally { setPartBusy(false); }
+  }
 
   // 評価確定（別ルートの評価モーダル）後に評価結果/選定を再取得＝リロード不要で反映（F.1・クロスルート）。
   useEffect(() => {
@@ -460,10 +489,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       </section>
 
       {/* 関連情報ストリップ＝概要の直下・全幅（クエスト詳細 SC-12 と同じ strip 配置・FR-41 Phase1 slice②）。
-          コンテスト配下のアイデアでは非表示（FR-46・ユーザー方針）。 */}
+          コンテスト配下のアイデアでは非表示（FR-46・ユーザー方針）。Tier2 参加導線はチャットカードに集約。 */}
       {!idea.is_contest && <RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="strip" />}
-      {/* コンテスト配下＝Tier2 議論参加の導線（リクエスト→投稿者承認・案X・FR-46）。 */}
-      {idea.is_contest && <IdeaParticipationPanel ideaId={ideaId} />}
 
       {/* ============ メイン＋右レール ============ */}
       <div className="idea-layout">
@@ -555,9 +582,31 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             ) : (
               <p className="role-note">まだコメントはありません。</p>
             )}
-            <Link className="btn btn-primary" href={`/ideas/${ideaId}/chat`}>
-              チャットを開く →
-            </Link>
+            {/* コンテスト配下＝Tier2（議論参加）承認制。投稿者には参加リクエストの承認/却下を表示（案X・FR-46）。 */}
+            {idea.is_contest && partCtx?.is_author && (partCtx.requests ?? []).some((r) => r.status === "requested") && (
+              <div className="idea-part-requests" style={{ marginBottom: "var(--space-3)" }}>
+                <p className="role-note" style={{ marginBottom: "var(--space-2)" }}>💬 議論への参加リクエスト（承認するとチャットに参加できます）</p>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                  {(partCtx.requests ?? []).filter((r) => r.status === "requested").map((r) => (
+                    <li key={r.user_id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                      <Avatar name={r.display_name ?? "?"} size="sm" />
+                      <span style={{ fontWeight: 500 }}>{r.display_name ?? "（不明）"}</span>
+                      <span style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
+                        <button className="btn btn-primary btn-sm" type="button" onClick={() => void decidePart(r.user_id, "approved")} disabled={partBusy}>承認</button>
+                        <button className="btn btn-outline btn-sm" type="button" onClick={() => void decidePart(r.user_id, "rejected")} disabled={partBusy}>却下</button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* チャットを開く／議論に参加をリクエスト＝Tier2 承認状態で切替（コンテスト配下）。 */}
+            {(() => {
+              const canChat = !idea.is_contest || partCtx?.is_author || partCtx?.my_status === "approved";
+              if (canChat) return <Link className="btn btn-primary" href={`/ideas/${ideaId}/chat`}>チャットを開く →</Link>;
+              if (partCtx?.my_status === "requested") return <button className="btn btn-outline" type="button" disabled>⏳ 承認待ち</button>;
+              return <button className="btn btn-primary" type="button" onClick={() => void requestPart()} disabled={partBusy}>💬 議論に参加をリクエスト</button>;
+            })()}
           </section>
         </div>
 
