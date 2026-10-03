@@ -1603,8 +1603,9 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .table tr.is-suspended td { color: var(--color-text-muted); }
 /* 権限の補足注記（画面末尾） */
 .role-note { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-4); }
-/* 画面タイトル（業務層・ピクセル見出し）とセクション見出し（SC-91/92） */
-.page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+/* 画面タイトル（業務層）とセクション見出し（SC-91/92）。
+   ※業務画面の見出しは**ビジネス用フォント**（--font-base）。ピクセル体はゲーム要素専用（tokens.css・ユーザー方針 2026-10-03）。 */
+.page-title { font-family: var(--font-base); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: var(--space-2) 0 var(--space-3); flex-wrap: wrap; }
 .section-head h2 { font-size: var(--text-lg); margin: 0; }
 /* ページ見出し（タイトル＋右アクション・SC-10 等の一覧画面） */
