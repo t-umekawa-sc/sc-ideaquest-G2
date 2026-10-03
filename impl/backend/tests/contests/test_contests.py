@@ -157,6 +157,32 @@ def test_t_tc_106_delete_requires_capability_and_soft_deletes(client, factory):
         _cleanup_contest(cid)
 
 
+def test_t_tc_118_participants_list_admin_only(client, factory):
+    """T-TC-118: 参加者一覧（パーティタブ）は運営のみ・承認待ち先頭／一般は403・can_manage も分岐。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"参加_{uuid.uuid4().hex[:6]}")
+    try:
+        # 本人がリクエスト（requested）。
+        _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+        client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        # 一般は一覧403・can_manage=false。
+        assert client.get(f"{BASE}/{cid}/participants").status_code == 403
+        assert client.get(f"{BASE}/{cid}").json()["can_manage"] is False
+        # 管理者は一覧200（requested を含む）・can_manage=true。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        r = client.get(f"{BASE}/{cid}/participants")
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        assert any(p["status"] == "requested" for p in data)
+        assert client.get(f"{BASE}/{cid}").json()["can_manage"] is True
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
 def test_t_tc_116_auto_approve_opens_participation(client, factory):
     """T-TC-116: auto_approve=true のコンテストは社内でも参加リクエストが即 approved（オープン参加）。"""
     _admin(client, factory)

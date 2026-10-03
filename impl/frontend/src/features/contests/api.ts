@@ -54,3 +54,18 @@ export function finalizeContest(id: string): Promise<ContestFinalizeResult | nul
     method: "POST", headers: idempotencyHeader(),
   });
 }
+
+export type ContestParticipant = components["schemas"]["ContestParticipantDTO"];
+
+// Tier1 参加者一覧（パーティタブ・運営のみ）。
+export async function getContestParticipants(id: string, signal?: AbortSignal): Promise<ContestParticipant[]> {
+  const res = await apiFetch<{ data: ContestParticipant[] }>(`/contests/${id}/participants`, { signal });
+  return res?.data ?? [];
+}
+
+// Tier1 参加の承認/却下（管理者・T.2）。CSRF は apiFetch が付与。
+export function decideContestParticipation(id: string, userId: string, status: "approved" | "rejected"): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/contests/${id}/participation/${userId}`, {
+    method: "PATCH", body: JSON.stringify({ status }),
+  });
+}

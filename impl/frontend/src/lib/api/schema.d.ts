@@ -4172,6 +4172,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Contest Participants
+         * @description Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。
+         */
+        get: operations["list_contest_participants_api_v1_contests__contest_id__participants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contests/{contest_id}/participation": {
         parameters: {
             query?: never;
@@ -5997,6 +6017,11 @@ export interface components {
              * @default []
              */
             my_participating_idea_ids: string[];
+            /**
+             * Can Manage
+             * @default false
+             */
+            can_manage: boolean;
         };
         /**
          * ContestFinalizeResponse
@@ -6043,6 +6068,27 @@ export interface components {
         ContestListResponse: {
             /** Data */
             data: components["schemas"]["ContestListItem"][];
+        };
+        /**
+         * ContestParticipantDTO
+         * @description Tier1 参加者1件（パーティタブ・運営用）。
+         */
+        ContestParticipantDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Status */
+            status: string;
+            /** Requested At */
+            requested_at?: string | null;
+            /** Decided At */
+            decided_at?: string | null;
+        };
+        /** ContestParticipantsResponse */
+        ContestParticipantsResponse: {
+            /** Data */
+            data: components["schemas"]["ContestParticipantDTO"][];
         };
         /**
          * ContestRankingEntry
@@ -18572,6 +18618,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestFinalizeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_contest_participants_api_v1_contests__contest_id__participants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestParticipantsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -72,6 +72,16 @@ def upsert_contest_participation(session: Session, contest_id: uuid.UUID, user_i
     return row
 
 
+def list_contest_participants(session: Session, contest_id: uuid.UUID) -> list[ContestParticipant]:
+    """コンテストの Tier1 参加者一覧（パーティタブ・運営用）。requested を先頭、以後 requested_at 昇順。"""
+    rows = session.execute(
+        select(ContestParticipant).where(ContestParticipant.contest_id == contest_id)
+        .order_by(ContestParticipant.requested_at.asc())
+    ).scalars().all()
+    # 承認待ち（requested）を先に（運営がさばきやすい）。
+    return sorted(rows, key=lambda r: (r.status != "requested", r.requested_at))
+
+
 def is_contest_participant(session: Session, contest_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Tier1 承認済みか（投票ゲート・案X）。"""
     row = get_contest_participation(session, contest_id, user_id)

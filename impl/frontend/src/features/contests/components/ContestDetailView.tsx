@@ -12,15 +12,20 @@ import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
 import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
 import { listIdeas, type IdeaCard } from "@/features/ideas/api";
+import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
+import { parseSnippet } from "@/features/search/snippet";
 
 import {
+  decideContestParticipation,
   deleteContest,
   finalizeContest,
   getContest,
+  getContestParticipants,
   getContestRanking,
   requestContestParticipation,
   updateContest,
   type ContestDetail,
+  type ContestParticipant,
   type ContestRankingEntry,
 } from "../api";
 import {
@@ -48,6 +53,11 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
+  const [view, setView] = useState("ideas");       // 上位タブ: ideas | search | party
+  const [ftq, setFtq] = useState("");              // 全文検索クエリ
+  const [ftRows, setFtRows] = useState<SearchRow[]>([]);
+  const [ftLoading, setFtLoading] = useState(false);
+  const [participants, setParticipants] = useState<ContestParticipant[] | null>(null);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
 
@@ -84,6 +94,41 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       .sort((a, b) => (b.last_chat_at ?? "").localeCompare(a.last_chat_at ?? "")),
     [ideas, myIdeaSet],
   );
+
+  // 🔍 全文検索（backing quest の既存 J＝GET /quests/{id}/search を流用・デバウンス）。
+  useEffect(() => {
+    const term = ftq.trim();
+    if (view !== "search" || !term || !questId) { setFtRows([]); return; }
+    setFtLoading(true);
+    const timer = setTimeout(async () => {
+      const res = await searchQuest(questId, { q: term, perPage: 50 }).catch(() => null);
+      setFtRows(res?.data ?? []);
+      setFtLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ftq, view, questId]);
+
+  // 👥 パーティ（Tier1 参加者）＝運営がタブを開いたら取得（承認待ちを先頭）。
+  useEffect(() => {
+    if (view !== "party" || !contest?.can_manage) return;
+    const ac = new AbortController();
+    getContestParticipants(contestId, ac.signal).then(setParticipants).catch(() => setParticipants([]));
+    return () => ac.abort();
+  }, [view, contest?.can_manage, contestId, reload]);
+
+  async function decideParticipation(userId: string, status: "approved" | "rejected") {
+    setBusy(true);
+    try {
+      const r = await decideContestParticipation(contestId, userId, status);
+      if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
+      snack({ type: "success", title: status === "approved" ? "参加を承認しました" : "参加を却下しました" });
+      setReload((n) => n + 1);
+    } catch {
+      snack({ type: "error", title: "更新に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     const ac = new AbortController();
@@ -315,34 +360,107 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         })}
       </section>
 
-      <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み" style={{ marginTop: "var(--space-6)" }}>
-        {CONTEST_IDEA_TABS.map((t) => (
-          <label key={t.key}>
-            <input type="radio" name="contest-idea-tab" checked={tab === t.key} onChange={() => setTab(t.key)} />
-            {t.label} <span className="seg-n">{tabCount(t.key)}</span>
-          </label>
+      {/* 上位タブ（クエスト詳細と同じ .tabs）＝アイデア / 全文検索 / パーティ（運営のみ）。 */}
+      <div className="tabs" role="tablist" style={{ marginTop: "var(--space-6)" }}>
+        {([["ideas", "💡 アイデア"], ["search", "🔍 全文検索"],
+           ...(contest.can_manage ? [["party", "👥 パーティ"]] : [])] as [string, string][]).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={view === k} className={`tab${view === k ? " is-active" : ""}`}
+                  onClick={() => setView(k)}>
+            {label}{k === "party" && participants != null && <span className="tab-count">{participants.length}</span>}
+          </button>
         ))}
       </div>
 
-      {tabIdeas.length === 0 ? (
-        <p className="hint">このタブに該当するアイデアはありません。</p>
-      ) : (
-        <ul className="contest-ideas">
-          {tabIdeas.map((i) => (
-            <li key={i.id} className="card contest-idea">
-              <Link href={`/ideas/${i.id}`} className="contest-idea__title">{i.title}</Link>
-              <p className="contest-idea__value">{i.value}</p>
-              <div className="contest-idea__meta">
-                <span>👤 {i.author.display_name}</span>
-                <span>🗳️ {i.vote_summary.approve}</span>
-                {i.is_selected && <span className="badge badge-success">入賞</span>}
-                {hofIds.has(i.id) && <span className="badge badge-muted">🏆 殿堂入り</span>}
-                {shelvedIds.has(i.id) && <span className="badge badge-muted">📦 お蔵入り</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
+      {view === "ideas" && (
+        <>
+          <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み" style={{ marginTop: "var(--space-3)" }}>
+            {CONTEST_IDEA_TABS.map((t) => (
+              <label key={t.key}>
+                <input type="radio" name="contest-idea-tab" checked={tab === t.key} onChange={() => setTab(t.key)} />
+                {t.label} <span className="seg-n">{tabCount(t.key)}</span>
+              </label>
+            ))}
+          </div>
+          {tabIdeas.length === 0 ? (
+            <p className="hint">このタブに該当するアイデアはありません。</p>
+          ) : (
+            <ul className="contest-ideas">
+              {tabIdeas.map((i) => (
+                <li key={i.id} className="card contest-idea">
+                  <Link href={`/ideas/${i.id}`} className="contest-idea__title">{i.title}</Link>
+                  <p className="contest-idea__value">{i.value}</p>
+                  <div className="contest-idea__meta">
+                    <span>👤 {i.author.display_name}</span>
+                    <span>🗳️ {i.vote_summary.approve}</span>
+                    {i.is_selected && <span className="badge badge-success">入賞</span>}
+                    {hofIds.has(i.id) && <span className="badge badge-muted">🏆 殿堂入り</span>}
+                    {shelvedIds.has(i.id) && <span className="badge badge-muted">📦 お蔵入り</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {view === "search" && (
+        <section aria-label="全文検索" style={{ marginTop: "var(--space-3)" }}>
+          <input className="input" type="search" value={ftq} onChange={(e) => setFtq(e.target.value)}
+                 placeholder="キーワードで全文検索（このコンテストのアイデア・チャット・添付ファイル名）" aria-label="全文検索" />
+          {!ftq.trim() ? (
+            <p className="hint" style={{ marginTop: "var(--space-3)" }}>キーワードを入力してください。</p>
+          ) : ftLoading && ftRows.length === 0 ? (
+            <p className="hint" style={{ marginTop: "var(--space-3)" }}>検索中…</p>
+          ) : ftRows.length === 0 ? (
+            <p className="hint" style={{ marginTop: "var(--space-3)" }}>「{ftq}」に一致する結果がありません。</p>
+          ) : (
+            <ul className="contest-ideas" style={{ marginTop: "var(--space-3)" }}>
+              {ftRows.map((r, i) => (
+                <li key={`${r.type}-${r.chat_message_id ?? r.attachment_id ?? r.idea_id ?? i}`} className="card contest-idea">
+                  <Link className="contest-idea__title"
+                        href={r.idea_id ? (r.type === "idea" ? `/ideas/${r.idea_id}` : `/ideas/${r.idea_id}/chat`) : "#"}>
+                    <span className="badge badge-muted" style={{ marginRight: 8 }}>{FT_TYPE_LABEL[r.type] ?? r.type}</span>
+                    {r.idea_title}
+                  </Link>
+                  <p className="contest-idea__value">
+                    {parseSnippet(r.snippet_html).map((s, j) => s.hit ? <mark key={j}>{s.text}</mark> : <span key={j}>{s.text}</span>)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {view === "party" && contest.can_manage && (
+        <section aria-label="パーティ（参加者）" style={{ marginTop: "var(--space-3)" }}>
+          {participants == null ? (
+            <p className="hint">読み込み中…</p>
+          ) : participants.length === 0 ? (
+            <p className="hint">まだ参加者はいません。</p>
+          ) : (
+            <ul className="contest-ideas">
+              {participants.map((p) => (
+                <li key={p.user_id} className="card contest-idea">
+                  <div className="contest-idea__meta" style={{ marginTop: 0, justifyContent: "space-between" }}>
+                    <span>👤 {p.display_name ?? "（不明）"} <span className={`badge ${PART_BADGE[p.status] ?? "badge-muted"}`}>{PART_LABEL[p.status] ?? p.status}</span></span>
+                    {p.status === "requested" && (
+                      <span style={{ display: "flex", gap: "var(--space-2)" }}>
+                        <Button variant="primary" size="sm" onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>承認</Button>
+                        <button className="btn btn-outline btn-sm" type="button" onClick={() => void decideParticipation(p.user_id, "rejected")} disabled={busy}>却下</button>
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
     </section>
   );
 }
+
+const FT_TYPE_LABEL: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
+const PART_LABEL: Record<string, string> = { requested: "承認待ち", approved: "参加中", rejected: "却下", left: "退出" };
+const PART_BADGE: Record<string, string> = { requested: "badge-danger", approved: "badge-success", rejected: "badge-muted", left: "badge-muted" };

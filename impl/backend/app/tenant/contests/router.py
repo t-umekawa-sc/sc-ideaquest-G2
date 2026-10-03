@@ -16,6 +16,7 @@ from app.tenant.contests.schemas import (
     ContestCreateRequest,
     ContestDetail,
     ContestListResponse,
+    ContestParticipantsResponse,
     ContestUpdateRequest,
     ContestFinalizeResponse,
     ParticipationDecideRequest,
@@ -80,6 +81,12 @@ def finalize_contest(contest_id: str, request: Request, session: dict = Depends(
 
 
 # ---- 参加 2階層（T.2・§5.1） ----
+
+@router.get("/contests/{contest_id}/participants", response_model=ContestParticipantsResponse)
+def list_contest_participants(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    """Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。"""
+    return service.list_participants(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
 
 @router.post("/contests/{contest_id}/participation", response_model=ParticipationResponse,
              dependencies=[Depends(verify_origin), Depends(verify_csrf)])

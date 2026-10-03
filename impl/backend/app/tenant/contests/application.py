@@ -52,7 +52,7 @@ def _can_create_contest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
 
 
 def _detail(c, *, idea_count: int = 0, flags: list | None = None,
-            my_participating_idea_ids: list | None = None) -> dict:
+            my_participating_idea_ids: list | None = None, can_manage: bool = False) -> dict:
     return {
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
@@ -60,7 +60,7 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None,
         "auto_archive_days": c.auto_archive_days, "auto_approve": c.auto_approve,
         "prize_config": c.prize_config,
         "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
-        "my_participating_idea_ids": my_participating_idea_ids or [],
+        "my_participating_idea_ids": my_participating_idea_ids or [], "can_manage": can_manage,
     }
 
 
@@ -124,7 +124,31 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
         user = profile_repo.get_user_by_account(ts, account_id)
         mine = ([str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)] if user else [])
-        return _detail(c, flags=flags, my_participating_idea_ids=mine)
+        can_manage = bool(user and _can_create_contest(account_id, ts, user.id))
+        return _detail(c, flags=flags, my_participating_idea_ids=mine, can_manage=can_manage)
+
+
+def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
+    """Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。承認待ちを先頭に。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="参加者の管理は運営（contest_create/管理者）のみ可能です")
+        rows = repo.list_contest_participants(ts, c.id)
+        users = quests_repo.get_users_by_ids(ts, {r.user_id for r in rows})
+        data = [{"user_id": str(r.user_id),
+                 "display_name": (users.get(r.user_id).display_name if users.get(r.user_id) else None),
+                 "status": r.status, "requested_at": r.requested_at, "decided_at": r.decided_at}
+                for r in rows]
+        return {"data": data}
 
 
 def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *,

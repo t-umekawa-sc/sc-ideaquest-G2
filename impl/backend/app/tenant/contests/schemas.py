@@ -78,6 +78,20 @@ class ContestDetail(BaseModel):
     idea_count: int = 0
     flags: list[ContestIdeaFlagDTO] = []   # 殿堂入り/お蔵入り（SC-54 タブ導出・入賞は ideas.is_selected）
     my_participating_idea_ids: list[str] = []  # ログインユーザーが議論に参加（投稿者 or Tier2承認）するアイデア（新着の議論の限定用）
+    can_manage: bool = False               # 運営操作（状態遷移/削除/パーティタブ）可否＝管理者 or contest_create
+
+
+class ContestParticipantDTO(BaseModel):
+    """Tier1 参加者1件（パーティタブ・運営用）。"""
+    user_id: str
+    display_name: str | None = None
+    status: str                            # requested | approved | rejected | left
+    requested_at: datetime | None = None
+    decided_at: datetime | None = None
+
+
+class ContestParticipantsResponse(BaseModel):
+    data: list[ContestParticipantDTO]
 
 
 class ContestRankingEntry(BaseModel):
