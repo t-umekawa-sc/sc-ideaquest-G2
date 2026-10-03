@@ -941,7 +941,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <div className="list-toolbar">
             <div className="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
             {canEdit && (
-              <button className={`btn btn-outline btn-sm${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティ・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティ・権限を編集</button>
+              <button className={`btn btn-primary${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティ・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティ・権限を編集</button>
             )}
           </div>
 

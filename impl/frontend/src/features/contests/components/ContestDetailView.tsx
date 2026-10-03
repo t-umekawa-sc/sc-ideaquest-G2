@@ -611,7 +611,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <section aria-label="パーティ">
             <div className="list-toolbar">
               <div className="muted text-sm">コンテストの参加者（運営が承認/退出・審査員を管理）</div>
-              <Button variant="primary" size="sm" onClick={() => { setCandQ(""); setAddOpen(true); }}>＋ メンバーを追加</Button>
+              <Button variant="primary" onClick={() => { setCandQ(""); setAddOpen(true); }}>＋ メンバーを追加</Button>
             </div>
             {/* 主催者（所有者）＝クエスト詳細のパーティと同じく先頭に表示。 */}
             {contest.owner_display_name && (
