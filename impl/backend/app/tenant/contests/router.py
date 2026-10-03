@@ -22,6 +22,7 @@ from app.tenant.contests.schemas import (
     ContestFinalizeResponse,
     EvaluatorUpdateRequest,
     IdeaFlagUpdateRequest,
+    IdeaParticipationContextDTO,
     ParticipationDecideRequest,
     ParticipationResponse,
     ContestRankingResponse,
@@ -130,6 +131,13 @@ def decide_contest_participation(contest_id: str, uid: str, body: ParticipationD
                                  request: Request, session: dict = Depends(require_me)):
     return service.decide_contest_participation(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, uid, body.status)
+
+
+@router.get("/ideas/{idea_id}/participation", response_model=IdeaParticipationContextDTO)
+def get_idea_participation_context(idea_id: str, request: Request, session: dict = Depends(require_me)):
+    """Tier2 参加の文脈（SC-22/SC-24 導線）＝コンテスト配下か・自分が投稿者か・自分の状態・申請一覧。"""
+    return service.idea_participation_context(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id)
 
 
 @router.post("/ideas/{idea_id}/participation", response_model=ParticipationResponse,

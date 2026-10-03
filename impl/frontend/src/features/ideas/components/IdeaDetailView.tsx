@@ -20,6 +20,7 @@ import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav"
 
 import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
+import { IdeaParticipationPanel } from "@/features/contests/components/IdeaParticipationPanel";
 import { RelatedInfoPanel } from "@/features/info-input";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
@@ -461,6 +462,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       {/* 関連情報ストリップ＝概要の直下・全幅（クエスト詳細 SC-12 と同じ strip 配置・FR-41 Phase1 slice②）。
           コンテスト配下のアイデアでは非表示（FR-46・ユーザー方針）。 */}
       {!idea.is_contest && <RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="strip" />}
+      {/* コンテスト配下＝Tier2 議論参加の導線（リクエスト→投稿者承認・案X・FR-46）。 */}
+      {idea.is_contest && <IdeaParticipationPanel ideaId={ideaId} />}
 
       {/* ============ メイン＋右レール ============ */}
       <div className="idea-layout">

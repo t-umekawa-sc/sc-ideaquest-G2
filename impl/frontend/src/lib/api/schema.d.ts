@@ -4293,7 +4293,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Idea Participation Context
+         * @description Tier2 参加の文脈（SC-22/SC-24 導線）＝コンテスト配下か・自分が投稿者か・自分の状態・申請一覧。
+         */
+        get: operations["get_idea_participation_context_api_v1_ideas__idea_id__participation_get"];
         put?: never;
         /** Request Idea Participation */
         post: operations["request_idea_participation_api_v1_ideas__idea_id__participation_post"];
@@ -6888,6 +6892,32 @@ export interface components {
             /** Data */
             data: components["schemas"]["IdeaCardDTO"][];
             page_info: components["schemas"]["IdeaCursorPageInfo"];
+        };
+        /** IdeaParticipantBriefDTO */
+        IdeaParticipantBriefDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * IdeaParticipationContextDTO
+         * @description Tier2 参加の文脈（SC-22/SC-24 の参加導線用）。
+         */
+        IdeaParticipationContextDTO: {
+            /** Is Contest */
+            is_contest: boolean;
+            /** Is Author */
+            is_author: boolean;
+            /** My Status */
+            my_status: string;
+            /**
+             * Requests
+             * @default []
+             */
+            requests: components["schemas"]["IdeaParticipantBriefDTO"][];
         };
         /**
          * IdeaPublishRequest
@@ -18940,6 +18970,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_idea_participation_context_api_v1_ideas__idea_id__participation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaParticipationContextDTO"];
                 };
             };
             /** @description Validation Error */

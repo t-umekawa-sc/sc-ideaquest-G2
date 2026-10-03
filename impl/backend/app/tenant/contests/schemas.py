@@ -103,6 +103,20 @@ class EvaluatorUpdateRequest(BaseModel):
     granted: bool
 
 
+class IdeaParticipantBriefDTO(BaseModel):
+    user_id: str
+    display_name: str | None = None
+    status: str                            # requested | approved | rejected | left
+
+
+class IdeaParticipationContextDTO(BaseModel):
+    """Tier2 参加の文脈（SC-22/SC-24 の参加導線用）。"""
+    is_contest: bool
+    is_author: bool
+    my_status: str                         # author | none | requested | approved | rejected | left
+    requests: list[IdeaParticipantBriefDTO] = []  # 投稿者にのみ返す（承認管理用）
+
+
 class IdeaFlagUpdateRequest(BaseModel):
     """アイデアの入賞/殿堂入り/お蔵入りの手動設定（SC-54 アイデアタブ・運営）。"""
     model_config = ConfigDict(extra="forbid")

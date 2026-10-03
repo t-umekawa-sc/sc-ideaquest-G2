@@ -95,6 +95,15 @@ def get_idea_participation(session: Session, idea_id: uuid.UUID, user_id: uuid.U
     ).scalars().first()
 
 
+def list_idea_participations(session: Session, idea_id: uuid.UUID) -> list[IdeaParticipant]:
+    """アイデアの Tier2 参加者一覧（投稿者の承認管理用）。承認待ちを先頭に（requested → 他）。"""
+    rows = session.execute(
+        select(IdeaParticipant).where(IdeaParticipant.idea_id == idea_id)
+        .order_by(IdeaParticipant.requested_at.asc())
+    ).scalars().all()
+    return sorted(rows, key=lambda r: (r.status != "requested", r.requested_at))
+
+
 def upsert_idea_participation(session: Session, idea_id: uuid.UUID, user_id: uuid.UUID, *,
                               status: str, decided_by_id: uuid.UUID | None = None) -> IdeaParticipant:
     """Tier2 参加の作成/更新（冪等）。承認主体はアイデア投稿者（decided_by_id）。"""

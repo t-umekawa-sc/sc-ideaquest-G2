@@ -239,6 +239,37 @@ def test_t_tc_126_manual_idea_flags(client, factory):
         _purge_contest_idea(cid, iid)
 
 
+def test_t_tc_127_idea_participation_context(client, factory):
+    """T-TC-127: Tier2 参加文脈＝投稿者は is_author＋申請一覧・希望者はリクエスト→requested→投稿者承認で approved。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
+    iid = _seed_published_idea(qid, _user_id(author["id"]))
+    req = factory.make_seed_company_account(display_name=f"希望_{uuid.uuid4().hex[:6]}")
+    ruid = _user_id(req["id"])
+    PART = f"/api/v1/ideas/{iid}/participation"
+    try:
+        # 希望者：最初は none → リクエスト → requested。
+        _login(client, SEED_COMPANY_CODE, req["login_id"], req["password"])
+        assert client.get(PART).json()["my_status"] == "none"
+        assert client.post(PART, headers=_csrf(client)).status_code == 200
+        ctx = client.get(PART).json()
+        assert ctx["is_contest"] is True and ctx["my_status"] == "requested" and ctx["is_author"] is False
+        # 投稿者：is_author＋requests に希望者（requested）。承認で approved。
+        _login(client, SEED_COMPANY_CODE, author["login_id"], author["password"])
+        ac = client.get(PART).json()
+        assert ac["is_author"] is True and any(r["user_id"] == str(ruid) and r["status"] == "requested" for r in ac["requests"])
+        assert client.patch(f"{PART}/{ruid}", json={"status": "approved"}, headers=_csrf(client)).status_code == 200
+        _login(client, SEED_COMPANY_CODE, req["login_id"], req["password"])
+        assert client.get(PART).json()["my_status"] == "approved"
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM idea_participants WHERE idea_id=:i"), {"i": str(iid)})
+            ts.commit()
+        _purge_contest_idea(cid, iid)
+
+
 def test_t_tc_125_idea_detail_is_contest_flag(client, factory):
     """T-TC-125: コンテスト配下アイデアの詳細は is_contest=true（SC-22 で関連情報非表示）・通常は false。"""
     _admin(client, factory)

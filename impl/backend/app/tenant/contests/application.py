@@ -381,6 +381,33 @@ def decide_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, c
     return out
 
 
+def idea_participation_context(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str) -> dict:
+    """Tier2 参加の文脈（SC-22/SC-24 の導線用）＝コンテスト配下か・自分が投稿者か・自分の参加状態・（投稿者には）申請一覧。"""
+    from app.tenant.ideas import repository as ideas_repo
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = ideas_repo.get_idea(ts, uuid.UUID(idea_id))
+        if idea is None:
+            raise AppError(404, "not_found")
+        is_contest = repo.contest_by_quest(ts, idea.quest_id) is not None
+        is_author = idea.author_id == user.id
+        mine = repo.get_idea_participation(ts, idea.id, user.id)
+        my_status = "author" if is_author else (mine.status if mine else "none")
+        requests: list[dict] = []
+        if is_contest and is_author:
+            rows = repo.list_idea_participations(ts, idea.id)
+            users = quests_repo.get_users_by_ids(ts, {r.user_id for r in rows})
+            requests = [{"user_id": str(r.user_id),
+                         "display_name": (users.get(r.user_id).display_name if users.get(r.user_id) else None),
+                         "status": r.status} for r in rows]
+        return {"is_contest": is_contest, "is_author": is_author, "my_status": my_status, "requests": requests}
+
+
 def request_idea_participation(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str) -> dict:
     """Tier2 参加リクエスト（本人・チャット希望）。コンテスト配下アイデアのみ。"""
     from app.tenant.ideas import repository as ideas_repo

@@ -84,6 +84,23 @@ export function setContestIdeaFlag(contestId: string, ideaId: string, flag: "sel
   });
 }
 
+// ---- Tier2 参加（アイデア単位・SC-22/SC-24 の議論参加導線） ----
+export type IdeaParticipationContext = components["schemas"]["IdeaParticipationContextDTO"];
+
+export function getIdeaParticipation(ideaId: string, signal?: AbortSignal): Promise<IdeaParticipationContext | null> {
+  return apiFetch<IdeaParticipationContext>(`/ideas/${ideaId}/participation`, { signal });
+}
+
+// Tier2 参加リクエスト（本人・Tier1 承認済・コンテスト配下アイデアのみ）。
+export function requestIdeaParticipation(ideaId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/ideas/${ideaId}/participation`, { method: "POST", headers: idempotencyHeader() });
+}
+
+// Tier2 承認/却下（アイデア投稿者のみ）。
+export function decideIdeaParticipation(ideaId: string, userId: string, status: "approved" | "rejected"): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/ideas/${ideaId}/participation/${userId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
 export type ContestCandidate = components["schemas"]["ContestCandidateDTO"];
 export type ContestCandidates = components["schemas"]["ContestCandidatesResponse"];
 
