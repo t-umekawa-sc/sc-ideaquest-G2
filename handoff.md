@@ -6,8 +6,8 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `0b5cb828 feat(contest): Step2c 表彰確定・ランキング・恒久フラグ`（commit＋origin/main へ push 済）
-- working tree: clean（全コミット済・push 済）
+- 最新コミット: `488c61aa feat(contest): Step2b-3 SC-54 コンテスト詳細（frontend）`（commit＋origin/main へ push 済）
+- working tree: SC-54 は push 済でクリーン。**ただし `doc/セキュリティ検証/DAST_ZAP検証手順.md` に本セッション外の未コミット変更あり**（§5 役割分担節の加筆・私の作業ではない＝別セッション/編集者由来の可能性。意図確認のため未コミットで保持）。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB）。ゲーミフィケーション付き。
