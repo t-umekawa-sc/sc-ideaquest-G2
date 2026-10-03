@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `64c7be88 feat(contest): パーティに運営がメンバーを直接追加（会社ユーザーピッカー）`（commit＋origin/main へ push 済）
+- 最新コミット: `922a4122 fix(contest): パーティ操作のちらつき解消＋排除→退出＋追加ダイアログ維持＋候補もっと見る`（commit＋origin/main へ push 済）
 - working tree: clean（全コミット済・push 済）。※`doc/セキュリティ検証/DAST_ZAP検証手順.md` は別セッションで作業中（本セッション対象外・ユーザー確認済）。
 - alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`。
 - **SC-54 受入ポリッシュ第2弾（本セッション・全 push 済）**: 4パネル（概要/コンテスト内アクティビティ/新着の議論/活発さ・`355a278d`）＋新着の議論を本人参加アイデアに限定（my_participating_idea_ids・T-TC-117）／チェックボックス標準化（.checkbox）／「パーティー→パーティ」UI全面統一（`fd10fd5d`・35ファイル）／**上位タブ 💡アイデア・🔍全文検索・👥パーティ**（`5ea2ce51`・パーティは運営のみ=can_manage・`GET /contests/{id}/participants`・T-TC-118）。全backend 936 passed・traceability ✅（960件）。
