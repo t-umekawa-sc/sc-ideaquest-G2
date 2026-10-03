@@ -21,6 +21,7 @@ from app.tenant.contests.schemas import (
     ContestUpdateRequest,
     ContestFinalizeResponse,
     EvaluatorUpdateRequest,
+    IdeaFlagUpdateRequest,
     ParticipationDecideRequest,
     ParticipationResponse,
     ContestRankingResponse,
@@ -88,6 +89,15 @@ def finalize_contest(contest_id: str, request: Request, session: dict = Depends(
 def list_contest_participants(contest_id: str, request: Request, session: dict = Depends(require_me)):
     """Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。"""
     return service.list_participants(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
+@router.patch("/contests/{contest_id}/ideas/{idea_id}/flags", response_model=dict,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def set_contest_idea_flag(contest_id: str, idea_id: str, body: IdeaFlagUpdateRequest, request: Request,
+                          session: dict = Depends(require_me)):
+    """アイデアの入賞/殿堂入り/お蔵入りを運営が手動設定（SC-54 アイデアタブの動線・運営のみ）。"""
+    return service.set_idea_status(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, idea_id, body.flag, body.on)
 
 
 @router.get("/contests/{contest_id}/participant-candidates", response_model=ContestCandidatesResponse)

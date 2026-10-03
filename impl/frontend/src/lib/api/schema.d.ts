@@ -4192,6 +4192,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/ideas/{idea_id}/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Contest Idea Flag
+         * @description アイデアの入賞/殿堂入り/お蔵入りを運営が手動設定（SC-54 アイデアタブの動線・運営のみ）。
+         */
+        patch: operations["set_contest_idea_flag_api_v1_contests__contest_id__ideas__idea_id__flags_patch"];
+        trace?: never;
+    };
     "/api/v1/contests/{contest_id}/participant-candidates": {
         parameters: {
             query?: never;
@@ -6852,6 +6872,16 @@ export interface components {
              * @default 0
              */
             evaluator_count: number;
+        };
+        /**
+         * IdeaFlagUpdateRequest
+         * @description アイデアの入賞/殿堂入り/お蔵入りの手動設定（SC-54 アイデアタブ・運営）。
+         */
+        IdeaFlagUpdateRequest: {
+            /** Flag */
+            flag: string;
+            /** On */
+            on: boolean;
         };
         /** IdeaListResponse */
         IdeaListResponse: {
@@ -18733,6 +18763,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestParticipantsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_contest_idea_flag_api_v1_contests__contest_id__ideas__idea_id__flags_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeaFlagUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

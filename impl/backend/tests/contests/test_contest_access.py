@@ -211,6 +211,31 @@ def test_t_tc_117_detail_my_participating_idea_ids(client, factory):
         _purge_contest_idea(cid, iid)
 
 
+def test_t_tc_126_manual_idea_flags(client, factory):
+    """T-TC-126: 運営がアイデアを入賞/殿堂入り/お蔵入りへ手動振り分け・一般は403。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
+    iid = _seed_published_idea(qid, _user_id(author["id"]))
+    FLAGS = f"{BASE}/{cid}/ideas/{iid}/flags"
+    try:
+        # 殿堂入り 付与→詳細 flags に反映。
+        assert client.patch(FLAGS, json={"flag": "hall_of_fame", "on": True}, headers=_csrf(client)).status_code == 200
+        assert any(f["idea_id"] == str(iid) and f["flag"] == "hall_of_fame" for f in client.get(f"{BASE}/{cid}").json()["flags"])
+        # 殿堂入り 解除→消える。
+        client.patch(FLAGS, json={"flag": "hall_of_fame", "on": False}, headers=_csrf(client))
+        assert not any(f["flag"] == "hall_of_fame" for f in client.get(f"{BASE}/{cid}").json()["flags"])
+        # 入賞（selected）→ ideas.is_selected。
+        assert client.patch(FLAGS, json={"flag": "selected", "on": True}, headers=_csrf(client)).status_code == 200
+        assert client.get(f"/api/v1/ideas/{iid}").json()["is_selected"] is True
+        # 一般は403。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.patch(FLAGS, json={"flag": "shelved", "on": True}, headers=_csrf(client)).status_code == 403
+    finally:
+        _purge_contest_idea(cid, iid)
+
+
 def test_t_tc_125_idea_detail_is_contest_flag(client, factory):
     """T-TC-125: コンテスト配下アイデアの詳細は is_contest=true（SC-22 で関連情報非表示）・通常は false。"""
     _admin(client, factory)

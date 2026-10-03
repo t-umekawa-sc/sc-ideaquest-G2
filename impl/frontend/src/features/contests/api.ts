@@ -77,6 +77,13 @@ export function setContestEvaluator(id: string, userId: string, granted: boolean
   });
 }
 
+// アイデアの入賞/殿堂入り/お蔵入りを運営が手動設定（SC-54 アイデアタブの動線・運営のみ）。
+export function setContestIdeaFlag(contestId: string, ideaId: string, flag: "selected" | "hall_of_fame" | "shelved", on: boolean): Promise<{ flag: string; on: boolean } | null> {
+  return apiFetch<{ flag: string; on: boolean }>(`/contests/${contestId}/ideas/${ideaId}/flags`, {
+    method: "PATCH", body: JSON.stringify({ flag, on }),
+  });
+}
+
 export type ContestCandidate = components["schemas"]["ContestCandidateDTO"];
 export type ContestCandidates = components["schemas"]["ContestCandidatesResponse"];
 

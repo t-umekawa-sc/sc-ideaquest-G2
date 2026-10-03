@@ -200,6 +200,14 @@ def set_idea_flag(session: Session, *, contest_id: uuid.UUID, idea_id: uuid.UUID
     return row
 
 
+def remove_idea_flag(session: Session, idea_id: uuid.UUID, flag: str) -> int:
+    """殿堂入り/お蔵入りを解除（運営の手動操作・冪等）。削除件数を返す。"""
+    from sqlalchemy import delete as _delete
+    res = session.execute(_delete(ContestIdeaFlag).where(ContestIdeaFlag.idea_id == idea_id,
+                                                         ContestIdeaFlag.flag == flag))
+    return res.rowcount or 0
+
+
 def list_flags_for_contest(session: Session, contest_id: uuid.UUID) -> list[ContestIdeaFlag]:
     return list(session.execute(
         select(ContestIdeaFlag).where(ContestIdeaFlag.contest_id == contest_id)

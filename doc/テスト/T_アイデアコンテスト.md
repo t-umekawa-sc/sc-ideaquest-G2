@@ -32,6 +32,7 @@
 | T-TC-119 | api | パーティタブ運営操作＝審査員付与/剥奪・参加者 is_evaluator・詳細に主催者・排除(論理) | 参加者（approved）あり | `PATCH /contests/{id}/participants/{uid}/evaluator`／`GET /participants`／`GET /contests/{id}`／`PATCH .../participation/{uid}` rejected | granted=true で is_evaluator=true・false で解除／詳細に owner_display_name／排除は status=rejected（運営のみ） | T.2／§5.3／T.0 |
 | T-TC-124 | api | パーティ直接追加＝会社ユーザー候補（既参加/主催者除外・運営のみ）＋PATCH approved で即参加 | 会社に複数ユーザー | `GET /contests/{id}/participant-candidates?q=`／`PATCH .../participation/{uid}` approved | 候補に会社ユーザーを含み主催者/既参加は除外・一般は403／承認で候補から消え参加中に入る | T.2／T.0／FR-38候補基盤 |
 | T-TC-125 | api | コンテスト配下アイデアの詳細は `is_contest=true`（SC-22 で関連情報を非表示）・通常クエストは false | コンテスト配下アイデア／通常クエストのアイデア | `GET /ideas/{id}` | コンテスト配下=is_contest true／通常=false | §2.3／FR-46 |
+| T-TC-126 | api | 運営がアイデアを入賞/殿堂入り/お蔵入りへ手動振り分け（SC-54 動線）・一般は403 | コンテスト配下アイデア | `PATCH /contests/{id}/ideas/{iid}/flags`（flag=selected/hall_of_fame/shelved・on） | selected→is_selected・hall_of_fame/shelved→contest_idea_flags 付与/解除（詳細 flags に反映）・一般は403・他コンテストのアイデアは404 | T.1／§4.2／§5.64 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

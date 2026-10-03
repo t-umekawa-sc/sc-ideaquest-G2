@@ -205,6 +205,40 @@ def participant_candidates(account_id: uuid.UUID, company_id: uuid.UUID, contest
                 "next_cursor": next_cursor, "has_next": has_next}
 
 
+def set_idea_status(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
+                    idea_id: str, flag: str, on: bool) -> dict:
+    """アイデアの入賞/殿堂入り/お蔵入りを運営が手動で設定（SC-54 アイデアタブの動線・運営のみ）。
+
+    flag＝`selected`（ideas.is_selected）／`hall_of_fame`・`shelved`（contest_idea_flags）。
+    """
+    from app.tenant.ideas import repository as ideas_repo
+    if flag not in ("selected", "hall_of_fame", "shelved"):
+        raise AppError(422, "validation_error", detail="flag が不正です", errors=[{"field": "flag"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, actor.id):
+            raise AppError(403, "forbidden", detail="入賞/殿堂入り/お蔵入りの設定は運営（contest_create/管理者）のみ可能です")
+        idea = ideas_repo.get_idea(ts, uuid.UUID(idea_id))
+        if idea is None or idea.quest_id != c.quest_id:
+            raise AppError(404, "not_found")  # このコンテストのアイデアではない
+        if flag == "selected":
+            idea.is_selected = on
+        elif on:
+            repo.set_idea_flag(ts, contest_id=c.id, idea_id=idea.id, flag=flag, granted_by_id=actor.id)
+        else:
+            repo.remove_idea_flag(ts, idea.id, flag)
+        ts.commit()
+    return {"flag": flag, "on": on}
+
+
 def set_participant_evaluator(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
                              target_user_id: str, granted: bool) -> dict:
     """参加者に審査員（contest_evaluator・②会社レベル能力）を付与/剥奪（パーティタブ・運営のみ）。

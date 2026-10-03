@@ -103,6 +103,13 @@ class EvaluatorUpdateRequest(BaseModel):
     granted: bool
 
 
+class IdeaFlagUpdateRequest(BaseModel):
+    """アイデアの入賞/殿堂入り/お蔵入りの手動設定（SC-54 アイデアタブ・運営）。"""
+    model_config = ConfigDict(extra="forbid")
+    flag: str                              # selected | hall_of_fame | shelved
+    on: bool
+
+
 class ContestCandidateDTO(BaseModel):
     """パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者は除外）。"""
     user_id: str

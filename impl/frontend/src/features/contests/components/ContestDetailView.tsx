@@ -27,6 +27,7 @@ import {
   getParticipantCandidates,
   requestContestParticipation,
   setContestEvaluator,
+  setContestIdeaFlag,
   updateContest,
   type ContestCandidate,
   type ContestDetail,
@@ -260,9 +261,37 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
+  async function setIdeaFlag(ideaId: string, flag: "selected" | "hall_of_fame" | "shelved", on: boolean) {
+    setBusy(true);
+    try {
+      const r = await setContestIdeaFlag(contestId, ideaId, flag, on);
+      if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
+      // 楽観更新＝全体リロードを避けてタブ/カウントに即反映。
+      if (flag === "selected") {
+        setIdeas((cur) => cur.map((i) => (i.id === ideaId ? { ...i, is_selected: on } : i)));
+      } else {
+        setContest((c) => c ? { ...c, flags: on
+          ? [...(c.flags ?? []), { idea_id: ideaId, flag }]
+          : (c.flags ?? []).filter((f) => !(f.idea_id === ideaId && f.flag === flag)) } : c);
+      }
+      const label = flag === "selected" ? "入賞" : flag === "hall_of_fame" ? "殿堂入り" : "お蔵入り";
+      snack({ type: "success", title: on ? `${label}に設定しました` : `${label}を解除しました` });
+    } catch {
+      snack({ type: "error", title: "更新に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const ideaMenu = (r: IdeaView): RowMenuItem[] => [
     { label: "詳細を開く", onClick: () => router.push(`/ideas/${r.id}`) },
     ...(r.draft ? [] : [{ label: "💬 チャットで議論", onClick: () => router.push(`/ideas/${r.id}/chat`) }]),
+    // 運営の動線＝入賞/殿堂入り/お蔵入りへの振り分け（SC-54・contest.can_manage のみ）。
+    ...(contest?.can_manage && !r.draft ? [
+      { label: r.selected ? "🏅 入賞を解除" : "🏅 入賞にする", onClick: () => void setIdeaFlag(r.id, "selected", !r.selected) },
+      { label: hofIds.has(r.id) ? "🏆 殿堂入りを解除" : "🏆 殿堂入りにする", onClick: () => void setIdeaFlag(r.id, "hall_of_fame", !hofIds.has(r.id)) },
+      { label: shelvedIds.has(r.id) ? "📦 お蔵入りを解除" : "📦 お蔵入りにする", onClick: () => void setIdeaFlag(r.id, "shelved", !shelvedIds.has(r.id)) },
+    ] : []),
   ];
 
   // SC-12 クエスト詳細のアイデア列を踏襲（件名/提案価値/あなた/フォロー/賛成反対/💬/評価/操作）。
@@ -752,7 +781,7 @@ type IdeaView = {
   id: string; title: string; value: string; poster: string; posterAvatar: string | null; iconUrl: string | null;
   agree: number; disagree: number; comments: number; ev: number; evalstate: "pending" | "done";
   mystate: "unvoted" | "voted" | "mine" | "draft"; following: boolean; revision: number;
-  draft: boolean; unreadChat: number;
+  draft: boolean; unreadChat: number; selected: boolean;
 };
 function toIdeaView(c: IdeaCard): IdeaView {
   const isDraft = c.status === "draft";
@@ -763,7 +792,7 @@ function toIdeaView(c: IdeaCard): IdeaView {
     iconUrl: c.icon_image_url ?? null, agree: c.vote_summary.approve, disagree: c.vote_summary.oppose,
     comments: c.comment_count, ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
     mystate: isDraft ? "draft" : myVote ? "voted" : "unvoted", following: c.following, revision: c.current_revision,
-    draft: isDraft, unreadChat: c.unread_chat_count ?? 0,
+    draft: isDraft, unreadChat: c.unread_chat_count ?? 0, selected: c.is_selected,
   };
 }
 const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
