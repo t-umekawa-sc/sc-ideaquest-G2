@@ -4192,6 +4192,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/participant-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contest Participant Candidates
+         * @description パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ）。
+         */
+        get: operations["contest_participant_candidates_api_v1_contests__contest_id__participant_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contests/{contest_id}/participants/{uid}/evaluator": {
         parameters: {
             query?: never;
@@ -5955,6 +5975,21 @@ export interface components {
              * @default 0
              */
             oppose: number;
+        };
+        /**
+         * ContestCandidateDTO
+         * @description パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者は除外）。
+         */
+        ContestCandidateDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+        };
+        /** ContestCandidatesResponse */
+        ContestCandidatesResponse: {
+            /** Data */
+            data: components["schemas"]["ContestCandidateDTO"][];
         };
         /** ContestCreateRequest */
         ContestCreateRequest: {
@@ -18686,6 +18721,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestParticipantsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contest_participant_candidates_api_v1_contests__contest_id__participant_candidates_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestCandidatesResponse"];
                 };
             };
             /** @description Validation Error */

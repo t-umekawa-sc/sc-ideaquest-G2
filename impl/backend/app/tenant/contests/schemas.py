@@ -103,6 +103,16 @@ class EvaluatorUpdateRequest(BaseModel):
     granted: bool
 
 
+class ContestCandidateDTO(BaseModel):
+    """パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者は除外）。"""
+    user_id: str
+    display_name: str
+
+
+class ContestCandidatesResponse(BaseModel):
+    data: list[ContestCandidateDTO]
+
+
 class ContestRankingEntry(BaseModel):
     """ランキング1件。軸により idea_id（成果軸）or user_id（貢献軸）のいずれかが主体。"""
     rank: int

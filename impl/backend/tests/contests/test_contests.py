@@ -219,6 +219,37 @@ def test_t_tc_119_party_manage_evaluator_owner_remove(client, factory):
         _cleanup_contest(cid)
 
 
+def test_t_tc_124_participant_candidates_and_add(client, factory):
+    """T-TC-124: パーティ直接追加＝会社ユーザー候補（主催者/既参加除外・運営のみ）＋PATCH approved で参加。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    name = f"候補_{uuid.uuid4().hex[:6]}"
+    cand = factory.make_seed_company_account(display_name=name)
+    cuid = _user_id(cand["id"])
+    try:
+        CAND = f"{BASE}/{cid}/participant-candidates"
+        qp = {"q": name}
+        # 候補（氏名検索）に対象ユーザーを含む・主催者（admin）は含まない。
+        data = client.get(CAND, params=qp).json()["data"]
+        ids = {u["user_id"] for u in data}
+        assert str(cuid) in ids and str(_user_id(admin["id"])) not in ids
+        # 一般は候補取得403。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.get(CAND, params=qp).status_code == 403
+        # 運営が追加（PATCH approved）＝候補から消え、参加者一覧に入る。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.patch(f"{BASE}/{cid}/participation/{cuid}", json={"status": "approved"},
+                            headers=_csrf(client)).status_code == 200
+        assert str(cuid) not in {u["user_id"] for u in client.get(CAND, params=qp).json()["data"]}
+        plist = client.get(f"{BASE}/{cid}/participants").json()["data"]
+        assert any(p["user_id"] == str(cuid) and p["status"] == "approved" for p in plist)
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
 def test_t_tc_116_auto_approve_opens_participation(client, factory):
     """T-TC-116: auto_approve=true のコンテストは社内でも参加リクエストが即 approved（オープン参加）。"""
     _admin(client, factory)

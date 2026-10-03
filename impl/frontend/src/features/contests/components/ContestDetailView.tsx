@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { ActivitySpark, Avatar, Button, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Button, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
 import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
@@ -22,9 +22,11 @@ import {
   getContest,
   getContestParticipants,
   getContestRanking,
+  getParticipantCandidates,
   requestContestParticipation,
   setContestEvaluator,
   updateContest,
+  type ContestCandidate,
   type ContestDetail,
   type ContestParticipant,
   type ContestRankingEntry,
@@ -63,6 +65,9 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [ftLoading, setFtLoading] = useState(false);
   const ftPerPage = 20;
   const [participants, setParticipants] = useState<ContestParticipant[] | null>(null);
+  const [addOpen, setAddOpen] = useState(false);          // パーティ追加ピッカー
+  const [candQ, setCandQ] = useState("");
+  const [candidates, setCandidates] = useState<ContestCandidate[]>([]);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
 
@@ -159,6 +164,32 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       setReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "更新に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // パーティ追加ピッカー＝会社ユーザー候補をデバウンス取得（運営のみ）。
+  useEffect(() => {
+    if (!addOpen) return;
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      getParticipantCandidates(contestId, candQ.trim() || undefined, ac.signal)
+        .then(setCandidates).catch(() => setCandidates([]));
+    }, 250);
+    return () => { clearTimeout(timer); ac.abort(); };
+  }, [addOpen, candQ, contestId, reload]);
+
+  async function addMember(userId: string) {
+    setBusy(true);
+    try {
+      const r = await decideContestParticipation(contestId, userId, "approved");
+      if (!r) { snack({ type: "error", title: "追加できませんでした（権限が必要です）" }); return; }
+      snack({ type: "success", title: "参加者に追加しました" });
+      setCandidates((cs) => cs.filter((c) => c.user_id !== userId));
+      setReload((n) => n + 1);
+    } catch {
+      snack({ type: "error", title: "追加に失敗しました" });
     } finally {
       setBusy(false);
     }
@@ -500,6 +531,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <section aria-label="パーティ">
             <div className="list-toolbar">
               <div className="muted text-sm">コンテストの参加者（運営が承認/排除・審査員を管理）</div>
+              <Button variant="primary" size="sm" onClick={() => { setCandQ(""); setAddOpen(true); }}>＋ メンバーを追加</Button>
             </div>
             {/* 主催者（所有者）＝クエスト詳細のパーティと同じく先頭に表示。 */}
             {contest.owner_display_name && (
@@ -575,6 +607,34 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           </section>
         );
       })()}
+
+      {addOpen && (
+        <Modal open={addOpen} title="メンバーを追加" size="md" onClose={() => setAddOpen(false)}>
+          <div className="modal__body">
+            <input className="input" type="search" value={candQ} onChange={(e) => setCandQ(e.target.value)}
+                   placeholder="氏名で検索" aria-label="ユーザー検索" autoFocus />
+            {candidates.length === 0 ? (
+              <p className="hint" style={{ marginTop: "var(--space-3)" }}>
+                {candQ.trim() ? "該当するユーザーがいません。" : "追加できる会社ユーザーがいません（全員が参加済みの可能性）。"}
+              </p>
+            ) : (
+              <ul className="member-list" style={{ marginTop: "var(--space-2)" }}>
+                {candidates.map((cand) => (
+                  <li key={cand.user_id} className="member-row">
+                    <Avatar name={cand.display_name} />
+                    <span className="member-name">{cand.display_name}</span>
+                    <button className="btn btn-primary btn-sm" type="button" style={{ marginLeft: "auto" }}
+                            onClick={() => void addMember(cand.user_id)} disabled={busy}>追加</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="modal__footer">
+            <button className="btn btn-outline" type="button" onClick={() => setAddOpen(false)}>閉じる</button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }

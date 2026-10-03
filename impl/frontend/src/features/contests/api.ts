@@ -76,3 +76,12 @@ export function setContestEvaluator(id: string, userId: string, granted: boolean
     method: "PATCH", body: JSON.stringify({ granted }),
   });
 }
+
+export type ContestCandidate = components["schemas"]["ContestCandidateDTO"];
+
+// パーティ追加の候補ユーザー（会社の有効ユーザー・既参加/主催者除外・運営のみ）。
+export async function getParticipantCandidates(id: string, q?: string, signal?: AbortSignal): Promise<ContestCandidate[]> {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  const res = await apiFetch<{ data: ContestCandidate[] }>(`/contests/${id}/participant-candidates${qs}`, { signal });
+  return res?.data ?? [];
+}

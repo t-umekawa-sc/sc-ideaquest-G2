@@ -158,6 +158,33 @@ def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: 
         return {"data": data}
 
 
+def participant_candidates(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
+                           q: str | None = None) -> dict:
+    """パーティ追加の候補＝会社の有効ユーザー（既参加〔approved/requested〕・主催者は除外）。運営のみ。
+
+    会社全体スコープ＝`list_cross_group_candidates(group_ids=[])`（部署絞りなし）を流用（FR-38 候補基盤）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, actor.id):
+            raise AppError(403, "forbidden", detail="参加者の追加は運営（contest_create/管理者）のみ可能です")
+        # 既参加（approved/requested）＋主催者は候補から除外。
+        exclude = {c.created_by_id}
+        for p in repo.list_contest_participants(ts, c.id):
+            if p.status in ("approved", "requested"):
+                exclude.add(p.user_id)
+        rows = quests_repo.list_cross_group_candidates(ts, [], q=q, exclude_user_ids=list(exclude), limit=20)
+        return {"data": [{"user_id": str(u.id), "display_name": u.display_name} for u in rows]}
+
+
 def set_participant_evaluator(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
                              target_user_id: str, granted: bool) -> dict:
     """参加者に審査員（contest_evaluator・②会社レベル能力）を付与/剥奪（パーティタブ・運営のみ）。
