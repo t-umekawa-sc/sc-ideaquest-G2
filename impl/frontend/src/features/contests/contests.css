@@ -71,6 +71,7 @@
 .join-req-block .card { overflow: hidden; }
 .join-req-title { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-2); }
 .join-req-block .join-req-row { background: #FFFBEB; }
+.member-row.contest-member--excluded { opacity: .6; }
 
 .contest-ideas { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .contest-idea { padding: var(--space-3); }

@@ -527,6 +527,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         const list = participants ?? [];
         const pending = list.filter((p) => p.status === "requested");
         const members = list.filter((p) => p.status === "approved");
+        const excluded = list.filter((p) => p.status === "rejected" || p.status === "left");
         return (
           <section aria-label="パーティ">
             <div className="list-toolbar">
@@ -602,6 +603,27 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                     )}
                   </div>
                 </div>
+                {/* 排除済み（rejected/left）＝履歴として表示。再承認で参加に戻せる。 */}
+                {excluded.length > 0 && (
+                  <div className="join-req-block">
+                    <h3 className="join-req-title">🚫 排除済み<span className="tab-count">{excluded.length}</span></h3>
+                    <div className="card" style={{ padding: 0 }}>
+                      <ul className="member-list">
+                        {excluded.map((p) => (
+                          <li key={p.user_id} className="member-row contest-member--excluded">
+                            <Avatar name={p.display_name ?? "?"} />
+                            <span className="member-name">{p.display_name ?? "（不明）"}</span>
+                            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                              <span className="badge badge-muted">{p.status === "left" ? "退出" : "排除済み"}</span>
+                              <button className="btn btn-outline btn-sm" type="button"
+                                      onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>再承認</button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </section>
