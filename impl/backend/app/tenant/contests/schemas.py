@@ -79,6 +79,8 @@ class ContestDetail(BaseModel):
     flags: list[ContestIdeaFlagDTO] = []   # 殿堂入り/お蔵入り（SC-54 タブ導出・入賞は ideas.is_selected）
     my_participating_idea_ids: list[str] = []  # ログインユーザーが議論に参加（投稿者 or Tier2承認）するアイデア（新着の議論の限定用）
     can_manage: bool = False               # 運営操作（状態遷移/削除/パーティタブ）可否＝管理者 or contest_create
+    owner_user_id: str | None = None       # 主催者（created_by・パーティタブで所有者表示）
+    owner_display_name: str | None = None
 
 
 class ContestParticipantDTO(BaseModel):
@@ -86,12 +88,19 @@ class ContestParticipantDTO(BaseModel):
     user_id: str
     display_name: str | None = None
     status: str                            # requested | approved | rejected | left
+    is_evaluator: bool = False             # ②会社レベル能力 contest_evaluator 保持（審査員）
     requested_at: datetime | None = None
     decided_at: datetime | None = None
 
 
 class ContestParticipantsResponse(BaseModel):
     data: list[ContestParticipantDTO]
+
+
+class EvaluatorUpdateRequest(BaseModel):
+    """審査員（contest_evaluator）付与/剥奪（パーティタブ・運営）。"""
+    model_config = ConfigDict(extra="forbid")
+    granted: bool
 
 
 class ContestRankingEntry(BaseModel):

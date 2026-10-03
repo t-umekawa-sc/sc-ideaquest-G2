@@ -29,6 +29,7 @@
 | T-TC-116 | api | 参加承認はコンテスト単位で選べる＝`auto_approve=true` なら社内でも即 approved（オープン参加） | 社内会社・`auto_approve=true` の contest | `POST /contests/{id}/participation`（本人） | 即 `approved`（承認待ちにならず投稿/投票可）／既定（false）は従来どおり `requested` | T.2／FR-46 |
 | T-TC-117 | api | 詳細の `my_participating_idea_ids`＝自分が投稿者 or Tier2承認のアイデア（SC-54「新着の議論」の限定根拠） | コンテスト＋アイデア・Tier2 承認済み/未参加ユーザー | `GET /contests/{id}` | Tier2 承認者の応答に当該 idea_id を含む・未参加者は含まない | T.1／§5.1 |
 | T-TC-118 | api | 参加者一覧（パーティタブ）＝運営のみ・承認待ちを先頭／一般は403 | Tier1 リクエスト済み | `GET /contests/{id}/participants` | 管理者=200・requested を先頭に一覧／一般（権限なし）は403・`can_manage` も false | T.2／T.0 |
+| T-TC-119 | api | パーティタブ運営操作＝審査員付与/剥奪・参加者 is_evaluator・詳細に主催者・排除(論理) | 参加者（approved）あり | `PATCH /contests/{id}/participants/{uid}/evaluator`／`GET /participants`／`GET /contests/{id}`／`PATCH .../participation/{uid}` rejected | granted=true で is_evaluator=true・false で解除／詳細に owner_display_name／排除は status=rejected（運営のみ） | T.2／§5.3／T.0 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

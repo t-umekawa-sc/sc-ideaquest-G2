@@ -23,6 +23,7 @@ import {
   getContestParticipants,
   getContestRanking,
   requestContestParticipation,
+  setContestEvaluator,
   updateContest,
   type ContestDetail,
   type ContestParticipant,
@@ -131,6 +132,30 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       const r = await decideContestParticipation(contestId, userId, status);
       if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
       snack({ type: "success", title: status === "approved" ? "参加を承認しました" : "参加を却下しました" });
+      setReload((n) => n + 1);
+    } catch {
+      snack({ type: "error", title: "更新に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeMember(userId: string, name: string) {
+    const ok = await confirm({
+      variant: "danger",
+      title: "参加者を排除",
+      msg: `「${name}」をこのコンテストから排除しますか？ 投稿・投票・チャットができなくなります（再参加には再申請が必要）。投稿済みのアイデア等は監査のため残ります。`,
+    });
+    if (!ok) return;
+    await decideParticipation(userId, "rejected");
+  }
+
+  async function toggleEvaluator(userId: string, granted: boolean) {
+    setBusy(true);
+    try {
+      const r = await setContestEvaluator(contestId, userId, granted);
+      if (!r) { snack({ type: "error", title: "更新できませんでした（権限が必要です）" }); return; }
+      snack({ type: "success", title: granted ? "審査員に設定しました" : "審査員を解除しました" });
       setReload((n) => n + 1);
     } catch {
       snack({ type: "error", title: "更新に失敗しました" });
@@ -474,8 +499,23 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         return (
           <section aria-label="パーティ">
             <div className="list-toolbar">
-              <div className="muted text-sm">コンテストの参加者（運営が承認/却下を管理）</div>
+              <div className="muted text-sm">コンテストの参加者（運営が承認/排除・審査員を管理）</div>
             </div>
+            {/* 主催者（所有者）＝クエスト詳細のパーティと同じく先頭に表示。 */}
+            {contest.owner_display_name && (
+              <div className="join-req-block">
+                <h3 className="join-req-title">👑 主催者</h3>
+                <div className="card" style={{ padding: 0 }}>
+                  <ul className="member-list">
+                    <li className="member-row">
+                      <Avatar name={contest.owner_display_name} />
+                      <span className="member-name">{contest.owner_display_name}</span>
+                      <span className="badge badge-muted" style={{ marginLeft: "auto" }}>主催者</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
             {participants == null ? (
               <p className="admin-muted">読み込み中…</p>
             ) : (
@@ -500,7 +540,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                     </div>
                   </div>
                 )}
-                {/* 参加中メンバー一覧。 */}
+                {/* 参加中メンバー一覧＝審査員トグル＋排除（論理削除）。 */}
                 <div className="join-req-block">
                   <h3 className="join-req-title">👥 参加中<span className="tab-count">{members.length}</span></h3>
                   <div className="card" style={{ padding: 0 }}>
@@ -511,8 +551,19 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                         {members.map((p) => (
                           <li key={p.user_id} className="member-row">
                             <Avatar name={p.display_name ?? "?"} />
-                            <span className="member-name">{p.display_name ?? "（不明）"}</span>
-                            <span className="badge badge-success" style={{ marginLeft: "auto" }}>参加中</span>
+                            <span className="member-name">
+                              {p.display_name ?? "（不明）"}
+                              {p.is_evaluator && <span className="badge badge-success" style={{ marginLeft: 6 }}>⚖️ 審査員</span>}
+                            </span>
+                            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                              <label className="checkbox" style={{ fontSize: "var(--text-sm)" }}>
+                                <input type="checkbox" checked={p.is_evaluator} disabled={busy}
+                                       onChange={(e) => void toggleEvaluator(p.user_id, e.target.checked)} />
+                                審査員
+                              </label>
+                              <button className="btn btn-outline btn-sm" type="button"
+                                      onClick={() => void removeMember(p.user_id, p.display_name ?? "（不明）")} disabled={busy}>排除</button>
+                            </span>
                           </li>
                         ))}
                       </ul>

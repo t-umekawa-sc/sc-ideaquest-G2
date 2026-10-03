@@ -183,6 +183,42 @@ def test_t_tc_118_participants_list_admin_only(client, factory):
         _cleanup_contest(cid)
 
 
+def test_t_tc_119_party_manage_evaluator_owner_remove(client, factory):
+    """T-TC-119: パーティ運営＝審査員付与/剥奪・is_evaluator・詳細の主催者・排除(論理)。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"参加_{uuid.uuid4().hex[:6]}")
+    puid = _user_id(part["id"])
+    try:
+        # 参加を承認（approved）。
+        client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "approved"}, headers=_csrf(client))
+        # 審査員 付与→is_evaluator=true。
+        assert client.patch(f"{BASE}/{cid}/participants/{puid}/evaluator", json={"granted": True},
+                            headers=_csrf(client)).status_code == 200
+        plist = client.get(f"{BASE}/{cid}/participants").json()["data"]
+        assert any(p["user_id"] == str(puid) and p["is_evaluator"] for p in plist)
+        # 審査員 剥奪→false。
+        client.patch(f"{BASE}/{cid}/participants/{puid}/evaluator", json={"granted": False}, headers=_csrf(client))
+        plist2 = client.get(f"{BASE}/{cid}/participants").json()["data"]
+        assert all(not (p["user_id"] == str(puid) and p["is_evaluator"]) for p in plist2)
+        # 詳細に主催者（owner）表示。
+        detail = client.get(f"{BASE}/{cid}").json()
+        assert detail["owner_display_name"]
+        # 排除（rejected）＝論理削除。一般は403。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.patch(f"{BASE}/{cid}/participants/{puid}/evaluator", json={"granted": True},
+                            headers=_csrf(client)).status_code == 403
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "rejected"},
+                            headers=_csrf(client)).status_code == 200
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
+            ts.execute(_text("DELETE FROM user_capabilities WHERE user_id = :u"), {"u": str(puid)})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
 def test_t_tc_116_auto_approve_opens_participation(client, factory):
     """T-TC-116: auto_approve=true のコンテストは社内でも参加リクエストが即 approved（オープン参加）。"""
     _admin(client, factory)

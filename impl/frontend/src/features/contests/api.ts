@@ -63,9 +63,16 @@ export async function getContestParticipants(id: string, signal?: AbortSignal): 
   return res?.data ?? [];
 }
 
-// Tier1 参加の承認/却下（管理者・T.2）。CSRF は apiFetch が付与。
+// Tier1 参加の承認/却下/排除（運営・T.2）。rejected で参加中メンバーを排除（論理削除）。CSRF は apiFetch が付与。
 export function decideContestParticipation(id: string, userId: string, status: "approved" | "rejected"): Promise<{ status: string } | null> {
   return apiFetch<{ status: string }>(`/contests/${id}/participation/${userId}`, {
     method: "PATCH", body: JSON.stringify({ status }),
+  });
+}
+
+// 参加者に審査員（contest_evaluator）を付与/剥奪（パーティタブ・運営）。
+export function setContestEvaluator(id: string, userId: string, granted: boolean): Promise<{ granted: boolean } | null> {
+  return apiFetch<{ granted: boolean }>(`/contests/${id}/participants/${userId}/evaluator`, {
+    method: "PATCH", body: JSON.stringify({ granted }),
   });
 }

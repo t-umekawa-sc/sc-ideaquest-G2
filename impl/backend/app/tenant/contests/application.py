@@ -52,7 +52,8 @@ def _can_create_contest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
 
 
 def _detail(c, *, idea_count: int = 0, flags: list | None = None,
-            my_participating_idea_ids: list | None = None, can_manage: bool = False) -> dict:
+            my_participating_idea_ids: list | None = None, can_manage: bool = False,
+            owner_display_name: str | None = None) -> dict:
     return {
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
@@ -61,6 +62,7 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None,
         "prize_config": c.prize_config,
         "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
         "my_participating_idea_ids": my_participating_idea_ids or [], "can_manage": can_manage,
+        "owner_user_id": str(c.created_by_id), "owner_display_name": owner_display_name,
     }
 
 
@@ -125,7 +127,9 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         user = profile_repo.get_user_by_account(ts, account_id)
         mine = ([str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)] if user else [])
         can_manage = bool(user and _can_create_contest(account_id, ts, user.id))
-        return _detail(c, flags=flags, my_participating_idea_ids=mine, can_manage=can_manage)
+        owner = quests_repo.get_users_by_ids(ts, {c.created_by_id}).get(c.created_by_id)
+        return _detail(c, flags=flags, my_participating_idea_ids=mine, can_manage=can_manage,
+                       owner_display_name=(owner.display_name if owner else None))
 
 
 def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
@@ -142,13 +146,44 @@ def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: 
             raise AppError(404, "not_found")
         if not _can_create_contest(account_id, ts, user.id):
             raise AppError(403, "forbidden", detail="参加者の管理は運営（contest_create/管理者）のみ可能です")
+        from app.tenant.capabilities import repository as caps_repo
         rows = repo.list_contest_participants(ts, c.id)
         users = quests_repo.get_users_by_ids(ts, {r.user_id for r in rows})
         data = [{"user_id": str(r.user_id),
                  "display_name": (users.get(r.user_id).display_name if users.get(r.user_id) else None),
-                 "status": r.status, "requested_at": r.requested_at, "decided_at": r.decided_at}
+                 "status": r.status,
+                 "is_evaluator": caps_repo.has_capability(ts, r.user_id, "contest_evaluator"),
+                 "requested_at": r.requested_at, "decided_at": r.decided_at}
                 for r in rows]
         return {"data": data}
+
+
+def set_participant_evaluator(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
+                             target_user_id: str, granted: bool) -> dict:
+    """参加者に審査員（contest_evaluator・②会社レベル能力）を付与/剥奪（パーティタブ・運営のみ）。
+
+    contest_evaluator は会社横断の能力（§5.3・決定J'）＝付与するとその人は全コンテストの審査員になる。
+    """
+    from app.tenant.capabilities import repository as caps_repo
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, actor.id):
+            raise AppError(403, "forbidden", detail="審査員の設定は運営（contest_create/管理者）のみ可能です")
+        uid = uuid.UUID(target_user_id)
+        if granted:
+            caps_repo.grant(ts, uid, "contest_evaluator", granted_by_id=actor.id)
+        else:
+            caps_repo.revoke(ts, uid, "contest_evaluator")
+        ts.commit()
+    return {"granted": granted}
 
 
 def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *,
@@ -246,11 +281,11 @@ def decide_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, c
         actor = profile_repo.get_user_by_account(ts, account_id)
         if actor is None:
             raise AppError(401, "unauthenticated")
-        if not _is_company_admin(account_id):
-            raise AppError(403, "forbidden", detail="Tier1 参加の承認は管理者のみです")
         c = repo.get(ts, uuid.UUID(contest_id))
         if c is None:
             raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, actor.id):
+            raise AppError(403, "forbidden", detail="Tier1 参加の承認/排除は運営（contest_create/管理者）のみです")
         row = repo.upsert_contest_participation(ts, c.id, uuid.UUID(target_user_id),
                                                 status=status, decided_by_id=actor.id)
         out = {"status": row.status}

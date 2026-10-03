@@ -4192,6 +4192,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/participants/{uid}/evaluator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Participant Evaluator
+         * @description 参加者に審査員（contest_evaluator）を付与/剥奪（パーティタブ・運営のみ）。
+         */
+        patch: operations["set_participant_evaluator_api_v1_contests__contest_id__participants__uid__evaluator_patch"];
+        trace?: never;
+    };
     "/api/v1/contests/{contest_id}/participation": {
         parameters: {
             query?: never;
@@ -6022,6 +6042,10 @@ export interface components {
              * @default false
              */
             can_manage: boolean;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Owner Display Name */
+            owner_display_name?: string | null;
         };
         /**
          * ContestFinalizeResponse
@@ -6080,6 +6104,11 @@ export interface components {
             display_name?: string | null;
             /** Status */
             status: string;
+            /**
+             * Is Evaluator
+             * @default false
+             */
+            is_evaluator: boolean;
             /** Requested At */
             requested_at?: string | null;
             /** Decided At */
@@ -6455,6 +6484,14 @@ export interface components {
             fields: {
                 [key: string]: components["schemas"]["EvaluationDiffField"];
             };
+        };
+        /**
+         * EvaluatorUpdateRequest
+         * @description 審査員（contest_evaluator）付与/剥奪（パーティタブ・運営）。
+         */
+        EvaluatorUpdateRequest: {
+            /** Granted */
+            granted: boolean;
         };
         /**
          * FeedActivityDTO
@@ -18649,6 +18686,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestParticipantsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_participant_evaluator_api_v1_contests__contest_id__participants__uid__evaluator_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluatorUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

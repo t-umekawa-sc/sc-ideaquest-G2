@@ -19,6 +19,7 @@ from app.tenant.contests.schemas import (
     ContestParticipantsResponse,
     ContestUpdateRequest,
     ContestFinalizeResponse,
+    EvaluatorUpdateRequest,
     ParticipationDecideRequest,
     ParticipationResponse,
     ContestRankingResponse,
@@ -86,6 +87,15 @@ def finalize_contest(contest_id: str, request: Request, session: dict = Depends(
 def list_contest_participants(contest_id: str, request: Request, session: dict = Depends(require_me)):
     """Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。"""
     return service.list_participants(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
+@router.patch("/contests/{contest_id}/participants/{uid}/evaluator", response_model=dict,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def set_participant_evaluator(contest_id: str, uid: str, body: EvaluatorUpdateRequest, request: Request,
+                             session: dict = Depends(require_me)):
+    """参加者に審査員（contest_evaluator）を付与/剥奪（パーティタブ・運営のみ）。"""
+    return service.set_participant_evaluator(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, uid, body.granted)
 
 
 @router.post("/contests/{contest_id}/participation", response_model=ParticipationResponse,
