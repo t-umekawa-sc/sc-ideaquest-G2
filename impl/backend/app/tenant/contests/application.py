@@ -56,7 +56,8 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None) -> dict:
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
         "starts_at": c.starts_at, "ends_at": c.ends_at,
-        "auto_archive_days": c.auto_archive_days, "prize_config": c.prize_config,
+        "auto_archive_days": c.auto_archive_days, "auto_approve": c.auto_approve,
+        "prize_config": c.prize_config,
         "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
     }
 
@@ -70,7 +71,7 @@ def _list_item(c) -> dict:
 
 def create_contest(account_id: uuid.UUID, company_id: uuid.UUID, *, theme: str, description: str | None,
                    mode: str, status: str, starts_at, ends_at, auto_archive_days: int | None,
-                   prize_config: dict | None) -> dict:
+                   prize_config: dict | None, auto_approve: bool = False) -> dict:
     """コンテスト作成＝backing quest を 1:1 生成＋contests 行。要 `contest_create`（または管理者）。"""
     if mode not in _MODES:
         raise AppError(422, "validation_error", detail="mode が不正です", errors=[{"field": "mode"}])
@@ -94,7 +95,7 @@ def create_contest(account_id: uuid.UUID, company_id: uuid.UUID, *, theme: str, 
         c = repo.create(ts, quest_id=quest.id, theme=theme, description=description, mode=mode,
                         status=status, starts_at=starts_at, ends_at=ends_at,
                         auto_archive_days=auto_archive_days, prize_config=prize_config,
-                        created_by_id=user.id)
+                        created_by_id=user.id, auto_approve=auto_approve)
         out = _detail(c)
         ts.commit()
     return out
@@ -147,7 +148,7 @@ def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str
             if quest is not None:
                 quest.status = _QUEST_STATUS[status]
         # フィールド編集（送られたもののみ）。
-        for key in ("theme", "description", "starts_at", "ends_at", "auto_archive_days", "prize_config"):
+        for key in ("theme", "description", "starts_at", "ends_at", "auto_archive_days", "auto_approve", "prize_config"):
             if key in fields:
                 setattr(c, key, fields[key])
         c.updated_at = datetime.now(timezone.utc)
@@ -195,7 +196,8 @@ def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, 
         c = repo.get(ts, uuid.UUID(contest_id))
         if c is None:
             raise AppError(404, "not_found")
-        auto = company.access_mode == "public"  # DEMO はサインアップ即参加（閲覧+投稿+投票）
+        # public/DEMO は常に自動承認（決定G）／社内はコンテスト単位の auto_approve で選べる（既定=承認制）。
+        auto = company.access_mode == "public" or bool(c.auto_approve)
         row = repo.upsert_contest_participation(ts, c.id, user.id,
                                                 status="approved" if auto else "requested",
                                                 decided_by_id=user.id if auto else None)

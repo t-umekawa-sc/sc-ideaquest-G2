@@ -43,7 +43,7 @@ def create_contest(body: ContestCreateRequest, request: Request, session: dict =
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         theme=body.theme, description=body.description, mode=body.mode, status=body.status,
         starts_at=body.starts_at, ends_at=body.ends_at, auto_archive_days=body.auto_archive_days,
-        prize_config=body.prize_config)
+        auto_approve=body.auto_approve, prize_config=body.prize_config)
 
 
 @router.patch("/contests/{contest_id}", response_model=ContestDetail,

@@ -26,6 +26,7 @@
 | T-TC-113 | int | 単一ポリシー解決＝コンテスト配下は会社全体可視・通常クエストは従来ゲート | contest-backed quest／通常 quest | `contests/access.py`（`contest_of`/`can_vote`/`can_chat`/`can_evaluate`）＋`quests/repository.can_access_quest` 中央分岐 | コンテスト配下=会社全員可視（非パーティー員でも可）＋Tier/審査員ゲート／通常=`contest_of`=None で従来パーティー＋部署ゲート（分岐が1モジュール） | §2.3 |
 | T-TC-114 | api | public/DEMO の Tier1 自動 approved（決定G） | `access_mode=public`・サインアップ直後 | `POST /contests/{id}/participation` | 即 `approved`（閲覧＋投稿＋投票がすぐ可） | §8.2／決定G |
 | T-TC-115 | api | コンテスト配下のアイデア投稿＝Tier1 参加者に開放（§5.1 の「自分のアイデア投稿」・単一ポリシー） | Tier1 承認済み/未参加（いずれも非クエストメンバー） | コンテスト backing quest へ `POST /quests/{qid}/ideas` | Tier1 承認済み=201（member/idea_create 権限は不要）・未参加=403 | §5.1／§2.3 |
+| T-TC-116 | api | 参加承認はコンテスト単位で選べる＝`auto_approve=true` なら社内でも即 approved（オープン参加） | 社内会社・`auto_approve=true` の contest | `POST /contests/{id}/participation`（本人） | 即 `approved`（承認待ちにならず投稿/投票可）／既定（false）は従来どおり `requested` | T.2／FR-46 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

@@ -16,11 +16,11 @@ from app.tenant.contests.orm import Contest, ContestIdeaFlag, ContestParticipant
 
 def create(session: Session, *, quest_id: uuid.UUID, theme: str, description: str | None,
            mode: str, status: str, starts_at, ends_at, auto_archive_days: int | None,
-           prize_config: dict | None, created_by_id: uuid.UUID) -> Contest:
+           prize_config: dict | None, created_by_id: uuid.UUID, auto_approve: bool = False) -> Contest:
     c = Contest(id=uuid.uuid4(), quest_id=quest_id, theme=theme, description=description,
                 mode=mode, status=status, starts_at=starts_at, ends_at=ends_at,
                 auto_archive_days=auto_archive_days, prize_config=prize_config,
-                created_by_id=created_by_id)
+                created_by_id=created_by_id, auto_approve=auto_approve)
     session.add(c)
     session.flush()
     return c

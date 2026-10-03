@@ -157,6 +157,23 @@ def test_t_tc_106_delete_requires_capability_and_soft_deletes(client, factory):
         _cleanup_contest(cid)
 
 
+def test_t_tc_116_auto_approve_opens_participation(client, factory):
+    """T-TC-116: auto_approve=true のコンテストは社内でも参加リクエストが即 approved（オープン参加）。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"即参加_{uuid.uuid4().hex[:6]}")
+    try:
+        assert client.get(f"{BASE}/{cid}").json()["auto_approve"] is True
+        _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+        r = client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        assert r.status_code == 200 and r.json()["status"] == "approved", r.text  # 承認待ちにならず即 approved
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
 def test_t_tc_107_status_can_revert_adjacent(client, factory):
     """T-TC-107: 状態は隣接1段で前進・後退とも可／非隣接は409。backing quest.status も同期。"""
     _admin(client, factory)

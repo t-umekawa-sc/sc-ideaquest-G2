@@ -16,6 +16,7 @@ class ContestCreateRequest(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     auto_archive_days: int | None = None
+    auto_approve: bool = False        # Tier1 参加の自動承認（社内でも誰でも即参加・既定=承認制）
     prize_config: dict | None = None
 
 
@@ -24,10 +25,11 @@ class ContestUpdateRequest(BaseModel):
 
     theme: str | None = None
     description: str | None = None
-    status: str | None = None        # 状態遷移（前進のみ・draft→open→judging→closed→archived）
+    status: str | None = None        # 状態遷移（前進・後退とも隣接1段）
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     auto_archive_days: int | None = None
+    auto_approve: bool | None = None  # Tier1 参加の自動承認
     prize_config: dict | None = None
 
 
@@ -70,6 +72,7 @@ class ContestDetail(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     auto_archive_days: int | None = None
+    auto_approve: bool = False        # Tier1 参加の自動承認（誰でも即参加）か承認制か
     prize_config: dict | None = None
     created_at: datetime
     idea_count: int = 0

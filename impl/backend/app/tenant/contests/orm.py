@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,6 +30,8 @@ class Contest(CompanyBase):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auto_archive_days: Mapped[int | None] = mapped_column(Integer, nullable=True)   # rolling の自動お蔵入り日数
+    # Tier1 参加の自動承認（FR-46）。true＝社内でも申請なしで即 approved（オープン参加）。既定 false＝管理者承認制。
+    auto_approve: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     prize_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)         # 表彰軸と上位N・付与XP/コイン・実績（§6.3）
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -55,6 +55,7 @@ export function ContestListView() {
   const [startsAt, setStartsAt] = useState("");   // YYYY-MM-DD（会期型の開始日）
   const [endsAt, setEndsAt] = useState("");       // YYYY-MM-DD（会期型の締切）
   const [autoArchiveDays, setAutoArchiveDays] = useState(""); // 常設型の自動お蔵入り日数
+  const [autoApprove, setAutoApprove] = useState(false); // Tier1 参加の自動承認（コンテスト単位）
   const [themeErr, setThemeErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,23 +80,24 @@ export function ContestListView() {
   function openCreate() {
     setFormMode("create"); setEditingId(null);
     setTheme(""); setDescription(""); setMode("bounded"); setStatus("draft");
-    setStartsAt(""); setEndsAt(""); setAutoArchiveDays(""); setThemeErr(null);
+    setStartsAt(""); setEndsAt(""); setAutoArchiveDays(""); setAutoApprove(false); setThemeErr(null);
     setOpen(true);
   }
 
   async function openEditOrDuplicate(row: ContestRow, m: FormMode) {
     setFormMode(m); setThemeErr(null);
     setTheme(row.theme); setMode(row.mode); setStatus("draft");
-    setStartsAt(""); setEndsAt(""); setAutoArchiveDays("");
+    setStartsAt(""); setEndsAt(""); setAutoArchiveDays(""); setAutoApprove(false);
     setEditingId(m === "edit" ? row.id : null);
     setOpen(true);
-    // 説明/会期は一覧DTOに無い＝詳細を取得してプリフィル（取得失敗は空のまま）。
+    // 説明/会期/参加設定は一覧DTOに無い＝詳細を取得してプリフィル（取得失敗は空のまま）。
     const detail = await getContest(row.id).catch(() => null);
     if (detail) {
       setDescription(detail.description ?? "");
       setStartsAt((detail.starts_at ?? "").slice(0, 10));
       setEndsAt((detail.ends_at ?? "").slice(0, 10));
       setAutoArchiveDays(detail.auto_archive_days != null ? String(detail.auto_archive_days) : "");
+      setAutoApprove(detail.auto_approve ?? false);
       if (m === "edit") setStatus(detail.status);
     }
   }
@@ -151,11 +153,11 @@ export function ContestListView() {
       : { starts_at: toIso(startsAt), ends_at: toIso(endsAt) };
     try {
       if (formMode === "edit" && editingId) {
-        const updated = await updateContest(editingId, { theme: theme.trim(), description: description.trim() || null, ...period });
+        const updated = await updateContest(editingId, { theme: theme.trim(), description: description.trim() || null, auto_approve: autoApprove, ...period });
         if (!updated) { snack({ type: "error", title: "更新に失敗しました（権限が必要な場合があります）" }); return; }
         snack({ type: "success", title: "コンテストを更新しました" });
       } else {
-        const created = await createContest({ theme: theme.trim(), description: description.trim() || null, mode, status, ...period });
+        const created = await createContest({ theme: theme.trim(), description: description.trim() || null, mode, status, auto_approve: autoApprove, ...period });
         if (!created) { snack({ type: "error", title: "作成に失敗しました（権限が必要な場合があります）" }); return; }
         snack({ type: "success", title: "コンテストを作成しました" });
       }
@@ -264,6 +266,12 @@ export function ContestListView() {
                 </select>
               </Field>
             )}
+            <Field id="ct-approve" label="参加の受付">
+              <label className="check-row">
+                <input type="checkbox" id="ct-approve" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} />
+                <span>誰でも参加可（自動承認）<span className="muted text-xs">／OFF＝管理者の承認制</span></span>
+              </label>
+            </Field>
           </div>
           <div className="modal__footer">
             <button className="btn btn-outline" type="button" onClick={() => setOpen(false)} disabled={saving}>キャンセル</button>

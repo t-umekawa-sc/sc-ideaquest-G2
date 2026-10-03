@@ -5938,6 +5938,11 @@ export interface components {
             ends_at?: string | null;
             /** Auto Archive Days */
             auto_archive_days?: number | null;
+            /**
+             * Auto Approve
+             * @default false
+             */
+            auto_approve: boolean;
             /** Prize Config */
             prize_config?: {
                 [key: string]: unknown;
@@ -5963,6 +5968,11 @@ export interface components {
             ends_at?: string | null;
             /** Auto Archive Days */
             auto_archive_days?: number | null;
+            /**
+             * Auto Approve
+             * @default false
+             */
+            auto_approve: boolean;
             /** Prize Config */
             prize_config?: {
                 [key: string]: unknown;
@@ -6066,6 +6076,8 @@ export interface components {
             ends_at?: string | null;
             /** Auto Archive Days */
             auto_archive_days?: number | null;
+            /** Auto Approve */
+            auto_approve?: boolean | null;
             /** Prize Config */
             prize_config?: {
                 [key: string]: unknown;
