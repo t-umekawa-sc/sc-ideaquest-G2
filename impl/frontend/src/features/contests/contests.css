@@ -8,15 +8,16 @@
 /* 作成/編集モーダルの2カラム行（開始日/締切）。狭幅は1カラムに。 */
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 @media (max-width: 480px) { .row-2 { grid-template-columns: 1fr; } }
-/* チェックボックス＋ラベルの行（参加の受付 等）。 */
-.check-row { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); cursor: pointer; }
-.check-row input { width: 16px; height: 16px; }
 
 /* 一覧カード表示（DataTable card）。 */
 .contest-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-subtle); }
 
 /* SC-54 詳細 */
 .contest-detail .backlink { display: inline-block; margin-bottom: var(--space-3); }
+/* 概要＋アクティビティ（2段組）／新着の議論＋活発さ（2段組）＝クエスト詳細 .quest-top と同構成。 */
+.contest-top { display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--space-4); align-items: start; }
+.contest-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); }
+@media (max-width: 860px) { .contest-top, .contest-grid-2 { grid-template-columns: 1fr; } }
 .contest-head { padding: var(--space-4); }
 /* タイトル/メタ（左）とアクション（右上）を両端に＝クエスト詳細 .quest-head__top と同配置。 */
 .contest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }

@@ -77,6 +77,7 @@ class ContestDetail(BaseModel):
     created_at: datetime
     idea_count: int = 0
     flags: list[ContestIdeaFlagDTO] = []   # 殿堂入り/お蔵入り（SC-54 タブ導出・入賞は ideas.is_selected）
+    my_participating_idea_ids: list[str] = []  # ログインユーザーが議論に参加（投稿者 or Tier2承認）するアイデア（新着の議論の限定用）
 
 
 class ContestRankingEntry(BaseModel):

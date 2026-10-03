@@ -187,6 +187,30 @@ def test_t_tc_115_post_idea_open_to_tier1(client, factory):
             _cleanup_contest(cid)
 
 
+def test_t_tc_117_detail_my_participating_idea_ids(client, factory):
+    """T-TC-117: 詳細の my_participating_idea_ids＝自分が投稿者 or Tier2承認のアイデア（新着の議論の限定根拠）。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
+    iid = _seed_published_idea(qid, _user_id(author["id"]))
+    chatter = factory.make_seed_company_account(display_name=f"参加_{uuid.uuid4().hex[:6]}")
+    outsider = factory.make_seed_company_account(display_name=f"非参加_{uuid.uuid4().hex[:6]}")
+    try:
+        _approve_tier2(iid, _user_id(chatter["id"]))
+        # 投稿者本人の応答には自分のアイデアが含まれる。
+        _login(client, SEED_COMPANY_CODE, author["login_id"], author["password"])
+        assert str(iid) in client.get(f"{BASE}/{cid}").json()["my_participating_idea_ids"]
+        # Tier2 承認者の応答にも含まれる。
+        _login(client, SEED_COMPANY_CODE, chatter["login_id"], chatter["password"])
+        assert str(iid) in client.get(f"{BASE}/{cid}").json()["my_participating_idea_ids"]
+        # 未参加者には含まれない。
+        _login(client, SEED_COMPANY_CODE, outsider["login_id"], outsider["password"])
+        assert str(iid) not in client.get(f"{BASE}/{cid}").json()["my_participating_idea_ids"]
+    finally:
+        _purge_contest_idea(cid, iid)
+
+
 def test_t_tc_120_evaluate_requires_contest_evaluator(client, factory):
     """T-TC-120(api): 評価は `contest_evaluator` 保持者のみ・投稿者でも非保持は 403（運営指名のみ）。"""
     _admin(client, factory)

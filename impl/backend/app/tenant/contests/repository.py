@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.tenant.contests.orm import Contest, ContestIdeaFlag, ContestParticipant, IdeaParticipant
@@ -194,3 +194,16 @@ def list_flags_for_contest(session: Session, contest_id: uuid.UUID) -> list[Cont
     return list(session.execute(
         select(ContestIdeaFlag).where(ContestIdeaFlag.contest_id == contest_id)
     ).scalars().all())
+
+
+def discussion_idea_ids(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """ログインユーザーが議論に参加しているアイデア id（自分が投稿者 or Tier2 approved）。
+    「新着の議論」を本人関与のアイデアに限定する用途（SC-54・backing quest スコープ）。"""
+    from app.tenant.ideas.orm import Idea
+    stmt = select(Idea.id).where(
+        Idea.quest_id == quest_id,
+        or_(Idea.author_id == user_id,
+            Idea.id.in_(select(IdeaParticipant.idea_id).where(
+                IdeaParticipant.user_id == user_id, IdeaParticipant.status == "approved"))),
+    )
+    return list(session.execute(stmt).scalars().all())

@@ -51,7 +51,8 @@ def _can_create_contest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
     return _is_company_admin(account_id) or caps_app.user_has_capability(ts, user_id, "contest_create")
 
 
-def _detail(c, *, idea_count: int = 0, flags: list | None = None) -> dict:
+def _detail(c, *, idea_count: int = 0, flags: list | None = None,
+            my_participating_idea_ids: list | None = None) -> dict:
     return {
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
@@ -59,6 +60,7 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None) -> dict:
         "auto_archive_days": c.auto_archive_days, "auto_approve": c.auto_approve,
         "prize_config": c.prize_config,
         "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
+        "my_participating_idea_ids": my_participating_idea_ids or [],
     }
 
 
@@ -120,7 +122,9 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         if c is None:
             raise AppError(404, "not_found")
         flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
-        return _detail(c, flags=flags)
+        user = profile_repo.get_user_by_account(ts, account_id)
+        mine = ([str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)] if user else [])
+        return _detail(c, flags=flags, my_participating_idea_ids=mine)
 
 
 def update_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *,

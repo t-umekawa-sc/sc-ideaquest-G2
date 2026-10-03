@@ -267,9 +267,9 @@ export function ContestListView() {
               </Field>
             )}
             <Field id="ct-approve" label="参加の受付">
-              <label className="check-row">
+              <label className="checkbox">
                 <input type="checkbox" id="ct-approve" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} />
-                <span>誰でも参加可（自動承認）<span className="muted text-xs">／OFF＝管理者の承認制</span></span>
+                <span>誰でも参加可（自動承認）<span className="muted text-xs">　／　OFF＝管理者の承認制</span></span>
               </label>
             </Field>
           </div>

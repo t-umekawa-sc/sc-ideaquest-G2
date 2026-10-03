@@ -5992,6 +5992,11 @@ export interface components {
              * @default []
              */
             flags: components["schemas"]["ContestIdeaFlagDTO"][];
+            /**
+             * My Participating Idea Ids
+             * @default []
+             */
+            my_participating_idea_ids: string[];
         };
         /**
          * ContestFinalizeResponse

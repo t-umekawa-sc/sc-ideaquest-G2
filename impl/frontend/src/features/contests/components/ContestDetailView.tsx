@@ -7,7 +7,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Button, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
+import { getQuestActivities } from "@/features/feed/api";
+import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
 import { listIdeas, type IdeaCard } from "@/features/ideas/api";
 
 import {
@@ -41,6 +44,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [contest, setContest] = useState<ContestDetail | null>(null);
   const [ideas, setIdeas] = useState<IdeaCard[]>([]);
   const [rankings, setRankings] = useState<Record<string, ContestRankingEntry[]>>({});
+  const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（日次スパーク）
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
@@ -61,7 +65,25 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     CONTEST_RANKING_AXES.forEach((a, i) => { rmap[a.key] = ranks[i]?.data ?? []; });
     setRankings(rmap);
     setLoading(false);
+    // 活動の活発さ（日次スパーク）＝backing quest の活動集計を流用（取得失敗は非表示）。
+    void getQuestActivity(c.quest_id).then(setActivity).catch(() => setActivity(null));
   }, [contestId]);
+
+  // コンテスト内アクティビティ（ActivityFeed）＝backing quest の活動フィードを流用。
+  const questId = contest?.quest_id;
+  const loadFeed = useCallback(
+    (cursor?: string | null) => (questId ? getQuestActivities(questId, cursor) : Promise.resolve(null)),
+    [questId],
+  );
+
+  // 💬 新着の議論＝自分が参加する（投稿者 or Tier2承認）アイデアで未読があるもの（新しい順）。
+  const myIdeaSet = useMemo(() => new Set(contest?.my_participating_idea_ids ?? []), [contest]);
+  const unreadDiscussions = useMemo(
+    () => ideas
+      .filter((i) => (i.unread_chat_count ?? 0) > 0 && myIdeaSet.has(i.id))
+      .sort((a, b) => (b.last_chat_at ?? "").localeCompare(a.last_chat_at ?? "")),
+    [ideas, myIdeaSet],
+  );
 
   useEffect(() => {
     const ac = new AbortController();
@@ -189,6 +211,8 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     <section className="contest-detail">
       <Link className="backlink backlink--float" href="/contests">← アイデアコンテスト一覧</Link>
 
+      {/* 概要（左）＋コンテスト内アクティビティ（右）を2段組（クエスト詳細 .quest-top と同構成）。 */}
+      <div className="contest-top">
       <header className="card contest-head">
         <div className="contest-head__top">
           <div className="contest-head__main">
@@ -224,6 +248,48 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           </div>
         </div>
       </header>
+
+        <section className="card contest-activity" aria-label="コンテスト内アクティビティ">
+          <ActivityFeed title="コンテスト内アクティビティ" load={loadFeed}
+                        emptyText="このコンテストの活動はまだありません。" />
+        </section>
+      </div>
+
+      {/* 💬 新着の議論（自分が参加するアイデアの未読・左）＋ 📈 活動の活発さ（右）を2段組。 */}
+      <div className="contest-grid-2">
+        <section className="card unread-panel" aria-label="新着の議論">
+          <div className="section-head">
+            <h2 className="unread-panel__title">💬 新着の議論</h2>
+            {unreadDiscussions.length > 0 && (
+              <span className="unread-panel__n">{unreadDiscussions.reduce((s, i) => s + (i.unread_chat_count ?? 0), 0)} 件の未読</span>
+            )}
+          </div>
+          {unreadDiscussions.length > 0 ? (
+            <ul className="unread-list">
+              {unreadDiscussions.map((i) => (
+                <li key={i.id}>
+                  <Link className="unread-item" href={`/ideas/${i.id}/chat`}>
+                    <span className="unread-item__title">{i.title}</span>
+                    <span className="badge badge-danger">💬 +{i.unread_chat_count}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="hint">未読のチャットはありません。あなたが参加しているアイデアに新しい投稿があるとここに表示されます。</p>
+          )}
+        </section>
+
+        <section className="card" aria-label="活動の活発さ">
+          <div className="section-head"><h2 className="unread-panel__title">📈 活動の活発さ</h2></div>
+          <ActivitySpark
+            daily={(activity?.daily ?? []).map((d) => ({ date: d.date, count: d.count }))}
+            label={`直近${activity?.days ?? 14}日・💬 合計 ${activity?.total ?? 0} 件`}
+            legend="棒＝日次コメント数（コンテスト内の公開アイデア横断・直近3日を強調）。"
+            emptyText="まだ活動の記録はありません。参加者の投稿があるとここに表示されます。"
+          />
+        </section>
+      </div>
 
       <section className="contest-podium" aria-label="表彰台（ランキング）">
         {CONTEST_RANKING_AXES.map((axis) => {
