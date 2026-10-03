@@ -6,14 +6,14 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-03 JST
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `abdbe53e feat(contest): パーティタブに主催者表示・審査員設定・参加者の排除`（commit＋origin/main へ push 済）
+- 最新コミット: `64c7be88 feat(contest): パーティに運営がメンバーを直接追加（会社ユーザーピッカー）`（commit＋origin/main へ push 済）
 - working tree: clean（全コミット済・push 済）。※`doc/セキュリティ検証/DAST_ZAP検証手順.md` は別セッションで作業中（本セッション対象外・ユーザー確認済）。
 - alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`。
 - **SC-54 受入ポリッシュ第2弾（本セッション・全 push 済）**: 4パネル（概要/コンテスト内アクティビティ/新着の議論/活発さ・`355a278d`）＋新着の議論を本人参加アイデアに限定（my_participating_idea_ids・T-TC-117）／チェックボックス標準化（.checkbox）／「パーティー→パーティ」UI全面統一（`fd10fd5d`・35ファイル）／**上位タブ 💡アイデア・🔍全文検索・👥パーティ**（`5ea2ce51`・パーティは運営のみ=can_manage・`GET /contests/{id}/participants`・T-TC-118）。全backend 936 passed・traceability ✅（960件）。
 - **SC-53/54 受入ポリッシュ（本セッション後半・全 push 済）**: ①一覧を SC-10 UI に統一（DataTable＋RowMenu 詳細/編集/複製/削除）＋ステータスをセグメントスイッチに（`26acf5f0`）＋`DELETE /contests/{id}`（T-TC-106）／②作成/編集に会期入力（開始日/締切・自動お蔵入り日数）＋詳細に会期ステータス遷移（`34949470`）／③**ステータス隣接後退可**＋詳細の遷移UIをクエスト詳細の ⋯ RowMenu（進める/戻す/削除）に統一（`f7345c52`・T-TC-107）／④`.page-title` をビジネス体に是正＝ピクセル体はゲーム要素専用（`893019a2`・全業務画面26箇所に波及）。全backend 933 passed・traceability ✅（957件）。
 - **（解決済）参加ポリシー**: 会社単位ではなく**コンテスト単位 `contests.auto_approve`** で選べるようにした（`66c456e1`・作成/編集モーダルのトグル・T-TC-116）。public/DEMO は常に自動承認（決定G）。
 - **（解決済）SC-54 パネル/タブ化＋パーティ管理**: 4パネル＋上位タブ（アイデア/全文検索=クエスト詳細と同一UI/パーティ=運営のみ）。パーティは主催者表示・審査員トグル（contest_evaluator）・排除（rejected 論理削除）まで実装。「パーティー→パーティ」UI統一済み。
-- **次の TODO（パーティ追加・未着手）**: 運営が任意の会社ユーザーを参加者に**直接追加**する導線。現状は本人リクエスト→運営承認のみ。実装には**会社ユーザーのディレクトリEP（テナント・会社内ユーザー候補一覧）＋ピッカーUI**が必要（quest の group-scoped 候補とは別＝会社全体）。追加後は `upsert_contest_participation(approved)` で即参加にできる（decide EP が upsert するため PATCH approved でも可）。
+- **（解決済）パーティ直接追加**: 運営が会社ユーザーを直接追加＝`GET /contests/{id}/participant-candidates?q=`（会社全体候補・主催者/既参加除外・運営のみ＝`list_cross_group_candidates([])` 流用）＋パーティタブの検索ピッカー（`64c7be88`・T-TC-124）。追加は PATCH participation approved 再利用。これで SC-54 パーティは主催者/審査員/排除/追加までクエスト詳細同等。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB）。ゲーミフィケーション付き。
