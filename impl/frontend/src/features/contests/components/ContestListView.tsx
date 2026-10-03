@@ -52,6 +52,9 @@ export function ContestListView() {
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState("bounded");
   const [status, setStatus] = useState("draft");
+  const [startsAt, setStartsAt] = useState("");   // YYYY-MM-DD（会期型の開始日）
+  const [endsAt, setEndsAt] = useState("");       // YYYY-MM-DD（会期型の締切）
+  const [autoArchiveDays, setAutoArchiveDays] = useState(""); // 常設型の自動お蔵入り日数
   const [themeErr, setThemeErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,18 +78,26 @@ export function ContestListView() {
 
   function openCreate() {
     setFormMode("create"); setEditingId(null);
-    setTheme(""); setDescription(""); setMode("bounded"); setStatus("draft"); setThemeErr(null);
+    setTheme(""); setDescription(""); setMode("bounded"); setStatus("draft");
+    setStartsAt(""); setEndsAt(""); setAutoArchiveDays(""); setThemeErr(null);
     setOpen(true);
   }
 
   async function openEditOrDuplicate(row: ContestRow, m: FormMode) {
     setFormMode(m); setThemeErr(null);
     setTheme(row.theme); setMode(row.mode); setStatus("draft");
+    setStartsAt(""); setEndsAt(""); setAutoArchiveDays("");
     setEditingId(m === "edit" ? row.id : null);
     setOpen(true);
-    // 説明は一覧DTOに無い＝詳細を取得してプリフィル（取得失敗は空のまま）。
+    // 説明/会期は一覧DTOに無い＝詳細を取得してプリフィル（取得失敗は空のまま）。
     const detail = await getContest(row.id).catch(() => null);
-    if (detail) { setDescription(detail.description ?? ""); if (m === "edit") setStatus(detail.status); }
+    if (detail) {
+      setDescription(detail.description ?? "");
+      setStartsAt((detail.starts_at ?? "").slice(0, 10));
+      setEndsAt((detail.ends_at ?? "").slice(0, 10));
+      setAutoArchiveDays(detail.auto_archive_days != null ? String(detail.auto_archive_days) : "");
+      if (m === "edit") setStatus(detail.status);
+    }
   }
 
   async function remove(row: ContestRow) {
@@ -128,15 +139,23 @@ export function ContestListView() {
 
   async function submit() {
     if (!theme.trim()) { setThemeErr("テーマを入力してください。"); return; }
+    if (mode !== "rolling" && startsAt && endsAt && startsAt > endsAt) {
+      setThemeErr("締切は開始日以降にしてください。"); return;
+    }
     setThemeErr(null);
     setSaving(true);
+    // 会期＝会期型は開始日/締切（日付→ISO）、常設型は自動お蔵入り日数。
+    const toIso = (d: string) => (d ? new Date(`${d}T00:00:00Z`).toISOString() : null);
+    const period = mode === "rolling"
+      ? { auto_archive_days: autoArchiveDays ? Number(autoArchiveDays) : null }
+      : { starts_at: toIso(startsAt), ends_at: toIso(endsAt) };
     try {
       if (formMode === "edit" && editingId) {
-        const updated = await updateContest(editingId, { theme: theme.trim(), description: description.trim() || null });
+        const updated = await updateContest(editingId, { theme: theme.trim(), description: description.trim() || null, ...period });
         if (!updated) { snack({ type: "error", title: "更新に失敗しました（権限が必要な場合があります）" }); return; }
         snack({ type: "success", title: "コンテストを更新しました" });
       } else {
-        const created = await createContest({ theme: theme.trim(), description: description.trim() || null, mode, status });
+        const created = await createContest({ theme: theme.trim(), description: description.trim() || null, mode, status, ...period });
         if (!created) { snack({ type: "error", title: "作成に失敗しました（権限が必要な場合があります）" }); return; }
         snack({ type: "success", title: "コンテストを作成しました" });
       }
@@ -215,20 +234,35 @@ export function ContestListView() {
                         placeholder="コンテストの趣旨・応募要領など（任意）" />
             </Field>
             {formMode !== "edit" && (
-              <>
-                <Field id="ct-mode" label="種別">
-                  <select className="select" id="ct-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
-                    <option value="bounded">{CONTEST_MODE_LABEL.bounded}</option>
-                    <option value="rolling">{CONTEST_MODE_LABEL.rolling}</option>
-                  </select>
+              <Field id="ct-mode" label="種別">
+                <select className="select" id="ct-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+                  <option value="bounded">{CONTEST_MODE_LABEL.bounded}</option>
+                  <option value="rolling">{CONTEST_MODE_LABEL.rolling}</option>
+                </select>
+              </Field>
+            )}
+            {mode === "rolling" ? (
+              <Field id="ct-archive" label="自動お蔵入り日数">
+                <input className="input" id="ct-archive" type="number" min={1} value={autoArchiveDays}
+                       onChange={(e) => setAutoArchiveDays(e.target.value)} placeholder="例）90（経過アイデアを自動でお蔵入り）" />
+              </Field>
+            ) : (
+              <div className="row-2">
+                <Field id="ct-starts" label="開始日">
+                  <input className="input" id="ct-starts" type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
                 </Field>
-                <Field id="ct-status" label="公開">
-                  <select className="select" id="ct-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="draft">準備中（下書き）</option>
-                    <option value="open">すぐ公募を開始</option>
-                  </select>
+                <Field id="ct-ends" label="締切">
+                  <input className="input" id="ct-ends" type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
                 </Field>
-              </>
+              </div>
+            )}
+            {formMode !== "edit" && (
+              <Field id="ct-status" label="公開">
+                <select className="select" id="ct-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="draft">準備中（下書き）</option>
+                  <option value="open">すぐ公募を開始</option>
+                </select>
+              </Field>
             )}
           </div>
           <div className="modal__footer">

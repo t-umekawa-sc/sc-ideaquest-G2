@@ -14,6 +14,7 @@ import {
   getContest,
   getContestRanking,
   requestContestParticipation,
+  updateContest,
   type ContestDetail,
   type ContestRankingEntry,
 } from "../api";
@@ -124,6 +125,23 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
+  // 会期の前進遷移（運営操作・forward-only・§4.1）。judging→closed は finalize（表彰付与）が担うため別扱い。
+  async function advanceStatus(to: string, label: string) {
+    const ok = await confirm({ title: `${label}しますか？`, confirmLabel: label });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await updateContest(contestId, { status: to });
+      if (!r) { snack({ type: "error", title: "変更できませんでした（権限が必要です）" }); return; }
+      snack({ type: "success", title: `${label}しました` });
+      setReload((n) => n + 1);
+    } catch {
+      snack({ type: "error", title: "状態の変更に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <section className="contest-detail"><p className="hint">読み込み中…</p></section>;
   if (notFound || !contest) {
     return (
@@ -154,9 +172,19 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
         </dl>
         <div className="contest-head__actions">
-          <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>
+          {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
+          {/* 運営操作＝会期の前進（権限が無ければサーバーが 403）。 */}
+          {contest.status === "draft" && (
+            <button className="btn btn-primary" type="button" onClick={() => advanceStatus("open", "公募を開始")} disabled={busy}>▶ 公募を開始</button>
+          )}
+          {contest.status === "open" && (
+            <button className="btn btn-outline" type="button" onClick={() => advanceStatus("judging", "審査に進む")} disabled={busy}>審査に進む →</button>
+          )}
           {contest.status === "judging" && (
             <button className="btn btn-primary" type="button" onClick={finalize} disabled={busy}>🏆 表彰を確定</button>
+          )}
+          {contest.status === "closed" && (
+            <button className="btn btn-outline" type="button" onClick={() => advanceStatus("archived", "アーカイブ")} disabled={busy}>アーカイブ</button>
           )}
         </div>
       </header>

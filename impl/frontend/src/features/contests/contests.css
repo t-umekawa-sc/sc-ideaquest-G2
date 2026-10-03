@@ -5,6 +5,10 @@
 .seg-n { font-size: var(--text-xs); opacity: 0.75; margin-left: 2px; }
 .segmented > label:has(input:checked) .seg-n { opacity: 0.9; }
 
+/* 作成/編集モーダルの2カラム行（開始日/締切）。狭幅は1カラムに。 */
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 480px) { .row-2 { grid-template-columns: 1fr; } }
+
 /* 一覧カード表示（DataTable card）。 */
 .contest-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-subtle); }
 
