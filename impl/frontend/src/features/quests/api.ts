@@ -1,4 +1,4 @@
-// quests 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/C_クエスト・パーティー・権限.md C.1〜C.4/C.9。
+// quests 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/C_クエスト・パーティ・権限.md C.1〜C.4/C.9。
 import { apiFetch, idempotencyHeader } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import type { components } from "@/lib/api/schema";
@@ -58,7 +58,7 @@ export function withdrawJoinQuest(questId: string): Promise<null> {
   return apiFetch<null>(`/quests/${questId}/join-request`, { method: "DELETE" }) as Promise<null>;
 }
 
-// 参加リクエスト 受信側（SC-12 パーティータブ・C.9.1・owner/quest_admin のみ）。
+// 参加リクエスト 受信側（SC-12 パーティタブ・C.9.1・owner/quest_admin のみ）。
 export type JoinRequestRow = components["schemas"]["JoinRequestRowDTO"];
 export type JoinRequestListResponse = components["schemas"]["JoinRequestListResponse"];
 
@@ -139,8 +139,8 @@ export function listCompanyGroupDirectory(q?: string): Promise<QuestGroupsRespon
   return apiFetch<QuestGroupsResponse>(`/quest-group-directory${suffix}`);
 }
 
-// パーティー候補＝同一グループの有効メンバー（SC-11・C.4）。exclude_user_ids はサーバー側で除外
-// （既にパーティー内/追加中/作成者本人＝ページングと整合）。
+// パーティ候補＝同一グループの有効メンバー（SC-11・C.4）。exclude_user_ids はサーバー側で除外
+// （既にパーティ内/追加中/作成者本人＝ページングと整合）。
 export function listGroupMemberCandidates(
   groupId: string,
   params?: { q?: string; exclude_user_ids?: string[]; limit?: number; cursor?: string },
@@ -154,7 +154,7 @@ export function listGroupMemberCandidates(
   return apiFetch<QuestCandidatesResponse>(`/quest-groups/${groupId}/members${suffix}`);
 }
 
-// 複数グループ横断のパーティー候補（FR-38・SC-11/SC-12・C.4 GET /quest-group-candidates）。
+// 複数グループ横断のパーティ候補（FR-38・SC-11/SC-12・C.4 GET /quest-group-candidates）。
 // group_ids のいずれかに所属する候補を返し、各候補に所属 group_ids（部署バッジ用）が付く。
 // exclude_user_ids はサーバー側で除外（既参加/追加中/作成者本人）。
 export function listQuestGroupCandidates(
@@ -202,8 +202,8 @@ export function updateQuest(questId: string, input: QuestUpdateInput): Promise<Q
   return apiFetch<QuestDetail>(`/quests/${questId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
-// パーティー（参加メンバー＋権限）だけを一括更新（C.3 PUT /quests/{id}/party・あるべき全体像で差分適用）。
-// SC-12「パーティー・権限を編集」＝URL モーダルから members のみ送る（参加グループ等の内容は触らない）。owner/quest_admin。
+// パーティ（参加メンバー＋権限）だけを一括更新（C.3 PUT /quests/{id}/party・あるべき全体像で差分適用）。
+// SC-12「パーティ・権限を編集」＝URL モーダルから members のみ送る（参加グループ等の内容は触らない）。owner/quest_admin。
 export function updateParty(questId: string, members: QuestMemberInput[]): Promise<QuestMembersResponse | null> {
   return apiFetch<QuestMembersResponse>(`/quests/${questId}/party`, { method: "PUT", body: JSON.stringify({ members }) });
 }

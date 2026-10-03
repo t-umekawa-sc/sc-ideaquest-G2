@@ -586,7 +586,7 @@ def _validate_mentions(ts, quest, mention_ids) -> list[uuid.UUID]:
         uid = _parse_uuid(raw, field="mentions")
         is_member = quests_repo.get_active_member(ts, quest.id, uid) is not None or (quest is not None and quest.owner_id == uid)
         if not is_member:
-            raise AppError(422, "validation_error", detail="パーティー外のユーザーはメンションできません", errors=[{"field": "mentions", "code": "invalid_mention"}])
+            raise AppError(422, "validation_error", detail="パーティ外のユーザーはメンションできません", errors=[{"field": "mentions", "code": "invalid_mention"}])
         result.append(uid)
     return result
 

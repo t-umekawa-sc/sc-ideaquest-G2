@@ -25,7 +25,7 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
   prefill?: ProjectPrefill;
   conceptId?: string | null;       // 由来コンセプト（無ければコンセプト非依存＝単純タスク管理）
   conceptTitle?: string | null;
-  ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行・作成時＝session）
+  ownerName: string;               // 作成者/所有者の氏名（パーティの固定 owner 行・作成時＝session）
   ownerUserId?: string;            // 作成者/所有者の user_id（候補除外用）
   onDone: () => void;              // 成功（作成/更新）後の閉じ＝呼び元へ戻る（登録系ダイアログ標準・デザイン標準 §4.1）
   onCancel: (to?: string) => void; // キャンセル

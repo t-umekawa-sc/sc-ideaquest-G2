@@ -1250,7 +1250,7 @@ def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: 
         _authorize_edit(ts, quest, user)
         _guard_not_completed(quest)
         if uid == quest.owner_id:
-            raise AppError(422, "validation_error", detail="作成者はパーティーから外せません", errors=[{"field": "user_id", "reason": "last_owner"}])
+            raise AppError(422, "validation_error", detail="作成者はパーティから外せません", errors=[{"field": "user_id", "reason": "last_owner"}])
         cg_ids = chat_repo.list_chat_thread_ids_for_quest(ts, quest.id)  # L.4 失効対象（除去前に取得）
         repo.remove_member(ts, quest.id, uid)  # 有効参加が無ければ no-op（冪等）
         ts.commit()

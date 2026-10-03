@@ -34,7 +34,7 @@ export function renderTextHtml(raw: string, members: Member[]): string {
 }
 
 // 本文の @token を members の user_id 群へ解決（composer の送信用・重複排除）。
-//   @全員/@all は当該パーティーの全メンバーへ展開する（宛先が明確な一括通知・FR-24／E.6）。
+//   @全員/@all は当該パーティの全メンバーへ展開する（宛先が明確な一括通知・FR-24／E.6）。
 //   個別トークンは nospace 完全一致のみ（renderTextHtml の強調契約と一致）。
 export function resolveMentionIds(body: string, members: Member[]): string[] {
   const ids = new Set<string>();

@@ -201,7 +201,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           // #8: 実際に付与された評価 XP（server の xp_delta）を表示。再確定（冪等・0）は XP を出さない
           //（従来は再確定でも「＋30 XP」と誤表示していた＝金額の正はサーバー）。
           const xp = res?.xp_delta ?? 0;
-          const msgBody = `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`;
+          const msgBody = `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティ全員" : "限定"}`;
           if (xp > 0) {
             snack({ type: "reward", title: "評価を確定しました", msg: msgBody, rewards: [{ k: "xp", t: `＋${xp} XP` }] });
           } else {
@@ -472,7 +472,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
             <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="party" checked={visibility === "party"} onChange={() => setVisibility("party")} />
               <span>
-                <span className="vis-opt__title">🔓 パーティー全員に公開（既定）</span>
+                <span className="vis-opt__title">🔓 パーティ全員に公開（既定）</span>
                 <span className="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・観点別コメントを閲覧できます。フィードバックを全員で共有。</span>
               </span>
             </label>
@@ -504,7 +504,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         )}
 
         <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-          <strong>下書き保存</strong>は一時保存です（本人のみ表示・全観点がそろっていなくても保存できます）。<strong>確定</strong>すると他の評価者・パーティーに反映され、評価で XP、投稿者にコインが付与されます。
+          <strong>下書き保存</strong>は一時保存です（本人のみ表示・全観点がそろっていなくても保存できます）。<strong>確定</strong>すると他の評価者・パーティに反映され、評価で XP、投稿者にコインが付与されます。
         </p>
 
         {/* フルページ時はカード内末尾に標準フッター（右寄せ・区切り線）。モーダル時は本文外の .modal__footer（EvalFrame）へ。 */}

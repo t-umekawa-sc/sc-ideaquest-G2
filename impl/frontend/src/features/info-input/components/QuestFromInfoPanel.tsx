@@ -2,7 +2,7 @@
 
 // SC-50「この情報からクエストを作成」＝機会特定→行動の動線（実 API・C.2 from_info_id）。正＝mocks/SC-50。
 // 下書きクエストを作成し、サーバーが info_link（関連・manual）を自動生成する。作成後は登録系ダイアログの標準
-// （デザイン標準 §4.1）に従い、詳細へ遷移せずダイアログを閉じて呼び元（情報詳細）へ戻る。参加部署・パーティー・
+// （デザイン標準 §4.1）に従い、詳細へ遷移せずダイアログを閉じて呼び元（情報詳細）へ戻る。参加部署・パーティ・
 // 6権限・カラー・公開は SC-11（クエスト編集）で仕上げる（本パネルは軽量な起票）。
 import { useEffect, useState } from "react";
 
@@ -55,7 +55,7 @@ export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: strin
       await createQuestFromInfo({
         title: n, color: DEFAULT_COLOR, purpose: purpose.trim() || null, categories, deadline: due || null, from_info_id: infoId,
       });
-      snack({ type: "success", title: `クエスト「${n}」を下書き作成しました`, msg: "この情報を関連リンク（関連）として紐づけました。参加部署・パーティー・公開はクエスト編集で仕上げてください。" });
+      snack({ type: "success", title: `クエスト「${n}」を下書き作成しました`, msg: "この情報を関連リンク（関連）として紐づけました。参加部署・パーティ・公開はクエスト編集で仕上げてください。" });
       // 登録系ダイアログの標準（デザイン標準 §4.1）＝作成後は詳細（クエスト）へ遷移せず、ダイアログを閉じて
       // 呼び元（情報詳細ダイアログ）へ戻る。作成結果はトーストで伝える（クエスト編集は情報詳細の関連から辿れる）。
       onDone();
@@ -95,7 +95,7 @@ export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: strin
         <Field id="qfi-due" label="締切（任意）">
           <input className="input" id="qfi-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
-        <div className="field-note">下書きクエストとして作成します。<strong>参加部署・パーティー・6権限・カラー・公開</strong>は、作成後のクエスト編集（SC-11）で設定してください。</div>
+        <div className="field-note">下書きクエストとして作成します。<strong>参加部署・パーティ・6権限・カラー・公開</strong>は、作成後のクエスト編集（SC-11）で設定してください。</div>
       </div>
       <div className="modal__footer">
         <button className="btn btn-outline dialog-close-left" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>

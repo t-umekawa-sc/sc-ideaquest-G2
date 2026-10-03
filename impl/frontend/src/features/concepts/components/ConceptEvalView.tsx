@@ -225,7 +225,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
             <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="party" checked={visibility === "party"} onChange={() => setVisibility("party")} />
               <span>
-                <span className="vis-opt__title">🔓 パーティー全員に公開（既定）</span>
+                <span className="vis-opt__title">🔓 パーティ全員に公開（既定）</span>
                 <span className="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・推奨・総評を閲覧できます。</span>
               </span>
             </label>

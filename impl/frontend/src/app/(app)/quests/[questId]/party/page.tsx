@@ -1,6 +1,6 @@
-// SC-12「パーティー・権限を編集」のフルページ・フォールバック（直アクセス/リロード時）。
+// SC-12「パーティ・権限を編集」のフルページ・フォールバック（直アクセス/リロード時）。
 // 詳細からのソフト遷移では @modal/(.)quests/[questId]/party のモーダルが差し込まれる（Intercept Routes）。
-// プリフィルは QuestForm が GET /quests/{id} で取得。正＝C.1/C.3・SC-12 パーティータブ。
+// プリフィルは QuestForm が GET /quests/{id} で取得。正＝C.1/C.3・SC-12 パーティタブ。
 import { redirect } from "next/navigation";
 
 import { QuestPartyPanel } from "@/features/quests";

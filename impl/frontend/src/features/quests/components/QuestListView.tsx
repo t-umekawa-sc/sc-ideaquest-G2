@@ -1,11 +1,11 @@
 "use client";
 
-// SC-10 クエスト一覧＝「所属グループ内で作られ、かつ自分がパーティー参加中」のクエスト（B/クエストドメイン）。
+// SC-10 クエスト一覧＝「所属グループ内で作られ、かつ自分がパーティ参加中」のクエスト（B/クエストドメイン）。
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-10_クエスト一覧.html（DoD＝モック一致）。
 // backend 接続（C.1 GET /quests・C.4 GET /quest-groups）＝マウント時フェッチ→ビュー型へマッピング。
 // 一覧操作は DataTable（client モード）に委譲＝検索/絞込(状態/カテゴリー/グループ)/ソート/表示切替/CSV/ピン。
 // カードは cardRaw で専用クエストカード（アクセント左帯＋クエストアイコン・SC-01/SC-12 と一貫）を完全制御。
-// 参照制限（所属グループ×パーティー参加中／自分の下書き）はサーバー強制（FR-15）。下書きは本人だけに表示（グレー）。
+// 参照制限（所属グループ×パーティ参加中／自分の下書き）はサーバー強制（FR-15）。下書きは本人だけに表示（グレー）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -147,9 +147,9 @@ export function QuestListView() {
   }, [quests]);
 
   // 複製＝作成ダイアログ（SC-11）を追加モードで開き、入力項目を引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
-  // 件名/カラー/カテゴリー/参加グループ/期限日/目的・テーマ＋**参加メンバー（パーティー）＋権限**（2026-09-13 決定）。
+  // 件名/カラー/カテゴリー/参加グループ/期限日/目的・テーマ＋**参加メンバー（パーティ）＋権限**（2026-09-13 決定）。
   // クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
-  // 目的・テーマ（purpose）・参加グループ（quest_groups 0..N・FR-38）・パーティー（members）は一覧DTOに無いので
+  // 目的・テーマ（purpose）・参加グループ（quest_groups 0..N・FR-38）・パーティ（members）は一覧DTOに無いので
   // 詳細（C.1 getQuest）を取得して引き継ぐ。作成者は新しい作成者（＝自分）に置き換わるため members からは除外。
   // id・ステータス（→下書き）・アイコン画像はサーバー生成/バイナリのため引き継がず新規入力。
   const questMenu = (x: Quest): RowMenuItem[] => [
@@ -159,7 +159,7 @@ export function QuestListView() {
     {
       label: "複製",
       onClick: async () => {
-        // 目的・テーマ／参加グループ／パーティーは一覧に無い＝詳細を取得して載せる（取得失敗時は空でフォールバック）。
+        // 目的・テーマ／参加グループ／パーティは一覧に無い＝詳細を取得して載せる（取得失敗時は空でフォールバック）。
         const detail = await getQuest(x.id).catch(() => null);
         router.push(
           buildDuplicateHref("/quests/new", {
@@ -167,7 +167,7 @@ export function QuestListView() {
             color: x.accent,
             categories: x.cats,
             quest_group_ids: (detail?.quest_groups ?? []).map((g) => g.id), // 参加グループ（アクセス条件）を引き継ぐ（FR-38・0..N）
-            // パーティー＝作成者以外の参加メンバーを権限・所属グループ込みで引き継ぐ（新作成者はフォームが別途 owner で追加）。
+            // パーティ＝作成者以外の参加メンバーを権限・所属グループ込みで引き継ぐ（新作成者はフォームが別途 owner で追加）。
             members: (detail?.members ?? [])
               .filter((m) => !m.is_creator)
               .map((m) => ({ user_id: m.user.user_id, display_name: m.user.display_name, permissions: m.permissions, group_ids: m.group_ids ?? [] })),
@@ -232,7 +232,7 @@ export function QuestListView() {
         <Link href="/quests/new" className="btn btn-primary">＋ クエストを作成</Link>
       </div>
       <p className="muted text-sm" style={{ marginBottom: "var(--space-4)" }}>
-        「所属グループ内で作られ、かつ自分がパーティー参加中」のクエストを表示します。
+        「所属グループ内で作られ、かつ自分がパーティ参加中」のクエストを表示します。
       </p>
 
       {loadError ? (

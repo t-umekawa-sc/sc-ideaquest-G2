@@ -1,7 +1,7 @@
 "use client";
 
 // 開発メンバー管理フォーム本体（FR-43・Q.1b）＝**モーダル content のみ**（Modal シェルは RouteModal/Panel が提供）。
-// クエスト「パーティー・権限を編集」と同一 UI（.party 2カラム）。projectId で詳細（owner名）＋メンバーを取得し差分保存。
+// クエスト「パーティ・権限を編集」と同一 UI（.party 2カラム）。projectId で詳細（owner名）＋メンバーを取得し差分保存。
 import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
@@ -66,7 +66,7 @@ export function ProjectMembersForm({ projectId, onDone, onCancel }: {
   return (
     <>
       <ModalBody>
-        <p className="role-note" style={{ marginTop: 0 }}>開発領域の担当者（会社内の任意ユーザー）。<strong>イノベーション担当（クエストパーティー）は参照＋チャット発言を継続</strong>できます。担当割当は開発メンバーに限ります。</p>
+        <p className="role-note" style={{ marginTop: 0 }}>開発領域の担当者（会社内の任意ユーザー）。<strong>イノベーション担当（クエストパーティ）は参照＋チャット発言を継続</strong>できます。担当割当は開発メンバーに限ります。</p>
         <Field className="dialog-section is-quiet" id="pm_party" label="参加メンバー（開発メンバー）・役割">
           <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel="作成者" ownerUserId={ownerUserId} allGroupIds={allGroupIds} groupNameById={groupNameById} />
         </Field>

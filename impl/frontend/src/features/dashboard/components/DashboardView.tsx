@@ -200,7 +200,7 @@ export function DashboardView({
           {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
         </div>
         <div className="quest-card__stats">
-          <span>👥 パーティー{q.member_count ?? 0}</span>
+          <span>👥 パーティ{q.member_count ?? 0}</span>
           <span>💡 アイデア{q.idea_count ?? 0}</span>
         </div>
       </Link>
@@ -628,7 +628,7 @@ export function DashboardView({
                     {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
                   </div>
                   <div className="quest-card__stats">
-                    <span>👥 パーティー{q.member_count ?? 0}</span>
+                    <span>👥 パーティ{q.member_count ?? 0}</span>
                     <span>💡 アイデア{q.idea_count ?? 0}</span>
                   </div>
                 </Link>
@@ -653,7 +653,7 @@ export function DashboardView({
                   <span className={`badge ${q.my_state === "rejected" ? "badge-danger" : "badge-muted"}`}>{JR_LABEL[q.my_state ?? ""] ?? q.my_state}</span>
                 </div>
                 <div className="quest-card__stats">
-                  <span>👥 パーティー{q.member_count ?? 0}</span>
+                  <span>👥 パーティ{q.member_count ?? 0}</span>
                   <span>💡 アイデア{q.idea_count ?? 0}</span>
                 </div>
               </Link>

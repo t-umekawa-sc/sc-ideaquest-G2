@@ -1,6 +1,6 @@
 "use client";
 
-// SC-12「パーティー・権限を編集」の URL 付きモーダル本体（Intercept 側から使用）。
+// SC-12「パーティ・権限を編集」の URL 付きモーダル本体（Intercept 側から使用）。
 // 参加メンバー＋権限だけを編集し C.3 PUT /party で保存（内容フィールドは出さない＝QuestForm partyOnly）。
 // プリフィルは QuestForm が GET /quests/{id} で取得。onDone で QUESTS_CHANGED_EVENT＝詳細/一覧が再取得。
 import { RouteModal } from "@/components/ui";
@@ -20,7 +20,7 @@ export function QuestPartyModal({
   locale: Locale;
 }) {
   return (
-    <RouteModal title="パーティー・権限を編集" size="xl">
+    <RouteModal title="パーティ・権限を編集" size="xl">
       {(close) => (
         <QuestForm
           mode="edit"

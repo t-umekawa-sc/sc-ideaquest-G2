@@ -1,6 +1,6 @@
 /* SC-11 クエスト作成・編集フォーム（features/quests）＝mocks/SC-11_クエスト作成編集.html 準拠。
    共通クラス（.field/.input/.textarea/.swatches/.icon-field/.btn/.badge/.avatar/.quest-icon/.role-note）は
-   design-system.css。ここは SC-11 固有（2カラム行・パーティー権限編集・カテゴリーの簡易マルチセレクト）のみ。 */
+   design-system.css。ここは SC-11 固有（2カラム行・パーティ権限編集・カテゴリーの簡易マルチセレクト）のみ。 */
 
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
@@ -13,7 +13,7 @@
 .tagselect__sugbtn { padding: 3px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
 .tagselect__sugbtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
 
-/* パーティー・権限セクション */
+/* パーティ・権限セクション */
 .party { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
 .party__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
 .party__count { font-size: var(--text-xs); color: var(--color-text-muted); }
@@ -25,7 +25,7 @@
 .party__scope-note { color: var(--color-text-muted); }
 /* 候補の件数メタ（モック「候補 N 名（表示 M）」相当。サーバーはカーソル型のため総数は省き表示中＋続きの有無）。 */
 .party__candmeta { padding: var(--space-2) var(--space-4) 0; font-size: var(--text-xs); color: var(--color-text-muted); }
-/* 候補追加／選択中パーティー＝広い画面では左右2カラム、狭い画面では上下（縦積み）。 */
+/* 候補追加／選択中パーティ＝広い画面では左右2カラム、狭い画面では上下（縦積み）。 */
 .party__cols { display: grid; grid-template-columns: 1fr; }
 .party__col { min-width: 0; display: flex; flex-direction: column; }
 .party__col + .party__col { border-top: 1px solid var(--color-border); }
@@ -73,7 +73,7 @@
 .cand__plus { color: var(--color-primary); font-weight: 700; }
 
 /* =============================================================
- * SC-12 クエスト詳細＝ヒーロー＋クエスト内ランキング／タブ（アイデア/パーティー/全文検索/概要）。
+ * SC-12 クエスト詳細＝ヒーロー＋クエスト内ランキング／タブ（アイデア/パーティ/全文検索/概要）。
  * 正＝doc/画面設計/mocks/SC-12_クエスト詳細.html。
  * ============================================================= */
 /* レビュー#3＝縦積み＝ヘッダー(全幅)／KPI＋ランキング(同じ行)／クエスト内アクティビティ(全幅)。 */
@@ -159,7 +159,7 @@
 .ft-result__snippet { margin: 0; font-size: var(--text-sm); line-height: 1.7; }
 .ft-result mark { background: #FEF08A; color: inherit; padding: 0 1px; border-radius: 2px; }
 
-/* パーティー一覧 */
+/* パーティ一覧 */
 .member-list { list-style: none; margin: 0; padding: 0; }
 .member-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .member-row:last-child { border-bottom: 0; }
@@ -173,7 +173,7 @@
 .join-req-block .card { overflow: hidden; }
 .join-req-title { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-2); }
 .join-req-row { cursor: pointer; }
-/* 参加リクエスト行は淡い色地でパーティーメンバー（白地）と区別（同化防止）。pending＝注目のアンバー系／rejected＝グレー。 */
+/* 参加リクエスト行は淡い色地でパーティメンバー（白地）と区別（同化防止）。pending＝注目のアンバー系／rejected＝グレー。 */
 .join-req-block:not(.join-req-block--rejected) .join-req-row { background: #FFFBEB; }
 .join-req-block:not(.join-req-block--rejected) .join-req-row:hover { background: #FEF3C7; }
 .join-req-block--rejected .join-req-row { background: var(--color-surface-alt, rgba(0, 0, 0, 0.03)); }
@@ -203,7 +203,7 @@
   .quest-head__main { flex-direction: column; }
   .quest-head__main > .quest-icon { align-self: center; }
   .quest-head__main > div { width: 100%; }
-  /* パーティー一覧＝折り返さず横スクロール（行は内容幅・権限バッジ nowrap）。 */
+  /* パーティ一覧＝折り返さず横スクロール（行は内容幅・権限バッジ nowrap）。 */
   .tab-party-card { overflow-x: auto; }
   .member-row { flex-wrap: nowrap; min-width: max-content; }
   .member-perms { flex-wrap: nowrap; margin-left: var(--space-5); }

@@ -118,7 +118,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     snack({ type: "success", title: "自動要約を更新しました" });
   }
 
-  // 後続クエスト複製（⑥次アクション＝次サイクルへ）＝件名/カラー/カテゴリ/参加グループ/期限/目的＋パーティーを引き継ぐ。
+  // 後続クエスト複製（⑥次アクション＝次サイクルへ）＝件名/カラー/カテゴリ/参加グループ/期限/目的＋パーティを引き継ぐ。
   const dupHref = buildDuplicateHref("/quests/new", {
     title: `${quest.title}（続き）`,
     color: quest.color,
@@ -250,7 +250,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           <span className="qresult__kpi"><b>{p.selected_count}</b><span>選定</span></span>
           <span className="qresult__kpi"><b>{p.vote_total}</b><span>投票</span></span>
           <span className="qresult__kpi"><b>{p.evaluation_count}</b><span>評価</span></span>
-          <span className="qresult__kpi"><b>{p.party_size}</b><span>パーティー</span></span>
+          <span className="qresult__kpi"><b>{p.party_size}</b><span>パーティ</span></span>
         </div>
         <div className="qresult__aspects">
           {ASPECT_LABELS.map(([k, label]) => {

@@ -16,7 +16,7 @@ import { deleteTask, getProject, listProjectMembers, listProjectTasks, listRecen
 import type { RecentTaskChat } from "../api";
 import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
 import "@/features/dashboard/dashboard.css"; // 🕒最近の議論の一覧クラス（.unread-list/.unread-item）をダッシュボードから踏襲（§2.1c）
-import "@/features/quests/quests.css"; // パーティー一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
+import "@/features/quests/quests.css"; // パーティ一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
 import "../projects.css";
 
 const P_STATUS_LABEL: Record<string, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
@@ -241,7 +241,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         </section>
       )}
 
-      {/* 開発メンバー タブ＝クエストのパーティー行レイアウト（.card＞.member-list＞.member-row）を踏襲しつつ、開発担当とイノベーション担当を個別グループで表示（§2.1c） */}
+      {/* 開発メンバー タブ＝クエストのパーティ行レイアウト（.card＞.member-list＞.member-row）を踏襲しつつ、開発担当とイノベーション担当を個別グループで表示（§2.1c） */}
       {tab === "members" && (
         <section aria-label="開発メンバー">
           <div className="list-toolbar">
@@ -281,7 +281,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             </ul>
           </div>
 
-          <p className="hint" style={{ marginTop: "var(--space-3)" }}>※ 開発担当＝タスク担当・状態更新の主体（会社内の任意ユーザー）。イノベーション担当（由来クエストのパーティー）は参照＋チャット発言（口出し）が可能。</p>
+          <p className="hint" style={{ marginTop: "var(--space-3)" }}>※ 開発担当＝タスク担当・状態更新の主体（会社内の任意ユーザー）。イノベーション担当（由来クエストのパーティ）は参照＋チャット発言（口出し）が可能。</p>
         </section>
       )}
 

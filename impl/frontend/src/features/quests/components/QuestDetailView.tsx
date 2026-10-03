@@ -1,8 +1,8 @@
 "use client";
 
-// SC-12 クエスト詳細＝クエストヘッダー＋クエスト内週間ランキング＋タブ（アイデア一覧/パーティー/全文検索/概要）。
+// SC-12 クエスト詳細＝クエストヘッダー＋クエスト内週間ランキング＋タブ（アイデア一覧/パーティ/全文検索/概要）。
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-12_クエスト詳細.html（DoD＝モック一致）。
-// 接続範囲＝ヘッダー/概要/パーティー（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
+// 接続範囲＝ヘッダー/概要/パーティ（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
 // 編集導線（SC-11 /quests/{id}/edit）＋**アイデアタブ（D.1 GET /quests/{id}/ideas・IDEAS_CHANGED 購読）**。
 // アイデアタブ/全文検索(J)/評価列(F)/クエスト内週間ランキング(G) すべて実接続。
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -93,18 +93,18 @@ function statusBadgeClass(s: string): string {
   if (s === "draft") return "badge badge-muted";
   return "badge badge-success";
 }
-// API 権限 → パーティー表示バッジ（👑 所有者を先頭に）。
+// API 権限 → パーティ表示バッジ（👑 所有者を先頭に）。
 const PERM_BADGE: Record<string, string> = { owner: "👑 所有者", quest_admin: "クエスト管理", evaluator: "評価者", vote: "投票", idea_create: "作成", comment: "コメント" };
 const PERM_VIEW_ORDER = ["owner", "quest_admin", "evaluator", "vote", "idea_create", "comment"];
 
 // 並び順＝価値創造の流れ（アイデア→コンセプト）を先頭に、検索はコンテンツ横断ユーティリティとして隣接、
-// パーティー（人・管理）を後方、結果を culmination として最右（2026-09-26 ユーザー決定）。
+// パーティ（人・管理）を後方、結果を culmination として最右（2026-09-26 ユーザー決定）。
 const TABS = [
   { key: "ideas", label: "💡 アイデア" },
   // 🧩 コンセプト＝ISO 56001 ②③段の候補コンセプト＋検証プール（FR-42・§4.6）。アイデア選別を受けて創造/検証する段。
   { key: "concept", label: "🧩 コンセプト" },
   { key: "search", label: "🔍 全文検索" },
-  { key: "party", label: "👥 パーティー" },
+  { key: "party", label: "👥 パーティ" },
   // 🏁 結果＝クエストの最終成果（FR-39）。アイデア選別の申し送り＋勝ち残ったコンセプト（判定/選定）。最右に固定。
   { key: "result", label: "🏁 結果" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
@@ -344,7 +344,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // 後退＝隣接1段のみ・draft（0）へは戻さない＝下限 recruiting（curIdx>=2 のとき prev が recruiting 以上）。C.5。
   const prevStatus = curStatusIdx >= 2 ? STATUS_ORDER[curStatusIdx - 1] : undefined;
 
-  // --- FR-40 受信側＝参加リクエストの承認/却下（SC-12 §4.3 パーティータブ・owner/quest_admin のみ・C.9.1）---
+  // --- FR-40 受信側＝参加リクエストの承認/却下（SC-12 §4.3 パーティタブ・owner/quest_admin のみ・C.9.1）---
   const [joinReqs, setJoinReqs] = useState<JoinRequestRow[] | null>(null);   // null=未取得
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});  // 部署 id→名（バッジ装飾）
   const [reqSel, setReqSel] = useState<JoinRequestRow | null>(null);         // 承認/却下ダイアログ対象
@@ -359,13 +359,13 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
     }
   }, [questId]);
 
-  // owner/quest_admin なら（タブに依らず）参加リクエストを取得＝パーティータブの未処理バッジを常時表示するため。
+  // owner/quest_admin なら（タブに依らず）参加リクエストを取得＝パーティタブの未処理バッジを常時表示するため。
   useEffect(() => {
     if (!canEdit) return;
     void loadJoinReqs();
   }, [canEdit, loadJoinReqs]);
 
-  // 部署名は装飾（行/ダイアログのバッジ）＝パーティータブを開いた時に一度だけ取得。
+  // 部署名は装飾（行/ダイアログのバッジ）＝パーティタブを開いた時に一度だけ取得。
   useEffect(() => {
     if (tab !== "party" || !canEdit || Object.keys(groupNames).length > 0) return;
     void listCompanyGroupDirectory()
@@ -464,7 +464,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
     return () => { alive = false; };
   }, [questId]);
 
-  // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティー所属）。
+  // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティ所属）。
   const loadQuestFeed = useCallback((cursor?: string | null) => getQuestActivities(questId, cursor), [questId]);
 
   // アイデア行の操作メニュー（⋯）＝リスト操作列とカード右下で共用。未投票=クイック投票／下書き=続き／
@@ -574,7 +574,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
   const ownerName = quest.owner.display_name || "?";
   const party = quest.members;
-  // 完了クエストは書き込み凍結（サーバー 409）＝編集/アイデア追加/パーティー編集を事前無効化（is-frozen・SC-22 と統一）。
+  // 完了クエストは書き込み凍結（サーバー 409）＝編集/アイデア追加/パーティ編集を事前無効化（is-frozen・SC-22 と統一）。
   const questCompleted = quest.status === "completed";
 
   return (
@@ -602,7 +602,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                   {(() => { const du = deadlineUrgency(quest.deadline, todayISO()); return (
                     <span className="deadline" data-urgency={du.level}>⏳ 締切 {deadlineText(quest.deadline)}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>
                   ); })()}
-                  <span>👥 パーティー {quest.member_count}人</span>
+                  <span>👥 パーティ {quest.member_count}人</span>
                   <span>💡 アイデア {quest.idea_count}件</span>
                   <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span>
                   {(() => {
@@ -746,7 +746,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <h3>★ クエスト KPI ★</h3>
           <div className="quest-kpi__grid">
             <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>💡</span><span className="quest-kpi__num">{quest.idea_count}</span><span className="quest-kpi__label">アイデア</span></div>
-            <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>👥</span><span className="quest-kpi__num">{quest.member_count}</span><span className="quest-kpi__label">パーティー</span></div>
+            <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>👥</span><span className="quest-kpi__num">{quest.member_count}</span><span className="quest-kpi__label">パーティ</span></div>
             {(() => {
               const du = deadlineUrgency(quest.deadline, todayISO());
               const txt = du.level === "none" ? "—" : du.level === "over" ? "超過" : String(du.days);
@@ -935,13 +935,13 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
       )}
 
-      {/* パーティー（実接続・C.1/C.3＋FR-40 受信側＝参加リクエスト承認/却下・C.9.1） */}
+      {/* パーティ（実接続・C.1/C.3＋FR-40 受信側＝参加リクエスト承認/却下・C.9.1） */}
       {tab === "party" && (
-        <section aria-label="パーティー">
+        <section aria-label="パーティ">
           <div className="list-toolbar">
             <div className="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
             {canEdit && (
-              <button className={`btn btn-outline btn-sm${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティー・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティー・権限を編集</button>
+              <button className={`btn btn-outline btn-sm${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティ・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティ・権限を編集</button>
             )}
           </div>
 
@@ -1018,7 +1018,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
       )}
 
-      {/* 承認/却下ダイアログ（共有・パーティータブ/ダッシュボード/通知の3経路）＝タブに依らず reqSel で開く。 */}
+      {/* 承認/却下ダイアログ（共有・パーティタブ/ダッシュボード/通知の3経路）＝タブに依らず reqSel で開く。 */}
       {reqSel && (
         <JoinRequestDialog
           questId={questId}

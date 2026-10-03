@@ -1,6 +1,6 @@
 "use client";
 
-// 開発メンバー選択ピッカー（FR-43・Q.1b）＝クエスト「参加メンバー（パーティー）・権限」エディタ（.party 2カラム）を踏襲。
+// 開発メンバー選択ピッカー（FR-43・Q.1b）＝クエスト「参加メンバー（パーティ）・権限」エディタ（.party 2カラム）を踏襲。
 // 候補は**実データ＝会社ディレクトリ**（quest_group_directory／quest-group-candidates を再利用）。役割は開発役割（lead/member）。
 // 参加グループ（アクセス条件）は上位 Field で controlled（groupFilter）＝候補スコープ＋グループ外マーキング。
 import { useEffect, useMemo, useState } from "react";

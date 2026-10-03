@@ -834,7 +834,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
               </div>
               {hintOpen && (
                 <p className="composer__hint" id="composerHint">
-                  <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span className="xp">+5 XP</span>（日次上限あり）。<br />
+                  <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティ全員が閲覧・投稿できます（コメント作成権限）。投稿で <span className="xp">+5 XP</span>（日次上限あり）。<br />
                   ツールバー: 📎添付 ・ <code>@</code>メンション（<code>@全員</code>／<code>@all</code> でメンバー全員に通知）・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。
                 </p>
               )}

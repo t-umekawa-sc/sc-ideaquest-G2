@@ -412,8 +412,8 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           <section className="card" aria-label="投票">
             <div className="concept-section-head">
               <h2 className="card-title" style={{ margin: 0 }}>投票</h2>
-              <ScreenPurpose summary="パーティー全員の賛否（民意・機運）。1人1票・変更/取消可・自分にも可。評価スコアには影響しない（投票と評価は独立）。" dialogTitle="投票とは（投票・評価・総合判定の住み分け）">
-                <p style={{ margin: 0 }}><strong>投票</strong>＝コンセプト投票権限を持つ<strong>パーティー全員</strong>が賛成/反対で示す<strong>民意（機運）</strong>です。1人1票・変更/取消可・自分のコンセプトにも投票可（投票で +5 XP＝各コンセプト初回）。<strong>評価スコアや総合判定を自動では動かさない参考シグナル</strong>です。</p>
+              <ScreenPurpose summary="パーティ全員の賛否（民意・機運）。1人1票・変更/取消可・自分にも可。評価スコアには影響しない（投票と評価は独立）。" dialogTitle="投票とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>投票</strong>＝コンセプト投票権限を持つ<strong>パーティ全員</strong>が賛成/反対で示す<strong>民意（機運）</strong>です。1人1票・変更/取消可・自分のコンセプトにも投票可（投票で +5 XP＝各コンセプト初回）。<strong>評価スコアや総合判定を自動では動かさない参考シグナル</strong>です。</p>
                 <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。3 つは独立した入力で、総合判定が最終アウトプットです。</p>
               </ScreenPurpose>
             </div>

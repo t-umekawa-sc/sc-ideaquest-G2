@@ -4,7 +4,7 @@
 // レイアウト/コピー/フィールドの正＝doc/画面設計/mocks/SC-11_クエスト作成編集.html（DoD＝モック一致）。
 // FR-38 再設計（2026-09-12）＝参加部署＝アクセス条件（フラット 0..N・すべて同格・主グループ廃止）。
 //  - 参加部署は会社ディレクトリから単一の複数選択（0 件も可＝全社がアクセス可・候補）。
-//  - パーティー候補＝参加部署の所属者（0 件なら会社全体）。参加部署外の名指しメンバーは in_scope=false＝失効表示。
+//  - パーティ候補＝参加部署の所属者（0 件なら会社全体）。参加部署外の名指しメンバーは in_scope=false＝失効表示。
 //  - 409 group_in_use は廃止（外すのはブロックしない＝失効で表現）。
 // 入力検証はデザイン標準 §4.7（インライン aria-invalid＋上部サマリ・送信時＋blur・フォーカス移動しない）。
 // 権限キーは UI（manage/eval/vote/idea/comment）⇔ API（quest_admin/evaluator/vote/idea_create/comment）で写像。
@@ -126,7 +126,7 @@ type Props = {
   ownerName: string; // 作成=session ユーザー／編集=取得した owner で上書き
   ownerUserId: string | null; // 候補の自己除外（C.4）
   locale?: Locale;
-  // パーティー限定編集（SC-12「パーティー・権限を編集」）＝参加メンバー＋権限だけを編集し、C.3 PUT /party で保存。
+  // パーティ限定編集（SC-12「パーティ・権限を編集」）＝参加メンバー＋権限だけを編集し、C.3 PUT /party で保存。
   // 内容（件名/カテゴリ/参加グループ等）のフィールドは出さない。edit モード前提（questId 必須）。
   partyOnly?: boolean;
   onDone: () => void;
@@ -177,7 +177,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             purpose?: string;
             quest_group_ids?: string[];
             strategy_document_ids?: string[]; // 適用経営資料（R.1b）＝複製で引き継ぐ
-            // 複製で引き継ぐパーティー（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
+            // 複製で引き継ぐパーティ（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
             members?: { user_id: string; display_name: string; permissions?: string[]; group_ids?: string[] }[];
             deadline?: string;
             discoverable?: boolean; // 発見カタログ掲載（FR-40・C.9.0）＝複製で引き継ぐ
@@ -222,7 +222,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       deptIds: m.group_ids ?? [],
     })),
   );
-  const [selQuery, setSelQuery] = useState(""); // 選択中パーティーの名前絞込
+  const [selQuery, setSelQuery] = useState(""); // 選択中パーティの名前絞込
   const [selOutOnly, setSelOutOnly] = useState(false); // 参加部署外（失効中）のみ表示
   const SEL_PAGE = 8;
   const [selShown, setSelShown] = useState(SEL_PAGE);
@@ -408,7 +408,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     () => candidates.filter((c) => !members.some((m) => m.userId === c.user_id)),
     [candidates, members],
   );
-  // 選択中パーティーの絞込（名前／参加部署外＝失効中のみ）＋ページング。
+  // 選択中パーティの絞込（名前／参加部署外＝失効中のみ）＋ページング。
   const filteredMembers = useMemo(
     () => members.filter((m) => (!selQuery.trim() || m.name.includes(selQuery.trim())) && (!selOutOnly || !m.inScope)),
     [members, selQuery, selOutOnly],
@@ -418,7 +418,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   function bulkRemoveMembers() {
     const ids = new Set(filteredMembers.map((m) => m.userId));
     if (ids.size === 0) return;
-    if (ids.size > 1 && !window.confirm(`${ids.size} 名をパーティーから外します。よろしいですか？`)) return;
+    if (ids.size > 1 && !window.confirm(`${ids.size} 名をパーティから外します。よろしいですか？`)) return;
     setMembers((m) => m.filter((x) => !ids.has(x.userId)));
   }
 
@@ -484,7 +484,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   function addAllCandidates() {
     // 表示中（取得済み・未追加）の候補を一括追加。件数が多い時は確認（サーバーページングのため「表示中」が対象）。
     if (displayedCandidates.length === 0) return;
-    if (displayedCandidates.length > 30 && !window.confirm(`表示中の ${displayedCandidates.length} 名をパーティーに追加します。よろしいですか？`)) return;
+    if (displayedCandidates.length > 30 && !window.confirm(`表示中の ${displayedCandidates.length} 名をパーティに追加します。よろしいですか？`)) return;
     setMembers((m) => {
       const have = new Set(m.map((x) => x.userId));
       const add = displayedCandidates
@@ -553,7 +553,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   type SaveKind = "create-draft" | "create-publish" | "edit-save" | "edit-publish" | "party-save";
   async function persist(kind: SaveKind) {
     const forPublish = kind === "create-publish" || kind === "edit-publish" || (kind === "edit-save" && status !== "draft");
-    // パーティー限定編集は内容（件名等）を触らないため内容検証はしない（C.3 members のみ）。
+    // パーティ限定編集は内容（件名等）を触らないため内容検証はしない（C.3 members のみ）。
     const clientErrors = kind === "party-save" ? {} : validate(forPublish);
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
@@ -564,7 +564,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     }
     setFieldErrors({});
     setSummary([]);
-    // 編集の内容保存で無変更なら API を呼ばず info「変更はありません」（発行/公開/パーティーは対象外・デザイン標準 §14）。
+    // 編集の内容保存で無変更なら API を呼ばず info「変更はありません」（発行/公開/パーティは対象外・デザイン標準 §14）。
     if (kind === "edit-save") {
       const sig = questContentSig({
         title: name, color, categories, deadline, purpose: theme, deptIds, strategyDocIds, discoverable, members: buildMembers(),
@@ -608,7 +608,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         const doneTitle =
           kind === "create-publish" ? "クエストを作成・公開しました"
           : kind === "edit-publish" ? "クエストを公開しました"
-          : kind === "party-save" ? "パーティーを更新しました"
+          : kind === "party-save" ? "パーティを更新しました"
           : "クエストを保存しました";
         snack({ type: "success", title: doneTitle });
       }
@@ -633,7 +633,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // パーティー限定編集＝members のみ保存（C.3）。以降は通常の作成/編集フロー。
+    // パーティ限定編集＝members のみ保存（C.3）。以降は通常の作成/編集フロー。
     if (partyOnly) { void persist("party-save"); return; }
     // 送信（Enter/主ボタン）＝作成は公開、編集の下書きは公開、編集の公開中は保存。
     if (!isEdit) void persist("create-publish");
@@ -666,7 +666,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       <ModalBody>
         <p className="role-note" style={{ marginTop: 0 }}>
           {partyOnly
-            ? <><strong>パーティー・権限の編集</strong>＝参加メンバーと各権限だけを変更します（所有者・クエスト管理権限者のみ）。参加グループ等の内容はクエスト編集から変更してください。</>
+            ? <><strong>パーティ・権限の編集</strong>＝参加メンバーと各権限だけを変更します（所有者・クエスト管理権限者のみ）。参加グループ等の内容はクエスト編集から変更してください。</>
             : <><strong>作成</strong>は認証済みなら誰でも（作成者＝所有者）。<strong>編集</strong>は所有者・クエスト管理権限者のみ。</>}
         </p>
 
@@ -779,8 +779,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         </>
         )}
 
-        {/* パーティー・権限＝入力グループの区切り（§4.1 ダイアログ内コンテンツ標準）。 */}
-        <Field className="dialog-section is-quiet" id="q_party" label="参加メンバー（パーティー）・権限" required>
+        {/* パーティ・権限＝入力グループの区切り（§4.1 ダイアログ内コンテンツ標準）。 */}
+        <Field className="dialog-section is-quiet" id="q_party" label="参加メンバー（パーティ）・権限" required>
           <div className="party">
             {/* 参加クエストグループ（アクセス条件）バナー＝候補の範囲（モック SC-11 と一致）。 */}
             <div className="party__scope">
@@ -862,9 +862,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             )}
               </div>
               <div className="party__col">
-            {/* 選択中のパーティー（モック順＝後・右カラム）＝ヘッダ／警告／絞込・まとめて外す／一覧／もっと見る。 */}
+            {/* 選択中のパーティ（モック順＝後・右カラム）＝ヘッダ／警告／絞込・まとめて外す／一覧／もっと見る。 */}
             <div className="party__head">
-              <strong>選択中のパーティー</strong>
+              <strong>選択中のパーティ</strong>
               <span className="party__count">{members.length + 1} 名</span>
             </div>
             {outOfScopeCount > 0 && (
@@ -925,7 +925,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                       ))}
                     </div>
                   </div>
-                  {!frozen && <button type="button" className="pmember__remove" aria-label={`${m.name} をパーティーから外す`} onClick={() => removeMember(m.userId)}>✕</button>}
+                  {!frozen && <button type="button" className="pmember__remove" aria-label={`${m.name} をパーティから外す`} onClick={() => removeMember(m.userId)}>✕</button>}
                 </div>
               ))}
             </div>
@@ -941,7 +941,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
         {!partyOnly && (
           <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-            <strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>作成/公開</strong>で公開し、パーティーに通知します。
+            <strong>下書き保存</strong>すると本人だけに表示され、パーティには公開されません。<strong>作成/公開</strong>で公開し、パーティに通知します。
           </p>
         )}
       </ModalBody>

@@ -1,6 +1,6 @@
 // C-TC-274（unit）参加リクエスト受信側 API クライアント写像＝EP パス/メソッド/クエリ/Idempotency を検証。
-// SC-12 パーティータブ（FR-40 受信側・C.9.1）。EP パス/メソッド誤りの回帰防止（apiFetch はモック）。
-// 正＝doc/API設計/C_クエスト・パーティー・権限.md C.9.1。
+// SC-12 パーティタブ（FR-40 受信側・C.9.1）。EP パス/メソッド誤りの回帰防止（apiFetch はモック）。
+// 正＝doc/API設計/C_クエスト・パーティ・権限.md C.9.1。
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const apiFetch = vi.fn(async () => ({}));

@@ -1,6 +1,6 @@
-// SC-12「パーティー・権限を編集」の URL 付きモーダル（Intercept Routes）。詳細からのソフト遷移で
+// SC-12「パーティ・権限を編集」の URL 付きモーダル（Intercept Routes）。詳細からのソフト遷移で
 // /quests/[questId]/party をこのモーダルに差し込む。直アクセス/リロードは (app)/quests/[questId]/party のフルページへ。
-// プリフィルは QuestForm が GET /quests/{id} で取得。正＝C.1/C.3・SC-12 パーティータブ。
+// プリフィルは QuestForm が GET /quests/{id} で取得。正＝C.1/C.3・SC-12 パーティタブ。
 import { redirect } from "next/navigation";
 
 import { QuestPartyModal } from "@/features/quests";

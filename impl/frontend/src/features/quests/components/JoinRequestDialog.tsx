@@ -1,6 +1,6 @@
 "use client";
 
-// 参加リクエストの承認/却下ダイアログ（FR-40・C.9.1）＝SC-12 パーティータブ／SC-01 ダッシュボード／通知リンクの3経路で共有。
+// 参加リクエストの承認/却下ダイアログ（FR-40・C.9.1）＝SC-12 パーティタブ／SC-01 ダッシュボード／通知リンクの3経路で共有。
 // 申請者プロフィール（承認判断材料）＋**対象クエストの概要**（どのクエストの申請か分かるように）＋承諾/拒否。
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
@@ -58,7 +58,7 @@ export function JoinRequestDialog({
       if (action === "approve") await approveJoinRequest(questId, request.user.user_id);
       else await rejectJoinRequest(questId, request.user.user_id);
       onClose();
-      snackbar({ type: "success", msg: action === "approve" ? "パーティーに追加しました。" : "参加リクエストを却下しました。" });
+      snackbar({ type: "success", msg: action === "approve" ? "パーティに追加しました。" : "参加リクエストを却下しました。" });
       onDecided?.(request.user.user_id, action);
     } catch (err) {
       snackbar({

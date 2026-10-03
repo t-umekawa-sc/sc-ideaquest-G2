@@ -202,7 +202,7 @@ export function listScopeMessages(scopeId: string): Promise<ConceptChatMsgList |
   return apiFetch<ConceptChatMsgList>(`/concept-chat-scopes/${scopeId}/messages`);
 }
 
-// メッセージ投稿（コメント権限＝既定パーティー員）。
+// メッセージ投稿（コメント権限＝既定パーティ員）。
 export function postScopeMessage(scopeId: string, body: string): Promise<ConceptChatMsg | null> {
   return apiFetch<ConceptChatMsg>(`/concept-chat-scopes/${scopeId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
 }

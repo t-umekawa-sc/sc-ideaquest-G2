@@ -153,7 +153,7 @@ export function unlockSpell(spellId: string): Promise<{ unlocked: boolean; skill
   return apiFetch<{ unlocked: boolean; skill_point_balance: number }>(`/spells/${spellId}/unlock`, { method: "POST" });
 }
 
-// パーティーメンバー（@メンション候補・C.1）。応答は QuestMembersResponse＝各要素は
+// パーティメンバー（@メンション候補・C.1）。応答は QuestMembersResponse＝各要素は
 // `{ user: {user_id, display_name, …}, permissions, joined_at, is_creator }`（display_name は **user にネスト**）。
 export type PartyMember = { user: { user_id: string; display_name: string; avatar_image_url?: string | null } };
 export function getPartyMembers(questId: string): Promise<{ data: PartyMember[] } | null> {

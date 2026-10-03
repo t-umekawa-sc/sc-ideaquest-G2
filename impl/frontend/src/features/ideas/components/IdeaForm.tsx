@@ -340,9 +340,9 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
       } else if (publishXp > 0) {
         // 実際に付与された額を表示（金額の正はサーバー・#8）。冪等等で 0 の時は素の成功表示。
-        snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: `＋${publishXp} XP` }] });
+        snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティに公開しました。", rewards: [{ k: "xp", t: `＋${publishXp} XP` }] });
       } else {
-        snack({ type: "success", title: "アイデアを投稿しました", msg: "パーティーに公開しました。" });
+        snack({ type: "success", title: "アイデアを投稿しました", msg: "パーティに公開しました。" });
       }
       onDone();
     } catch (err) {
@@ -408,7 +408,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             </>
           ) : (
             <>
-              <strong>アイデア作成権限</strong>を持つパーティーメンバーが投稿できます。必須は{" "}
+              <strong>アイデア作成権限</strong>を持つパーティメンバーが投稿できます。必須は{" "}
               <strong>件名・アイデア本文・価値</strong> の 3 項目。
             </>
           )}
@@ -622,8 +622,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             </>
           ) : (
             <>
-              必須3項目がそろうと「投稿する」が押せます。<strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。
-              <strong>投稿</strong>でパーティーに公開し、アイデアごとのチャットが自動で作成され、投稿で XP を獲得します。
+              必須3項目がそろうと「投稿する」が押せます。<strong>下書き保存</strong>すると本人だけに表示され、パーティには公開されません。
+              <strong>投稿</strong>でパーティに公開し、アイデアごとのチャットが自動で作成され、投稿で XP を獲得します。
             </>
           )}
         </p>

@@ -8,7 +8,7 @@ export type TeamFeed = components["schemas"]["TeamFeedResponse"];
 
 const q = (cursor?: string | null) => (cursor ? `?limit=8&cursor=${encodeURIComponent(cursor)}` : "?limit=8");
 
-// クエスト内フィード（SC-12・門番＝パーティー所属）。
+// クエスト内フィード（SC-12・門番＝パーティ所属）。
 export function getQuestActivities(questId: string, cursor?: string | null): Promise<QuestFeed | null> {
   return apiFetch<QuestFeed>(`/quests/${questId}/activities${q(cursor)}`);
 }

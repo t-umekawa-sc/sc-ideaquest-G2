@@ -41,7 +41,7 @@ export function getIdea(ideaId: string): Promise<IdeaDetail | null> {
   return apiFetch<IdeaDetail>(`/ideas/${ideaId}`);
 }
 
-// アイデア作成（SC-21・D.2）。status=published は即公開（strict 検証＋パーティー通知＋チャット作成・XP は G 依存で no-op）。
+// アイデア作成（SC-21・D.2）。status=published は即公開（strict 検証＋パーティ通知＋チャット作成・XP は G 依存で no-op）。
 // status=draft は本人のみ表示（loose 検証）。作成者＝author。
 export function createIdea(questId: string, input: IdeaCreateInput): Promise<IdeaDetail | null> {
   return apiFetch<IdeaDetail>(`/quests/${questId}/ideas`, { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });
@@ -83,7 +83,7 @@ export function removeVote(ideaId: string): Promise<null> {
   return apiFetch<null>(`/ideas/${ideaId}/vote`, { method: "DELETE" }) as Promise<null>;
 }
 
-// アイデアをフォロー（SC-22・D.6・冪等・パーティー所属）。completed 後の新規は 409。
+// アイデアをフォロー（SC-22・D.6・冪等・パーティ所属）。completed 後の新規は 409。
 export function followIdea(ideaId: string): Promise<null> {
   return apiFetch<null>(`/ideas/${ideaId}/follow`, { method: "POST" }) as Promise<null>;
 }

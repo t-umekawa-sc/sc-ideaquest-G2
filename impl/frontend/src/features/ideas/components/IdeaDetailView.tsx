@@ -721,7 +721,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                 <span className={stClass}>{stLabel}</span>
               </dd>
               <dt>公開範囲</dt>
-              <dd>このクエストのパーティー内</dd>
+              <dd>このクエストのパーティ内</dd>
               <dt>版</dt>
               <dd>v{idea.current_revision}</dd>
               <dt>投稿日</dt>

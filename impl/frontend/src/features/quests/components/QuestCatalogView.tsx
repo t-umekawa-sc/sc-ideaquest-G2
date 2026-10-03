@@ -176,8 +176,8 @@ export function QuestCatalogView() {
           {r.deadline ? <span className="deadline">⏳ 締切 {r.deadline}</span> : null}
         </div>
         <div className="quest-card__stats">
-          {/* ダッシュボードの参加中クエストカードと表記統一（👥 パーティーN／💡 アイデアN）。 */}
-          <span>👥 パーティー{r.member_count}</span>
+          {/* ダッシュボードの参加中クエストカードと表記統一（👥 パーティN／💡 アイデアN）。 */}
+          <span>👥 パーティ{r.member_count}</span>
           <span>💡 アイデア{r.idea_count}</span>
           {/* フォロー中は★アイコンで表す（バッジ重複を避ける）。他状態はバッジ表示。 */}
           {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}

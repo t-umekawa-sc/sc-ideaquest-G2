@@ -404,7 +404,7 @@ body.iq-nav-lock { overflow: hidden; }
 .modal--sm .modal__panel { max-width: 480px; }
 .modal--md .modal__panel { max-width: 600px; }
 .modal--lg .modal__panel { max-width: 720px; }
-.modal--xl .modal__panel { max-width: 960px; } /* クエスト作成/編集＝パーティーを左右2カラムで配置するため広め */
+.modal--xl .modal__panel { max-width: 960px; } /* クエスト作成/編集＝パーティを左右2カラムで配置するため広め */
 
 /* ダイアログ内コンテンツ標準（決定 2026-09-18・参照系＋入力系で共通・デザイン標準 §4.1）
    ＝対象/セクションは「囲まない」。項目見出し（.dialog-label）＋項目間の薄い仕切り線（.dialog-section の border-top）で区切る。
