@@ -5671,22 +5671,6 @@
     ゾーン左の色帯は見本用の仕切り（実装では出さない）。
   </p>
 
-  <!-- Zone A -->
-  <div class="sg-zone" style="--z:var(--sg-zone-a)">
-    <div class="sg-zone__label" style="--z:var(--sg-zone-a)">A 最上段 ・ ステータス<span class="sg-zone__note">既存の hero＋週間ランキングを踏襲</span></div>
-    <div class="sg-dash-2col">
-      <div class="card">
-        <div class="section-head"><h3>🎮 あなたのステータス</h3><span class="badge">Lv.12</span></div>
-        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">次のレベルまで</div><div class="sg-row__sub">XP 320 / 500</div></div><span class="badge badge-muted">◆ 1,240</span></div>
-      </div>
-      <div class="card">
-        <div class="section-head"><h3>🏆 週間ランキング</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
-        <div class="sg-row"><span class="badge">🥇</span><div class="sg-row__main"><div class="sg-row__title">佐藤 花子</div></div><span class="badge badge-muted">980</span></div>
-        <div class="sg-row"><span class="badge">🥈</span><div class="sg-row__main"><div class="sg-row__title">鈴木 太郎</div></div><span class="badge badge-muted">845</span></div>
-      </div>
-    </div>
-  </div>
-
   <!-- Zone B -->
   <div class="sg-zone" style="--z:var(--sg-zone-b)">
     <div class="sg-zone__label" style="--z:var(--sg-zone-b)">B あなたの番（要対応）<span class="sg-zone__note">散在する要対応をタブで1枚に集約・バッジで件数</span></div>
@@ -5810,6 +5794,17 @@
       <label><input type="radio" name="sg-qfilter"> 参加中</label>
       <label><input type="radio" name="sg-qfilter"> 参加リクエスト中</label>
       <label><input type="radio" name="sg-qfilter"> フォロー中</label>
+    </div>
+  </div>
+
+  <!-- Zone A（最下段）＝現状のゲーム風パネルをそのまま流用（完全踏襲のためモック省略） -->
+  <div class="sg-zone" style="--z:var(--sg-zone-a)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-a)">A 最下段 ・ ステータス（ゲーム風）</div>
+    <div class="card" style="background:var(--color-surface-alt)">
+      <p class="hint" style="margin:0">
+        <strong>現状のゲーム風パネルをそのまま流用</strong>（`.pixel-panel hero`＝3Dアバター/Lv/XPバー/コイン・SP/ショップ・きせかえ・魔法スキル ＋ `.pixel-panel rank-panel`＝週間ランキング）。
+        <strong>完全踏襲のためモック省略</strong>。現物は <a href="SC-01_ダッシュボード.html">SC-01 ダッシュボード</a> を参照。配置のみ<strong>最下段</strong>へ変更。
+      </p>
     </div>
   </div>
 </section>
