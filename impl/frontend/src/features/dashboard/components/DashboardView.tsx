@@ -39,6 +39,12 @@ import {
 } from "../api";
 import { JoinRequestDialog, type JoinRequestQuestSummary } from "@/features/quests";
 import type { JoinRequestRow } from "@/features/quests/api";
+
+// クエストのステータス日本語ラベル（SC-10/SC-12 と同一表記）。ダッシュボードのクエストカードで英語 status をそのまま出さない。
+const QUEST_STATUS_LABEL: Record<string, string> = {
+  draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了",
+};
+const questStatusLabel = (s: string): string => QUEST_STATUS_LABEL[s] ?? s;
 import "../dashboard.css";
 
 type Balance = {
@@ -194,7 +200,7 @@ export function DashboardView({
       <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
         <div className="between">
           <span className="card-title">{q.title}</span>
-          <span className="badge">{q.status}</span>
+          <span className="badge">{questStatusLabel(q.status)}</span>
         </div>
         <div className="quest-card__meta">
           {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
@@ -671,7 +677,7 @@ export function DashboardView({
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); void unfollowQuestCard(q.id); }}>★</button>
                   <div className="between">
                     <span className="card-title">{q.title}</span>
-                    <span className="badge">{q.status}</span>
+                    <span className="badge">{questStatusLabel(q.status)}</span>
                   </div>
                   <div className="quest-card__meta">
                     {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
