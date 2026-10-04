@@ -5673,10 +5673,12 @@
   .sg-dash #sgb-vote:checked ~ .sg-btabhead .sg-see-vote,
   .sg-dash #sgb-req:checked ~ .sg-btabhead .sg-see-req,
   .sg-dash #sgb-draft:checked ~ .sg-btabhead .sg-see-draft { display: inline; }
-  .sg-dash .sg-bpanel { display: none; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
-  .sg-dash #sgb-vote:checked ~ .sg-bpanel[data-p="vote"],
-  .sg-dash #sgb-req:checked ~ .sg-bpanel[data-p="req"],
-  .sg-dash #sgb-draft:checked ~ .sg-bpanel[data-p="draft"] { display: grid; }
+  /* 3タブを1セルに重ね、最も高いタブ分を常に確保＝タブ切替で Zone B の高さが変わらない。表示切替は visibility。 */
+  .sg-dash .sg-bpanels { display: grid; }
+  .sg-dash .sg-bpanel { grid-area: 1 / 1; visibility: hidden; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); align-content: start; }
+  .sg-dash #sgb-vote:checked ~ .sg-bpanels .sg-bpanel[data-p="vote"],
+  .sg-dash #sgb-req:checked ~ .sg-bpanels .sg-bpanel[data-p="req"],
+  .sg-dash #sgb-draft:checked ~ .sg-bpanels .sg-bpanel[data-p="draft"] { visibility: visible; }
   /* 承認待ち＝申請者ベース（本番 .incoming-jr-card）。クエスト/コンテスト名＋誰が参加希望か。 */
   .sg-dash .incoming-jr-card { text-align: left; }
   .sg-dash .incoming-jr-card__applicant { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
@@ -5739,6 +5741,7 @@
       </div>
     </div>
 
+    <div class="sg-bpanels">
     <!-- ① 未投票＝現状の vote-card を踏襲（アイデア/クエストリンク＋賛成/反対）。クエスト＋参加中コンテストを統合・3カラム。 -->
     <div class="sg-bpanel" data-p="vote">
       <article class="card card-accent vote-card">
@@ -5812,6 +5815,7 @@
         <div class="draft-card__meta"><span>評価 3/5 項目入力済</span><span>最終更新: 先週</span></div>
         <div class="draft-card__cta">評価を続ける ✎</div>
       </div>
+    </div>
     </div>
 
     <p class="sg-row__sub" style="margin-top:var(--space-3)">
