@@ -5681,6 +5681,8 @@
   .sg-dash .draft-card__title { font-weight: 700; }
   .sg-dash .draft-card__meta { display: flex; gap: var(--space-3); margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); flex-wrap: wrap; }
   .sg-dash .draft-card__cta { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; color: var(--color-primary); }
+  .sg-dash .draft-card__title a, .sg-dash .draft-card__meta a, .sg-dash .incoming-jr-card a.card-title { color: var(--color-primary); text-decoration: none; }
+  .sg-dash .draft-card__title a:hover, .sg-dash .draft-card__meta a:hover, .sg-dash .incoming-jr-card a.card-title:hover { text-decoration: underline; }
 </style>
 <!-- 本番ダッシュボード同様に .container（max-width＋左右padding）で中央寄せ＝左右マージンを再現。 -->
 <div class="container">
@@ -5742,43 +5744,43 @@
 
     <!-- ② 承認待ち＝申請者ベース（表示項目が違う）。クエスト参加リクエスト＋コンテスト参加リクエストを併置。クリックで承認ダイアログ。 -->
     <div class="sg-bpanel" data-p="req">
-      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
-        <div class="between"><span class="card-title">配送効率化クエスト</span><span class="badge badge-danger">未処理</span></div>
+      <div class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
+        <div class="between"><a class="card-title" href="#">配送効率化クエスト</a><span class="badge badge-danger">未処理</span></div>
         <div class="incoming-jr-card__applicant"><span class="sg-avatar">テ</span><span class="incoming-jr-card__name">テスト 太郎 さんが参加を希望</span></div>
-        <div class="sg-row__sub" style="margin-top:4px">デモグループ ・ 2026/10/04</div>
-      </button>
-      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#7C3AED">
-        <div class="between"><span class="card-title">🏆 業務改善アイデア大募集</span><span class="badge badge-danger">未処理</span></div>
+        <div class="sg-row__sub" style="margin-top:4px">デモグループ ・ 2026/10/04 ・ <a href="#">承認する →</a></div>
+      </div>
+      <div class="card card-accent quest-card incoming-jr-card" style="--accent:#7C3AED">
+        <div class="between"><span class="row-center" style="gap:4px;min-width:0">🏆 <a class="card-title" href="#">業務改善アイデア大募集</a></span><span class="badge badge-danger">未処理</span></div>
         <div class="incoming-jr-card__applicant"><span class="sg-avatar">山</span><span class="incoming-jr-card__name">山田 次郎 さんが参加を希望</span></div>
-        <div class="sg-row__sub" style="margin-top:4px">コンテスト参加リクエスト ・ 2026/10/03</div>
-      </button>
-      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
-        <div class="between"><span class="card-title">新オフィス移転</span><span class="badge badge-danger">未処理</span></div>
+        <div class="sg-row__sub" style="margin-top:4px">コンテスト参加リクエスト ・ 2026/10/03 ・ <a href="#">承認する →</a></div>
+      </div>
+      <div class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
+        <div class="between"><a class="card-title" href="#">新オフィス移転</a><span class="badge badge-danger">未処理</span></div>
         <div class="incoming-jr-card__applicant"><span class="sg-avatar">鈴</span><span class="incoming-jr-card__name">鈴木 三郎 さんが参加を希望</span></div>
-        <div class="sg-row__sub" style="margin-top:4px">総務部 ・ 2026/10/02</div>
-      </button>
+        <div class="sg-row__sub" style="margin-top:4px">総務部 ・ 2026/10/02 ・ <a href="#">承認する →</a></div>
+      </div>
     </div>
 
     <!-- ③ 下書き＝種別で表示が違う（クエスト/アイデア/評価）。クリックで作成/編集へ。 -->
     <div class="sg-bpanel" data-p="draft">
-      <button type="button" class="card card-accent draft-card">
+      <div class="card card-accent draft-card">
         <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">クエスト</span></div>
-        <div class="draft-card__title">新オフィスのレイアウト改善</div>
+        <div class="draft-card__title"><a href="#">新オフィスのレイアウト改善</a></div>
         <div class="draft-card__meta"><span>カテゴリー未確定</span><span>最終更新: 昨日</span></div>
         <div class="draft-card__cta">続きを書く ✎</div>
-      </button>
-      <button type="button" class="card card-accent draft-card">
+      </div>
+      <div class="card card-accent draft-card">
         <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">アイデア</span></div>
-        <div class="draft-card__title">配送ルートのAI最適化</div>
-        <div class="draft-card__meta"><span>クエスト: 配送効率化クエスト</span><span>最終更新: 2日前</span></div>
+        <div class="draft-card__title"><a href="#">配送ルートのAI最適化</a></div>
+        <div class="draft-card__meta"><span>クエスト: <a href="#">配送効率化クエスト</a></span><span>最終更新: 2日前</span></div>
         <div class="draft-card__cta">続きを書く ✎</div>
-      </button>
-      <button type="button" class="card card-accent draft-card">
+      </div>
+      <div class="card card-accent draft-card">
         <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">評価</span></div>
-        <div class="draft-card__title">受付のデジタル化</div>
+        <div class="draft-card__title"><a href="#">受付のデジタル化</a></div>
         <div class="draft-card__meta"><span>評価 3/5 項目入力済</span><span>最終更新: 先週</span></div>
         <div class="draft-card__cta">評価を続ける ✎</div>
-      </button>
+      </div>
     </div>
 
     <p class="sg-row__sub" style="margin-top:var(--space-3)">
