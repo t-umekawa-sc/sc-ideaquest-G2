@@ -71,7 +71,18 @@
 .join-req-block .card { overflow: hidden; }
 .join-req-title { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-2); }
 .join-req-block .join-req-row { background: #FFFBEB; }
+.join-req-row { cursor: pointer; }
+.join-req-block .join-req-row:hover { background: #FEF3C7; }
+.join-req-row .member-name { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.join-req-row:focus { outline: none; }
+.join-req-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); }
 .member-row.contest-member--excluded { opacity: .6; }
+
+/* 参加リクエストダイアログのゲームプロフィール（SC-01/SC-54・クエスト JoinRequestDialog と同一・feature スコープのため複製）。 */
+.join-req-label--center { text-align: center; }
+.join-req-game { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+.join-req-game__avatar { width: 160px; height: 200px; border-radius: var(--radius-2, 8px); overflow: hidden; background: var(--color-surface-2, rgba(0, 0, 0, 0.04)); }
+.join-req-game__badges { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
 
 /* アイデアタブのツールバー（絞り込み＋追加ボタン）＝SC-12 と同一・feature スコープのため複製。 */
 .ideas-tab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }

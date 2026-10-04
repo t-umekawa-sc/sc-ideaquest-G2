@@ -133,6 +133,8 @@
 
 **backing quest をクエスト系から除外（バグ修正・2026-10-04・FR-46）＝ユーザー指摘**＝コンテストの backing quest（内部の器）が「クエスト」一覧(SC-10)・「クエストを探す」カタログ(SC-13)に漏れていた不具合を修正。`quests/repository._not_contest_backed`（`NOT EXISTS contests.quest_id`）を一覧2経路（`list_quests_for_user`／`_discoverable_conds`）に適用＋`can_discover_quest`（発見/フォロー/参加リクエストの門番）と `get_quest_detail`（クエスト詳細）で backing quest を 404。コンテスト内部の読取（アイデア一覧/全文検索/活動＝`/quests/{id}/*`）は `can_access_quest`＝`can_view_contest` 経由で無影響。backing quest は**アイデアコンテストとしてのみ可視**（設計 §2.2 改訂）。テスト＝T-TC-138/139・backend フル **950 green**・ブラウザ目視（カタログ0件）。**コンテスト詳細の戻る導線**＝`backToListOr`（router.back＝遷移元へ復帰）＋ラベル来歴 `markContestFromList`/`consumeContestFromList`（一覧経由＝「← アイデアコンテスト一覧」／ダッシュボード・通知経由＝「← 戻る」）＝nav 規約踏襲・目視確認（一覧→一覧・ダッシュボード→ダッシュボード）。
 
+**参加リクエスト承認ダイアログ（2026-10-04・FR-46・ユーザー要望）＝クエストの JoinRequestDialog に統一**＝ダッシュボード「未処理のコンテスト参加リクエスト」カードクリック／SC-54 パーティタブの参加リクエスト行クリックで `ContestJoinRequestDialog` を開く（上から 対象コンテスト概要→申請者→このコンテスト内の活動→ゲームプロフィール→承認/却下）。判断材料は `GET /contests/{id}/participation/{uid}/profile`（運営のみ・活動＝backing quest スコープの投稿/投票/チャット＝`contests/repository.participant_activity`・ゲーム層＝viewer のゲームモード ON 時のみ・クエスト C.9.1 と同型）。パーティタブは `.join-req-block`/`.join-req-row`（クリック→ダイアログ）に変更しクエスト詳細と一致。feature スコープCSS（`.join-req-game*` 等）は contests.css に複製。テスト＝T-TC-141・backend **951 green**・frontend build+vitest 219・ブラウザ目視（両経路のダイアログ4セクション）。
+
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。

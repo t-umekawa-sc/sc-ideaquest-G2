@@ -43,6 +43,7 @@
 | T-TC-137 | api | ダッシュボードの**未処理コンテスト参加リクエスト**＝運営に requested を返す・一般は空 | 承認制 contest・requested 1件・運営/一般 | `GET /dashboard`（`incoming_contest_requests`） | 運営=当該 contest 概要＋申請者を含む／一般（運営でない）=空配列 | I.1／T.2／SC-01 |
 | T-TC-138 | api | コンテストの **backing quest はクエスト系の一覧に出ない**（内部の器・ユーザーにはコンテストとしてのみ可視） | contest（backing quest あり）・作成者/一般 | 作成者 `GET /quests`（SC-10・自分のクエスト）／`GET /quests/catalog`（SC-13 発見） | どちらの一覧にも backing quest.id を**含まない**（作成者の自分一覧にも出ない＝owner別格でも除外） | §2.2／FR-46 |
 | T-TC-139 | api | backing quest は**クエストとして発見/参加/詳細不可**（器を内部に閉じる・サーバーガード） | contest（backing quest あり） | `GET /quests/{backing}`／`POST /quests/{backing}/join-request`／`POST /quests/{backing}/follow` | 詳細=404・参加リクエスト=404（存在秘匿・`can_discover_quest`）・フォロー=404／アイデア一覧 `GET /quests/{backing}/ideas` は従来どおり可（コンテスト内部経路は can_access_quest 経由で無影響） | §2.2／FR-46 |
+| T-TC-141 | api | 参加リクエスト承認の判断材料プロフィール＝運営のみ・コンテスト内活動＋ゲーム層・申請のない user は404 | 承認制 contest・requested 済み・運営/一般 | `GET /contests/{id}/participation/{uid}/profile` | 運営=200（posted_idea_count/vote_count/chat_message_count＋game〔モードON時〕）／一般（運営でない）=403／未申請 user=404（存在秘匿） | T.2／C.9.1／SC-01/SC-54 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

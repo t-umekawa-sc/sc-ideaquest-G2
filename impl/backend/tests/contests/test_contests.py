@@ -476,3 +476,34 @@ def test_t_tc_137_dashboard_incoming_contest_requests(client, factory):
             ts.commit()
         _purge_contest_notifs([cid])
         _cleanup_contest(cid)
+
+
+def test_t_tc_141_participant_profile(client, factory):
+    """T-TC-141(api): 参加リクエスト判断材料プロフィール＝運営のみ・活動キー＋game・申請のない user は404。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    applicant = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
+    auid = _user_id(applicant["id"])
+    other = factory.make_seed_company_account(display_name=f"他_{uuid.uuid4().hex[:6]}")
+    nouid = _user_id(other["id"])
+    try:
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))  # requested
+        # 運営（admin）=200・活動キーを含む（新規応募は0）。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)  # まず一般で403確認
+        assert client.get(f"{BASE}/{cid}/participation/{auid}/profile").status_code == 403
+        # 管理者で 200。
+        a = factory.make_seed_company_account(system_role="company_account_admin", display_name=f"運営_{uuid.uuid4().hex[:6]}")
+        _login(client, SEED_COMPANY_CODE, a["login_id"], a["password"])
+        r = client.get(f"{BASE}/{cid}/participation/{auid}/profile")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["posted_idea_count"] == 0 and "vote_count" in body and "chat_message_count" in body
+        assert "game" in body
+        # 申請のない user は404。
+        assert client.get(f"{BASE}/{cid}/participation/{nouid}/profile").status_code == 404
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)

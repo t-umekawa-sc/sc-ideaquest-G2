@@ -114,6 +114,29 @@ def participation_status_map(session: Session, contest_ids: list[uuid.UUID],
     return {cid: st for cid, st in rows}
 
 
+def participant_activity(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    """申請者のこのコンテスト（backing quest）内の活動＝参加承認の判断材料（SC-01 ダイアログ・SC-54 パーティ）。
+
+    投稿アイデアは `ideas`（確定値）、投票/チャットは `activities`（quest_id スコープの reason 集計）。
+    """
+    from app.tenant.gamification.orm import Activity
+    from app.tenant.ideas.orm import Idea
+    ideas = session.execute(
+        select(func.count()).select_from(Idea).where(
+            Idea.quest_id == quest_id, Idea.author_id == user_id,
+            Idea.status == "published", Idea.deleted_at.is_(None))
+    ).scalar() or 0
+    rows = session.execute(
+        select(Activity.reason, func.count()).where(
+            Activity.quest_id == quest_id, Activity.user_id == user_id,
+            Activity.reason.in_(("vote", "chat"))
+        ).group_by(Activity.reason)
+    ).all()
+    by = {r: int(n) for r, n in rows}
+    return {"posted_idea_count": int(ideas), "vote_count": by.get("vote", 0),
+            "chat_message_count": by.get("chat", 0)}
+
+
 def get_idea_participation(session: Session, idea_id: uuid.UUID, user_id: uuid.UUID) -> IdeaParticipant | None:
     return session.execute(
         select(IdeaParticipant).where(IdeaParticipant.idea_id == idea_id,

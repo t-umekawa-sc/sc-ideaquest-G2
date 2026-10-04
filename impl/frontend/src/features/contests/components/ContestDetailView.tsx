@@ -11,6 +11,7 @@ import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeContestFromList } from "@/lib/nav";
+import { ContestJoinRequestDialog } from "./ContestJoinRequestDialog";
 import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
@@ -72,6 +73,8 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [ftLoading, setFtLoading] = useState(false);
   const ftPerPage = 20;
   const [participants, setParticipants] = useState<ContestParticipant[] | null>(null);
+  const [partyReqSel, setPartyReqSel] = useState<ContestParticipant | null>(null);  // 参加リクエストダイアログ対象
+  const [partyReqOpen, setPartyReqOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);          // パーティ追加ピッカー
   const [candQ, setCandQ] = useState("");
   const [candidates, setCandidates] = useState<ContestCandidate[]>([]);
@@ -689,19 +692,20 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
               <p className="admin-muted">読み込み中…</p>
             ) : (
               <>
-                {/* 参加リクエスト（承認待ち・上位）＝運営のみ。行で承認/却下。 */}
+                {/* 参加リクエスト（承認待ち・上位）＝運営のみ。行クリックで参加リクエストダイアログ→承認/却下（クエスト詳細と同型）。 */}
                 {pending.length > 0 && (
                   <div className="join-req-block">
                     <h3 className="join-req-title">📩 参加リクエスト<span className="tab-count">{pending.length}</span></h3>
                     <div className="card" style={{ padding: 0 }}>
                       <ul className="member-list">
                         {pending.map((p) => (
-                          <li key={p.user_id} className="member-row join-req-row">
+                          <li key={p.user_id} className="member-row join-req-row" role="button" tabIndex={0}
+                              onClick={(e) => { setPartyReqSel(p); setPartyReqOpen(true); (e.currentTarget as HTMLElement).blur(); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPartyReqSel(p); setPartyReqOpen(true); } }}>
                             <Avatar name={p.display_name ?? "?"} />
                             <span className="member-name">{p.display_name ?? "（不明）"}</span>
-                            <span style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
-                              <Button variant="primary" size="sm" onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>承認</Button>
-                              <button className="btn btn-outline btn-sm" type="button" onClick={() => void decideParticipation(p.user_id, "rejected")} disabled={busy}>却下</button>
+                            <span className="muted text-sm" style={{ marginLeft: "auto" }}>
+                              {p.requested_at ? new Date(p.requested_at).toLocaleDateString("ja-JP") : ""}
                             </span>
                           </li>
                         ))}
@@ -799,6 +803,25 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
             <button className="btn btn-outline dialog-close-left" type="button" onClick={() => setAddOpen(false)}>閉じる</button>
           </div>
         </Modal>
+      )}
+
+      {/* 参加リクエスト承認/却下ダイアログ（クエスト詳細と同型・概要→申請者→活動→ゲームプロフィール）。 */}
+      {partyReqSel && contest && (
+        <ContestJoinRequestDialog
+          contestId={contestId}
+          request={{
+            user_id: partyReqSel.user_id,
+            display_name: partyReqSel.display_name ?? "（不明）",
+            avatar_image_url: null,
+            created_at: partyReqSel.requested_at ?? null,
+            status: partyReqSel.status,
+          }}
+          contest={{ theme: contest.theme, status: contest.status, starts_at: contest.starts_at, ends_at: contest.ends_at }}
+          open={partyReqOpen}
+          onClose={() => setPartyReqOpen(false)}
+          onClosed={() => setPartyReqSel(null)}
+          onDecided={() => setPartyReload((n) => n + 1)}
+        />
       )}
     </section>
   );

@@ -108,6 +108,24 @@ class EvaluatorUpdateRequest(BaseModel):
     granted: bool
 
 
+class ContestGameProfileDTO(BaseModel):
+    """申請者のゲームプロフィール（判断材料・viewer のゲームモード ON 時のみ）。"""
+    avatar_base: str
+    level: int
+    xp: int
+    rank: int | None = None
+    rank_total: int
+    achievement_count: int
+
+
+class ContestParticipantProfileDTO(BaseModel):
+    """参加リクエスト承認の判断材料（SC-01 ダイアログ・SC-54 パーティ・運営のみ）。活動はこのコンテスト内スコープ。"""
+    posted_idea_count: int
+    vote_count: int
+    chat_message_count: int
+    game: ContestGameProfileDTO | None = None
+
+
 class IdeaParticipantBriefDTO(BaseModel):
     user_id: str
     display_name: str | None = None

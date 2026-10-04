@@ -66,6 +66,12 @@ export async function getContestParticipants(id: string, signal?: AbortSignal): 
   return res?.data ?? [];
 }
 
+// 参加リクエスト承認の判断材料（運営のみ・コンテスト内活動＋ゲーム層）＝SC-01 ダイアログ/SC-54 パーティ。
+export type ContestParticipantProfile = components["schemas"]["ContestParticipantProfileDTO"];
+export function getContestParticipantProfile(id: string, userId: string, signal?: AbortSignal): Promise<ContestParticipantProfile | null> {
+  return apiFetch<ContestParticipantProfile>(`/contests/${id}/participation/${userId}/profile`, { signal });
+}
+
 // Tier1 参加の承認/却下/排除（運営・T.2）。rejected で参加中メンバーを排除（論理削除）。CSRF は apiFetch が付与。
 export function decideContestParticipation(id: string, userId: string, status: "approved" | "rejected"): Promise<{ status: string } | null> {
   return apiFetch<{ status: string }>(`/contests/${id}/participation/${userId}`, {

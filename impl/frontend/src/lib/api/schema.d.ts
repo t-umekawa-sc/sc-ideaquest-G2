@@ -4192,6 +4192,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contests/{contest_id}/participation/{uid}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contest Participant Profile
+         * @description 参加リクエスト承認の判断材料（運営のみ＝SC-01 ダイアログ/SC-54 パーティ・コンテスト内活動＋ゲーム層）。
+         */
+        get: operations["contest_participant_profile_api_v1_contests__contest_id__participation__uid__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contests/{contest_id}/ideas/{idea_id}/flags": {
         parameters: {
             query?: never;
@@ -6127,6 +6147,24 @@ export interface components {
             /** Granted Now */
             granted_now: number;
         };
+        /**
+         * ContestGameProfileDTO
+         * @description 申請者のゲームプロフィール（判断材料・viewer のゲームモード ON 時のみ）。
+         */
+        ContestGameProfileDTO: {
+            /** Avatar Base */
+            avatar_base: string;
+            /** Level */
+            level: number;
+            /** Xp */
+            xp: number;
+            /** Rank */
+            rank?: number | null;
+            /** Rank Total */
+            rank_total: number;
+            /** Achievement Count */
+            achievement_count: number;
+        };
         /** ContestIdeaFlagDTO */
         ContestIdeaFlagDTO: {
             /** Idea Id */
@@ -6201,6 +6239,19 @@ export interface components {
             requested_at?: string | null;
             /** Decided At */
             decided_at?: string | null;
+        };
+        /**
+         * ContestParticipantProfileDTO
+         * @description 参加リクエスト承認の判断材料（SC-01 ダイアログ・SC-54 パーティ・運営のみ）。活動はこのコンテスト内スコープ。
+         */
+        ContestParticipantProfileDTO: {
+            /** Posted Idea Count */
+            posted_idea_count: number;
+            /** Vote Count */
+            vote_count: number;
+            /** Chat Message Count */
+            chat_message_count: number;
+            game?: components["schemas"]["ContestGameProfileDTO"] | null;
         };
         /** ContestParticipantsResponse */
         ContestParticipantsResponse: {
@@ -18817,6 +18868,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContestParticipantsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contest_participant_profile_api_v1_contests__contest_id__participation__uid__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestParticipantProfileDTO"];
                 };
             };
             /** @description Validation Error */

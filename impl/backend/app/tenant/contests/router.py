@@ -18,6 +18,7 @@ from app.tenant.contests.schemas import (
     ContestListResponse,
     ContestCandidatesResponse,
     ContestParticipantsResponse,
+    ContestParticipantProfileDTO,
     ContestUpdateRequest,
     ContestFinalizeResponse,
     EvaluatorUpdateRequest,
@@ -90,6 +91,12 @@ def finalize_contest(contest_id: str, request: Request, session: dict = Depends(
 def list_contest_participants(contest_id: str, request: Request, session: dict = Depends(require_me)):
     """Tier1 参加者一覧（パーティタブ・運営のみ＝contest_create/管理者）。"""
     return service.list_participants(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
+@router.get("/contests/{contest_id}/participation/{uid}/profile", response_model=ContestParticipantProfileDTO)
+def contest_participant_profile(contest_id: str, uid: str, request: Request, session: dict = Depends(require_me)):
+    """参加リクエスト承認の判断材料（運営のみ＝SC-01 ダイアログ/SC-54 パーティ・コンテスト内活動＋ゲーム層）。"""
+    return service.participant_profile(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id, uid)
 
 
 @router.patch("/contests/{contest_id}/ideas/{idea_id}/flags", response_model=dict,

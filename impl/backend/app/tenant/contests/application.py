@@ -177,6 +177,44 @@ def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: 
         return {"data": data}
 
 
+def participant_profile(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
+                        target_user_id: str) -> dict:
+    """参加リクエスト承認の判断材料（運営のみ・SC-01 ダイアログ/SC-54 パーティ）。
+    活動はこのコンテスト内スコープ、ゲーム層は viewer のゲームモード ON 時のみ（クエスト C.9.1 と同型）。"""
+    from app.control_plane.game_mode import resolve_effective_game_mode
+    from app.tenant.achievements import repository as ach_repo
+    from app.tenant.gamification import repository as gami_repo
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        if not _can_create_contest(account_id, ts, actor.id):
+            raise AppError(403, "forbidden", detail="参加者の管理は運営（contest_create/管理者）のみ可能です")
+        target = uuid.UUID(target_user_id)
+        part = repo.get_contest_participation(ts, c.id, target)
+        if part is None or part.status not in ("requested", "rejected"):
+            raise AppError(404, "not_found")  # 申請のない user のプロフィールは覗けない（存在秘匿）
+        out = {**repo.participant_activity(ts, c.quest_id, target), "game": None}
+        if resolve_effective_game_mode(account_id, company_id):
+            tu = next(iter(profile_repo.list_users_by_ids(ts, [target])), None)
+            rows = gami_repo.aggregate_ranking(ts, start=None, end=None)
+            idx = next((i for i, r in enumerate(rows) if r[0] == target), None)
+            out["game"] = {
+                "avatar_base": (tu.avatar_base if tu else "male"),
+                "level": (tu.level if tu else 1), "xp": (tu.xp if tu else 0),
+                "rank": (idx + 1) if idx is not None else None, "rank_total": len(rows),
+                "achievement_count": len(ach_repo.list_user_achievements(ts, target)),
+            }
+    return out
+
+
 def participant_candidates(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str,
                            q: str | None = None, cursor: str | None = None) -> dict:
     """パーティ追加の候補＝会社の有効ユーザー（既参加〔approved/requested〕・主催者は除外）。運営のみ・カーソルページング。

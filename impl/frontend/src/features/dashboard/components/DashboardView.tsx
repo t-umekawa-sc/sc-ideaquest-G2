@@ -28,7 +28,7 @@ import { greetingFor } from "@/lib/greeting";
 import { markChatFromDashboard } from "@/lib/nav";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import { unfollowQuest } from "@/features/quests/api";
-import { decideContestParticipation } from "@/features/contests/api";
+import { ContestJoinRequestDialog } from "@/features/contests/components/ContestJoinRequestDialog";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
 import {
@@ -246,25 +246,17 @@ export function DashboardView({
     if (incomingSel) setProcessedIncoming((m) => ({ ...m, [`${incomingSel.questId}:${userId}`]: true }));
     void getDashboard().then((d) => { if (d) setData(d); });
   };
-  // 未処理のコンテスト参加リクエスト（運営・FR-46）＝カード内の承認/却下で直接処理（パーティタブと同型・処理済みは即リストから外す）。
+  // 未処理のコンテスト参加リクエスト（運営・FR-46）＝カードクリックで参加リクエストダイアログ（クエストと同型・処理済みは即リストから外す）。
   const [processedContest, setProcessedContest] = useState<Record<string, boolean>>({});
-  const [contestBusy, setContestBusy] = useState(false);
   const incomingContestRequests = (data?.incoming_contest_requests ?? []).filter(
     (it) => !processedContest[`${it.contest.id}:${it.user.user_id}`],
   );
-  const decideContest = async (contestId: string, userId: string, status: "approved" | "rejected") => {
-    setContestBusy(true);
-    try {
-      const r = await decideContestParticipation(contestId, userId, status);
-      if (!r) { snackbar({ type: "error", msg: "更新できませんでした（権限が必要です）。" }); return; }
-      setProcessedContest((m) => ({ ...m, [`${contestId}:${userId}`]: true }));  // 楽観除去
-      snackbar({ type: "success", msg: status === "approved" ? "参加を承認しました。" : "参加を却下しました。" });
-      void getDashboard().then((d) => { if (d) setData(d); });
-    } catch {
-      snackbar({ type: "error", msg: "更新に失敗しました。" });
-    } finally {
-      setContestBusy(false);
-    }
+  const [contestReqSel, setContestReqSel] = useState<DashboardData["incoming_contest_requests"][number] | null>(null);
+  const [contestReqOpen, setContestReqOpen] = useState(false);
+  const openContestReq = (it: DashboardData["incoming_contest_requests"][number]) => { setContestReqSel(it); setContestReqOpen(true); };
+  const onContestDecided = (userId: string) => {
+    if (contestReqSel) setProcessedContest((m) => ({ ...m, [`${contestReqSel.contest.id}:${userId}`]: true }));
+    void getDashboard().then((d) => { if (d) setData(d); });
   };
   const unfollowQuestCard = async (id: string) => {
     setUnfollowedQuests((m) => ({ ...m, [id]: true })); // 楽観
@@ -630,7 +622,7 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* 未処理のコンテスト参加リクエスト（運営・0件なら非表示・FR-46）＝カード内の承認/却下で直接処理（クエストとは別パネル＝遷移先/承認API/スコープが異種）。 */}
+      {/* 未処理のコンテスト参加リクエスト（運営・0件なら非表示・FR-46）＝カードクリックで参加リクエストダイアログ（クエストと同型）。別パネル＝遷移先/承認API/スコープが異種。 */}
       {incomingContestRequests.length > 0 && (
         <motion.section aria-label="未処理のコンテスト参加リクエスト" {...flowMotion(7)}>
           <div className="section-head">
@@ -638,22 +630,21 @@ export function DashboardView({
           </div>
           <div className="quest-grid">
             {incomingContestRequests.map((it) => (
-              <div key={`${it.contest.id}:${it.user.user_id}`} className="card card-accent quest-card incoming-jr-card">
+              <button
+                key={`${it.contest.id}:${it.user.user_id}`}
+                type="button"
+                className="card card-accent quest-card incoming-jr-card"
+                onClick={() => openContestReq(it)}
+              >
                 <div className="between">
-                  <Link href={`/contests/${it.contest.id}`} className="card-title">{it.contest.theme}</Link>
+                  <span className="card-title">🏆 {it.contest.theme}</span>
                   <span className="badge badge-danger">未処理</span>
                 </div>
                 <div className="incoming-jr-card__applicant">
                   <Avatar name={it.user.display_name} imageUrl={it.user.avatar_image_url ?? undefined} size="sm" noTooltip />
                   <span className="incoming-jr-card__name">{it.user.display_name} さんが参加を希望</span>
                 </div>
-                <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-                  <button type="button" className="btn btn-primary btn-sm" disabled={contestBusy}
-                          onClick={() => void decideContest(it.contest.id, it.user.user_id, "approved")}>承認</button>
-                  <button type="button" className="btn btn-outline btn-sm" disabled={contestBusy}
-                          onClick={() => void decideContest(it.contest.id, it.user.user_id, "rejected")}>却下</button>
-                </div>
-              </div>
+              </button>
             ))}
           </div>
         </motion.section>
@@ -800,6 +791,28 @@ export function DashboardView({
           onClose={() => setIncomingOpen(false)}
           onClosed={() => setIncomingSel(null)}
           onDecided={onIncomingDecided}
+        />
+      )}
+      {contestReqSel && (
+        <ContestJoinRequestDialog
+          contestId={contestReqSel.contest.id}
+          request={{
+            user_id: contestReqSel.user.user_id,
+            display_name: contestReqSel.user.display_name,
+            avatar_image_url: contestReqSel.user.avatar_image_url ?? null,
+            created_at: contestReqSel.created_at ?? null,
+            status: "requested",
+          }}
+          contest={{
+            theme: contestReqSel.contest.theme,
+            status: contestReqSel.contest.status ?? null,
+            starts_at: contestReqSel.contest.starts_at ?? null,
+            ends_at: contestReqSel.contest.ends_at ?? null,
+          }}
+          open={contestReqOpen}
+          onClose={() => setContestReqOpen(false)}
+          onClosed={() => setContestReqSel(null)}
+          onDecided={onContestDecided}
         />
       )}
     </div>
