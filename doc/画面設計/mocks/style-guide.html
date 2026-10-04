@@ -5663,9 +5663,16 @@
   .sg-dash a.card-title:hover, .sg-dash .sg-row__title a:hover { text-decoration: underline; }
   /* B「あなたの番」タブ切替（CSS ラジオ・JS不要）＝選択タブのパネルだけ表示＋ラベル強調。 */
   .sg-dash .sg-btab-radio { position: absolute; opacity: 0; width: 1px; height: 1px; }
-  .sg-dash #sgb-vote:checked ~ .segmented label[for="sgb-vote"],
-  .sg-dash #sgb-req:checked ~ .segmented label[for="sgb-req"],
-  .sg-dash #sgb-draft:checked ~ .segmented label[for="sgb-draft"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  .sg-dash #sgb-vote:checked ~ .sg-btabhead .segmented label[for="sgb-vote"],
+  .sg-dash #sgb-req:checked ~ .sg-btabhead .segmented label[for="sgb-req"],
+  .sg-dash #sgb-draft:checked ~ .sg-btabhead .segmented label[for="sgb-draft"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  /* タブ行＝左にタブ・右に「すべて見る」（アクティブタブのぶんだけ表示）。 */
+  .sg-dash .sg-btabhead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+  .sg-dash .sg-seeall-top a { color: var(--color-primary); text-decoration: none; font-size: var(--text-sm); font-weight: 600; display: none; }
+  .sg-dash .sg-seeall-top a:hover { text-decoration: underline; }
+  .sg-dash #sgb-vote:checked ~ .sg-btabhead .sg-see-vote,
+  .sg-dash #sgb-req:checked ~ .sg-btabhead .sg-see-req,
+  .sg-dash #sgb-draft:checked ~ .sg-btabhead .sg-see-draft { display: inline; }
   .sg-dash .sg-bpanel { display: none; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
   .sg-dash #sgb-vote:checked ~ .sg-bpanel[data-p="vote"],
   .sg-dash #sgb-req:checked ~ .sg-bpanel[data-p="req"],
@@ -5684,9 +5691,6 @@
   .sg-dash .draft-card__title a, .sg-dash .draft-card__meta a, .sg-dash .incoming-jr-card a.card-title { color: var(--color-primary); text-decoration: none; }
   .sg-dash .draft-card__title a:hover, .sg-dash .draft-card__meta a:hover, .sg-dash .incoming-jr-card a.card-title:hover { text-decoration: underline; }
   /* 「すべて見る」（4件以上で表示・パネル右下）＋全件ダイアログ（もっと見る形式）。 */
-  .sg-seeall { margin-top: var(--space-3); text-align: right; grid-column: 1 / -1; }
-  .sg-seeall a { color: var(--color-primary); text-decoration: none; font-size: var(--text-sm); font-weight: 600; }
-  .sg-seeall a:hover { text-decoration: underline; }
   .sg-modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
   .sg-more-item { display: none; }                          /* もっと見るで開く追加バッチ */
   .sg-modal-grid.is-more .sg-more-item { display: block; }
@@ -5710,10 +5714,17 @@
     <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-vote" checked>
     <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-req">
     <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-draft">
-    <div class="segmented" role="radiogroup" aria-label="要対応の種別" style="margin-bottom:var(--space-3)">
-      <label for="sgb-vote">未投票 <span class="seg-n">5</span></label>
-      <label for="sgb-req">承認待ち <span class="seg-n">4</span></label>
-      <label for="sgb-draft">下書き <span class="seg-n">4</span></label>
+    <div class="sg-btabhead">
+      <div class="segmented" role="radiogroup" aria-label="要対応の種別">
+        <label for="sgb-vote">未投票 <span class="seg-n">5</span></label>
+        <label for="sgb-req">承認待ち <span class="seg-n">4</span></label>
+        <label for="sgb-draft">下書き <span class="seg-n">4</span></label>
+      </div>
+      <div class="sg-seeall-top">
+        <a class="sg-see-vote" href="#" data-sg-open="sgm-vote">すべて見る（全5件）→</a>
+        <a class="sg-see-req" href="#" data-sg-open="sgm-req">すべて見る（全4件）→</a>
+        <a class="sg-see-draft" href="#" data-sg-open="sgm-draft">すべて見る（全4件）→</a>
+      </div>
     </div>
 
     <!-- ① 未投票＝現状の vote-card を踏襲（アイデア/クエストリンク＋賛成/反対）。クエスト＋参加中コンテストを統合・3カラム。 -->
@@ -5748,7 +5759,6 @@
         <div class="vote-card__poster poster"><span class="sg-avatar">佐</span><span class="name text-sm muted">投稿: 佐藤 花子</span><a class="dash-chat-link" href="#">💬 議論</a></div>
         <div class="vote-actions"><button type="button" class="vote-quick agree">▲ 賛成</button><button type="button" class="vote-quick disagree">▼ 反対</button></div>
       </article>
-      <div class="sg-seeall"><a href="#" data-sg-open="sgm-vote">すべて見る（全5件）→</a></div>
     </div>
 
     <!-- ② 承認待ち＝申請者ベース（表示項目が違う）。クエスト参加リクエスト＋コンテスト参加リクエストを併置。クリックで承認ダイアログ。 -->
@@ -5768,7 +5778,6 @@
         <div class="incoming-jr-card__applicant"><span class="sg-avatar">鈴</span><span class="incoming-jr-card__name">鈴木 三郎 さんが参加を希望</span></div>
         <div class="sg-row__sub" style="margin-top:4px">総務部 ・ 2026/10/02 ・ <a href="#">承認する →</a></div>
       </div>
-      <div class="sg-seeall"><a href="#" data-sg-open="sgm-req">すべて見る（全4件）→</a></div>
     </div>
 
     <!-- ③ 下書き＝種別で表示が違う（クエスト/アイデア/評価）。クリックで作成/編集へ。 -->
@@ -5791,7 +5800,6 @@
         <div class="draft-card__meta"><span>評価 3/5 項目入力済</span><span>最終更新: 先週</span></div>
         <div class="draft-card__cta">評価を続ける ✎</div>
       </div>
-      <div class="sg-seeall"><a href="#" data-sg-open="sgm-draft">すべて見る（全4件）→</a></div>
     </div>
 
     <p class="sg-row__sub" style="margin-top:var(--space-3)">
