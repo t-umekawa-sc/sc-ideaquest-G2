@@ -12,7 +12,7 @@ import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-import { Avatar, CountUp, useSnackbar } from "@/components/ui";
+import { Avatar, CountUp, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { DashboardFx, type DashboardFxHandle } from "./DashboardFx";
 import { getTeamFeed } from "@/features/feed/api";
@@ -332,6 +332,76 @@ export function DashboardView({
     transition: reduceAnim ? { duration: 0 } : { duration: 0.3, ease: "easeOut", delay: Math.min(i, 6) * 0.05 },
   });
 
+  // ===== Zone B「あなたの番」＝未投票/承認待ち/下書きをタブ集約（ダッシュボード再設計 Phase1） =====
+  const [bTab, setBTab] = useState<"vote" | "req" | "draft">("vote");
+  const [bSeeAll, setBSeeAll] = useState<null | "vote" | "req" | "draft">(null);
+  const [bSeeAllN, setBSeeAllN] = useState(15);
+  // 承認待ち＝クエスト参加＋コンテスト参加を併合（表示は同型・クリックで各承認ダイアログ）。
+  type PendingReq = { type: "quest"; it: DashboardData["incoming_join_requests"][number] }
+                  | { type: "contest"; it: DashboardData["incoming_contest_requests"][number] };
+  const pendingReqs: PendingReq[] = [
+    ...incomingJoinRequests.map((it) => ({ type: "quest" as const, it })),
+    ...incomingContestRequests.map((it) => ({ type: "contest" as const, it })),
+  ];
+  const bCounts = { vote: unvoted.length, req: pendingReqs.length, draft: drafts.length };
+  const B_TITLE = { vote: "未投票のアイデア", req: "承認待ちの参加リクエスト", draft: "下書き" };
+  const B_PANEL = 3;   // パネルの初期表示（§3.1）
+  const bReqKey = (r: PendingReq) => r.type === "quest"
+    ? `q:${r.it.quest.id}:${r.it.user.user_id}` : `c:${r.it.contest.id}:${r.it.user.user_id}`;
+
+  const renderVoteCard = (v: DashboardData["unvoted_ideas"][number]) => (
+    <article key={v.id}
+      ref={(el) => { if (el) voteCardEls.current.set(v.id, el); else voteCardEls.current.delete(v.id); }}
+      className="card card-accent vote-card">
+      <div className="between">
+        <span className="idea-title-row">
+          <QuestIcon name={v.title} color={v.quest.color} imageUrl={v.icon_image_url} size="sm" />
+          <Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link>
+        </span>
+        <span className="badge badge-muted">未投票</span>
+      </div>
+      <Link className="vote-card__quest vote-card__quest--link" href={`/quests/${v.quest.id}`}>{v.quest.title}</Link>
+      <div className="vote-card__value">{v.value}</div>
+      <div className="vote-card__poster poster">
+        <Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" />
+        <span className="name text-sm muted">投稿: {v.poster.name}</span>
+        <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
+      </div>
+      <div className="vote-actions">
+        <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
+        <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
+      </div>
+    </article>
+  );
+  const renderReqCard = (r: PendingReq) => r.type === "quest" ? (
+    <button key={bReqKey(r)} type="button" className="card card-accent quest-card incoming-jr-card"
+      style={{ ["--accent" as string]: r.it.quest.color ?? "#3B82F6" } as React.CSSProperties}
+      onClick={() => { setBSeeAll(null); openIncoming(r.it); }}>
+      <div className="between"><span className="card-title">{r.it.quest.title}</span><span className="badge badge-danger">未処理</span></div>
+      <div className="incoming-jr-card__applicant"><Avatar name={r.it.user.display_name} imageUrl={r.it.user.avatar_image_url ?? undefined} size="sm" noTooltip /><span className="incoming-jr-card__name">{r.it.user.display_name} さんが参加を希望</span></div>
+      {r.it.message && <p className="incoming-jr-card__msg">{r.it.message}</p>}
+    </button>
+  ) : (
+    <button key={bReqKey(r)} type="button" className="card card-accent quest-card incoming-jr-card"
+      onClick={() => { setBSeeAll(null); openContestReq(r.it); }}>
+      <div className="between"><span className="card-title">🏆 {r.it.contest.theme}</span><span className="badge badge-danger">未処理</span></div>
+      <div className="incoming-jr-card__applicant"><Avatar name={r.it.user.display_name} imageUrl={r.it.user.avatar_image_url ?? undefined} size="sm" noTooltip /><span className="incoming-jr-card__name">{r.it.user.display_name} さんが参加を希望</span></div>
+    </button>
+  );
+  const renderDraftCard = (d: DashboardData["drafts"][number], i: number) => (
+    <Link key={i} className="card card-accent draft-card" href={hrefOfDraft(d)}>
+      <div className="draft-card__head"><span className="badge badge-draft">下書き</span><span className="badge badge-muted">{d.kind === "quest" ? "クエスト" : d.kind === "idea" ? "アイデア" : "⭐ 評価"}</span></div>
+      <div className="draft-card__title">{d.kind === "evaluation" ? d.idea.title : d.title}</div>
+      <div className="draft-card__meta">
+        {d.kind === "idea" && <span>{d.quest.title}</span>}
+        {d.kind === "evaluation" && <><span>{d.quest?.title}</span><span>採点 {d.progress.scored}/{d.progress.total} 観点</span></>}
+        {d.kind === "quest" && d.categories.map((c) => <span key={c}>{c}</span>)}
+      </div>
+      <div className="draft-card__cta">{d.kind === "evaluation" ? "採点を続ける ✎" : "続きを書く ✎"}</div>
+    </Link>
+  );
+  const bHasAny = bCounts.vote + bCounts.req + bCounts.draft > 0;
+
   return (
     <div className="dash-page stack">
       {/* レベルアップ祝福（ゲーム層演出）＝ゲームモード OFF では出さない（§4.11・レビュー#2）。 */}
@@ -339,6 +409,28 @@ export function DashboardView({
       <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
+
+      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B）。 */}
+      {bHasAny && (
+        <motion.section aria-label="あなたの番" {...flowMotion(1)}>
+          <div className="section-head">
+            <div className="segmented" role="radiogroup" aria-label="要対応の種別">
+              {(["vote", "req", "draft"] as const).map((k) => (
+                <label key={k}>
+                  <input type="radio" name="dash-btab" checked={bTab === k} onChange={() => setBTab(k)} />
+                  {k === "vote" ? "未投票" : k === "req" ? "承認待ち" : "下書き"} <span className="seg-n">{bCounts[k]}</span>
+                </label>
+              ))}
+            </div>
+            {bCounts[bTab] > B_PANEL && (
+              <button type="button" className="dash-see-all" onClick={() => { setBSeeAllN(15); setBSeeAll(bTab); }}>すべて見る（全{bCounts[bTab]}件）→</button>
+            )}
+          </div>
+          {bTab === "vote" && <div className="vote-grid">{unvoted.slice(0, B_PANEL).map(renderVoteCard)}</div>}
+          {bTab === "req" && <div className="quest-grid">{pendingReqs.slice(0, B_PANEL).map(renderReqCard)}</div>}
+          {bTab === "draft" && <div className="draft-grid">{drafts.slice(0, B_PANEL).map(renderDraftCard)}</div>}
+        </motion.section>
+      )}
       {/* 並び順（ユーザー要望・2026-09-15）＝新着の議論 → チームアクティビティ＋最近の通知 → 未投票 → フォロー中 → 下書き → 参加中クエスト。
           ヒーロー＋週間ランキング（ゲーム層）は §4.11 で最下部（2026-09-13）。空パネルは §7 で非表示。 */}
 
@@ -402,7 +494,7 @@ export function DashboardView({
           チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}
       <motion.div className="dash-bottom" {...flowMotion(2)}>
         <section className="card" aria-label="チームアクティビティ">
-          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
+          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />
         </section>
 
         <section className="card" aria-label="最近の通知">
@@ -447,48 +539,6 @@ export function DashboardView({
         </section>
 
       </motion.div>
-
-      {/* 未投票のアイデア（0件なら非表示） */}
-      {unvoted.length > 0 && (
-        <motion.section aria-label="未投票のアイデア" {...flowMotion(3)}>
-          <div className="section-head">
-            <h2>未投票のアイデア</h2>
-            <span className="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
-          </div>
-          <div className="vote-grid">
-            {/* GF-AC-040: 投票カードの繰り上がりは手組み FLIP（上の useIsoLayoutEffect）。
-                投票＝即座に配列から除外→残りカードだけ WAAPI で旧位置→新位置へスライド（ドリフトしない）。reduce-motion 時は即時。 */}
-            {unvoted.map((v) => (
-                <article
-                  key={v.id}
-                  ref={(el) => { if (el) voteCardEls.current.set(v.id, el); else voteCardEls.current.delete(v.id); }}
-                  className="card card-accent vote-card"
-                >
-                  <div className="between">
-                    <span className="idea-title-row">
-                      <QuestIcon name={v.title} color={v.quest.color} imageUrl={v.icon_image_url} size="sm" />
-                      <Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link>
-                    </span>
-                    <span className="badge badge-muted">未投票</span>
-                  </div>
-                  {/* クエスト名＝クエスト詳細への動線（SC-12）。 */}
-                  <Link className="vote-card__quest vote-card__quest--link" href={`/quests/${v.quest.id}`}>{v.quest.title}</Link>
-                  <div className="vote-card__value">{v.value}</div>
-                  {/* 作成者名の横にチャット動線を統一配置（戻るはダッシュボード＝markChatFromDashboard でラベル出し分け）。 */}
-                  <div className="vote-card__poster poster">
-                    <Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" />
-                    <span className="name text-sm muted">投稿: {v.poster.name}</span>
-                    <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
-                  </div>
-                  <div className="vote-actions">
-                    <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
-                    <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
-                  </div>
-                </article>
-            ))}
-          </div>
-        </motion.section>
-      )}
 
       {/* フォロー中のアイデア（0件なら非表示） */}
       {followed.length > 0 && (
@@ -543,33 +593,6 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* 下書き（1件も無ければ非表示） */}
-      {drafts.length > 0 && (
-        <motion.section aria-label="下書き" {...flowMotion(5)}>
-          <div className="section-head">
-            <h2>下書き</h2>
-            <span className="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
-          </div>
-          <div className="draft-grid">
-            {drafts.map((d, i) => (
-              <Link key={i} className="card card-accent draft-card" href={hrefOfDraft(d)}>
-                <div className="draft-card__head">
-                  <span className="badge badge-draft">下書き</span>
-                  <span className="badge badge-muted">{d.kind === "quest" ? "クエスト" : d.kind === "idea" ? "アイデア" : "⭐ 評価"}</span>
-                </div>
-                <div className="draft-card__title">{d.kind === "evaluation" ? d.idea.title : d.title}</div>
-                <div className="draft-card__meta">
-                  {d.kind === "idea" && <span>{d.quest.title}</span>}
-                  {d.kind === "evaluation" && <><span>{d.quest?.title}</span><span>採点 {d.progress.scored}/{d.progress.total} 観点</span></>}
-                  {d.kind === "quest" && d.categories.map((c) => <span key={c}>{c}</span>)}
-                </div>
-                <div className="draft-card__cta">{d.kind === "evaluation" ? "採点を続ける ✎" : "続きを書く ✎"}</div>
-              </Link>
-            ))}
-          </div>
-        </motion.section>
-      )}
-
       {/* 自分のクエスト（作成/運営・0件なら非表示・ユーザー要望で参加中と分離） */}
       {ownQuests.length > 0 && (
         <motion.section aria-label="自分のクエスト" {...flowMotion(6)}>
@@ -589,64 +612,6 @@ export function DashboardView({
             <Link href="/quests">すべて見る →</Link>
           </div>
           <div className="quest-grid">{joinedQuests.map(renderQuestCard)}</div>
-        </motion.section>
-      )}
-
-      {/* 未処理の参加リクエスト（自分が owner/quest_admin・0件なら非表示・FR-40）＝カードクリックで承認/却下ダイアログ。 */}
-      {incomingJoinRequests.length > 0 && (
-        <motion.section aria-label="未処理の参加リクエスト" {...flowMotion(7)}>
-          <div className="section-head">
-            <h2>未処理の参加リクエスト<span className="badge badge-danger" style={{ marginLeft: "var(--space-2)" }}>{incomingJoinRequests.length}</span></h2>
-          </div>
-          <div className="quest-grid">
-            {incomingJoinRequests.map((it) => (
-              <button
-                key={`${it.quest.id}:${it.user.user_id}`}
-                type="button"
-                className="card card-accent quest-card incoming-jr-card"
-                style={{ ["--accent" as string]: it.quest.color ?? "#3B82F6" } as React.CSSProperties}
-                onClick={() => openIncoming(it)}
-              >
-                <div className="between">
-                  <span className="card-title">{it.quest.title}</span>
-                  <span className="badge badge-danger">未処理</span>
-                </div>
-                <div className="incoming-jr-card__applicant">
-                  <Avatar name={it.user.display_name} imageUrl={it.user.avatar_image_url ?? undefined} size="sm" noTooltip />
-                  <span className="incoming-jr-card__name">{it.user.display_name} さんが参加を希望</span>
-                </div>
-                {it.message && <p className="incoming-jr-card__msg">{it.message}</p>}
-              </button>
-            ))}
-          </div>
-        </motion.section>
-      )}
-
-      {/* 未処理のコンテスト参加リクエスト（運営・0件なら非表示・FR-46）＝カードクリックで参加リクエストダイアログ（クエストと同型）。別パネル＝遷移先/承認API/スコープが異種。 */}
-      {incomingContestRequests.length > 0 && (
-        <motion.section aria-label="未処理のコンテスト参加リクエスト" {...flowMotion(7)}>
-          <div className="section-head">
-            <h2>未処理のコンテスト参加リクエスト<span className="badge badge-danger" style={{ marginLeft: "var(--space-2)" }}>{incomingContestRequests.length}</span></h2>
-          </div>
-          <div className="quest-grid">
-            {incomingContestRequests.map((it) => (
-              <button
-                key={`${it.contest.id}:${it.user.user_id}`}
-                type="button"
-                className="card card-accent quest-card incoming-jr-card"
-                onClick={() => openContestReq(it)}
-              >
-                <div className="between">
-                  <span className="card-title">🏆 {it.contest.theme}</span>
-                  <span className="badge badge-danger">未処理</span>
-                </div>
-                <div className="incoming-jr-card__applicant">
-                  <Avatar name={it.user.display_name} imageUrl={it.user.avatar_image_url ?? undefined} size="sm" noTooltip />
-                  <span className="incoming-jr-card__name">{it.user.display_name} さんが参加を希望</span>
-                </div>
-              </button>
-            ))}
-          </div>
         </motion.section>
       )}
 
@@ -814,6 +779,27 @@ export function DashboardView({
           onClosed={() => setContestReqSel(null)}
           onDecided={onContestDecided}
         />
+      )}
+
+      {/* B あなたの番「すべて見る」＝全件ダイアログ（標準 Modal・初期15＋もっと見る・§3.1/§Zone B）。 */}
+      {bSeeAll && (
+        <Modal open={!!bSeeAll} onClose={() => setBSeeAll(null)} onClosed={() => setBSeeAllN(15)} title={`${B_TITLE[bSeeAll]}（全${bCounts[bSeeAll]}件）`} size="lg">
+          <ModalBody>
+            <div className={bSeeAll === "vote" ? "vote-grid" : bSeeAll === "draft" ? "draft-grid" : "quest-grid"}>
+              {bSeeAll === "vote" && unvoted.slice(0, bSeeAllN).map(renderVoteCard)}
+              {bSeeAll === "req" && pendingReqs.slice(0, bSeeAllN).map(renderReqCard)}
+              {bSeeAll === "draft" && drafts.slice(0, bSeeAllN).map(renderDraftCard)}
+            </div>
+            {bCounts[bSeeAll] > bSeeAllN && (
+              <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
+                <button type="button" className="btn btn-outline" onClick={() => setBSeeAllN((n) => n + 15)}>もっと見る（残り{bCounts[bSeeAll] - bSeeAllN}件）</button>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setBSeeAll(null)}>閉じる</button>
+          </ModalFooter>
+        </Modal>
       )}
     </div>
   );

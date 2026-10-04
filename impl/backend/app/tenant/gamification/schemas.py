@@ -83,6 +83,7 @@ class FeedActivityDTO(BaseModel):
     ref_id: str | None = None
     quest_id: str | None = None
     quest_title: str | None = None
+    contest_id: str | None = None  # backing quest がコンテストなら付く＝フロントは /contests/{id} へリンク（/quests は404）
     actor: RankingUserDTO
     created_at: datetime
 

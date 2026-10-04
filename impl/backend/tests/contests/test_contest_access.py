@@ -432,3 +432,56 @@ def test_t_tc_139_backing_quest_not_joinable_as_quest(client, factory):
         assert client.get(f"/api/v1/quests/{qid}/ideas").status_code == 200                             # アイデア一覧は従来可（auto_approve=true）
     finally:
         _cleanup_contest(cid)
+
+
+def _grant_idea_post(uid, qid: str) -> None:
+    """backing quest 内の公開活動（idea_post）を1件付与（judge=False＝実績フック無効で検体を純化）。"""
+    from app.tenant.gamification import ledger
+    from app.tenant.profile.orm import User
+    with get_tenant_session(_seed_db()) as ts:
+        ledger.grant(ts, ts.get(User, uid), kind="xp_gain", amount=5, reason="idea_post",
+                     ref_type="ideas", ref_id=uuid.uuid4(), quest_id=uuid.UUID(qid), judge=False)
+        ts.commit()
+
+
+def test_g_tc_514_team_feed_includes_contest_activity(client, factory):
+    """G-TC-514(api): チームフィードに承認済み参加コンテストの活動も出る（行はテーマ/contest_id 付き）／未参加コンテストは出ない。
+
+    非作成者の参加者視点で検証する（作成者は backing quest の owner＝従来の member スコープで既に出てしまうため、
+    「承認済み参加（contest_participants）由来でスコープが広がる」ことを純粋に確かめるには非作成者を使う）。
+    """
+    _admin(client, factory)  # 作成者（admin）で2つのコンテストを作る
+    cid1 = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]  # 参加する方
+    cid2 = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]  # 参加しない方
+    qid1 = client.get(f"{BASE}/{cid1}").json()["quest_id"]
+    qid2 = client.get(f"{BASE}/{cid2}").json()["quest_id"]
+    theme1 = client.get(f"{BASE}/{cid1}").json()["theme"]
+    poster = factory.make_seed_company_account(display_name=f"投稿者_{uuid.uuid4().hex[:6]}")
+    poster_uid = _user_id(poster["id"])
+    me = factory.make_seed_company_account(display_name=f"参加者_{uuid.uuid4().hex[:6]}")
+    my_uid = _user_id(me["id"])
+    try:
+        _approve_tier1(cid1, my_uid)                       # me は cid1 のみ承認済み参加（cid2 は未参加）
+        _grant_idea_post(poster_uid, qid1)                 # cid1 配下の公開活動
+        _grant_idea_post(poster_uid, qid2)                 # cid2 配下の公開活動（me には出てはいけない）
+
+        _login(client, SEED_COMPANY_CODE, me["login_id"], me["password"])
+        r = client.get("/api/v1/me/feed")
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        by_quest = {d["quest_id"]: d for d in data}
+        assert qid1 in by_quest, "参加中コンテストの活動がフィードに出る"
+        assert qid2 not in by_quest, "未参加コンテストの活動は出ない"
+        row = by_quest[qid1]
+        assert row["contest_id"] == cid1                   # /contests へリンクするための contest_id
+        assert row["quest_title"] == theme1                # 見出しはコンテストテーマ
+        assert row["reason"] == "idea_post"
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM activities WHERE quest_id IN (:q1, :q2)"),
+                       {"q1": qid1, "q2": qid2})
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id IN (:c1, :c2)"),
+                       {"c1": cid1, "c2": cid2})
+            ts.commit()
+        _cleanup_contest(cid1)
+        _cleanup_contest(cid2)

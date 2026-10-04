@@ -6653,6 +6653,8 @@ export interface components {
             quest_id?: string | null;
             /** Quest Title */
             quest_title?: string | null;
+            /** Contest Id */
+            contest_id?: string | null;
             actor: components["schemas"]["RankingUserDTO"];
             /**
              * Created At

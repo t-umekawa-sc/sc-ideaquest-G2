@@ -24,7 +24,8 @@ const EVENT: Record<string, string> = {
 // ref から遷移先を解決（レビュー#3）＝アイデア（投稿/選定）はアイデア詳細（評価も見える）へ、実績は実績画面へ。
 function hrefOf(a: FeedActivity): string | null {
   if (a.ref_type === "ideas" && a.ref_id) return `/ideas/${a.ref_id}`;
-  if (a.ref_type === "quests" && a.ref_id) return `/quests/${a.ref_id}`;  // クエスト完了→詳細（結果タブ）
+  // コンテスト配下の backing quest は /quests だと 404＝コンテスト詳細へ。通常クエスト完了は従来どおり詳細（結果タブ）。
+  if (a.ref_type === "quests" && a.ref_id) return a.contest_id ? `/contests/${a.contest_id}` : `/quests/${a.ref_id}`;
   if (a.ref_type === "achievements") return "/achievements";
   return null;
 }
@@ -99,7 +100,9 @@ export function ActivityFeed({
                 <Avatar name={a.actor.name} imageUrl={a.actor.avatar ?? undefined} size="sm" level={a.actor.level ?? undefined} />
                 <div className="feed__body">
                   <span><strong className="feed__actor">{a.actor.name}</strong>が{href ? <Link className="feed__link" href={href}>{eventText}</Link> : eventText}</span>
-                  {showQuest && a.quest_title && <span className="feed__quest">🎯 {a.quest_title}</span>}
+                  {showQuest && a.quest_title && (a.contest_id
+                    ? <Link className="feed__quest feed__link" href={`/contests/${a.contest_id}`}>🏆 {a.quest_title}</Link>
+                    : <span className="feed__quest">🎯 {a.quest_title}</span>)}
                 </div>
                 <time className="feed__time" dateTime={a.created_at}>{timeAgo(a.created_at)}</time>
               </li>

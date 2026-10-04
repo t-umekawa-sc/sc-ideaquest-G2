@@ -20,6 +20,7 @@
 | G-TC-109 | int | 主要 reason の付与が G.6 対応表どおり（kind/reason/amount/ref_type） | seed アカウント | `ledger.grant` を selection(200)/evaluation(30)/evaluation_coin/achievement_reward で発行 | `selection=(xp_gain,200,ideas)`・`evaluation=(xp_gain,30,evaluations)`・`evaluation_coin=(coin_gain,_,ideas)`・`achievement_reward=(coin_gain,_,achievements)` | G.6／§7 |
 | G-TC-109 | api | クエスト内フィード＝公開種別のみ・actor 付き／非メンバーは 404（FR-36②・SC-12） | クエスト（owner=自分＋メンバー Bob）に Bob の `idea_post`（公開）・`vote`/`chat`（非公開）を付与 | `GET /quests/{id}/activities`（メンバー／非メンバー） | メンバー＝`200`・`idea_post` は出て `vote`/`chat` は出ない・`actor`（id/氏名）付き／非メンバー＝`404`（門番＝パーティー所属・存在秘匿） | G.5.1／FR-36 |
 | G-TC-110 | api | チームフィード＝参加クエスト横断の公開種別のみ・各行 quest 付き・不参加は除外（FR-36③・SC-01） | 参加 qid1(Bob idea_post/vote)・qid2(Carol selection)＋不参加 qid3(Frank idea_post) | `GET /me/feed` | `data` に `(qid1,idea_post)`・`(qid2,selection)` を含み、**qid3 は出ない**（`quest_id ∈ 参加集合`）・`vote` 等非公開は出ない・各行に `quest_title` | G.5.1／FR-36 |
+| G-TC-514 | api | チームフィードに参加中アイデアコンテストの活動も含める＋コンテスト行はテーマ/`contest_id`付き（SC-01 再設計・コンテスト統合） | 承認済み参加コンテスト（backing quest=qcn）で他メンバーが `idea_post`（公開）／未参加コンテスト（qcn2）で `idea_post` | `GET /me/feed` | `data` に qcn の `idea_post` を含み `quest_title`＝コンテストテーマ・`contest_id`＝当該コンテスト／**未参加 qcn2 は出ない**・通常クエスト行は `contest_id=null`（通知は recipient 宛で別途反映＝本TC対象外） | G.5.1／ダッシュボード再設計 §3 Zone C |
 
 ## 2. 画面 e2e（SC-32 魔法スキル・G）
 

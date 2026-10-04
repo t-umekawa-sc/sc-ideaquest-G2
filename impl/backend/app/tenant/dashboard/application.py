@@ -32,11 +32,11 @@ from app.tenant.quests.orm import Quest
 logger = logging.getLogger("app.dashboard")
 
 _EVAL_ASPECTS_TOTAL = 5   # 評価観点数（novelty/impact/feasibility/fit/cost・F）
-_UNVOTED_LIMIT = 6
+_UNVOTED_LIMIT = 30     # 再設計：パネルは3件表示、「すべて見る」ダイアログ用に多めに取得（§3.1）
 _QUESTS_LIMIT = 6
 _FOLLOWED_LIMIT = 6
-_UNREAD_CHATS_LIMIT = 6
-_RECENT_CHATS_LIMIT = 7  # 🕒 最近の議論（更新順・既読/未読問わず）＝新着とは別動線（SC-01 §4.8c）
+_UNREAD_CHATS_LIMIT = 5  # 新着の議論（§3.1）
+_RECENT_CHATS_LIMIT = 5  # 🕒 最近の議論（§3.1・新着とは別動線・SC-01 §4.8c）
 _NOTIF_LIMIT = 5
 _CATALOG_LIMIT = 100  # FR-40 SC-01（フォロー中/参加リクエスト）＝発見カタログから my_state で抽出（1ページで十分）
 _NON_DRAFT_STATUS = ["recruiting", "in_progress", "evaluating", "completed"]

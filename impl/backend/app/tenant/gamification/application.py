@@ -15,6 +15,7 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as chat_repo
+from app.tenant.contests import repository as contests_repo
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.profile import repository as profile_repo
@@ -189,7 +190,7 @@ def _paginate(rows: list, limit: int) -> tuple[list, bool, str | None]:
     return rows, has_next, (_encode_feed_cursor(rows[-1]) if has_next and rows else None)
 
 
-def _feed_row_dto(a, actor_user, quest_title: str | None = None) -> dict:
+def _feed_row_dto(a, actor_user, quest_title: str | None = None, contest_id: str | None = None) -> dict:
     row = {
         "id": str(a.id), "reason": a.reason, "kind": a.kind, "amount": a.amount,
         "ref_type": a.ref_type, "ref_id": str(a.ref_id) if a.ref_id else None,
@@ -198,6 +199,8 @@ def _feed_row_dto(a, actor_user, quest_title: str | None = None) -> dict:
     }
     if quest_title is not None:
         row["quest_title"] = quest_title
+    if contest_id is not None:
+        row["contest_id"] = contest_id  # コンテスト行＝フロントは /contests へ（backing quest は /quests だと404）
     return row
 
 
@@ -230,14 +233,23 @@ def get_team_feed(account_id, company_id, *, limit, cursor=None) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+        # スコープ＝参加クエスト ∪ 承認済みアイデアコンテストの backing quest（通知と非対称にしない・SC-01 再設計 Zone C）。
+        quest_ids = list({*quests_repo.list_member_quest_ids(ts, user.id),
+                          *contests_repo.approved_participation_quest_ids(ts, user.id)})
         if not quest_ids:
             return _EMPTY_FEED
         rows, has_next, next_cursor = _paginate(gami_repo.list_team_feed(ts, quest_ids, cursor=cur, limit=limit + 1), limit)
         actors = quests_repo.get_users_by_ids(ts, {a.user_id for a in rows})
-        quest_map = quests_repo.get_quests_by_ids(ts, {a.quest_id for a in rows if a.quest_id})  # 一括（二重 get_quest 解消）
-        data = [_feed_row_dto(a, actors.get(a.user_id),
-                              quest_title=(quest_map[a.quest_id].title if a.quest_id in quest_map else "")) for a in rows]
+        row_qids = {a.quest_id for a in rows if a.quest_id}
+        quest_map = quests_repo.get_quests_by_ids(ts, row_qids)  # 一括（二重 get_quest 解消）
+        contest_map = contests_repo.contests_by_quest_ids(ts, row_qids)  # backing quest→contest（テーマ/リンク）
+        data = [_feed_row_dto(
+                    a, actors.get(a.user_id),
+                    # コンテスト行はテーマを見出しに（backing quest.title もテーマだが明示）・通常行はクエスト名。
+                    quest_title=(contest_map[a.quest_id].theme if a.quest_id in contest_map
+                                 else (quest_map[a.quest_id].title if a.quest_id in quest_map else "")),
+                    contest_id=(str(contest_map[a.quest_id].id) if a.quest_id in contest_map else None),
+                ) for a in rows]
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 

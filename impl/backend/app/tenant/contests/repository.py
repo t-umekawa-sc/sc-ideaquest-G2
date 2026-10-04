@@ -199,6 +199,17 @@ def contest_by_quest(session: Session, quest_id: uuid.UUID) -> Contest | None:
     return c
 
 
+def contests_by_quest_ids(session: Session, quest_ids) -> dict[uuid.UUID, Contest]:
+    """backing quest_id 群 → contest の一括引き（チームフィードのコンテスト行ラベル/リンク用）。
+    通常クエストの quest_id は結果に含まれない（＝通常行は contest_id=null で扱える）。"""
+    ids = list(quest_ids)
+    if not ids:
+        return {}
+    rows = session.execute(select(Contest).where(Contest.quest_id.in_(ids),
+                                                 Contest.deleted_at.is_(None))).scalars().all()
+    return {c.quest_id: c for c in rows}
+
+
 # ---- 表彰・ランキング集計（会期スコープ＝backing quest×[starts_at, ends_at)・T.3/§6.1） ----
 # いずれも既存テーブル（votes/evaluations/evaluation_scores/activities）を会期×backing quest で集計＝新テーブル不要。
 # 遅延 import（contests→ideas/evaluations/gamification の読取・循環は実行時に解消）。

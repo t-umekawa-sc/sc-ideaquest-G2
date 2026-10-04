@@ -253,3 +253,7 @@
 .dash-page .rank-skel--avatar { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; }
 .dash-page .rank-skel--name { flex: 1; height: 14px; }
 .dash-page .rank-skel--score { flex: 0 0 auto; width: 46px; height: 30px; }
+
+/* B あなたの番「すべて見る」＝タブ行右のリンク風ボタン（再設計 §3.1）。 */
+.dash-page .dash-see-all { background: none; border: 0; padding: 0; color: var(--color-primary); font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap; }
+.dash-page .dash-see-all:hover { text-decoration: underline; }
