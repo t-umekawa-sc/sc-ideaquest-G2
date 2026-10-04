@@ -9,7 +9,8 @@
 | 操作 | 許可 | 補足 |
 |---|---|---|
 | コンテスト作成/編集/状態遷移/確定 | **②能力 `contest_create` 保持者**（＋ `company_account_admin`/`system_admin`） | 決定I＝一般ユーザーにも付与可（Q4「管理者のみ」を緩和） |
-| コンテスト一覧/詳細（read） | 会社内 active ユーザー（`public` 会社は参加者含む） | コンテスト配下は**会社全体可視**（パーティー/部署ゲート非依存・設計 §2.3） |
+| コンテスト**一覧**（`GET /contests`） | 会社内 active ユーザー | 一覧は全ユーザーに返す（承認制の未参加者も「どんなコンテストがあるか」は見える＝応募導線のため）。各行にメタ（参加人数・`auto_approve`・自分の参加状態）を付与し、未参加者はダイアログ表示→応募（SC-53・設計 §2.3） |
+| コンテスト**詳細/中身**（詳細・アイデア一覧/詳細・全文検索・活動・ランキング） | **`can_view_contest`**＝`auto_approve` OR 作成者 OR Tier1参加者(approved) OR 運営（`contest_create`/管理者） | 改訂 2026-10-04。承認制（`auto_approve=false`）×未参加は **403**（会社全体可視は撤廃）。`auto_approve=true`/public 会社は会社全体可視（設計 §2.3） |
 | Tier1 参加リクエスト | 本人 | `public`/DEMO はサインアップで自動 `approved`（決定G） |
 | Tier1 承認/却下 | **管理者**（`company_account_admin`/`system_admin`／`contest_create` 保持者） | `contest_participants.decided_by` |
 | Tier2 参加リクエスト（チャット希望） | 本人（Tier1 承認済み） | |
@@ -20,7 +21,8 @@
 | 能力付与/剥奪（`contest_evaluator`/`quest_create`/`contest_create`） | **`company_account_admin`/`system_admin`** | §5.3・SC-93 系 UI |
 | アイデア→クエスト昇格 | **②能力 `quest_create` 保持者**（社内のみ） | `public`/公開参加者には出さない |
 
-- **アクセス分岐は単一ポリシー解決**（設計 §2.3）＝`resolve_idea_access(quest, user)` でコンテスト配下は会社全体可視＋Tier1(投票)/Tier2(チャット)/審査員(評価) ゲート、通常クエストは従来のパーティー＋部署ゲート。**判定入口を1か所**に集約（クエスト/コンテスト双方へ一度で効く）。認可はサーバー権威（README §1.6・UI非表示に依存しない）。
+- **アクセス分岐は単一ポリシー解決**（設計 §2.3）＝`resolve_idea_access(quest, user)` でコンテスト配下は `can_view_contest`（参加者/運営/作成者/`auto_approve`）＋Tier1(投票)/Tier2(チャット)/審査員(評価) ゲート、通常クエストは従来のパーティー＋部署ゲート。**判定入口を1か所**＝`quests/repository.can_access_quest` のコンテスト分岐に集約（アイデア一覧/詳細/全文検索/活動へ一度で効く）。認可はサーバー権威（README §1.6・UI非表示に依存しない）。
+- **一覧の追加メタ（応募導線用）**＝`GET /contests` の各 item に `auto_approve`・`participant_count`（approved 数）・`my_status`（none/requested/approved/rejected/left）・`description` を付与、レスポンス直下に `can_manage`（会社レベル運営可否・全行共通）。フロントは `can_manage || auto_approve || my_status='approved'` で詳細遷移、未満はダイアログ（概要＋メタ＋応募）＝SC-53。
 - **公開モードの外周ガード**（会社 `access_mode='public'`・FR-48）＝`role=general` はコンテスト系許可リスト外のEPを **403**（README §1.6・A 参照）。本ドメイン T のEPはその許可リストに含む。
 
 ## T.1 コンテスト CRUD・会期

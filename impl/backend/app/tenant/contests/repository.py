@@ -88,6 +88,32 @@ def is_contest_participant(session: Session, contest_id: uuid.UUID, user_id: uui
     return row is not None and row.status == "approved"
 
 
+def count_approved_participants(session: Session, contest_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """コンテストごとの Tier1 承認済み参加人数（一覧の `participant_count`・SC-53 応募ダイアログ）。"""
+    if not contest_ids:
+        return {}
+    rows = session.execute(
+        select(ContestParticipant.contest_id, func.count())
+        .where(ContestParticipant.contest_id.in_(contest_ids),
+               ContestParticipant.status == "approved")
+        .group_by(ContestParticipant.contest_id)
+    ).all()
+    return {cid: int(n) for cid, n in rows}
+
+
+def participation_status_map(session: Session, contest_ids: list[uuid.UUID],
+                            user_id: uuid.UUID) -> dict[uuid.UUID, str]:
+    """閲覧者のコンテストごとの参加状態（一覧の `my_status`＝none/requested/approved/rejected/left）。"""
+    if not contest_ids:
+        return {}
+    rows = session.execute(
+        select(ContestParticipant.contest_id, ContestParticipant.status)
+        .where(ContestParticipant.contest_id.in_(contest_ids),
+               ContestParticipant.user_id == user_id)
+    ).all()
+    return {cid: st for cid, st in rows}
+
+
 def get_idea_participation(session: Session, idea_id: uuid.UUID, user_id: uuid.UUID) -> IdeaParticipant | None:
     return session.execute(
         select(IdeaParticipant).where(IdeaParticipant.idea_id == idea_id,

@@ -38,13 +38,18 @@ class ContestListItem(BaseModel):
     mode: str
     status: str
     theme: str
+    description: str | None = None          # 応募ダイアログの概要用（SC-53・承認制×未参加はダイアログで確認）
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     created_at: datetime
+    auto_approve: bool = False              # 誰でも参加可（行クリックで詳細遷移の分岐・SC-53）
+    participant_count: int = 0             # Tier1 承認済み参加人数（ダイアログのメタ）
+    my_status: str = "none"               # 閲覧者の参加状態：none | requested | approved | rejected | left
 
 
 class ContestListResponse(BaseModel):
     data: list[ContestListItem]
+    can_manage: bool = False               # 会社レベルの運営可否（全行共通＝contest_create/管理者）
 
 
 class ParticipationResponse(BaseModel):

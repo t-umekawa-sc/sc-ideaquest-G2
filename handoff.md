@@ -4,17 +4,28 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-03 JST（セッション末）
+- 更新: 2026-10-04 JST（セッション末）
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `bd510b08 feat(contest): Tier2 参加導線をチャットカードに集約`（commit＋origin/main へ push 済）
+- 最新コミット: 本セッションの `feat(contest): 承認制コンテストの可視ゲート（backend認可＋応募ダイアログ）`（commit＋origin/main へ push 済）。前回末は `69ff8dce`（docs(handoff)・親 `bd510b08`）。
 - working tree: clean（全コミット済・push 済）
-- alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`
+- alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`（**本セッションで migration 追加なし**＝認可ロジック変更のみ）
+- ⚠️ 開始時に **git リポジトリ破損**（`.git/objects` に空オブジェクト3つ＝HEAD/tree/blob・WSL2 クラッシュ起因）を検出。GitHub(origin/main) が完全コピーを保持していたため、空オブジェクト削除→`git fetch` で修復済（working tree 無傷）。**節目でこまめに push 推奨**。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB・ゲーミフィケーション付き）。
 現フェーズ＝**アイデアコンテスト機能（FR-46/47/48）**。コンテスト中核〜SC-54 詳細の作り込みは概ね完了し、次は公開/非公開モード（Step3）等。
 
 ## 3. 今回やったこと（このセッションの変更＝コミット単位・理由つき）
+
+> **本セッション（2026-10-04）＝アイデアコンテストのアクセス制御の整理＋承認制コンテストの可視ゲート実装（backend認可をテストで検証しながら＋frontend）。** 設計書ファースト→テストmd先出し→red→green で実施。詳細な設計判断はメモリ `contest-access-control-design`。
+>
+> - **設計整理（ユーザーと合意）**＝(1) コンテスト内の中身の可視は**会社レベルから撤廃しコンテスト単位 `auto_approve` へ移設**（承認制=参加者のみ）／(2) 会社 `access_mode` は メニュー/着地/外周403/サインアップの4役に専念（可視は担わない・直交）／(3) **決定O 改訂**＝公開会社は「コンテスト専用テナント」＝`role=general` はコンテスト許可リストのみ・**管理者はコンテスト＋管理許可リストのみ**（それ以外は管理者でも403）。旧「403 は general のみ=管理者全EP素通し」は誤りとして改訂。正本2箇所（`doc/API設計/A_認証・セッション.md §A.11.1`・`doc/設計ドラフト/アイデアコンテスト機能_設計.md §8.0`）を修正。
+> - **可視ゲート実装**（migration なし）＝`contests/access.py` に `can_view_contest`（`auto_approve` OR 作成者 OR Tier1参加者 OR 運営）/`is_contest_manager` 新設。`quests/repository.can_access_quest` のコンテスト分岐を委譲（アイデア一覧/詳細/全文検索/活動が一斉ゲート＝承認制×未参加は404存在秘匿）。`GET /contests/{id}`・ランキングは `can_view_contest` で**403明示ガード**。一覧 `GET /contests` に `auto_approve`/`participant_count`/`my_status`/`description`＋直下 `can_manage` を付与。
+> - **frontend**＝`ContestListView` 行クリックを `canManage||auto_approve||my_status='approved'` で分岐（詳細遷移 or **応募ダイアログ**＝概要+種別/会期/状態/参加人数+応募／運営以外は編集複製削除メニュー非表示）。`ContestDetailView` は直接URLの403を「参加承認制」の案内に。api `fetchContests` は `{items,canManage}` を返すよう変更。OpenAPI 型再生成済。
+> - **検証**＝backend フル **945 passed**（+4新規 T-TC-113改訂/128/129/133/134・回帰ゼロ）／frontend build+vitest 218 green／traceability ✅969／ブラウザ目視（承認制→ダイアログ・応募→承認待ち・誰でも参加可→詳細遷移）。既存 T-TC-112/115/117/120 は可視を開く `auto_approve=True` 前提に修正（tierゲート単体検証に純化・可視は新規TCが担当）、T-TC-118 の can_manage 判定は一覧EP経由に変更。
+>
+> ---
+> 以下は前セッション（2026-10-03）の記録。
 > 前半（Step2b-2〜2c・SC-54 初版）は前セッション。本セッションは **SC-54 の受入ポリッシュと機能追加の連続**。すべて main に push 済み。コンテスト実装の正本ファイル＝backend `impl/backend/app/tenant/contests/`（access/application/repository/router/schemas/orm）・frontend `impl/frontend/src/features/contests/`（api.ts/types.ts/contests.css/components/{ContestListView,ContestDetailView}.tsx）。
 
 - **SC-53 一覧をクエスト一覧UIに統一＋コンテスト削除** `26acf5f0`: `ContestListView` を DataTable（検索/並替/絞込/列設定/エクスポート/表示切替）＋RowMenu（詳細/編集/複製/削除）に。会期ステータスを `.segmented` スイッチに。backend に `DELETE /contests/{id}`（論理削除・application.delete_contest）＝T-TC-106。
@@ -58,7 +69,8 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - コミット/push は main 直（本プロジェクトの慣習・都度 commit&push）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-1. **Step3 公開/非公開モード（FR-48・SEC・次の主要ステップ）**＝`companies.access_mode='public'` の外周ガード。`role=general` はコンテスト系許可リスト外のEPを 403（正＝`doc/API設計/README.md §1.6`・`doc/API設計/A_認証・セッション.md §A.11.1`）。実装箇所の候補＝`app/control_plane/me/deps.py` の `require_me` 近辺か専用 Depends で access_mode×role×パスを判定。併せて `GET /public/bootstrap`（公開ランディング用・SC-53 着地）。TC＝`doc/テスト/T_アイデアコンテスト.md` の T-TC-150/151/201＋T-TC-114（public 自動承認）。**大きめ・全EP横断の認可＝慎重に（既存テストの回帰確認を厚く）**。
+0. **（進行中・次セッション着手）コンテスト参加リクエストの通知＋ダッシュボード未処理パネル表示**（ユーザー要望 2026-10-04）＝Tier1 参加リクエスト（`request_contest_participation`）を運営（主催者/`contest_create`/管理者）へ通知（H `notify()`・新 type 例 `contest_participation_requested`）＋SC-01 ダッシュボード（I `GET /dashboard`）の「未処理（承認待ち）」に表示。**既存の未処理パネルと分けるか統合かはレビューして提案**（クエストのパーティ参加リクエストと同型か確認）。未着手。
+1. **Step3 公開/非公開モード（FR-48・SEC・主要ステップ）**＝`companies.access_mode='public'` の外周ガード。**決定O 改訂済（2026-10-04）**＝`role=general`＝コンテスト許可リストのみ／**管理者（system_admin/company_account_admin）＝コンテスト＋管理許可リストのみ・それ以外は管理者でも403**（公開会社=コンテスト専用テナント）。正＝`doc/API設計/README.md §1.6`・`doc/API設計/A_認証・セッション.md §A.11.1`。実装箇所の候補＝`app/control_plane/me/deps.py` の `require_me` 近辺か専用 Depends で access_mode×role×パスを判定。併せて `GET /public/bootstrap`（公開ランディング用・SC-53 着地）。TC＝`doc/テスト/T_アイデアコンテスト.md` の T-TC-150/151/201＋T-TC-114（public 自動承認）。**大きめ・全EP横断の認可＝慎重に（既存テストの回帰確認を厚く）**。
 2. **Step4 セルフサインアップ（FR-48・SEC 重）**＝SC-05（画面）＋`POST /public/signup`・`POST /public/signup/verify`（正＝`doc/API設計/A_認証・セッション.md §A.11`・SEC A〜J）。TC＝`doc/テスト/A_認証.md` A-TC-120〜127。`companies.self_signup_enabled` を gate に使う。
 3. **Step5 アイデア→クエスト昇格（FR-47・T.5）**＝`POST /ideas/{id}/promote-to-quest`（要 `quest_create`・内容コピー＋`quests.origin_idea_id` で由来参照・社内のみ）。TC＝T-TC-140。
 4. **SC-54 残フォロー（任意）**＝①参加状態・権限に応じた CTA 出し分け（現状「参加する」は open 時のみ表示・権限無は 403→snackbar）／②ランキング軸の会期日付が未設定（starts_at/ends_at=null）だと全期間集計になる点の UI 明示／③SC-54 の正式モック（`doc/画面設計/mocks`）と `doc/画面設計/screens/SC-54_*.md` の起票（現状は遷移図のみが仕様源）。

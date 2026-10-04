@@ -6144,6 +6144,8 @@ export interface components {
             status: string;
             /** Theme */
             theme: string;
+            /** Description */
+            description?: string | null;
             /** Starts At */
             starts_at?: string | null;
             /** Ends At */
@@ -6153,11 +6155,31 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Auto Approve
+             * @default false
+             */
+            auto_approve: boolean;
+            /**
+             * Participant Count
+             * @default 0
+             */
+            participant_count: number;
+            /**
+             * My Status
+             * @default none
+             */
+            my_status: string;
         };
         /** ContestListResponse */
         ContestListResponse: {
             /** Data */
             data: components["schemas"]["ContestListItem"][];
+            /**
+             * Can Manage
+             * @default false
+             */
+            can_manage: boolean;
         };
         /**
          * ContestParticipantDTO

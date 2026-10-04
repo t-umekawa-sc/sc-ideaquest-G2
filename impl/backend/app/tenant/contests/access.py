@@ -20,14 +20,49 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.control_plane.auth.orm import Account
+from app.db.control import control_session
 from app.tenant.capabilities import application as caps_app
 from app.tenant.contests import repository as contest_repo
 from app.tenant.contests.orm import Contest
+from app.tenant.profile.orm import User
 
 
 def contest_of(session: Session, quest_id: uuid.UUID) -> Contest | None:
     """quest がコンテストの backing quest なら Contest を返す（通常クエストは None）。"""
     return contest_repo.contest_by_quest(session, quest_id)
+
+
+def _is_company_admin_by_user(session: Session, user_id: uuid.UUID) -> bool:
+    """user_id → account → control の system_role で管理者判定（can_view_contest 用・user_id しか無い門番から呼ぶ）。"""
+    u = session.get(User, user_id)
+    if u is None:
+        return False
+    with control_session() as s:
+        acc = s.get(Account, u.account_id)
+    return acc is not None and acc.system_role in ("company_account_admin", "system_admin")
+
+
+def is_contest_manager(session: Session, user_id: uuid.UUID) -> bool:
+    """運営＝②能力 `contest_create` 保持者 OR 会社アカウント管理者/システム管理者（作成/編集/可視の運営権限・決定I）。"""
+    return (caps_app.user_has_capability(session, user_id, "contest_create")
+            or _is_company_admin_by_user(session, user_id))
+
+
+def can_view_contest(session: Session, contest: Contest, user_id: uuid.UUID) -> bool:
+    """コンテストの中身（詳細/アイデア/議論/検索/活動/ランキング）の可視可否（改訂 2026-10-04・ユーザー要件・設計 §2.3）。
+
+    - `auto_approve`（誰でも参加可）＝会社全体に公開（public 会社もサインアップで自動承認＝実質同じ・決定G）。
+    - 承認制（`auto_approve=false`）は**参加資格のある者のみ**＝作成者 / Tier1 参加者 / 運営。
+      未参加者は一覧のダイアログで概要＋応募のみ（SC-53）＝詳細・配下リソースは本ゲートで遮断する。
+    """
+    if contest.auto_approve:
+        return True
+    if contest.created_by_id == user_id:
+        return True
+    if contest_repo.is_contest_participant(session, contest.id, user_id):
+        return True
+    return is_contest_manager(session, user_id)
 
 
 def can_post_idea(session: Session, contest: Contest, user_id: uuid.UUID) -> bool:

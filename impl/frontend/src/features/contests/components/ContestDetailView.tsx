@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
@@ -58,6 +59,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（日次スパーク）
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [forbidden, setForbidden] = useState(false);  // 承認制×未参加＝backend 403（応募は一覧から）
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
   const [view, setView] = useState("ideas");       // 上位タブ: ideas | search | party
   const [ftq, setFtq] = useState("");              // 全文検索クエリ（SC-12 と同一 UI）
@@ -79,7 +81,13 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    const c = await getContest(contestId, signal).catch(() => null);
+    let c: ContestDetail | null = null;
+    try {
+      c = await getContest(contestId, signal);
+    } catch (e) {
+      // 承認制×未参加＝backend が can_view_contest で 403（応募は一覧のダイアログから・設計 §2.3）。
+      if (e instanceof ApiError && e.status === 403) { setForbidden(true); setLoading(false); return; }
+    }
     if (!c) { setNotFound(true); setLoading(false); return; }
     setContest(c);
     const [list, ...ranks] = await Promise.all([
@@ -399,6 +407,15 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   }
 
   if (loading) return <section className="contest-detail"><p className="hint">読み込み中…</p></section>;
+  if (forbidden) {
+    return (
+      <section className="contest-detail">
+        <Link className="backlink" href="/contests">← アイデアコンテスト一覧</Link>
+        <p className="hint">このコンテストは参加承認制です。閲覧には参加が必要です。<br />
+          一覧の該当コンテストを開いて「応募する」から参加をリクエストしてください。</p>
+      </section>
+    );
+  }
   if (notFound || !contest) {
     return (
       <section className="contest-detail">

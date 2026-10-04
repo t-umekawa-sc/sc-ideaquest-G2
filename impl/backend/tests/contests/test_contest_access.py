@@ -103,18 +103,22 @@ def _purge_contest_idea(cid: str, iid: uuid.UUID) -> None:
     _cleanup_contest(c)
 
 
-def test_t_tc_113_resolve_access_company_wide_under_contest(client, factory):
-    """T-TC-113(int): コンテスト配下は会社全体可視（非パーティー員でも可）・通常クエストは contest_of=None で従来ゲート。"""
+def test_t_tc_113_resolve_access_gated_under_contest(client, factory):
+    """T-TC-113(int): コンテスト配下は can_view_contest で可視分岐（承認制×未参加は不可・Tier1 承認で可）・通常は従来ゲート（改訂 2026-10-04）。"""
     _admin(client, factory)
-    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]  # auto_approve 既定=false（承認制）
     qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
     outsider = factory.make_seed_company_account(display_name=f"社外観覧_{uuid.uuid4().hex[:6]}")
     ouid = _user_id(outsider["id"])
     try:
         with get_tenant_session(_seed_db()) as ts:
             quest = quests_repo.get_quest(ts, uuid.UUID(qid))
-            # コンテスト配下＝backing quest は contest を引けて、非パーティー員でも可視（会社全体）。
             assert contest_access.contest_of(ts, uuid.UUID(qid)) is not None
+            # 承認制×未参加＝可視不可（旧「会社全体可視」を撤廃）。
+            assert quests_repo.can_access_quest(ts, quest, ouid) is False
+            # Tier1 承認後は可視。
+            contest_repo.upsert_contest_participation(ts, uuid.UUID(cid), ouid, status="approved")
+            ts.flush()
             assert quests_repo.can_access_quest(ts, quest, ouid) is True
             # 通常クエスト（コンテスト非配下）は contest_of=None＝従来のパーティー＋部署ゲートに委譲。
             normal_qid = ts.execute(_text(
@@ -123,13 +127,90 @@ def test_t_tc_113_resolve_access_company_wide_under_contest(client, factory):
             assert normal_qid is not None
             assert contest_access.contest_of(ts, normal_qid) is None
     finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
         _cleanup_contest(cid)
+
+
+def test_t_tc_128_can_view_contest_truth_table(client, factory):
+    """T-TC-128(int): can_view_contest の各条件＝auto_approve/Tier1参加者/運営(管理者・contest_create)/作成者。"""
+    admin = _admin(client, factory)  # 作成者＝この管理者
+    gated = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]              # auto_approve=false
+    openc = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]  # auto_approve=true
+    outsider = factory.make_seed_company_account(display_name=f"未参加_{uuid.uuid4().hex[:6]}")
+    ouid = _user_id(outsider["id"])
+    participant = factory.make_seed_company_account(display_name=f"参加_{uuid.uuid4().hex[:6]}")
+    puid = _user_id(participant["id"])
+    manager = factory.make_seed_company_account(system_role="company_account_admin",
+                                                display_name=f"運営_{uuid.uuid4().hex[:6]}")
+    muid = _user_id(manager["id"])
+    capholder = factory.make_seed_company_account(display_name=f"能力_{uuid.uuid4().hex[:6]}")
+    factory.grant_capability(capholder["id"], "contest_create")
+    cuid = _user_id(capholder["id"])
+    try:
+        with get_tenant_session(_seed_db()) as ts:
+            gc = contest_repo.get(ts, uuid.UUID(gated))
+            oc = contest_repo.get(ts, uuid.UUID(openc))
+            contest_repo.upsert_contest_participation(ts, gc.id, puid, status="approved")
+            ts.flush()
+            assert contest_access.can_view_contest(ts, oc, ouid) is True   # auto_approve=true＝誰でも
+            assert contest_access.can_view_contest(ts, gc, ouid) is False  # 承認制×未参加＝不可
+            assert contest_access.can_view_contest(ts, gc, puid) is True   # Tier1 承認者
+            assert contest_access.can_view_contest(ts, gc, muid) is True   # 運営（管理者・作成者でない）
+            assert contest_access.can_view_contest(ts, gc, cuid) is True   # 運営（contest_create 能力）
+            assert contest_access.can_view_contest(ts, gc, _user_id(admin["id"])) is True  # 作成者
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            for c in (gated, openc):
+                ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": c})
+            ts.execute(_text("DELETE FROM user_capabilities WHERE user_id=:u"), {"u": str(cuid)})
+            ts.commit()
+        for c in (gated, openc):
+            _cleanup_contest(c)
+
+
+def test_t_tc_129_gated_detail_ideas_search_guard(client, factory):
+    """T-TC-129(api): 承認制×未参加は 詳細=403・配下アイデア一覧/全文検索=404（存在秘匿）・Tier1 承認後は可視。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]  # 承認制
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
+    iid = _seed_published_idea(qid, _user_id(author["id"]))
+    outsider = factory.make_seed_company_account(display_name=f"未参加_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, outsider["login_id"], outsider["password"])
+        assert client.get(f"{BASE}/{cid}").status_code == 403                    # 詳細＝明示 403
+        assert client.get(f"/api/v1/quests/{qid}/ideas").status_code == 404       # アイデア一覧＝404（can_access_quest）
+        assert client.get(f"/api/v1/quests/{qid}/search", params={"q": "案"}).status_code == 404  # 全文検索＝404
+        # Tier1 承認後は見える。
+        _approve_tier1(cid, _user_id(outsider["id"]))
+        assert client.get(f"{BASE}/{cid}").status_code == 200
+        assert client.get(f"/api/v1/quests/{qid}/ideas").status_code == 200
+    finally:
+        _purge_contest_idea(cid, iid)
+
+
+def test_t_tc_133_ranking_gated(client, factory):
+    """T-TC-133(api): ランキングは can_view_contest でゲート＝承認制×未参加は 403・auto_approve=true は誰でも 200。"""
+    _admin(client, factory)
+    gated = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    openc = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    outsider = factory.make_seed_company_account(display_name=f"未参加_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, outsider["login_id"], outsider["password"])
+        assert client.get(f"{BASE}/{gated}/ranking", params={"axis": "approve_votes"}).status_code == 403
+        assert client.get(f"{BASE}/{openc}/ranking", params={"axis": "approve_votes"}).status_code == 200
+    finally:
+        _cleanup_contest(gated)
+        _cleanup_contest(openc)
 
 
 def test_t_tc_112_vote_tier1_open_chat_tier2_approval(client, factory):
     """T-TC-112(api): 投票＝Tier1 参加者に開放・チャット＝Tier2 承認者のみ（案X の分岐）。"""
     _admin(client, factory)
-    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    # auto_approve=True＝可視を開けて tier ゲート単体を検証（可視ゲートは T-TC-128/129）。
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
     qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
     author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
     iid = _seed_published_idea(qid, _user_id(author["id"]))
@@ -164,7 +245,8 @@ def test_t_tc_112_vote_tier1_open_chat_tier2_approval(client, factory):
 def test_t_tc_115_post_idea_open_to_tier1(client, factory):
     """T-TC-115(api): コンテスト配下のアイデア投稿＝Tier1 参加者に開放（member/idea_create 権限は不要）・未参加は 403。"""
     _admin(client, factory)
-    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    # auto_approve=True＝可視を開けて Tier1 投稿ゲート単体を検証（可視ゲートは T-TC-128/129）。
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
     qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
     poster = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
     outsider = factory.make_seed_company_account(display_name=f"未参加_{uuid.uuid4().hex[:6]}")
@@ -191,7 +273,8 @@ def test_t_tc_115_post_idea_open_to_tier1(client, factory):
 def test_t_tc_117_detail_my_participating_idea_ids(client, factory):
     """T-TC-117: 詳細の my_participating_idea_ids＝自分が投稿者 or Tier2承認のアイデア（新着の議論の限定根拠）。"""
     _admin(client, factory)
-    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    # auto_approve=True＝投稿者/Tier2承認者/未参加のいずれも詳細を閲覧できる状態で my_participating を検証（可視ゲートは T-TC-128/129）。
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
     qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
     author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
     iid = _seed_published_idea(qid, _user_id(author["id"]))
@@ -297,7 +380,8 @@ def test_t_tc_125_idea_detail_is_contest_flag(client, factory):
 def test_t_tc_120_evaluate_requires_contest_evaluator(client, factory):
     """T-TC-120(api): 評価は `contest_evaluator` 保持者のみ・投稿者でも非保持は 403（運営指名のみ）。"""
     _admin(client, factory)
-    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    # auto_approve=True＝可視を開けて審査員ゲート単体を検証（可視ゲートは T-TC-128/129）。
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
     qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
     author = factory.make_seed_company_account(display_name=f"投稿_{uuid.uuid4().hex[:6]}")
     iid = _seed_published_idea(qid, _user_id(author["id"]))

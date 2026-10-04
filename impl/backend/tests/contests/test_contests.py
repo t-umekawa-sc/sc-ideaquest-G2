@@ -166,16 +166,16 @@ def test_t_tc_118_participants_list_admin_only(client, factory):
         # 本人がリクエスト（requested）。
         _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
         client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
-        # 一般は一覧403・can_manage=false。
+        # 一般は参加者一覧403・一覧EP の can_manage=false（承認制で未承認の本人は詳細に入れないため can_manage は一覧EPで確認）。
         assert client.get(f"{BASE}/{cid}/participants").status_code == 403
-        assert client.get(f"{BASE}/{cid}").json()["can_manage"] is False
-        # 管理者は一覧200（requested を含む）・can_manage=true。
+        assert client.get(BASE).json()["can_manage"] is False
+        # 管理者は一覧200（requested を含む）・一覧EP の can_manage=true。
         _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
         r = client.get(f"{BASE}/{cid}/participants")
         assert r.status_code == 200, r.text
         data = r.json()["data"]
         assert any(p["status"] == "requested" for p in data)
-        assert client.get(f"{BASE}/{cid}").json()["can_manage"] is True
+        assert client.get(BASE).json()["can_manage"] is True
     finally:
         with get_tenant_session(_seed_db()) as ts:
             ts.execute(_text("DELETE FROM contest_participants WHERE contest_id = :c"), {"c": cid})
@@ -352,5 +352,36 @@ def test_t_tc_111_tier2_participation_author_approves(client, factory):
         with get_tenant_session(_seed_db()) as ts:
             ts.execute(_text("DELETE FROM idea_participants WHERE idea_id = :i"), {"i": str(iid)})
             ts.execute(_text("DELETE FROM ideas WHERE id = :i"), {"i": str(iid)})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
+def test_t_tc_134_list_item_meta_for_apply_dialog(client, factory):
+    """T-TC-134(api): 一覧 item に応募導線用メタ（auto_approve/participant_count/my_status/description）＋直下 can_manage。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open", description="説明文X"), headers=_csrf(client)).json()["id"]  # 承認制
+    participant = factory.make_seed_company_account(display_name=f"参加_{uuid.uuid4().hex[:6]}")
+    puid = _user_id(participant["id"])
+    try:
+        # 運営（admin）が直接 approved で追加（参加人数=1 の素）。
+        assert client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "approved"},
+                            headers=_csrf(client)).status_code == 200
+        # 運営の一覧＝can_manage true・item にメタ。
+        body = client.get(BASE).json()
+        assert body["can_manage"] is True
+        item = next(i for i in body["data"] if i["id"] == cid)
+        assert item["auto_approve"] is False
+        assert item["participant_count"] == 1
+        assert item["description"] == "説明文X"
+        assert item["my_status"] == "none"  # admin は作成者だが Tier1 参加者ではない
+        # 一般（参加者本人）の一覧＝can_manage false・my_status=approved。
+        _login(client, SEED_COMPANY_CODE, participant["login_id"], participant["password"])
+        body2 = client.get(BASE).json()
+        assert body2["can_manage"] is False
+        item2 = next(i for i in body2["data"] if i["id"] == cid)
+        assert item2["my_status"] == "approved"
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
             ts.commit()
         _cleanup_contest(cid)

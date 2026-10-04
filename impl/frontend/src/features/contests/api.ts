@@ -11,10 +11,13 @@ export type ContestRanking = components["schemas"]["ContestRankingResponse"];
 export type ContestRankingEntry = components["schemas"]["ContestRankingEntry"];
 export type ContestFinalizeResult = components["schemas"]["ContestFinalizeResponse"];
 
-export async function fetchContests(status?: string, signal?: AbortSignal): Promise<ContestListItem[]> {
+// 一覧＝item 配列＋会社レベルの運営可否（can_manage・全行共通）。承認制×未参加は行クリックでダイアログ（SC-53・応募導線）。
+export type ContestListResult = { items: ContestListItem[]; canManage: boolean };
+
+export async function fetchContests(status?: string, signal?: AbortSignal): Promise<ContestListResult> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  const res = await apiFetch<{ data: ContestListItem[] }>(`/contests${qs}`, { signal });
-  return res?.data ?? [];
+  const res = await apiFetch<{ data: ContestListItem[]; can_manage?: boolean }>(`/contests${qs}`, { signal });
+  return { items: res?.data ?? [], canManage: res?.can_manage ?? false };
 }
 
 export function getContest(id: string, signal?: AbortSignal): Promise<ContestDetail | null> {

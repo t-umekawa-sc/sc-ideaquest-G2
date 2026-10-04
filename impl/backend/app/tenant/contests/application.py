@@ -14,6 +14,7 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.capabilities import application as caps_app
+from app.tenant.contests import access as contest_access
 from app.tenant.contests import repository as repo
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
@@ -66,10 +67,13 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None,
     }
 
 
-def _list_item(c) -> dict:
+def _list_item(c, *, participant_count: int = 0, my_status: str = "none") -> dict:
     return {
         "id": str(c.id), "mode": c.mode, "status": c.status, "theme": c.theme,
+        "description": c.description,
         "starts_at": c.starts_at, "ends_at": c.ends_at, "created_at": c.created_at,
+        "auto_approve": c.auto_approve, "participant_count": participant_count,
+        "my_status": my_status,
     }
 
 
@@ -112,7 +116,14 @@ def list_contests(account_id: uuid.UUID, company_id: uuid.UUID, *, status: str |
         raise AppError(401, "unauthenticated")
     with get_tenant_session(company.db_identifier) as ts:
         rows = repo.list_all(ts, status=status)
-        return {"data": [_list_item(c) for c in rows]}
+        user = profile_repo.get_user_by_account(ts, account_id)
+        can_manage = bool(user and _can_create_contest(account_id, ts, user.id))
+        ids = [c.id for c in rows]
+        counts = repo.count_approved_participants(ts, ids)
+        mystat = repo.participation_status_map(ts, ids, user.id) if user else {}
+        data = [_list_item(c, participant_count=counts.get(c.id, 0),
+                           my_status=mystat.get(c.id, "none")) for c in rows]
+        return {"data": data, "can_manage": can_manage}
 
 
 def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
@@ -123,9 +134,15 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         c = repo.get(ts, uuid.UUID(contest_id))
         if c is None:
             raise AppError(404, "not_found")
-        flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
         user = profile_repo.get_user_by_account(ts, account_id)
-        mine = ([str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)] if user else [])
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        # 可視ゲート（改訂 2026-10-04・設計 §2.3）＝承認制×未参加は 403（応募は一覧のダイアログから）。
+        if not contest_access.can_view_contest(ts, c, user.id):
+            raise AppError(403, "forbidden",
+                           detail="このコンテストの閲覧には参加が必要です（一覧から応募してください）")
+        flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
+        mine = [str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)]
         can_manage = bool(user and _can_create_contest(account_id, ts, user.id))
         owner = quests_repo.get_users_by_ids(ts, {c.created_by_id}).get(c.created_by_id)
         return _detail(c, flags=flags, my_participating_idea_ids=mine, can_manage=can_manage,
@@ -481,6 +498,10 @@ def ranking(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str, *, ax
         c = repo.get(ts, uuid.UUID(contest_id))
         if c is None:
             raise AppError(404, "not_found")
+        # 可視ゲート（改訂 2026-10-04・設計 §2.3）＝承認制×未参加はランキングも 403。
+        if not contest_access.can_view_contest(ts, c, user.id):
+            raise AppError(403, "forbidden",
+                           detail="このコンテストのランキング閲覧には参加が必要です（一覧から応募してください）")
         start, end = c.starts_at, c.ends_at
         data: list[dict] = []
         if axis == "contribution":

@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, DataTable, Field, Modal, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 
-import { createContest, deleteContest, fetchContests, getContest, updateContest } from "../api";
+import { createContest, deleteContest, fetchContests, getContest, requestContestParticipation, updateContest } from "../api";
 import type { ContestListItem } from "../api";
 import { CONTEST_MODE_LABEL, CONTEST_STATUS_BADGE, CONTEST_TABS, contestStatusLabel } from "../types";
 import "../contests.css";
@@ -22,6 +22,8 @@ const fmtDate = (v: string | null | undefined) => (v ? v.slice(0, 10) : "—");
 type ContestRow = {
   id: string; theme: string; mode: string; modeLabel: string; status: string; statusLabel: string;
   starts: string; ends: string;
+  // 承認制×未参加の行クリック分岐＋応募ダイアログ用（SC-53・設計 §2.3）。
+  autoApprove: boolean; myStatus: string; participantCount: number; description: string | null;
 };
 
 function toRow(c: ContestListItem): ContestRow {
@@ -29,6 +31,8 @@ function toRow(c: ContestListItem): ContestRow {
     id: c.id, theme: c.theme, mode: c.mode, modeLabel: CONTEST_MODE_LABEL[c.mode] ?? c.mode,
     status: c.status, statusLabel: contestStatusLabel(c.status),
     starts: fmtDate(c.starts_at), ends: fmtDate(c.ends_at),
+    autoApprove: c.auto_approve ?? false, myStatus: c.my_status ?? "none",
+    participantCount: c.participant_count ?? 0, description: c.description ?? null,
   };
 }
 
@@ -42,7 +46,11 @@ export function ContestListView() {
   const confirm = useConfirm();
   const [tab, setTab] = useState(CONTEST_TABS[0].key);
   const [items, setItems] = useState<ContestListItem[] | null>(null);
+  const [canManage, setCanManage] = useState(false);   // 会社レベルの運営可否（全行共通）
   const [reload, setReload] = useState(0);
+  // 応募ダイアログ（承認制×未参加の行クリック＝概要＋メタ＋応募・SC-53）。
+  const [applyRow, setApplyRow] = useState<ContestRow | null>(null);
+  const [applying, setApplying] = useState(false);
   // モーダル（作成/編集/複製の共通フォーム）。
   const [open, setOpen] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("create");
@@ -61,8 +69,8 @@ export function ContestListView() {
   useEffect(() => {
     const ac = new AbortController();
     fetchContests(undefined, ac.signal)
-      .then((all) => setItems(all))
-      .catch(() => setItems([]));
+      .then((res) => { setItems(res.items); setCanManage(res.canManage); })
+      .catch(() => { setItems([]); setCanManage(false); });
     return () => ac.abort();
   }, [reload]);
 
@@ -118,12 +126,45 @@ export function ContestListView() {
     }
   }
 
-  // 行アクション＝標準順（詳細を開く → 編集 → 複製 → 削除〔danger〕・デザイン標準 §4.5）。
+  // 行クリック/「詳細を開く」の分岐＝参加資格があれば詳細へ、承認制×未参加はダイアログ（応募導線・SC-53・設計 §2.3）。
+  // backend も can_view_contest で詳細を 403 ガード（UI非表示に依存しない）。
+  function goToContest(row: ContestRow) {
+    if (canManage || row.autoApprove || row.myStatus === "approved") {
+      router.push(`/contests/${row.id}`);
+    } else {
+      setApplyRow(row);
+    }
+  }
+
+  async function applyToContest(row: ContestRow) {
+    setApplying(true);
+    try {
+      const r = await requestContestParticipation(row.id);
+      if (!r) { snack({ type: "error", title: "応募できませんでした" }); return; }
+      if (r.status === "approved") {  // 念のため（auto_approve 化等）＝そのまま詳細へ。
+        setApplyRow(null);
+        router.push(`/contests/${row.id}`);
+        return;
+      }
+      snack({ type: "success", title: "参加リクエストを送信しました（承認待ち）" });
+      // 一覧の my_status を更新＝ダイアログを「承認待ち」に。
+      setItems((cur) => (cur ?? []).map((c) => (c.id === row.id ? { ...c, my_status: "requested" } : c)));
+      setApplyRow((cur) => (cur ? { ...cur, myStatus: "requested" } : cur));
+    } catch {
+      snack({ type: "error", title: "参加リクエストに失敗しました" });
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  // 行アクション＝標準順。運営（can_manage）のみ編集/複製/削除を出す（一般は「詳細を開く」のみ＝分岐）。
   const menu = (row: ContestRow): RowMenuItem[] => [
-    { label: "詳細を開く", onClick: () => router.push(`/contests/${row.id}`) },
-    { label: "編集", onClick: () => void openEditOrDuplicate(row, "edit") },
-    { label: "複製", onClick: () => void openEditOrDuplicate(row, "duplicate") },
-    { label: "削除", danger: true, onClick: () => void remove(row) },
+    { label: "詳細を開く", onClick: () => goToContest(row) },
+    ...(canManage ? [
+      { label: "編集", onClick: () => void openEditOrDuplicate(row, "edit") },
+      { label: "複製", onClick: () => void openEditOrDuplicate(row, "duplicate") },
+      { label: "削除", danger: true, onClick: () => void remove(row) },
+    ] : []),
   ];
 
   const columns: DataTableColumn<ContestRow>[] = [
@@ -208,7 +249,7 @@ export function ContestListView() {
           searchFields="テーマ"
           exportName="アイデアコンテスト一覧"
           emptyText="このタブに該当するコンテストはありません。"
-          onRowClick={(x) => router.push(`/contests/${x.id}`)}
+          onRowClick={(x) => goToContest(x)}
           card={(x) => (
             <>
               <div className="between">
@@ -276,6 +317,34 @@ export function ContestListView() {
           <div className="modal__footer">
             <button className="btn btn-outline" type="button" onClick={() => setOpen(false)} disabled={saving}>キャンセル</button>
             <Button variant="primary" onClick={submit} loading={saving}>{submitLabel}</Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* 応募ダイアログ（承認制×未参加＝概要＋メタのみ確認し、ここから応募・SC-53・設計 §2.3）。 */}
+      {applyRow && (
+        <Modal open={!!applyRow} title={applyRow.theme} size="md" onClose={() => setApplyRow(null)}>
+          <div className="modal__body">
+            <p className="muted text-sm" style={{ marginTop: 0 }}>
+              このコンテストは参加承認制です。参加すると応募・投票や内容の閲覧ができます。
+            </p>
+            {applyRow.description && <p style={{ whiteSpace: "pre-wrap" }}>{applyRow.description}</p>}
+            <dl className="contest-meta" style={{ marginTop: "var(--space-3)" }}>
+              <div><dt>種別</dt><dd>{applyRow.modeLabel}</dd></div>
+              <div><dt>会期</dt><dd>{applyRow.starts} 〜 {applyRow.ends}</dd></div>
+              <div><dt>状態</dt><dd><span className={`badge ${CONTEST_STATUS_BADGE[applyRow.status] ?? "badge-muted"}`}>{applyRow.statusLabel}</span></dd></div>
+              <div><dt>参加人数</dt><dd>{applyRow.participantCount} 人</dd></div>
+            </dl>
+          </div>
+          <div className="modal__footer">
+            <button className="btn btn-outline" type="button" onClick={() => setApplyRow(null)} disabled={applying}>閉じる</button>
+            {applyRow.myStatus === "requested" ? (
+              <span className="badge badge-muted">⏳ 承認待ち</span>
+            ) : applyRow.status === "open" ? (
+              <Button variant="primary" onClick={() => void applyToContest(applyRow)} loading={applying}>応募する</Button>
+            ) : (
+              <span className="muted text-sm">現在は応募を受け付けていません</span>
+            )}
           </div>
         </Modal>
       )}
