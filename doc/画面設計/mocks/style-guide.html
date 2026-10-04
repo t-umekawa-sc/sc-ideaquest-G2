@@ -5661,6 +5661,26 @@
   /* タイトルのリンク化（アイデア/クエスト/コンテスト詳細への動線）。 */
   .sg-dash a.card-title, .sg-dash .sg-row__title a, .sg-dash .sg-ann .sg-row__title a { color: var(--color-primary); text-decoration: none; }
   .sg-dash a.card-title:hover, .sg-dash .sg-row__title a:hover { text-decoration: underline; }
+  /* B「あなたの番」タブ切替（CSS ラジオ・JS不要）＝選択タブのパネルだけ表示＋ラベル強調。 */
+  .sg-dash .sg-btab-radio { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .sg-dash #sgb-vote:checked ~ .segmented label[for="sgb-vote"],
+  .sg-dash #sgb-req:checked ~ .segmented label[for="sgb-req"],
+  .sg-dash #sgb-draft:checked ~ .segmented label[for="sgb-draft"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  .sg-dash .sg-bpanel { display: none; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+  .sg-dash #sgb-vote:checked ~ .sg-bpanel[data-p="vote"],
+  .sg-dash #sgb-req:checked ~ .sg-bpanel[data-p="req"],
+  .sg-dash #sgb-draft:checked ~ .sg-bpanel[data-p="draft"] { display: grid; }
+  /* 承認待ち＝申請者ベース（本番 .incoming-jr-card）。クエスト/コンテスト名＋誰が参加希望か。 */
+  .sg-dash .incoming-jr-card { text-align: left; }
+  .sg-dash .incoming-jr-card__applicant { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+  .sg-dash .incoming-jr-card__name { font-size: var(--text-sm); font-weight: 600; }
+  /* 下書き＝クエスト/アイデア/評価で表示差（本番 .draft-card・破線枠）。 */
+  .sg-dash .draft-card { border-style: dashed; border-color: var(--color-border-strong); background: var(--color-surface-alt); text-align: left; }
+  .sg-dash .draft-card__head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+  .sg-dash .badge-draft { background: #FEF3C7; color: var(--color-warning, #B45309); }
+  .sg-dash .draft-card__title { font-weight: 700; }
+  .sg-dash .draft-card__meta { display: flex; gap: var(--space-3); margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); flex-wrap: wrap; }
+  .sg-dash .draft-card__cta { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; color: var(--color-primary); }
 </style>
 <!-- 本番ダッシュボード同様に .container（max-width＋左右padding）で中央寄せ＝左右マージンを再現。 -->
 <div class="container">
@@ -5675,54 +5695,97 @@
 
   <!-- Zone B -->
   <div class="sg-zone" style="--z:var(--sg-zone-b)">
-    <div class="sg-zone__label" style="--z:var(--sg-zone-b)">B あなたの番（要対応）<span class="sg-zone__note">散在する要対応をタブで1枚に集約・バッジで件数</span></div>
+    <div class="sg-zone__label" style="--z:var(--sg-zone-b)">B あなたの番（要対応）<span class="sg-zone__note">散在する要対応をタブで集約（タブ＝クリックで切替）。各タブは種別ごとに表示が異なる・3カラム</span></div>
+    <!-- タブ切替（CSS ラジオ・JSなし）。パネルは種別ごとに表示項目が異なる。 -->
+    <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-vote" checked>
+    <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-req">
+    <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-draft">
     <div class="segmented" role="radiogroup" aria-label="要対応の種別" style="margin-bottom:var(--space-3)">
-      <label><input type="radio" name="sg-b" checked> 未投票 <span class="seg-n">4</span></label>
-      <label><input type="radio" name="sg-b"> 承認待ち <span class="seg-n">3</span></label>
-      <label><input type="radio" name="sg-b"> 下書き <span class="seg-n">2</span></label>
+      <label for="sgb-vote">未投票 <span class="seg-n">4</span></label>
+      <label for="sgb-req">承認待ち <span class="seg-n">3</span></label>
+      <label for="sgb-draft">下書き <span class="seg-n">2</span></label>
     </div>
-    <!-- 未投票＝現状の未投票カードを踏襲（アイデア/クエストへのリンク＋大きい賛成/反対）。クエスト＋参加中コンテストを統合。 -->
-    <div class="vote-grid">
+
+    <!-- ① 未投票＝現状の vote-card を踏襲（アイデア/クエストリンク＋賛成/反対）。クエスト＋参加中コンテストを統合・3カラム。 -->
+    <div class="sg-bpanel" data-p="vote">
       <article class="card card-accent vote-card">
         <div class="between">
-          <span class="idea-title-row">
-            <span class="quest-icon sm"><span class="quest-icon__char" style="--accent:#0D9488">配</span></span>
-            <a class="card-title" href="#">配送ルート最適化</a>
-          </span>
+          <span class="idea-title-row"><span class="quest-icon sm"><span class="quest-icon__char" style="--accent:#0D9488">配</span></span><a class="card-title" href="#">配送ルート最適化</a></span>
           <span class="badge badge-muted">未投票</span>
         </div>
         <a class="vote-card__quest--link" href="#">配送効率化クエスト</a>
         <div class="vote-card__value">積載率を上げるルート案。帰り便の相乗りを…</div>
-        <div class="vote-card__poster poster">
-          <span class="sg-avatar">田</span><span class="name text-sm muted">投稿: 田中 一郎</span>
-          <a class="dash-chat-link" href="#">💬 チャットで議論</a>
-        </div>
-        <div class="vote-actions">
-          <button type="button" class="vote-quick agree">▲ 賛成</button>
-          <button type="button" class="vote-quick disagree">▼ 反対</button>
-        </div>
+        <div class="vote-card__poster poster"><span class="sg-avatar">田</span><span class="name text-sm muted">投稿: 田中 一郎</span><a class="dash-chat-link" href="#">💬 議論</a></div>
+        <div class="vote-actions"><button type="button" class="vote-quick agree">▲ 賛成</button><button type="button" class="vote-quick disagree">▼ 反対</button></div>
       </article>
       <article class="card card-accent vote-card">
         <div class="between">
-          <span class="idea-title-row">
-            <span class="quest-icon sm"><span class="quest-icon__char" style="--accent:#7C3AED">社</span></span>
-            <a class="card-title" href="#">社内SNSの提案</a>
-          </span>
+          <span class="idea-title-row"><span class="quest-icon sm"><span class="quest-icon__char" style="--accent:#7C3AED">社</span></span><a class="card-title" href="#">社内SNSの提案</a></span>
           <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆 コンテスト</span>
         </div>
         <a class="vote-card__quest--link" href="#">業務改善アイデア大募集（参加中）</a>
         <div class="vote-card__value">部署横断で気軽に相談できる場を…</div>
-        <div class="vote-card__poster poster">
-          <span class="sg-avatar">鈴</span><span class="name text-sm muted">投稿: 鈴木 太郎</span>
-          <a class="dash-chat-link" href="#">💬 チャットで議論</a>
+        <div class="vote-card__poster poster"><span class="sg-avatar">鈴</span><span class="name text-sm muted">投稿: 鈴木 太郎</span><a class="dash-chat-link" href="#">💬 議論</a></div>
+        <div class="vote-actions"><button type="button" class="vote-quick agree">▲ 賛成</button><button type="button" class="vote-quick disagree">▼ 反対</button></div>
+      </article>
+      <article class="card card-accent vote-card">
+        <div class="between">
+          <span class="idea-title-row"><span class="quest-icon sm"><span class="quest-icon__char" style="--accent:#2563EB">会</span></span><a class="card-title" href="#">会議室予約の改善</a></span>
+          <span class="badge badge-muted">未投票</span>
         </div>
-        <div class="vote-actions">
-          <button type="button" class="vote-quick agree">▲ 賛成</button>
-          <button type="button" class="vote-quick disagree">▼ 反対</button>
-        </div>
+        <a class="vote-card__quest--link" href="#">総務デジタル化クエスト</a>
+        <div class="vote-card__value">予約の重複をなくす仕組み…</div>
+        <div class="vote-card__poster poster"><span class="sg-avatar">佐</span><span class="name text-sm muted">投稿: 佐藤 花子</span><a class="dash-chat-link" href="#">💬 議論</a></div>
+        <div class="vote-actions"><button type="button" class="vote-quick agree">▲ 賛成</button><button type="button" class="vote-quick disagree">▼ 反対</button></div>
       </article>
     </div>
-    <p class="sg-row__sub" style="margin-top:var(--space-3)">※ コンテストは<strong>参加状態（承認済み）のもののみ</strong>表示（auto_approve でも未参加は出さない）。アイデア名→アイデア詳細、クエスト/コンテスト名→詳細へリンク。</p>
+
+    <!-- ② 承認待ち＝申請者ベース（表示項目が違う）。クエスト参加リクエスト＋コンテスト参加リクエストを併置。クリックで承認ダイアログ。 -->
+    <div class="sg-bpanel" data-p="req">
+      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
+        <div class="between"><span class="card-title">配送効率化クエスト</span><span class="badge badge-danger">未処理</span></div>
+        <div class="incoming-jr-card__applicant"><span class="sg-avatar">テ</span><span class="incoming-jr-card__name">テスト 太郎 さんが参加を希望</span></div>
+        <div class="sg-row__sub" style="margin-top:4px">デモグループ ・ 2026/10/04</div>
+      </button>
+      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#7C3AED">
+        <div class="between"><span class="card-title">🏆 業務改善アイデア大募集</span><span class="badge badge-danger">未処理</span></div>
+        <div class="incoming-jr-card__applicant"><span class="sg-avatar">山</span><span class="incoming-jr-card__name">山田 次郎 さんが参加を希望</span></div>
+        <div class="sg-row__sub" style="margin-top:4px">コンテスト参加リクエスト ・ 2026/10/03</div>
+      </button>
+      <button type="button" class="card card-accent quest-card incoming-jr-card" style="--accent:#0D9488">
+        <div class="between"><span class="card-title">新オフィス移転</span><span class="badge badge-danger">未処理</span></div>
+        <div class="incoming-jr-card__applicant"><span class="sg-avatar">鈴</span><span class="incoming-jr-card__name">鈴木 三郎 さんが参加を希望</span></div>
+        <div class="sg-row__sub" style="margin-top:4px">総務部 ・ 2026/10/02</div>
+      </button>
+    </div>
+
+    <!-- ③ 下書き＝種別で表示が違う（クエスト/アイデア/評価）。クリックで作成/編集へ。 -->
+    <div class="sg-bpanel" data-p="draft">
+      <button type="button" class="card card-accent draft-card">
+        <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">クエスト</span></div>
+        <div class="draft-card__title">新オフィスのレイアウト改善</div>
+        <div class="draft-card__meta"><span>カテゴリー未確定</span><span>最終更新: 昨日</span></div>
+        <div class="draft-card__cta">続きを書く ✎</div>
+      </button>
+      <button type="button" class="card card-accent draft-card">
+        <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">アイデア</span></div>
+        <div class="draft-card__title">配送ルートのAI最適化</div>
+        <div class="draft-card__meta"><span>クエスト: 配送効率化クエスト</span><span>最終更新: 2日前</span></div>
+        <div class="draft-card__cta">続きを書く ✎</div>
+      </button>
+      <button type="button" class="card card-accent draft-card">
+        <div class="draft-card__head"><span class="badge badge-draft">下書き</span><span class="badge badge-muted">評価</span></div>
+        <div class="draft-card__title">受付のデジタル化</div>
+        <div class="draft-card__meta"><span>評価 3/5 項目入力済</span><span>最終更新: 先週</span></div>
+        <div class="draft-card__cta">評価を続ける ✎</div>
+      </button>
+    </div>
+
+    <p class="sg-row__sub" style="margin-top:var(--space-3)">
+      ※ <strong>未投票</strong>＝クエスト＋参加状態のコンテストのアイデア（auto_approve でも未参加は出さない）。
+      <strong>承認待ち</strong>＝運営宛の参加リクエスト（クエスト参加＋コンテスト参加・申請者/対象を表示・クリックで承認ダイアログ）。
+      <strong>下書き</strong>＝クエスト/アイデア/評価（種別バッジで区別・クリックで作成/編集へ）。
+    </p>
   </div>
 
   <!-- Zone C -->
