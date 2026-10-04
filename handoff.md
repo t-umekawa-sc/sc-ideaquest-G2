@@ -33,6 +33,8 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 > - **ダッシュボードのステータス日本語化**＝「自分/フォロー中のクエスト」カードの status を SC-10/12 同一の日本語（募集中 等）に（`questStatusLabel`）。
 > - **参加リクエスト承認ダイアログ（ユーザー要望）＝クエスト JoinRequestDialog に統一**＝ダッシュボードの未処理コンテスト参加リクエストカード／SC-54 パーティタブの参加リクエスト行クリックで `ContestJoinRequestDialog`（概要→申請者→コンテスト内活動→ゲームプロフィール→承認/却下）。判断材料＝新EP `GET /contests/{id}/participation/{uid}/profile`（運営のみ・活動=backing quest スコープ `participant_activity`・ゲーム層=game mode ON 時）。パーティタブは `.join-req-block`/`.join-req-row`（クリック→ダイアログ）＝クエスト詳細と一致。CSS は contests.css に複製。TC=T-TC-141。backend **951 passed**・frontend build+vitest 219・traceability ✅975・目視（両経路4セクション）。
 >
+> - **ダッシュボード再設計（FR-49 お知らせ＋5ゾーン）＝設計ドラフト確定・Phase1 着手**＝`doc/設計ドラフト/ダッシュボード再設計・お知らせ_設計.md`（5ゾーン/件数§3.1/お知らせ選別§4.3a/標準ダイアログ/コンテスト統合）＋モック `style-guide.html`「19.」。**Phase1 増分1＝backend コンテスト統合**＝未投票/新着・最近の議論のスコープを「参加クエスト ∪ **参加承認済みコンテストの backing quest**」に拡張（`contests/repository.approved_participation_quest_ids`＋`dashboard/application._scope_quest_ids`）。TC＝I-TC-163。backend 952 passed・traceability ✅976。**残 Phase1＝件数調整/ゾーン再編(frontend)/SC-10スイッチ/D発見パネル**、Phase2＝お知らせ(FR-49)。
+>
 > ---
 > 以下は前セッション（2026-10-03）の記録。
 > 前半（Step2b-2〜2c・SC-54 初版）は前セッション。本セッションは **SC-54 の受入ポリッシュと機能追加の連続**。すべて main に push 済み。コンテスト実装の正本ファイル＝backend `impl/backend/app/tenant/contests/`（access/application/repository/router/schemas/orm）・frontend `impl/frontend/src/features/contests/`（api.ts/types.ts/contests.css/components/{ContestListView,ContestDetailView}.tsx）。

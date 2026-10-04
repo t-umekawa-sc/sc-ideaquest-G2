@@ -43,6 +43,7 @@
 | I-TC-141 | int | D 横断 read＝本人下書きアイデア（全クエスト横断） | 別クエストに下書き2・公開1 | `list_draft_ideas_by_author` | 下書き2のみ（公開は除く・author=自分） | I.3 |
 | I-TC-142 | int | D 横断 read＝未投票（参加クエスト・自票なし・締切内） | 参加/非参加・投票済/未投票混在 | `list_unvoted_published_ideas` | 参加クエストの published で自票なしのみ | I.3 |
 | I-TC-143 | int | F 横断 read＝本人下書き評価（進捗 scored/5） | 下書き評価（scored 2）＋確定評価 | `list_draft_evaluations_by_evaluator` | 下書きのみ・progress scored=2/total=5 | I.3 |
+| I-TC-163 | int | 議論/未投票スコープに**参加承認済みコンテスト**の backing quest を含む・未参加は含まない（FR-46 統合・Phase1） | 承認制コンテスト＋backing quest に公開アイデア・me は approved 参加者／別 me2 は未参加 | `contests/repository.approved_participation_quest_ids`／`dashboard/application._scope_quest_ids`／`_unvoted` | approved の me＝scope に backing quest を含み `_unvoted` に当該アイデアが出る／未参加 me2＝scope に含まない（auto_approve でも未参加は不可＝参加状態のみ） | §2.3／FR-46／I.3 |
 
 ## 5. 画面 e2e（SC-01・最近の通知）
 

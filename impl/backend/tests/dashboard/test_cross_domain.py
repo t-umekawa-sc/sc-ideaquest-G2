@@ -112,3 +112,46 @@ def test_i_tc_131_partial_failure_best_effort(client, factory, monkeypatch):
     assert result["weekly_ranking"] is None  # 例外パネルは null（default）
     assert result["hero"] is not None        # 他パネルは正常
     assert "notifications" in result and "drafts" in result  # 全体は例外送出せず返る（200 相当）
+
+
+def test_i_tc_163_dashboard_includes_approved_contest():
+    """I-TC-163(int): 議論/未投票スコープに参加承認済みコンテストの backing quest を含む・未参加は含まない（FR-46 統合）。"""
+    from app.tenant.contests import repository as contest_repo
+    from app.tenant.dashboard import application as dash
+    db = _db()
+    me, other = uuid.uuid4(), uuid.uuid4()
+    cqid, iid = uuid.uuid4(), uuid.uuid4()
+    with get_tenant_session(db) as ts:
+        ts.add(User(id=me, account_id=uuid.uuid4(), display_name="参加者", locale="ja", status="active"))
+        ts.add(User(id=other, account_id=uuid.uuid4(), display_name="投稿者", locale="ja", status="active"))
+        # 承認制コンテスト＋backing quest（器）＋公開アイデア（作者=other）。
+        quests_repo.create_quest(ts, quest_id=cqid, owner_id=other, title="コンテスト器", color="#6366F1", status="recruiting")
+        ts.flush()
+        c = contest_repo.create(ts, quest_id=cqid, theme="統合テスト", description=None, mode="bounded",
+                                status="open", starts_at=None, ends_at=None, auto_archive_days=None,
+                                prize_config=None, created_by_id=other, auto_approve=False)
+        ts.add(Idea(id=iid, quest_id=cqid, author_id=other, title="コンテスト案", body="b", value="v", status="published"))
+        contest_repo.upsert_contest_participation(ts, c.id, me, status="approved")  # me＝参加承認済み
+        ts.commit()
+        cid = c.id
+    try:
+        with get_tenant_session(db) as ts:
+            user = ts.get(User, me)
+            # 承認済み me＝scope に backing quest を含み、未投票に当該アイデアが出る。
+            assert cqid in contest_repo.approved_participation_quest_ids(ts, me)
+            assert cqid in dash._scope_quest_ids(ts, user)
+            assert any(u["id"] == str(iid) for u in dash._unvoted(ts, user))
+            # 未参加ユーザー（me2）＝scope に含まない。
+            assert cqid not in dash._scope_quest_ids(ts, SimpleNamespace(id=uuid.uuid4()))
+    finally:
+        from sqlalchemy import text as _sqltext
+        with get_tenant_session(db) as ts:
+            ts.execute(_sqltext("DELETE FROM votes WHERE idea_id=:i"), {"i": str(iid)})
+            ts.execute(_sqltext("DELETE FROM ideas WHERE id=:i"), {"i": str(iid)})
+            ts.execute(_sqltext("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": str(cid)})
+            ts.execute(_sqltext("DELETE FROM contests WHERE id=:c"), {"c": str(cid)})
+            ts.execute(_sqltext("DELETE FROM quest_members WHERE quest_id=:q"), {"q": str(cqid)})
+            ts.execute(_sqltext("DELETE FROM quest_revisions WHERE quest_id=:q"), {"q": str(cqid)})
+            ts.execute(_sqltext("DELETE FROM quests WHERE id=:q"), {"q": str(cqid)})
+            ts.execute(_sqltext("DELETE FROM users WHERE id IN (:a,:b)"), {"a": str(me), "b": str(other)})
+            ts.commit()

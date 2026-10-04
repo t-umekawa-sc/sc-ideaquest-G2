@@ -131,8 +131,16 @@ def _batch_refs(ts, ideas):
     return quests, posters, votes
 
 
+def _scope_quest_ids(ts, user: User) -> list:
+    """ダッシュボードの「議論/未投票」スコープ＝参加クエスト ∪ 参加承認済みコンテストの backing quest（FR-46 統合）。"""
+    from app.tenant.contests import repository as contest_repo
+    ids = list(quests_repo.list_member_quest_ids(ts, user.id))
+    ids += contest_repo.approved_participation_quest_ids(ts, user.id)
+    return list(dict.fromkeys(ids))
+
+
 def _unvoted(ts, user: User) -> list[dict]:
-    quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+    quest_ids = _scope_quest_ids(ts, user)
     ideas = ideas_repo.list_unvoted_published_ideas(ts, user.id, quest_ids, limit=_UNVOTED_LIMIT)
     quests, posters, votes = _batch_refs(ts, ideas)
     return [{
@@ -161,7 +169,7 @@ def _unread_chats(ts, user: User) -> list[dict]:
     """💬 新着の議論＝参加クエスト横断で、自分の未読チャット（他ユーザー投稿）があるアイデア（最終時刻順・SC-01）。
     通知（自分宛のみ）が拾わない「他ユーザー同士の会話」にも気付く動線（レビュー#3）。
     """
-    quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+    quest_ids = _scope_quest_ids(ts, user)
     rows = chat_repo.ideas_with_unread(ts, user.id, quest_ids, limit=_UNREAD_CHATS_LIMIT)
     if not rows:
         return []
@@ -187,7 +195,7 @@ def _recent_chats(ts, user: User) -> list[dict]:
     新着の議論（未読のみ・既読で消える）とは別動線＝「だいたい直近で更新されている議論に戻る」恒久リンク（SC-01 §4.8c）。
     `unread_chat_count` は右パネルの小インジケータ用（未読の有無表示）。
     """
-    quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+    quest_ids = _scope_quest_ids(ts, user)
     rows = chat_repo.ideas_with_unread(ts, user.id, quest_ids, limit=_RECENT_CHATS_LIMIT, only_unread=False)
     if not rows:
         return []

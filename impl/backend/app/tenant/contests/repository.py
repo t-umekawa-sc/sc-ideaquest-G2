@@ -114,6 +114,21 @@ def participation_status_map(session: Session, contest_ids: list[uuid.UUID],
     return {cid: st for cid, st in rows}
 
 
+def approved_participation_quest_ids(session: Session, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """ユーザーが Tier1 承認済みのコンテストの backing quest_id 一覧（ダッシュボード統合用・参加状態のみ）。
+
+    未投票/新着・最近の議論を「参加中コンテスト」にも広げる際のスコープ（auto_approve でも未参加は含まない）。
+    """
+    rows = session.execute(
+        select(Contest.quest_id)
+        .join(ContestParticipant, ContestParticipant.contest_id == Contest.id)
+        .where(ContestParticipant.user_id == user_id,
+               ContestParticipant.status == "approved",
+               Contest.deleted_at.is_(None))
+    ).scalars().all()
+    return list(dict.fromkeys(rows))
+
+
 def participant_activity(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> dict:
     """申請者のこのコンテスト（backing quest）内の活動＝参加承認の判断材料（SC-01 ダイアログ・SC-54 パーティ）。
 
