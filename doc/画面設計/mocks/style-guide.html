@@ -5618,5 +5618,149 @@
   })();
 </script>
 
+<!-- 19. ダッシュボードのゾーン構成（SC-01 再設計・検討中） -->
+<style>
+  /* 見本専用スコープ。採用後は SC-01（dash-*）/ design-system.css へ移植。 */
+  .sg-dash { --sg-zone-a:#6366F1; --sg-zone-b:#EF4444; --sg-zone-c:#0EA5E9; --sg-zone-d:#10B981; --sg-zone-e:#F59E0B; }
+  .sg-zone { margin: var(--space-5) 0; padding-left: var(--space-3); border-left: 4px solid var(--z, #ccc); }
+  .sg-zone__label { font-size: var(--text-xs); font-weight: 700; letter-spacing: .04em; color: var(--z, #666); margin-bottom: var(--space-2); }
+  .sg-zone__note { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 400; margin-left: var(--space-2); }
+  .sg-dash-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .sg-dash-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+  @media (max-width: 860px) { .sg-dash-2col, .sg-dash-3col { grid-template-columns: 1fr; } }
+  .sg-dash .card { padding: var(--space-4); }
+  .sg-dash .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+  .sg-dash .section-head h3 { font-size: var(--text-sm); margin: 0; }
+  .sg-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+  .sg-row:last-child { border-bottom: 0; }
+  .sg-row__main { min-width: 0; flex: 1; }
+  .sg-row__title { font-weight: 500; font-size: var(--text-sm); }
+  .sg-row__sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .sg-ann { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius); padding: var(--space-3); }
+  .sg-ann.is-pin { border-color: #F59E0B; }
+  .sg-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--color-surface-alt, #e5e7eb); display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 700; color: #555; flex: none; }
+</style>
+<section class="section sg-dash">
+  <h2>19. ダッシュボードのゾーン構成（SC-01 再設計・検討中）<span class="badge badge-muted">検討中</span></h2>
+  <p class="hint" style="max-width:820px">
+    パネル過多（約13枚）を<strong>5ゾーン</strong>に再編し、足しながら総量を抑える構成案（設計ドラフト「ダッシュボード再設計・お知らせ」§3）。
+    新規＝<strong>運営からのお知らせ</strong>／<strong>コンテスト告知・募集</strong>／<strong>おすすめクエスト</strong>／<strong>参加中コンテスト</strong>。
+    要対応は<strong>タブで1枚に集約</strong>、フォロー中（アイデア＋クエスト）は<strong>Zone E に集約（A案）</strong>、自分のクエストは一覧(SC-10)のスイッチへ移設。
+    ゾーン左の色帯は見本用の仕切り（実装では出さない）。
+  </p>
+
+  <!-- Zone A -->
+  <div class="sg-zone" style="--z:var(--sg-zone-a)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-a)">A 最上段 ・ ステータス<span class="sg-zone__note">既存の hero＋週間ランキングを踏襲</span></div>
+    <div class="sg-dash-2col">
+      <div class="card">
+        <div class="section-head"><h3>🎮 あなたのステータス</h3><span class="badge">Lv.12</span></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">次のレベルまで</div><div class="sg-row__sub">XP 320 / 500</div></div><span class="badge badge-muted">◆ 1,240</span></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h3>🏆 週間ランキング</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
+        <div class="sg-row"><span class="badge">🥇</span><div class="sg-row__main"><div class="sg-row__title">佐藤 花子</div></div><span class="badge badge-muted">980</span></div>
+        <div class="sg-row"><span class="badge">🥈</span><div class="sg-row__main"><div class="sg-row__title">鈴木 太郎</div></div><span class="badge badge-muted">845</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone B -->
+  <div class="sg-zone" style="--z:var(--sg-zone-b)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-b)">B あなたの番（要対応）<span class="sg-zone__note">散在する要対応をタブで1枚に集約・バッジで件数</span></div>
+    <div class="card">
+      <div class="tabs" role="tablist" style="margin-bottom:var(--space-3)">
+        <button class="tab is-active" role="tab" aria-selected="true">未投票 <span class="tab-count">4</span></button>
+        <button class="tab" role="tab" aria-selected="false">承認待ち <span class="tab-count">3</span></button>
+        <button class="tab" role="tab" aria-selected="false">下書き <span class="tab-count">2</span></button>
+      </div>
+      <!-- 未投票（クエスト＋参加中コンテストのアイデアを統合・バッジでソース明示） -->
+      <div class="sg-row">
+        <div class="sg-row__main"><div class="sg-row__title">配送ルート最適化 <span class="badge badge-muted">クエスト</span></div><div class="sg-row__sub">配送効率化クエスト</div></div>
+        <span style="display:flex;gap:6px"><button class="btn btn-sm btn-outline">▲ 賛成</button><button class="btn btn-sm btn-outline">▼ 反対</button></span>
+      </div>
+      <div class="sg-row">
+        <div class="sg-row__main"><div class="sg-row__title">社内SNSの提案 <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆 コンテスト</span></div><div class="sg-row__sub">業務改善アイデア大募集（参加中）</div></div>
+        <span style="display:flex;gap:6px"><button class="btn btn-sm btn-outline">▲ 賛成</button><button class="btn btn-sm btn-outline">▼ 反対</button></span>
+      </div>
+      <p class="sg-row__sub" style="margin-top:var(--space-2)">※ コンテストは<strong>参加状態（承認済み）のもののみ</strong>表示（auto_approve でも未参加は出さない）。</p>
+    </div>
+  </div>
+
+  <!-- Zone C -->
+  <div class="sg-zone" style="--z:var(--sg-zone-c)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-c)">C キャッチアップ<span class="sg-zone__note">議論（新着/最近をタブ・コンテストも含める）＋チームアクティビティ＋最近の通知</span></div>
+    <div class="sg-dash-2col">
+      <div class="card">
+        <div class="tabs" role="tablist" style="margin-bottom:var(--space-3)">
+          <button class="tab is-active" role="tab" aria-selected="true">💬 新着の議論 <span class="tab-count">6</span></button>
+          <button class="tab" role="tab" aria-selected="false">🕒 最近の議論</button>
+        </div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">棚卸しの自動化</div><div class="sg-row__sub">在庫クエスト</div></div><span class="badge badge-danger">💬 +3</span></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">受付のデジタル化 <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆</span></div><div class="sg-row__sub">コンテスト（参加中）</div></div><span class="badge badge-danger">💬 +1</span></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h3>🔔 最近の通知</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">あなたのアイデアが入賞しました</div><div class="sg-row__sub">3時間前</div></div></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">新しい端末からログインがありました</div><div class="sg-row__sub">昨日</div></div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:var(--space-4)">
+      <div class="section-head"><h3>📣 チームアクティビティ</h3></div>
+      <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">田中 さんがアイデアを投稿しました</div><div class="sg-row__sub">配送効率化クエスト ・ 10分前</div></div></div>
+      <button class="btn btn-sm btn-outline" style="margin-top:var(--space-2)">もっと見る</button>
+    </div>
+  </div>
+
+  <!-- Zone D -->
+  <div class="sg-zone" style="--z:var(--sg-zone-d)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-d)">D 見つける（新設）<span class="sg-zone__note">運営からのお知らせ／コンテスト告知・募集／おすすめの参加可能クエスト</span></div>
+    <div class="sg-dash-3col">
+      <div class="card">
+        <div class="section-head"><h3>📢 運営からのお知らせ</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
+        <div class="sg-ann is-pin" style="margin-bottom:var(--space-2)"><div class="sg-row__title">📌 年末アイデアソン開催のお知らせ <span class="badge badge-danger">未読</span></div><div class="sg-row__sub">2026-10-01 ・ 運営</div></div>
+        <div class="sg-ann"><div class="sg-row__title">評価期間の変更について</div><div class="sg-row__sub">2026-09-28 ・ 運営</div></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h3>🏆 募集中のコンテスト</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">業務改善アイデア大募集 2027</div><div class="sg-row__sub">締切 2026-12-20 ・ 参加 12人</div></div><button class="btn btn-sm btn-primary">応募</button></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">新規事業アイデアコンテスト</div><div class="sg-row__sub">締切 2026-11-30 ・ 参加 8人</div></div><button class="btn btn-sm btn-primary">応募</button></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h3>🔎 おすすめのクエスト</h3><a href="#" class="muted text-sm">クエストを探す →</a></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">オフィス移転プロジェクト</div><div class="sg-row__sub">総務部 ・ 👥 6</div></div><button class="btn btn-sm btn-outline">★ フォロー</button></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">採用広報の強化</div><div class="sg-row__sub">人事部 ・ 👥 4</div></div><button class="btn btn-sm btn-outline">★ フォロー</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone E -->
+  <div class="sg-zone" style="--z:var(--sg-zone-e)">
+    <div class="sg-zone__label" style="--z:var(--sg-zone-e)">E マイ ・ よく行く先／フォロー<span class="sg-zone__note">参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト＝A案で集約）</span></div>
+    <div class="sg-dash-2col">
+      <div class="card">
+        <div class="section-head"><h3>👣 参加中</h3></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">配送効率化クエスト</div><div class="sg-row__sub">募集中 ・ 👥 31 ・ 💡 12</div></div></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">業務改善アイデア大募集 <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆 コンテスト</span></div><div class="sg-row__sub">公募中 ・ 💡 24</div></div></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h3>★ フォロー中</h3><span class="badge badge-muted">アイデア＋クエスト</span></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">💡 受付のデジタル化</div><div class="sg-row__sub">アイデア ・ ▲12 / ▼2</div></div><button class="btn btn-sm btn-outline">★</button></div>
+        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">📜 採用広報の強化</div><div class="sg-row__sub">クエスト（非参加・ウォッチ）</div></div><button class="btn btn-sm btn-outline">★</button></div>
+      </div>
+    </div>
+    <p class="sg-row__sub" style="margin-top:var(--space-3)">
+      ※「自分のクエスト（作成）」はダッシュボードから撤去し、クエスト一覧(SC-10)のスイッチへ移設：
+    </p>
+    <div class="segmented" role="radiogroup" aria-label="クエスト一覧の絞り込み（SC-10）" style="margin-top:var(--space-2)">
+      <label><input type="radio" name="sg-qfilter" checked> すべて</label>
+      <label><input type="radio" name="sg-qfilter"> 自分が所有者</label>
+      <label><input type="radio" name="sg-qfilter"> 参加中</label>
+      <label><input type="radio" name="sg-qfilter"> 参加リクエスト中</label>
+      <label><input type="radio" name="sg-qfilter"> フォロー中</label>
+    </div>
+  </div>
+</section>
+
 </body>
 </html>
