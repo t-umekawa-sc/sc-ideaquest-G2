@@ -246,6 +246,40 @@ def _incoming_join_requests(ts, user) -> list[dict]:
     return out
 
 
+def _incoming_contest_requests(ts, user) -> list[dict]:
+    """運営（is_contest_manager）に見せる、未処理（requested）のコンテスト参加リクエスト（SC-01・FR-46）。
+
+    クエストの `_incoming_join_requests` と同型のカード素材（コンテスト概要＋申請者）。承認スコープが
+    会社全体（運営＝作成者/contest_create/管理者）のため、全コンテスト横断で requested を集める。
+    """
+    from app.tenant.contests import access as contest_access
+    from app.tenant.contests import repository as contest_repo
+    if not contest_access.is_contest_manager(ts, user.id):
+        return []
+    out: list[dict] = []
+    for c in contest_repo.list_all(ts):
+        reqs = [p for p in contest_repo.list_contest_participants(ts, c.id) if p.status == "requested"]
+        if not reqs:
+            continue
+        users = {u.id: u for u in profile_repo.list_users_by_ids(ts, [r.user_id for r in reqs])}
+        for r in reqs:
+            u = users.get(r.user_id)
+            out.append({
+                "contest": {
+                    "id": str(c.id), "theme": c.theme, "status": c.status,
+                    "starts_at": c.starts_at.isoformat() if c.starts_at else None,
+                    "ends_at": c.ends_at.isoformat() if c.ends_at else None,
+                },
+                "user": {
+                    "user_id": str(r.user_id),
+                    "display_name": u.display_name if u else "（不明）",
+                    "avatar_image_url": _image_url(u.avatar_image_path) if u else None,
+                },
+                "created_at": r.requested_at.isoformat() if r.requested_at else None,
+            })
+    return out
+
+
 def get_dashboard(session: dict) -> dict:
     """SC-01 の全パネルを1レスポンスに集約（I.1）。session＝require_me の戻り（account/company/role/user）。"""
     account_id = uuid.UUID(session["account_id"])
@@ -264,6 +298,7 @@ def get_dashboard(session: dict) -> dict:
         unread_chats = _safe(lambda: _unread_chats(ts, user), default=[])
         recent_chats = _safe(lambda: _recent_chats(ts, user), default=[])
         incoming_join_requests = _safe(lambda: _incoming_join_requests(ts, user), default=[])
+        incoming_contest_requests = _safe(lambda: _incoming_contest_requests(ts, user), default=[])
 
     # リッチパネルは各ドメイン application を再利用（自前セッション・best-effort）。
     quests = _safe(
@@ -293,4 +328,5 @@ def get_dashboard(session: dict) -> dict:
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
         "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
         "incoming_join_requests": incoming_join_requests,  # FR-40（未処理の受信参加リクエスト・owner/quest_admin）
+        "incoming_contest_requests": incoming_contest_requests,  # FR-46（未処理のコンテスト参加リクエスト・運営）
     }

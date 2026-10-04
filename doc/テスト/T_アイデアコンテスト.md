@@ -38,6 +38,9 @@
 | T-TC-125 | api | コンテスト配下アイデアの詳細は `is_contest=true`（SC-22 で関連情報を非表示）・通常クエストは false | コンテスト配下アイデア／通常クエストのアイデア | `GET /ideas/{id}` | コンテスト配下=is_contest true／通常=false | §2.3／FR-46 |
 | T-TC-126 | api | 運営がアイデアを入賞/殿堂入り/お蔵入りへ手動振り分け（SC-54 動線）・一般は403 | コンテスト配下アイデア | `PATCH /contests/{id}/ideas/{iid}/flags`（flag=selected/hall_of_fame/shelved・on） | selected→is_selected・hall_of_fame/shelved→contest_idea_flags 付与/解除（詳細 flags に反映）・一般は403・他コンテストのアイデアは404・**排他（他状態を自動解除）** | T.1／§4.2／§5.64 |
 | T-TC-127 | api | Tier2 参加文脈（SC-22/SC-24 導線）＝コンテスト配下か・投稿者か・自分の状態・申請一覧 | コンテスト配下アイデア・投稿者/希望者 | `GET /ideas/{id}/participation` | 投稿者=is_author true＋requests に申請一覧／希望者はリクエスト→requested／投稿者承認で approved／非コンテストは is_contest false | T.2／§5.1 |
+| T-TC-135 | api | Tier1 参加リクエスト（承認制）で**運営へ通知** `contest_join_request_received`／auto_approve・public は通知なし（即承認のため） | 承認制 contest・運営（作成者/contest_create）・申請者 | `POST /contests/{id}/participation`（本人）→運営の `GET /notifications` | 運営に `contest_join_request_received`（applicant_id/contest_id params）／申請者本人には出ない／auto_approve/public は requested にならず通知0 | T.2／H.2／FR-46 |
+| T-TC-136 | api | Tier1 承認/却下で**申請者へ通知** `contest_join_request_decided`（result=approved/rejected） | 承認制 contest・requested 済み | `PATCH /contests/{id}/participation/{uid}`（運営・approved/rejected）→申請者の `GET /notifications` | 申請者に `contest_join_request_decided`（result 一致・contest_id params）／運営自身には出ない | T.2／H.2 |
+| T-TC-137 | api | ダッシュボードの**未処理コンテスト参加リクエスト**＝運営に requested を返す・一般は空 | 承認制 contest・requested 1件・運営/一般 | `GET /dashboard`（`incoming_contest_requests`） | 運営=当該 contest 概要＋申請者を含む／一般（運営でない）=空配列 | I.1／T.2／SC-01 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

@@ -385,3 +385,94 @@ def test_t_tc_134_list_item_meta_for_apply_dialog(client, factory):
             ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
             ts.commit()
         _cleanup_contest(cid)
+
+
+def _purge_contest_notifs(cids: list[str]) -> None:
+    """検証で生成したコンテスト参加通知を params.contest_id で物理掃除（共有dev DB）。"""
+    with get_tenant_session(_seed_db()) as ts:
+        ts.execute(_text("DELETE FROM notifications WHERE type LIKE 'contest_join_request_%' "
+                         "AND params->>'contest_id' = ANY(:cids)"), {"cids": cids})
+        ts.commit()
+
+
+def test_t_tc_135_request_notifies_organizer(client, factory):
+    """T-TC-135(api): 承認制の参加リクエストで運営（作成者）へ contest_join_request_received／auto_approve は通知0・申請者本人にも出ない。"""
+    admin = _admin(client, factory)  # 作成者＝運営
+    gated = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    openc = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    applicant = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        assert client.post(f"{BASE}/{gated}/participation", headers=_csrf(client)).json()["status"] == "requested"
+        assert client.post(f"{BASE}/{openc}/participation", headers=_csrf(client)).json()["status"] == "approved"
+        # 申請者本人には received は出ない。
+        my = client.get("/api/v1/notifications").json()["data"]
+        assert not any(n["type"] == "contest_join_request_received" and n["ref"].get("contest_id") == gated for n in my)
+        # 作成者（admin）に gated の received が1件・auto_approve(openc) は通知0。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        recv = [n for n in client.get("/api/v1/notifications").json()["data"]
+                if n["type"] == "contest_join_request_received"]
+        assert any(n["ref"].get("contest_id") == gated for n in recv)
+        assert not any(n["ref"].get("contest_id") == openc for n in recv)
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            for c in (gated, openc):
+                ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": c})
+            ts.commit()
+        _purge_contest_notifs([gated, openc])
+        _cleanup_contest(gated)
+        _cleanup_contest(openc)
+
+
+def test_t_tc_136_decide_notifies_applicant(client, factory):
+    """T-TC-136(api): 承認/却下で申請者へ contest_join_request_decided（運営自身には出ない）。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    applicant = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
+    auid = _user_id(applicant["id"])
+    try:
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.patch(f"{BASE}/{cid}/participation/{auid}", json={"status": "approved"},
+                            headers=_csrf(client)).status_code == 200
+        # 申請者に decided 通知。
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        dec = [n for n in client.get("/api/v1/notifications").json()["data"]
+               if n["type"] == "contest_join_request_decided" and n["ref"].get("contest_id") == cid]
+        assert len(dec) == 1
+        # 運営自身には decided は出ない。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert not any(n["type"] == "contest_join_request_decided" and n["ref"].get("contest_id") == cid
+                       for n in client.get("/api/v1/notifications").json()["data"])
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
+        _purge_contest_notifs([cid])
+        _cleanup_contest(cid)
+
+
+def test_t_tc_137_dashboard_incoming_contest_requests(client, factory):
+    """T-TC-137(api): ダッシュボード incoming_contest_requests＝運営に requested を返す・一般は空。"""
+    admin = _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    applicant = factory.make_seed_company_account(display_name=f"応募_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        # 運営（admin）のダッシュボードに当該コンテストの申請が出る。
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        items = client.get("/api/v1/dashboard").json()["incoming_contest_requests"]
+        assert any(it["contest"]["id"] == cid and it["user"]["user_id"] == str(_user_id(applicant["id"]))
+                   for it in items)
+        # 一般（運営でない＝申請者本人）には出ない（空 or 当該なし）。
+        _login(client, SEED_COMPANY_CODE, applicant["login_id"], applicant["password"])
+        items2 = client.get("/api/v1/dashboard").json()["incoming_contest_requests"]
+        assert all(it["contest"]["id"] != cid for it in items2)
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
+        _purge_contest_notifs([cid])
+        _cleanup_contest(cid)

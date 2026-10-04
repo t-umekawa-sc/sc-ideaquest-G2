@@ -49,6 +49,8 @@
 
 - **ゲート**（案X）＝**投票は Tier1（`contest_participants='approved'`）に開放**／**チャットは Tier2（`idea_participants='approved'`・投稿者承認）**／**評価は審査員（`contest_evaluator`）のみ**。閲覧＋自分のアイデア投稿は Tier1。
 - 投稿・投票・評価・チャット本体は**既存EPを流用**（新設しない）＝D（アイデア/投票）/F（評価）/E（チャット）。本ドメインは参加の承認状態だけを管理し、単一ポリシー解決関数が各EPのゲートで参照する。
+- **参加リクエストの通知（H・2026-10-04 ユーザー要望）**＝承認制で `requested` になったとき**運営（作成者＋`contest_create` 保持者）へ `contest_join_request_received`**（📩・`params.contest_id`/`applicant_id`・クエストの `join_request_received` と同型）／`auto_approve`・public は即 `approved` で通知なし。承認/却下したとき**申請者へ `contest_join_request_decided`**（✅・`params.result`）。通知クリックは `/contests/{id}`（運営はパーティタブで承認）。
+- **ダッシュボード表示（I.1・SC-01）**＝運営（`is_contest_manager`）に `GET /dashboard` の `incoming_contest_requests`（未処理 requested＝コンテスト概要＋申請者）を返す。クエストの `incoming_join_requests` とは**別パネル**（データ/承認API/遷移先/承認スコープが異種＝カードUIは踏襲し隣接配置）。
 
 ## T.3 表彰・ランキング（既存基盤の再利用＋軸拡張）
 

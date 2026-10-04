@@ -51,6 +51,13 @@ export type IncomingJoinRequest = {
   created_at?: string | null;
 };
 
+// 未処理のコンテスト参加リクエスト（運営・FR-46）＝コンテスト概要＋申請者。カードクリックで承認/却下。
+export type IncomingContestRequest = {
+  contest: { id: string; theme: string; status?: string | null; starts_at?: string | null; ends_at?: string | null };
+  user: { user_id: string; display_name: string; avatar_image_url?: string | null };
+  created_at?: string | null;
+};
+
 // フォロー中クエスト（§4.6b）／参加リクエスト状況（§4.6c）＝発見カタログのメタカード（my_state 由来・FR-40）。
 export type WatchQuestCard = {
   id: string; title: string; purpose?: string | null; color?: string; icon_image_url?: string | null;
@@ -77,6 +84,7 @@ export type DashboardData = {
   followed_quests: WatchQuestCard[];  // §4.6b フォロー中のクエスト（非参加・following）
   join_requests: WatchQuestCard[];    // §4.6c 参加リクエスト状況（pending/rejected）
   incoming_join_requests: IncomingJoinRequest[];  // 未処理の受信参加リクエスト（owner/quest_admin）
+  incoming_contest_requests: IncomingContestRequest[];  // 未処理のコンテスト参加リクエスト（運営・FR-46）
 };
 
 export function getDashboard(): Promise<DashboardData | null> {

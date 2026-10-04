@@ -35,6 +35,16 @@ def list_for_user(session: Session, user_id: uuid.UUID) -> list[str]:
     return list(rows)
 
 
+def list_holders(session: Session, capability: str) -> list[uuid.UUID]:
+    """当該能力を有効に持つユーザー id 一覧（通知の運営宛先解決等・`revoked_at IS NULL`）。"""
+    rows = session.execute(
+        select(UserCapability.user_id).where(
+            UserCapability.capability == capability, UserCapability.revoked_at.is_(None)
+        )
+    ).scalars().all()
+    return list(dict.fromkeys(rows))
+
+
 def grant(session: Session, user_id: uuid.UUID, capability: str, *, granted_by_id: uuid.UUID | None) -> bool:
     """能力を付与（既に有効なら何もしない＝冪等）。新規付与なら True。"""
     if has_capability(session, user_id, capability):

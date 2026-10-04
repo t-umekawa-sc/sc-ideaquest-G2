@@ -41,6 +41,10 @@ describe("H-TC-211 notificationHref join_request_received（申請者ダイア�
   it("user_id 欠落 → /quests/{id} にフォールバック", () => {
     expect(notificationHref(notif({ quest_id: "q1" }, "join_request_received"))).toBe("/quests/q1");
   });
+  it("contest_id → /contests/{id}（コンテスト参加リクエスト・受信/決定とも・FR-46）", () => {
+    expect(notificationHref(notif({ contest_id: "ct1", user_id: "u9" }, "contest_join_request_received"))).toBe("/contests/ct1");
+    expect(notificationHref(notif({ contest_id: "ct1" }, "contest_join_request_decided"))).toBe("/contests/ct1");
+  });
 });
 
 describe("H-TC-210 markNotificationRead", () => {

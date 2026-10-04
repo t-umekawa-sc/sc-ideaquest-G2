@@ -13,6 +13,7 @@ class NotifRef(BaseModel):
     idea_revision_id: str | None = None
     achievement_id: str | None = None
     quest_id: str | None = None
+    contest_id: str | None = None  # コンテスト参加リクエスト通知の遷移先（/contests/{id}・FR-46・params 由来）
     user_id: str | None = None  # 申請者等の対象ユーザー（join_request_received＝クリックで当該申請者のダイアログを直接開く）
 
 

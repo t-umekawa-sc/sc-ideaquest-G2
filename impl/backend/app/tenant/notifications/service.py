@@ -47,6 +47,8 @@ TYPE_PRIORITY = {
     "security_password_changed": 14,
     "ai_task_done": 15,
     "ai_task_failed": 16,
+    "contest_join_request_received": 17,
+    "contest_join_request_decided": 18,
 }
 
 _REF_KEYS = (

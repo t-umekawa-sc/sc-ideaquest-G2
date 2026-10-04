@@ -315,7 +315,7 @@ export function ContestListView() {
             </Field>
           </div>
           <div className="modal__footer">
-            <button className="btn btn-outline" type="button" onClick={() => setOpen(false)} disabled={saving}>キャンセル</button>
+            <button className="btn btn-outline dialog-close-left" type="button" onClick={() => setOpen(false)} disabled={saving}>キャンセル</button>
             <Button variant="primary" onClick={submit} loading={saving}>{submitLabel}</Button>
           </div>
         </Modal>
@@ -337,7 +337,7 @@ export function ContestListView() {
             </dl>
           </div>
           <div className="modal__footer">
-            <button className="btn btn-outline" type="button" onClick={() => setApplyRow(null)} disabled={applying}>閉じる</button>
+            <button className="btn btn-outline dialog-close-left" type="button" onClick={() => setApplyRow(null)} disabled={applying}>閉じる</button>
             {applyRow.myStatus === "requested" ? (
               <span className="badge badge-muted">⏳ 承認待ち</span>
             ) : applyRow.status === "open" ? (

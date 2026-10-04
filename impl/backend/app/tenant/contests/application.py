@@ -14,8 +14,10 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.capabilities import application as caps_app
+from app.tenant.capabilities import repository as caps_repo
 from app.tenant.contests import access as contest_access
 from app.tenant.contests import repository as repo
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest
@@ -352,6 +354,27 @@ def delete_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str
 
 # ---- 参加 2階層（T.2・§5.1） ----
 
+def _notify_contest_request(company_id, contest_id, creator_id, applicant_id, actor_name) -> None:
+    """参加リクエスト受信通知（H `contest_join_request_received`・運営=作成者＋`contest_create` 保持者・申請者除外・post-commit）。"""
+    def _build(ts):
+        mgr = set(caps_repo.list_holders(ts, "contest_create"))
+        mgr.add(creator_id)
+        mgr.discard(applicant_id)
+        if not mgr:
+            return []
+        params = {"actor_name": actor_name, "applicant_id": str(applicant_id), "contest_id": str(contest_id)}
+        return [notify_svc.entry(r, "contest_join_request_received", params=params) for r in mgr]
+    notify_svc.dispatch(company_id, _build)
+
+
+def _notify_contest_decided(company_id, contest_id, applicant_id, result) -> None:
+    """参加リクエストの承認/却下を申請者へ通知（H `contest_join_request_decided`・post-commit）。"""
+    def _build(ts):
+        params = {"contest_id": str(contest_id), "result": result}
+        return [notify_svc.entry(applicant_id, "contest_join_request_decided", params=params)]
+    notify_svc.dispatch(company_id, _build)
+
+
 def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
     """Tier1 参加リクエスト（本人）。public/DEMO は自動 `approved`（決定G）、それ以外は `requested`。"""
     company = _resolve_company(company_id)
@@ -370,7 +393,11 @@ def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, 
                                                 status="approved" if auto else "requested",
                                                 decided_by_id=user.id if auto else None)
         out = {"status": row.status}
+        notify_ctx = None if auto else (c.id, c.created_by_id, user.id, user.display_name)
         ts.commit()
+    # 承認制で requested になったときのみ運営へ通知（即承認は通知不要・post-commit）。
+    if notify_ctx is not None:
+        _notify_contest_request(company_id, notify_ctx[0], notify_ctx[1], notify_ctx[2], notify_ctx[3])
     return out
 
 
@@ -391,10 +418,16 @@ def decide_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, c
             raise AppError(404, "not_found")
         if not _can_create_contest(account_id, ts, actor.id):
             raise AppError(403, "forbidden", detail="Tier1 参加の承認/排除は運営（contest_create/管理者）のみです")
-        row = repo.upsert_contest_participation(ts, c.id, uuid.UUID(target_user_id),
-                                                status=status, decided_by_id=actor.id)
+        target_uid = uuid.UUID(target_user_id)
+        # 直接追加（未申請）は申請者への「承認/却下」通知を出さない＝事前に requested だったときのみ決定通知。
+        prior = repo.get_contest_participation(ts, c.id, target_uid)
+        was_requested = prior is not None and prior.status == "requested"
+        row = repo.upsert_contest_participation(ts, c.id, target_uid, status=status, decided_by_id=actor.id)
         out = {"status": row.status}
+        notify_applicant = was_requested and target_uid != actor.id
         ts.commit()
+    if notify_applicant:
+        _notify_contest_decided(company_id, uuid.UUID(contest_id), target_uid, status)
     return out
 
 

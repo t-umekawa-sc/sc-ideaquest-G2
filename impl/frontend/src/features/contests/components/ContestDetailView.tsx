@@ -787,7 +787,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
             )}
           </div>
           <div className="modal__footer">
-            <button className="btn btn-outline" type="button" onClick={() => setAddOpen(false)}>閉じる</button>
+            <button className="btn btn-outline dialog-close-left" type="button" onClick={() => setAddOpen(false)}>閉じる</button>
           </div>
         </Modal>
       )}

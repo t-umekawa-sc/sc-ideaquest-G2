@@ -30,6 +30,7 @@ ICON = {
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
     "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
+    "contest_join_request_received": "📩", "contest_join_request_decided": "✅",
     "quest_watch_update": "👀", "info_refuting_raised": "⚠️",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
     "ai_task_done": "🤖", "ai_task_failed": "⚠️",
@@ -49,6 +50,15 @@ def _idea_title(session: Session, idea_id: uuid.UUID | None, en: bool) -> str:
     if idea:
         return idea.title  # UGC＝非翻訳（§2.1）
     return "(deleted idea)" if en else "（削除されたアイデア）"
+
+
+def _contest_theme(session: Session, contest_id, en: bool) -> str:
+    """コンテスト参加リクエスト通知の題名解決（`params.contest_id` 由来・UGC＝非翻訳）。"""
+    if not contest_id:
+        return "(deleted contest)" if en else "（削除されたコンテスト）"
+    from app.tenant.contests import repository as contest_repo  # 遅延 import（notifications→contests 逆依存回避）
+    c = contest_repo.get(session, uuid.UUID(str(contest_id)))
+    return c.theme if c else ("(deleted contest)" if en else "（削除されたコンテスト）")
 
 
 def _quest_context(session: Session, idea_id: uuid.UUID | None, en: bool,
@@ -202,6 +212,22 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
             body = (f'Your request to join the quest "{qt}" was declined' if en
                     else f"クエスト「{qt}」への参加リクエストが却下されました")
         context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
+        tag = "Join request" if en else "参加リクエスト"
+    elif t == "contest_join_request_received":
+        theme = _contest_theme(session, p.get("contest_id"), en)
+        body = (f'{actor} requested to join the contest "{theme}"' if en
+                else f"{actor} さんがコンテスト「{theme}」への参加をリクエストしました")
+        context = f'Contest "{theme}"' if en else f"コンテスト「{theme}」"
+        tag = "Join request" if en else "参加リクエスト"
+    elif t == "contest_join_request_decided":
+        theme = _contest_theme(session, p.get("contest_id"), en)
+        if p.get("result") == "approved":
+            body = (f'Your request to join the contest "{theme}" was approved' if en
+                    else f"コンテスト「{theme}」への参加リクエストが承認されました")
+        else:
+            body = (f'Your request to join the contest "{theme}" was declined' if en
+                    else f"コンテスト「{theme}」への参加リクエストが却下されました")
+        context = f'Contest "{theme}"' if en else f"コンテスト「{theme}」"
         tag = "Join request" if en else "参加リクエスト"
     elif t == "info_refuting_raised":
         # 反証（refuting）が成果物に提示された（§N.6・「根底を揺さぶる」）。宛先＝作成者/所有者・評価者・クエスト管理者。

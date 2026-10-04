@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-04 JST（セッション末）
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: 本セッションの `feat(contest): 承認制コンテストの可視ゲート（backend認可＋応募ダイアログ）`（commit＋origin/main へ push 済）。前回末は `69ff8dce`（docs(handoff)・親 `bd510b08`）。
+- 最新コミット: 本セッションの `feat(contest): 参加リクエストの通知＋ダッシュボード未処理パネル`（commit＋origin/main へ push 済）。その前が `ba014b3e feat(contest): 承認制コンテストの可視ゲート`。前回末は `69ff8dce`。
 - working tree: clean（全コミット済・push 済）
 - alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`（**本セッションで migration 追加なし**＝認可ロジック変更のみ）
 - ⚠️ 開始時に **git リポジトリ破損**（`.git/objects` に空オブジェクト3つ＝HEAD/tree/blob・WSL2 クラッシュ起因）を検出。GitHub(origin/main) が完全コピーを保持していたため、空オブジェクト削除→`git fetch` で修復済（working tree 無傷）。**節目でこまめに push 推奨**。
@@ -23,6 +23,10 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 > - **可視ゲート実装**（migration なし）＝`contests/access.py` に `can_view_contest`（`auto_approve` OR 作成者 OR Tier1参加者 OR 運営）/`is_contest_manager` 新設。`quests/repository.can_access_quest` のコンテスト分岐を委譲（アイデア一覧/詳細/全文検索/活動が一斉ゲート＝承認制×未参加は404存在秘匿）。`GET /contests/{id}`・ランキングは `can_view_contest` で**403明示ガード**。一覧 `GET /contests` に `auto_approve`/`participant_count`/`my_status`/`description`＋直下 `can_manage` を付与。
 > - **frontend**＝`ContestListView` 行クリックを `canManage||auto_approve||my_status='approved'` で分岐（詳細遷移 or **応募ダイアログ**＝概要+種別/会期/状態/参加人数+応募／運営以外は編集複製削除メニュー非表示）。`ContestDetailView` は直接URLの403を「参加承認制」の案内に。api `fetchContests` は `{items,canManage}` を返すよう変更。OpenAPI 型再生成済。
 > - **検証**＝backend フル **945 passed**（+4新規 T-TC-113改訂/128/129/133/134・回帰ゼロ）／frontend build+vitest 218 green／traceability ✅969／ブラウザ目視（承認制→ダイアログ・応募→承認待ち・誰でも参加可→詳細遷移）。既存 T-TC-112/115/117/120 は可視を開く `auto_approve=True` 前提に修正（tierゲート単体検証に純化・可視は新規TCが担当）、T-TC-118 の can_manage 判定は一覧EP経由に変更。
+>
+> - **コンテスト参加リクエストの通知＋ダッシュボード（FR-46・H/I・ユーザー要望）**＝承認制 `requested` で運営（作成者＋`contest_create` 保持者）へ `contest_join_request_received`／承認・却下で申請者へ `contest_join_request_decided`（直接追加〔未申請〕は決定通知なし・`auto_approve`/public は受信通知なし）。通知クリック＝`/contests/{id}`（`NotifRef.contest_id`＋`notificationHref`）。SC-01 に**別パネル**「未処理のコンテスト参加リクエスト」（`GET /dashboard` `incoming_contest_requests`＝運営のみ・カード内 承認/却下で直接処理）。**別パネル採用の理由**＝クエストの `incoming_join_requests` と遷移先/承認API/承認スコープ（会社全体）が異種（レビュー結論）。実装＝`contests/application._notify_contest_request`/`_notify_contest_decided`・`caps/repository.list_holders`・`notifications/catalog`(2type)+`schemas.NotifRef.contest_id`+`service` priority・`dashboard/application._incoming_contest_requests`・frontend `dashboard/{api,DashboardView}`・`notifications/api.notificationHref`。
+> - **キャンセルボタン位置の是正（ユーザー指摘）**＝コンテスト作成/編集/応募/メンバー追加モーダルのフッターに `dialog-close-left`（左端）＝デザイン標準 §4.1（キャンセル左・主要右）。SC-53 作成/編集モーダルだけ抜けていた。
+> - **検証（追加分）**＝T-TC-135/136/137＋vitest(notificationHref contest)・backend フル **948 passed**（回帰ゼロ）・frontend build+vitest 219・traceability ✅972・ブラウザ目視（フッター左端・ダッシュパネル＋承認/却下）。
 >
 > ---
 > 以下は前セッション（2026-10-03）の記録。
@@ -69,7 +73,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - コミット/push は main 直（本プロジェクトの慣習・都度 commit&push）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-0. **（進行中・次セッション着手）コンテスト参加リクエストの通知＋ダッシュボード未処理パネル表示**（ユーザー要望 2026-10-04）＝Tier1 参加リクエスト（`request_contest_participation`）を運営（主催者/`contest_create`/管理者）へ通知（H `notify()`・新 type 例 `contest_participation_requested`）＋SC-01 ダッシュボード（I `GET /dashboard`）の「未処理（承認待ち）」に表示。**既存の未処理パネルと分けるか統合かはレビューして提案**（クエストのパーティ参加リクエストと同型か確認）。未着手。
+0. **【完了 2026-10-04】コンテスト参加リクエストの通知＋ダッシュボード未処理パネル**（ユーザー要望）＝§3 本セッション記録のとおり実装・別パネル採用（レビュー結論）・948 green。
 1. **Step3 公開/非公開モード（FR-48・SEC・主要ステップ）**＝`companies.access_mode='public'` の外周ガード。**決定O 改訂済（2026-10-04）**＝`role=general`＝コンテスト許可リストのみ／**管理者（system_admin/company_account_admin）＝コンテスト＋管理許可リストのみ・それ以外は管理者でも403**（公開会社=コンテスト専用テナント）。正＝`doc/API設計/README.md §1.6`・`doc/API設計/A_認証・セッション.md §A.11.1`。実装箇所の候補＝`app/control_plane/me/deps.py` の `require_me` 近辺か専用 Depends で access_mode×role×パスを判定。併せて `GET /public/bootstrap`（公開ランディング用・SC-53 着地）。TC＝`doc/テスト/T_アイデアコンテスト.md` の T-TC-150/151/201＋T-TC-114（public 自動承認）。**大きめ・全EP横断の認可＝慎重に（既存テストの回帰確認を厚く）**。
 2. **Step4 セルフサインアップ（FR-48・SEC 重）**＝SC-05（画面）＋`POST /public/signup`・`POST /public/signup/verify`（正＝`doc/API設計/A_認証・セッション.md §A.11`・SEC A〜J）。TC＝`doc/テスト/A_認証.md` A-TC-120〜127。`companies.self_signup_enabled` を gate に使う。
 3. **Step5 アイデア→クエスト昇格（FR-47・T.5）**＝`POST /ideas/{id}/promote-to-quest`（要 `quest_create`・内容コピー＋`quests.origin_idea_id` で由来参照・社内のみ）。TC＝T-TC-140。
