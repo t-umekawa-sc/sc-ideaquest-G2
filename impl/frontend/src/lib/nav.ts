@@ -80,5 +80,21 @@ export function consumeChatFromDashboard(): boolean {
   } catch { return false; }
 }
 
+// コンテスト詳細の戻るラベルを文脈で出し分けるワンショット来歴。アイデアコンテスト一覧(SC-53)から詳細へ来た時だけ
+// 「← アイデアコンテスト一覧」、それ以外（ダッシュボードの未処理パネル/通知等）は「← 戻る」。戻る動作自体は常に router.back()。
+const CONTEST_FROM_LIST_KEY = "iq_contest_from_list";
+
+export function markContestFromList(): void {
+  try { sessionStorage.setItem(CONTEST_FROM_LIST_KEY, "1"); } catch { /* SSR/未対応環境は無視 */ }
+}
+
+export function consumeContestFromList(): boolean {
+  try {
+    const v = sessionStorage.getItem(CONTEST_FROM_LIST_KEY);
+    if (v != null) sessionStorage.removeItem(CONTEST_FROM_LIST_KEY);
+    return v != null;
+  } catch { return false; }
+}
+
 // クエスト詳細のスクロール位置保存キー（一覧→詳細→戻る復元・§4.12）。QuestDetailView と ConceptTab で共有。
 export const QUEST_SCROLL_KEY = "iq_quest_detail_scroll:";

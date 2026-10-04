@@ -5,11 +5,12 @@
 // 認可はサーバー権威（参加/確定は権限が無ければ 403＝スナックバーで案内・UIは非表示に依存しない）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
 import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { backToListOr, consumeContestFromList } from "@/lib/nav";
 import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
@@ -60,6 +61,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [forbidden, setForbidden] = useState(false);  // 承認制×未参加＝backend 403（応募は一覧から）
+  const [fromList, setFromList] = useState(false);     // 戻るラベル＝一覧から来たときだけ「← アイデアコンテスト一覧」（nav 来歴・one-shot）
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
   const [view, setView] = useState("ideas");       // 上位タブ: ideas | search | party
   const [ftq, setFtq] = useState("");              // 全文検索クエリ（SC-12 と同一 UI）
@@ -223,6 +225,9 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       setBusy(false);
     }
   }
+
+  // 戻るラベルの来歴を1回だけ消費（一覧→詳細のときだけ「← アイデアコンテスト一覧」・それ以外は「← 戻る」）。
+  useEffect(() => { setFromList(consumeContestFromList()); }, []);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -406,11 +411,15 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
   }
 
+  // 戻る＝常に router.back()（来歴があればダッシュボード/一覧/通知元へ復帰・無ければ /contests）。ラベルのみ文脈で出し分け（nav 規約）。
+  const backLabel = fromList ? "← アイデアコンテスト一覧" : "← 戻る";
+  const onBack = (e: MouseEvent) => { e.preventDefault(); backToListOr(router, "/contests"); };
+
   if (loading) return <section className="contest-detail"><p className="hint">読み込み中…</p></section>;
   if (forbidden) {
     return (
       <section className="contest-detail">
-        <Link className="backlink" href="/contests">← アイデアコンテスト一覧</Link>
+        <Link className="backlink" href="/contests" onClick={onBack}>{backLabel}</Link>
         <p className="hint">このコンテストは参加承認制です。閲覧には参加が必要です。<br />
           一覧の該当コンテストを開いて「応募する」から参加をリクエストしてください。</p>
       </section>
@@ -419,7 +428,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   if (notFound || !contest) {
     return (
       <section className="contest-detail">
-        <Link className="backlink" href="/contests">← アイデアコンテスト一覧</Link>
+        <Link className="backlink" href="/contests" onClick={onBack}>{backLabel}</Link>
         <p className="hint">コンテストが見つかりませんでした。</p>
       </section>
     );
@@ -429,7 +438,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
 
   return (
     <section className="contest-detail">
-      <Link className="backlink backlink--float" href="/contests">← アイデアコンテスト一覧</Link>
+      <Link className="backlink backlink--float" href="/contests" onClick={onBack}>{backLabel}</Link>
 
       {/* 概要（左）＋コンテスト内アクティビティ（右）を2段組（クエスト詳細 .quest-top と同構成）。 */}
       <div className="contest-top">

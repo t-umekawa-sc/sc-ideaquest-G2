@@ -296,6 +296,10 @@ def get_quest_detail(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         quest = repo.get_quest(ts, qid)
         if quest is None:
             raise AppError(404, "not_found")
+        # コンテストの backing quest はクエスト詳細として開かせない（FR-46・内部の器＝アイデアコンテストで閲覧）。
+        from app.tenant.contests import access as contest_access
+        if contest_access.contest_of(ts, quest.id) is not None:
+            raise AppError(404, "not_found")
         if quest.status == "draft":
             if quest.owner_id != user.id:
                 raise AppError(404, "not_found")  # 下書きは本人だけに見える

@@ -398,3 +398,37 @@ def test_t_tc_120_evaluate_requires_contest_evaluator(client, factory):
         assert re2.status_code == 403, re2.text
     finally:
         _purge_contest_idea(cid, iid)
+
+
+def test_t_tc_138_backing_quest_hidden_from_quest_lists(client, factory):
+    """T-TC-138(api): コンテストの backing quest はクエスト一覧(SC-10)・発見カタログ(SC-13)に出ない（内部の器・FR-46）。"""
+    _admin(client, factory)  # 作成者＝owner
+    cid = client.post(BASE, json=_body(status="open"), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    try:
+        # discoverable にしてもカタログに出ないこと＝除外が効くことを確認。
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("UPDATE quests SET discoverable=true WHERE id=:q"), {"q": qid})
+            ts.commit()
+        mine = client.get("/api/v1/quests?limit=100").json()["data"]
+        assert all(x["id"] != qid for x in mine)          # 作成者の自分一覧（owner別格でも除外）
+        cat = client.get("/api/v1/quest-catalog?per_page=100").json()["data"]
+        assert all(x["id"] != qid for x in cat)           # 発見カタログ
+    finally:
+        _cleanup_contest(cid)
+
+
+def test_t_tc_139_backing_quest_not_joinable_as_quest(client, factory):
+    """T-TC-139(api): backing quest はクエスト詳細/参加リクエスト/フォローが404・アイデア一覧は従来可（FR-46）。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    qid = client.get(f"{BASE}/{cid}").json()["quest_id"]
+    outsider = factory.make_seed_company_account(display_name=f"外_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, outsider["login_id"], outsider["password"])
+        assert client.get(f"/api/v1/quests/{qid}").status_code == 404                                  # 詳細
+        assert client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client)).status_code == 404  # 参加リクエスト
+        assert client.post(f"/api/v1/quests/{qid}/follow", headers=_csrf(client)).status_code == 404    # フォロー
+        assert client.get(f"/api/v1/quests/{qid}/ideas").status_code == 200                             # アイデア一覧は従来可（auto_approve=true）
+    finally:
+        _cleanup_contest(cid)

@@ -408,7 +408,7 @@ def list_quests_for_user(
         Quest,
         idea_count_col.label("idea_count"),
         member_count_col.label("member_count"),
-    ).where(Quest.deleted_at.is_(None), or_(public_cond, draft_cond))
+    ).where(Quest.deleted_at.is_(None), _not_contest_backed(), or_(public_cond, draft_cond))
 
     if q:
         # 簡易絞り＝件名/目的の部分一致（横断全文検索は §1.11 PGroonga に委譲・C.1）。カテゴリ一致は後続。
@@ -878,6 +878,14 @@ def _replace_permissions(
 
 # ---- 発見・フォロー・参加リクエスト（FR-40・C.9） ---------------------------------------
 
+def _not_contest_backed():
+    """コンテストの backing quest を除外する WHERE 条件（FR-46）。backing quest は内部の器なので
+    ユーザーにはクエストとして見せない（一覧/カタログ/発見・アイデアコンテストとしてのみ可視）。"""
+    from sqlalchemy import exists, not_
+    from app.tenant.contests.orm import Contest
+    return not_(exists().where(Contest.quest_id == Quest.id))
+
+
 def _discoverable_conds(user_id: uuid.UUID, visible_group_ids: list[uuid.UUID]):
     """`can_discover_quest`（C.9.0）の WHERE 条件群を返す＝discoverable ∧ 部署交差(0件=全社) ∧
     status∈発見対象 ∧ 未削除。中身門番 `can_access_quest` とは別（メタ専用・パーティー員か否かは問わない）。"""
@@ -894,6 +902,7 @@ def _discoverable_conds(user_id: uuid.UUID, visible_group_ids: list[uuid.UUID]):
         Quest.deleted_at.is_(None),
         Quest.status.in_(DISCOVERABLE_STATUS),
         dept_ok,
+        _not_contest_backed(),  # コンテストの backing quest はカタログに出さない（FR-46）
     ]
 
 
@@ -902,6 +911,10 @@ def can_discover_quest(session: Session, quest: Quest, visible_group_ids: list[u
     if quest is None or quest.deleted_at is not None:
         return False
     if not quest.discoverable or quest.status not in DISCOVERABLE_STATUS:
+        return False
+    # コンテストの backing quest はクエストとして発見/フォロー/参加リクエスト不可（FR-46・内部の器）。
+    from app.tenant.contests import access as contest_access
+    if contest_access.contest_of(session, quest.id) is not None:
         return False
     link_gids = list_group_ids_for_quest(session, quest.id)
     if not link_gids:  # 参加部署0件＝全社に開く

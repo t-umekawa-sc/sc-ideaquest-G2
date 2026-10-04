@@ -41,6 +41,8 @@
 | T-TC-135 | api | Tier1 参加リクエスト（承認制）で**運営へ通知** `contest_join_request_received`／auto_approve・public は通知なし（即承認のため） | 承認制 contest・運営（作成者/contest_create）・申請者 | `POST /contests/{id}/participation`（本人）→運営の `GET /notifications` | 運営に `contest_join_request_received`（applicant_id/contest_id params）／申請者本人には出ない／auto_approve/public は requested にならず通知0 | T.2／H.2／FR-46 |
 | T-TC-136 | api | Tier1 承認/却下で**申請者へ通知** `contest_join_request_decided`（result=approved/rejected） | 承認制 contest・requested 済み | `PATCH /contests/{id}/participation/{uid}`（運営・approved/rejected）→申請者の `GET /notifications` | 申請者に `contest_join_request_decided`（result 一致・contest_id params）／運営自身には出ない | T.2／H.2 |
 | T-TC-137 | api | ダッシュボードの**未処理コンテスト参加リクエスト**＝運営に requested を返す・一般は空 | 承認制 contest・requested 1件・運営/一般 | `GET /dashboard`（`incoming_contest_requests`） | 運営=当該 contest 概要＋申請者を含む／一般（運営でない）=空配列 | I.1／T.2／SC-01 |
+| T-TC-138 | api | コンテストの **backing quest はクエスト系の一覧に出ない**（内部の器・ユーザーにはコンテストとしてのみ可視） | contest（backing quest あり）・作成者/一般 | 作成者 `GET /quests`（SC-10・自分のクエスト）／`GET /quests/catalog`（SC-13 発見） | どちらの一覧にも backing quest.id を**含まない**（作成者の自分一覧にも出ない＝owner別格でも除外） | §2.2／FR-46 |
+| T-TC-139 | api | backing quest は**クエストとして発見/参加/詳細不可**（器を内部に閉じる・サーバーガード） | contest（backing quest あり） | `GET /quests/{backing}`／`POST /quests/{backing}/join-request`／`POST /quests/{backing}/follow` | 詳細=404・参加リクエスト=404（存在秘匿・`can_discover_quest`）・フォロー=404／アイデア一覧 `GET /quests/{backing}/ideas` は従来どおり可（コンテスト内部経路は can_access_quest 経由で無影響） | §2.2／FR-46 |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 

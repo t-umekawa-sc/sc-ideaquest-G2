@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-04 JST（セッション末）
 - ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: 本セッションの `feat(contest): 参加リクエストの通知＋ダッシュボード未処理パネル`（commit＋origin/main へ push 済）。その前が `ba014b3e feat(contest): 承認制コンテストの可視ゲート`。前回末は `69ff8dce`。
+- 最新コミット: 本セッションの `fix(contest): backing quest をクエスト系から除外＋詳細の戻る導線`（commit＋origin/main へ push 済）。履歴＝`cf5d724e`（通知＋ダッシュボード）→`ba014b3e`（可視ゲート）→`69ff8dce`（前回末）。
 - working tree: clean（全コミット済・push 済）
 - alembic heads: control=`0019_company_access_mode` / company=`0053_contest_auto_approve`（**本セッションで migration 追加なし**＝認可ロジック変更のみ）
 - ⚠️ 開始時に **git リポジトリ破損**（`.git/objects` に空オブジェクト3つ＝HEAD/tree/blob・WSL2 クラッシュ起因）を検出。GitHub(origin/main) が完全コピーを保持していたため、空オブジェクト削除→`git fetch` で修復済（working tree 無傷）。**節目でこまめに push 推奨**。
@@ -26,7 +26,10 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 >
 > - **コンテスト参加リクエストの通知＋ダッシュボード（FR-46・H/I・ユーザー要望）**＝承認制 `requested` で運営（作成者＋`contest_create` 保持者）へ `contest_join_request_received`／承認・却下で申請者へ `contest_join_request_decided`（直接追加〔未申請〕は決定通知なし・`auto_approve`/public は受信通知なし）。通知クリック＝`/contests/{id}`（`NotifRef.contest_id`＋`notificationHref`）。SC-01 に**別パネル**「未処理のコンテスト参加リクエスト」（`GET /dashboard` `incoming_contest_requests`＝運営のみ・カード内 承認/却下で直接処理）。**別パネル採用の理由**＝クエストの `incoming_join_requests` と遷移先/承認API/承認スコープ（会社全体）が異種（レビュー結論）。実装＝`contests/application._notify_contest_request`/`_notify_contest_decided`・`caps/repository.list_holders`・`notifications/catalog`(2type)+`schemas.NotifRef.contest_id`+`service` priority・`dashboard/application._incoming_contest_requests`・frontend `dashboard/{api,DashboardView}`・`notifications/api.notificationHref`。
 > - **キャンセルボタン位置の是正（ユーザー指摘）**＝コンテスト作成/編集/応募/メンバー追加モーダルのフッターに `dialog-close-left`（左端）＝デザイン標準 §4.1（キャンセル左・主要右）。SC-53 作成/編集モーダルだけ抜けていた。
-> - **検証（追加分）**＝T-TC-135/136/137＋vitest(notificationHref contest)・backend フル **948 passed**（回帰ゼロ）・frontend build+vitest 219・traceability ✅972・ブラウザ目視（フッター左端・ダッシュパネル＋承認/却下）。
+> - **検証（通知/パネル分）**＝T-TC-135/136/137＋vitest(notificationHref contest)・backend **948 passed**・frontend build+vitest 219・traceability ✅972・目視（フッター左端・ダッシュパネル＋承認/却下）。
+> - **backing quest をクエスト系から除外（バグ修正・ユーザー指摘）**＝コンテストの backing quest（内部の器）が「クエスト」一覧(SC-10)・「クエストを探す」カタログ(SC-13)に漏れていた。`quests/repository._not_contest_backed`（NOT EXISTS contests.quest_id）を `list_quests_for_user`／`_discoverable_conds` に適用＋`can_discover_quest`（発見/フォロー/参加リクエスト門番）・`get_quest_detail`（詳細）で 404。コンテスト内部読取（`/quests/{id}/ideas|search|activities`＝can_access_quest 経由）は無影響。backing quest は**アイデアコンテストとしてのみ可視**（設計 §2.2 改訂）。TC＝T-TC-138/139。※既存の「コンテスト開催」に残る quest_join_request/通知は孤児化するが無害（器非表示で導線に出ない）。
+> - **コンテスト詳細の戻る導線（ユーザー要望）**＝`backToListOr`（router.back＝遷移元復帰）＋ラベル来歴（`markContestFromList`/`consumeContestFromList`）＝一覧経由「← アイデアコンテスト一覧」／ダッシュボード・通知経由「← 戻る」。nav 規約踏襲。
+> - **検証（本バッチ）**＝backend フル **950 passed**（+2・回帰ゼロ）・traceability ✅974・ブラウザ目視（戻る＝一覧/ダッシュボード復帰・カタログに backing quest 0件）。
 >
 > ---
 > 以下は前セッション（2026-10-03）の記録。

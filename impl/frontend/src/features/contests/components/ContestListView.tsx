@@ -15,6 +15,7 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { createContest, deleteContest, fetchContests, getContest, requestContestParticipation, updateContest } from "../api";
 import type { ContestListItem } from "../api";
 import { CONTEST_MODE_LABEL, CONTEST_STATUS_BADGE, CONTEST_TABS, contestStatusLabel } from "../types";
+import { markContestFromList } from "@/lib/nav";
 import "../contests.css";
 
 const fmtDate = (v: string | null | undefined) => (v ? v.slice(0, 10) : "—");
@@ -130,6 +131,7 @@ export function ContestListView() {
   // backend も can_view_contest で詳細を 403 ガード（UI非表示に依存しない）。
   function goToContest(row: ContestRow) {
     if (canManage || row.autoApprove || row.myStatus === "approved") {
+      markContestFromList();  // 戻るラベルを「← アイデアコンテスト一覧」にする来歴（一覧→詳細のときだけ）。
       router.push(`/contests/${row.id}`);
     } else {
       setApplyRow(row);
