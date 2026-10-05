@@ -51,6 +51,11 @@ export function requestContestParticipation(id: string): Promise<{ status: strin
   });
 }
 
+// Tier1 自主退席（本人・T.2）＝status=left（管理者排除 rejected と主体を区別）。
+export function leaveContest(id: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/contests/${id}/participation`, { method: "DELETE" });
+}
+
 // 表彰確定（管理者・冪等・T.1）。judging→closed・上位N へ付与。
 export function finalizeContest(id: string): Promise<ContestFinalizeResult | null> {
   return apiFetch<ContestFinalizeResult>(`/contests/${id}/finalize`, {

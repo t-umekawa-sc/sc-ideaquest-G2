@@ -29,6 +29,7 @@ import {
   getContestParticipants,
   getContestRanking,
   getParticipantCandidates,
+  leaveContest,
   requestContestParticipation,
   setContestEvaluator,
   setContestIdeaFlag,
@@ -346,8 +347,31 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         type: "success",
         title: r.status === "approved" ? "参加しました（投稿・投票ができます）" : "参加リクエストを送信しました（承認待ち）",
       });
+      await load();  // my_status を更新＝参加後はタブ表示＋「退席」ボタンに切替。
     } catch {
       snack({ type: "error", title: "参加リクエストに失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 自主退席（本人・確認ダイアログ必須）。承認制で再参加する場合は再度承認が要る旨を明示。
+  async function leave() {
+    const ok = await confirm({
+      variant: "danger",
+      title: "コンテストを退席しますか？",
+      msg: `「${contest?.theme ?? "このコンテスト"}」を退席します。応募・投票・パーティの閲覧ができなくなります${contest?.auto_approve ? "（再参加はすぐ可能です）" : "（再参加には改めて運営の承認が必要です）"}。`,
+      confirmLabel: "退席する",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await leaveContest(contestId);
+      if (!r) { snack({ type: "error", title: "退席できませんでした" }); return; }
+      snack({ type: "success", title: "コンテストを退席しました" });
+      await load();  // my_status=left へ＝タブ非表示＋「参加する」ボタンに戻る。
+    } catch {
+      snack({ type: "error", title: "退席に失敗しました" });
     } finally {
       setBusy(false);
     }
@@ -440,6 +464,11 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   }
 
   const period = `${fmtDate(contest.starts_at)} 〜 ${fmtDate(contest.ends_at)}`;
+  // 参加状態（my_status）でタブ出し分け・参加/退席トグル（ユーザー要望）。
+  const myStatus = contest.my_status ?? "none";
+  const isParticipant = myStatus === "approved";
+  // タブ（アイデア/全文検索/パーティ）は参加後のみ表示（運営は管理のため常時可）。
+  const showTabs = isParticipant || contest.can_manage;
 
   return (
     <section className="contest-detail">
@@ -466,7 +495,14 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           </div>
           {/* 操作エリア統一（デザイン標準 §4.14）＝一次アクション(参加する)→編集(運営=can_manage)→⋮(ステータス遷移・削除danger)。権限が無ければサーバー 403。 */}
           <div className="contest-head__actions detail-head__actions">
-            {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
+            {/* 一次アクション＝参加/退席トグル（「参加する」と同じ位置・ユーザー要望）。参加中=退席(確認ダイアログ)／申請中=承認待ち／未参加=参加する。 */}
+            {isParticipant ? (
+              <button type="button" className="btn btn-outline" onClick={leave} disabled={busy}>退席</button>
+            ) : myStatus === "requested" ? (
+              <span className="badge badge-muted">⏳ 承認待ち</span>
+            ) : contest.status === "open" ? (
+              <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>
+            ) : null}
             {/* 編集＝運営のみ（従来は一覧の⋮のみ＝詳細に導線なしだった。共有 ContestFormModal で詳細からも編集可に）。 */}
             {contest.can_manage && <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>編集</button>}
             {contest.can_manage && (() => {
@@ -552,8 +588,22 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         })}
       </section>
 
-      {/* 上位タブ（クエスト詳細と同じ .tabs）＝アイデア / 全文検索 / パーティ（運営のみ）。 */}
-      <div className="tabs" role="tablist" style={{ marginTop: "var(--space-6)" }}>
+      {/* 参加前はタブ（アイデア/全文検索/パーティ）非表示＝参加誘導のみ（ユーザー要望）。参加後（approved）or 運営は表示。 */}
+      {!showTabs && (
+        <section className="card" style={{ marginTop: "var(--space-6)", textAlign: "center" }} aria-label="参加の案内">
+          <p className="hint" style={{ margin: "var(--space-2) 0" }}>
+            このコンテストに参加すると、応募アイデアの閲覧・投票・全文検索・パーティが利用できます。
+          </p>
+          {myStatus === "requested"
+            ? <p className="muted text-sm" style={{ margin: 0 }}>⏳ 参加リクエストは承認待ちです。</p>
+            : contest.status === "open"
+              ? <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>
+              : <p className="muted text-sm" style={{ margin: 0 }}>現在このコンテストは参加を受け付けていません。</p>}
+        </section>
+      )}
+
+      {/* 上位タブ（クエスト詳細と同じ .tabs）＝アイデア / 全文検索 / パーティ（運営のみ）。参加後のみ表示。 */}
+      {showTabs && <div className="tabs" role="tablist" style={{ marginTop: "var(--space-6)" }}>
         {([["ideas", "💡 アイデア"], ["search", "🔍 全文検索"],
            ...(contest.can_manage ? [["party", "👥 パーティ"]] : [])] as [string, string][]).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={view === k} className={`tab${view === k ? " is-active" : ""}`}
@@ -561,9 +611,9 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
             {label}{k === "party" && participants != null && <span className="tab-count">{participants.length}</span>}
           </button>
         ))}
-      </div>
+      </div>}
 
-      {view === "ideas" && (
+      {showTabs && view === "ideas" && (
         <>
           <div className="ideas-tab-toolbar" style={{ marginTop: "var(--space-3)" }}>
             <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み">
@@ -613,7 +663,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
       )}
 
       {/* 全文検索（J・実接続＝GET /quests/{id}/search・PGroonga）＝SC-12 クエスト詳細と同一 UI。 */}
-      {view === "search" && (
+      {showTabs && view === "search" && (
         <section aria-label="全文検索">
           <div className="list-toolbar">
             <div className="filters" data-sp-host>

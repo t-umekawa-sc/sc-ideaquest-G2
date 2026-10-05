@@ -39,6 +39,9 @@ function toRow(c: ContestListItem): ContestRow {
 }
 
 const MODE_OPTIONS: [string, string][] = Object.values(CONTEST_MODE_LABEL).map((v) => [v, v]);
+// 参加方式（auto_approve）＝誰でも参加（自動承認）か、運営の承認が要るか（ユーザー要望・一覧で一目で分かる列）。
+const JOIN_MODE_OPTIONS: [string, string][] = [["誰でも参加", "誰でも参加"], ["承認制", "承認制"]];
+const joinModeLabel = (x: ContestRow): string => (x.autoApprove ? "誰でも参加" : "承認制");
 
 type FormMode = "create" | "edit" | "duplicate";
 
@@ -152,6 +155,7 @@ export function ContestListView() {
     },
     { key: "mode", label: "種別", width: 170, sortable: true, filter: { type: "enum", options: MODE_OPTIONS }, sortVal: (x) => x.modeLabel, filterVal: (x) => x.modeLabel, render: (x) => x.modeLabel },
     { key: "status", label: "状態", width: 120, sortable: true, sortVal: (x) => x.statusLabel, filterVal: (x) => x.statusLabel, render: (x) => <span className={`badge ${CONTEST_STATUS_BADGE[x.status] ?? "badge-muted"}`}>{x.statusLabel}</span> },
+    { key: "join", label: "参加方式", width: 130, sortable: true, filter: { type: "enum", options: JOIN_MODE_OPTIONS }, sortVal: (x) => joinModeLabel(x), filterVal: (x) => joinModeLabel(x), csvVal: (x) => joinModeLabel(x), render: (x) => <span className={x.autoApprove ? "badge badge-success" : "badge badge-muted"} title={x.autoApprove ? "誰でも即参加（自動承認）" : "参加には運営の承認が必要"}>{joinModeLabel(x)}</span> },
     { key: "starts", label: "開始", width: 120, sortable: true, sortVal: (x) => x.starts, csvVal: (x) => x.starts, render: (x) => x.starts },
     { key: "ends", label: "締切", width: 120, sortable: true, sortVal: (x) => x.ends, csvVal: (x) => x.ends, render: (x) => x.ends },
     { key: "_actions", label: "", actions: true, locked: true, width: 64, render: (x) => <RowMenu items={menu(x)} /> },
@@ -201,6 +205,7 @@ export function ContestListView() {
               </div>
               <div className="contest-card__meta">
                 <span className="badge badge-muted">{x.modeLabel}</span>
+                <span className={x.autoApprove ? "badge badge-success" : "badge badge-muted"}>{joinModeLabel(x)}</span>
                 <span>⏳ {x.starts} 〜 {x.ends}</span>
               </div>
             </>

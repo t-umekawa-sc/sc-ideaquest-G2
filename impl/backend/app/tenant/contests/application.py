@@ -56,7 +56,7 @@ def _can_create_contest(account_id: uuid.UUID, ts, user_id: uuid.UUID) -> bool:
 
 def _detail(c, *, idea_count: int = 0, flags: list | None = None,
             my_participating_idea_ids: list | None = None, can_manage: bool = False,
-            owner_display_name: str | None = None) -> dict:
+            my_status: str = "none", owner_display_name: str | None = None) -> dict:
     return {
         "id": str(c.id), "quest_id": str(c.quest_id), "mode": c.mode, "status": c.status,
         "theme": c.theme, "description": c.description,
@@ -64,7 +64,8 @@ def _detail(c, *, idea_count: int = 0, flags: list | None = None,
         "auto_archive_days": c.auto_archive_days, "auto_approve": c.auto_approve,
         "prize_config": c.prize_config,
         "created_at": c.created_at, "idea_count": idea_count, "flags": flags or [],
-        "my_participating_idea_ids": my_participating_idea_ids or [], "can_manage": can_manage,
+        "my_participating_idea_ids": my_participating_idea_ids or [],
+        "my_status": my_status, "can_manage": can_manage,
         "owner_user_id": str(c.created_by_id), "owner_display_name": owner_display_name,
     }
 
@@ -146,9 +147,12 @@ def get_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -
         flags = [{"idea_id": str(f.idea_id), "flag": f.flag} for f in repo.list_flags_for_contest(ts, c.id)]
         mine = [str(i) for i in repo.discussion_idea_ids(ts, c.quest_id, user.id)]
         can_manage = bool(user and _can_create_contest(account_id, ts, user.id))
+        # 閲覧者の Tier1 参加状態（none/requested/approved/left/rejected）＝タブ出し分け・参加/退席トグル用。
+        part = repo.get_contest_participation(ts, c.id, user.id)
+        my_status = part.status if part else "none"
         owner = quests_repo.get_users_by_ids(ts, {c.created_by_id}).get(c.created_by_id)
         return _detail(c, flags=flags, my_participating_idea_ids=mine, can_manage=can_manage,
-                       owner_display_name=(owner.display_name if owner else None))
+                       my_status=my_status, owner_display_name=(owner.display_name if owner else None))
 
 
 def list_participants(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
@@ -436,6 +440,32 @@ def request_contest_participation(account_id: uuid.UUID, company_id: uuid.UUID, 
     # 承認制で requested になったときのみ運営へ通知（即承認は通知不要・post-commit）。
     if notify_ctx is not None:
         _notify_contest_request(company_id, notify_ctx[0], notify_ctx[1], notify_ctx[2], notify_ctx[3])
+    return out
+
+
+def leave_contest(account_id: uuid.UUID, company_id: uuid.UUID, contest_id: str) -> dict:
+    """Tier1 自主退席（本人）。参加中(approved)/申請中(requested)→ `left`（自主）。
+
+    管理者による排除は `decide_contest_participation(..., "rejected")`（status=rejected）＝**主体を区別**できる
+    （自主＝left/本人・管理者＝rejected/管理者。いずれも decided_by_id に実行者を記録）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        c = repo.get(ts, uuid.UUID(contest_id))
+        if c is None:
+            raise AppError(404, "not_found")
+        part = repo.get_contest_participation(ts, c.id, user.id)
+        if part is None or part.status not in ("approved", "requested"):
+            raise AppError(409, "conflict", detail="このコンテストに参加していません（退席できません）")
+        # 自主退席＝left・decided_by は本人（管理者 rejected と区別できる）。
+        row = repo.upsert_contest_participation(ts, c.id, user.id, status="left", decided_by_id=user.id)
+        out = {"status": row.status}
+        ts.commit()
     return out
 
 

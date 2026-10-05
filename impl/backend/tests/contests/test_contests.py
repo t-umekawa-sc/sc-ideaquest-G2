@@ -507,3 +507,58 @@ def test_t_tc_141_participant_profile(client, factory):
             ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
             ts.commit()
         _cleanup_contest(cid)
+
+
+def test_t_tc_202_self_leave_vs_manager_remove(client, factory):
+    """T-TC-202: 自己退席（DELETE /participation）＝approved→left（自主・decided_by=本人）。
+    管理者排除は rejected（decided_by=管理者）＝主体を区別できる（自主退席か管理者による退席か判別可能）。"""
+    admin = _admin(client, factory)
+    auid = _user_id(admin["id"])
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"退席者_{uuid.uuid4().hex[:6]}")
+    puid = _user_id(part["id"])
+    try:
+        _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+        # 参加（auto_approve=approved）→ 自己退席（DELETE）→ left。
+        assert client.post(f"{BASE}/{cid}/participation", headers=_csrf(client)).json()["status"] == "approved"
+        lr = client.delete(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        assert lr.status_code == 200 and lr.json()["status"] == "left", lr.text
+        with get_tenant_session(_seed_db()) as ts:
+            row = ts.execute(_text("SELECT status, decided_by_id FROM contest_participants WHERE contest_id=:c AND user_id=:u"),
+                             {"c": cid, "u": str(puid)}).one()
+            assert row[0] == "left" and str(row[1]) == str(puid)  # 自主退席＝decided_by 本人
+        # 未参加状態での退席は 409。
+        assert client.delete(f"{BASE}/{cid}/participation", headers=_csrf(client)).status_code == 409
+        # 再参加 → 管理者が排除（rejected・decided_by=管理者）＝自主(left)と区別できる。
+        assert client.post(f"{BASE}/{cid}/participation", headers=_csrf(client)).json()["status"] == "approved"
+        _login(client, SEED_COMPANY_CODE, admin["login_id"], admin["password"])
+        assert client.patch(f"{BASE}/{cid}/participation/{puid}", json={"status": "rejected"}, headers=_csrf(client)).json()["status"] == "rejected"
+        with get_tenant_session(_seed_db()) as ts:
+            row = ts.execute(_text("SELECT status, decided_by_id FROM contest_participants WHERE contest_id=:c AND user_id=:u"),
+                             {"c": cid, "u": str(puid)}).one()
+            assert row[0] == "rejected" and str(row[1]) == str(auid)  # 管理者による退席＝decided_by 管理者
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)
+
+
+def test_t_tc_203_detail_my_status(client, factory):
+    """T-TC-203: ContestDetail.my_status＝閲覧者の Tier1 参加状態（参加前 none／参加後 approved／退席後 left）。"""
+    _admin(client, factory)
+    cid = client.post(BASE, json=_body(status="open", auto_approve=True), headers=_csrf(client)).json()["id"]
+    part = factory.make_seed_company_account(display_name=f"状態_{uuid.uuid4().hex[:6]}")
+    try:
+        _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+        # 参加前（auto_approve なので閲覧可）＝none。
+        assert client.get(f"{BASE}/{cid}").json()["my_status"] == "none"
+        client.post(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        assert client.get(f"{BASE}/{cid}").json()["my_status"] == "approved"
+        client.delete(f"{BASE}/{cid}/participation", headers=_csrf(client))
+        assert client.get(f"{BASE}/{cid}").json()["my_status"] == "left"
+    finally:
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": cid})
+            ts.commit()
+        _cleanup_contest(cid)

@@ -4283,7 +4283,11 @@ export interface paths {
         put?: never;
         /** Request Contest Participation */
         post: operations["request_contest_participation_api_v1_contests__contest_id__participation_post"];
-        delete?: never;
+        /**
+         * Leave Contest
+         * @description Tier1 自主退席（本人）＝status=left（管理者 rejected と主体を区別）。
+         */
+        delete: operations["leave_contest_api_v1_contests__contest_id__participation_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6123,6 +6127,11 @@ export interface components {
              * @default []
              */
             my_participating_idea_ids: string[];
+            /**
+             * My Status
+             * @default none
+             */
+            my_status: string;
             /**
              * Can Manage
              * @default false
@@ -19026,6 +19035,37 @@ export interface operations {
         };
     };
     request_contest_participation_api_v1_contests__contest_id__participation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_contest_api_v1_contests__contest_id__participation_delete: {
         parameters: {
             query?: never;
             header?: never;

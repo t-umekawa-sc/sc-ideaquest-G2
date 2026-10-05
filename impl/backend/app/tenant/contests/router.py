@@ -132,6 +132,14 @@ def request_contest_participation(contest_id: str, request: Request, session: di
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
 
 
+@router.delete("/contests/{contest_id}/participation", response_model=ParticipationResponse,
+               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def leave_contest(contest_id: str, request: Request, session: dict = Depends(require_me)):
+    """Tier1 自主退席（本人）＝status=left（管理者 rejected と主体を区別）。"""
+    return service.leave_contest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), contest_id)
+
+
 @router.patch("/contests/{contest_id}/participation/{uid}", response_model=ParticipationResponse,
               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
 def decide_contest_participation(contest_id: str, uid: str, body: ParticipationDecideRequest,

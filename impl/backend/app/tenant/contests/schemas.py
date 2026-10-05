@@ -83,6 +83,7 @@ class ContestDetail(BaseModel):
     idea_count: int = 0
     flags: list[ContestIdeaFlagDTO] = []   # 殿堂入り/お蔵入り（SC-54 タブ導出・入賞は ideas.is_selected）
     my_participating_idea_ids: list[str] = []  # ログインユーザーが議論に参加（投稿者 or Tier2承認）するアイデア（新着の議論の限定用）
+    my_status: str = "none"                # 閲覧者の Tier1 参加状態（none/requested/approved/left）＝タブ出し分け・参加/退席トグル用
     can_manage: bool = False               # 運営操作（状態遷移/削除/パーティタブ）可否＝管理者 or contest_create
     owner_user_id: str | None = None       # 主催者（created_by・パーティタブで所有者表示）
     owner_display_name: str | None = None
