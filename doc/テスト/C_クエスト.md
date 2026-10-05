@@ -186,6 +186,7 @@
 | TC-ID | 階層 | 目的 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | C-TC-210 | unit | 締切→切迫度と残日表示の決定（#24） | `deadlineUrgency(deadline, todayISO)`／`deadlineCountdown(days)` | 締切なし=none/null／過去=over（days<0）／当日〜2日=urgent／3〜7日=soon／8日以上=safe／不正日付=none。`deadlineCountdown`＝null→""・負→「締切超過」・0→「今日締切」・正→「残りN日」 | SC-01/10/11/12（⏳ 締切）／ゲーム感 #24 |
+| C-TC-306 | unit | SC-10 絞り込みスイッチの関係判定（自分のクエスト移設・§6） | `questFilter.questRelation(my_state, is_owner)`／`matchQuestFilter(relation, filter)` | `questRelation`＝draft→draft／is_owner または my_state=owner→owner／pending→pending／following→following／その他→member（優先 draft>owner>pending>following>member）。`matchQuestFilter`＝all は全件真／owner は relation∈{owner,draft}（下書き含む）／member・pending・following は関係一致のみ | SC-10／ダッシュボード再設計§6（スイッチ＝すべて/所有者/参加中/参加リクエスト中/フォロー中） |
 
 ## 7. 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13）
 

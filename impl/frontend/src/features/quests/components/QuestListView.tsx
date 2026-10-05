@@ -17,7 +17,8 @@ import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { markQuestFromList } from "@/lib/nav";
 import { useScrollRestore } from "@/lib/scrollRestore";
 import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
-import { deleteQuest, getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
+import { deleteQuest, fetchQuestCatalog, getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard, type QuestCatalogCard } from "../api";
+import { matchQuestFilter, questRelation, type QuestFilter } from "../questFilter";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
@@ -28,6 +29,8 @@ type Quest = {
   party: number; ideas: number; my: string; order: number; draft?: boolean;
   discoverable: boolean; // 発見カタログ掲載（FR-40・C.9.0）＝列/ソート/絞込・複製プリフィル
   isOwner: boolean; // 削除アクションの活性判定（owner のみ・C.2＝quest_admin は詳細から）
+  // SC-10 絞り込みスイッチ（§6）＝自分とクエストの関係。owner/draft=自作・member=参加中・pending=参加リクエスト中・following=フォロー中。
+  relation: "owner" | "member" | "draft" | "pending" | "following";
 };
 
 // quest_status（enum・§3）→ 画面ラベル。"選定" は enum でなく evaluating〜completed の選定行為の呼称（C.5）。
@@ -59,12 +62,18 @@ function parseDeadline(d: string | null | undefined): { deadline: string; dl: nu
   return { deadline: `${y}/${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}`, dl, urgency: u.level, days: u.days };
 }
 
-// backend DTO（C.1）→ 一覧ビュー型。theme/purpose は一覧DTOに無い（検索は件名/カテゴリー）。
-// my_state は draft/member（未投稿/投稿済みはドメイン D 実装後・現状 member=未投稿の暫定表示）。
-function toQuest(c: QuestCard, index: number, total: number): Quest {
+// backend DTO（C.1 一覧／C.9 カタログ）→ 一覧ビュー型。両DTOは共有フィールドが同一（id/title/color/categories/status/
+// deadline/member_count/idea_count/owner/quest_groups/my_state）＝SC-10 一覧とカタログ（参加リクエスト中/フォロー中）を同型で扱う。
+// my_state は draft/member（一覧）/owner/pending/following/none（カタログ）。
+function toQuest(c: QuestCard | QuestCatalogCard, index: number, total: number): Quest {
   const dl = parseDeadline(c.deadline);
   const status = STATUS_LABEL[c.status] ?? c.status;
   const draft = c.my_state === "draft";
+  // is_owner は一覧DTOのみ持つ（カタログは my_state=owner で表す）。discoverable も一覧DTOのみ（カタログは掲載済＝true）。
+  const isOwner = ("is_owner" in c ? !!c.is_owner : false) || c.my_state === "owner";
+  const discoverable = "discoverable" in c ? (c.discoverable ?? false) : true;
+  // 自分とクエストの関係（スイッチ§6・純ロジックは questFilter.questRelation）。
+  const relation = questRelation(c.my_state, isOwner);
   // 参加部署（0..N・すべて同格・FR-38 再設計）。一覧は先頭部署を代表表示（0 件なら空）。
   const g0 = c.quest_groups[0];
   return {
@@ -73,8 +82,9 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
     deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, deadlineRaw: (c.deadline ?? "").slice(0, 10), party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
-    discoverable: c.discoverable ?? false,
-    isOwner: c.is_owner ?? false,
+    discoverable,
+    isOwner,
+    relation,
   };
 }
 
@@ -106,6 +116,8 @@ export function QuestListView() {
   const snack = useSnackbar();
   const [quests, setQuests] = useState<Quest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // SC-10 絞り込みスイッチ（§6）＝すべて/自分が所有者/参加中/参加リクエスト中/フォロー中（既定＝すべて）。
+  const [qFilter, setQFilter] = useState<QuestFilter>("all");
   // 一覧のスクロール位置復元（§4.12）＝取得完了（quests!==null）後に復元。
   useScrollRestore(quests !== null);
 
@@ -113,10 +125,20 @@ export function QuestListView() {
     let alive = true;
     const load = async () => {
       try {
-        const res = await listQuests({ limit: 100 });
+        // SC-10 一覧（member+owner+draft）＋ カタログ（参加リクエスト中/フォロー中＝非参加のため一覧に出ない・§6）を併合。
+        const [res, cat] = await Promise.all([
+          listQuests({ limit: 100 }),
+          // カタログは DataTable サーバー契約＝最小 QueryState で1ページ取得（pending/following のみ採用）。
+          fetchQuestCatalog({ search: "", sort: [], filters: {}, page: 1, perPage: 100, pinIds: [] }).catch(() => null),
+        ]);
         if (!alive) return;
         const rows = (res?.data ?? []).map((c, i, arr) => toQuest(c, i, arr.length));
-        setQuests(rows);
+        const haveIds = new Set(rows.map((r) => r.id));
+        const watchCards = (cat?.data ?? []).filter(
+          (c) => (c.my_state === "pending" || c.my_state === "following") && !haveIds.has(c.id),
+        );
+        const watchRows = watchCards.map((c, i) => toQuest(c, i, watchCards.length));
+        setQuests([...rows, ...watchRows]);
       } catch (err) {
         if (!alive) return;
         setLoadError(err instanceof ApiError && err.status === 401
@@ -145,6 +167,25 @@ export function QuestListView() {
     for (const q of quests ?? []) set.add(q.group);
     return [...set].map((g) => [g, g]);
   }, [quests]);
+
+  // スイッチの件数（タブ見出しの数字）と絞り込み後の表示データ。一致判定は questFilter.matchQuestFilter（owner=自作＝下書き含む）。
+  const qCounts = useMemo(() => {
+    const all = quests ?? [];
+    return {
+      all: all.length,
+      owner: all.filter((q) => matchQuestFilter(q.relation, "owner")).length,
+      member: all.filter((q) => q.relation === "member").length,
+      pending: all.filter((q) => q.relation === "pending").length,
+      following: all.filter((q) => q.relation === "following").length,
+    };
+  }, [quests]);
+  const visibleQuests = useMemo(
+    () => (quests ?? []).filter((q) => matchQuestFilter(q.relation, qFilter)),
+    [quests, qFilter],
+  );
+  const Q_FILTERS: [QuestFilter, string][] = [
+    ["all", "すべて"], ["owner", "自分が所有者"], ["member", "参加中"], ["pending", "参加リクエスト中"], ["following", "フォロー中"],
+  ];
 
   // 複製＝作成ダイアログ（SC-11）を追加モードで開き、入力項目を引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
   // 件名/カラー/カテゴリー/参加グループ/期限日/目的・テーマ＋**参加メンバー（パーティ）＋権限**（2026-09-13 決定）。
@@ -232,8 +273,20 @@ export function QuestListView() {
         <Link href="/quests/new" className="btn btn-primary">＋ クエストを作成</Link>
       </div>
       <p className="muted text-sm" style={{ marginBottom: "var(--space-4)" }}>
-        「所属グループ内で作られ、かつ自分がパーティ参加中」のクエストを表示します。
+        参加中・自作のクエストに加え、<strong>参加リクエスト中</strong>・<strong>フォロー中</strong>のクエストもスイッチで切り替えて表示します。
       </p>
+
+      {/* 絞り込みスイッチ（§6・ダッシュボードから「自分のクエスト」を移設）＝すべて/自分が所有者/参加中/参加リクエスト中/フォロー中。 */}
+      {quests !== null && !loadError && (
+        <div className="segmented" role="radiogroup" aria-label="クエストの絞り込み" style={{ marginBottom: "var(--space-4)" }}>
+          {Q_FILTERS.map(([k, label]) => (
+            <label key={k}>
+              <input type="radio" name="sc10-qfilter" checked={qFilter === k} onChange={() => setQFilter(k)} />
+              {label} <span className="seg-n">{qCounts[k]}</span>
+            </label>
+          ))}
+        </div>
+      )}
 
       {loadError ? (
         <p className="form-error" role="alert">{loadError}</p>
@@ -242,7 +295,7 @@ export function QuestListView() {
       ) : (
         <DataTable<Quest>
           storageKey="sc10-quests"
-          data={quests}
+          data={visibleQuests}
           columns={columns}
           rowId={(x) => x.id}
           unit="件"

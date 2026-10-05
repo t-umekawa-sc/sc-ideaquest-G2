@@ -66,6 +66,13 @@ export type WatchQuestCard = {
   owner?: { display_name?: string } | null;
 };
 
+// コンテスト一覧カード（contests application `_list_item`・Zone D 募集中／Zone E 参加中・FR-46）。
+export type ContestCard = {
+  id: string; mode: string; status: string; theme: string; description?: string | null;
+  starts_at?: string | null; ends_at?: string | null; created_at?: string | null;
+  auto_approve?: boolean; participant_count?: number; my_status?: string;
+};
+
 export type RankRow = { rank: number; user: { id: string; name: string; avatar?: string | null; level?: number }; score: number; xp: number; coin: number };
 export type WeeklyRanking = { data: RankRow[]; me: { rank: number | null; score: number; xp: number; coin: number; total_users: number } };
 
@@ -85,6 +92,9 @@ export type DashboardData = {
   join_requests: WatchQuestCard[];    // §4.6c 参加リクエスト状況（pending/rejected）
   incoming_join_requests: IncomingJoinRequest[];  // 未処理の受信参加リクエスト（owner/quest_admin）
   incoming_contest_requests: IncomingContestRequest[];  // 未処理のコンテスト参加リクエスト（運営・FR-46）
+  recommended_quests: WatchQuestCard[];  // Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
+  open_contests: ContestCard[];          // Zone D 募集中のコンテスト（open・未参加・FR-46）
+  joined_contests: ContestCard[];        // Zone E 参加中のアイデアコンテスト（approved・FR-46）
 };
 
 export function getDashboard(): Promise<DashboardData | null> {

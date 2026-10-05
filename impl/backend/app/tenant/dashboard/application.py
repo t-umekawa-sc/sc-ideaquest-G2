@@ -38,8 +38,12 @@ _FOLLOWED_LIMIT = 6
 _UNREAD_CHATS_LIMIT = 5  # 新着の議論（§3.1）
 _RECENT_CHATS_LIMIT = 5  # 🕒 最近の議論（§3.1・新着とは別動線・SC-01 §4.8c）
 _NOTIF_LIMIT = 5
-_CATALOG_LIMIT = 100  # FR-40 SC-01（フォロー中/参加リクエスト）＝発見カタログから my_state で抽出（1ページで十分）
+_CATALOG_LIMIT = 100  # FR-40 SC-01（フォロー中/参加リクエスト/おすすめ）＝発見カタログから my_state で抽出（1ページで十分）
 _NON_DRAFT_STATUS = ["recruiting", "in_progress", "evaluating", "completed"]
+# ダッシュボード再設計（Zone D/E）：パネルは少数表示、「すべて見る」は専用一覧/ダイアログへ。多めに取って frontend で slice（§3.1）。
+_RECOMMENDED_LIMIT = 30   # Zone D おすすめのクエスト（発見カタログ my_state=none・表示3）
+_OPEN_CONTESTS_LIMIT = 30  # Zone D 募集中のコンテスト（open・my_status=none・表示3）
+_JOINED_CONTESTS_LIMIT = 30  # Zone E 参加中のアイデアコンテスト（my_status=approved・表示5）
 
 
 def _resolve_company(company_id: uuid.UUID) -> Company | None:
@@ -322,6 +326,16 @@ def get_dashboard(session: dict) -> dict:
         account_id, company_id, per_page=_CATALOG_LIMIT)["data"], default=[])
     followed_quests = [c for c in _catalog if c.get("my_state") == "following"]
     join_requests = [c for c in _catalog if c.get("my_state") in ("pending", "rejected")]
+    # Zone D おすすめのクエスト（再設計§3.1 D）＝発見カタログで未参加・未フォロー・未申請（my_state=none）のみ。参加/フォロー済みはおすすめに出さない。
+    recommended_quests = [c for c in _catalog if c.get("my_state") == "none"][:_RECOMMENDED_LIMIT]
+    # Zone D/E コンテスト（再設計§3.1・FR-46）＝既存 contests application を再利用（I.3 殻）。
+    #   D 募集中＝open かつ未参加(none)＝ダッシュボードから応募できる機会／E 参加中＝approved＝よく行く先。
+    from app.tenant.contests import application as contests_app
+    _open_contests_all = _safe(lambda: contests_app.list_contests(
+        account_id, company_id, status="open")["data"], default=[])
+    open_contests = [c for c in _open_contests_all if c.get("my_status") == "none"][:_OPEN_CONTESTS_LIMIT]
+    _all_contests = _safe(lambda: contests_app.list_contests(account_id, company_id)["data"], default=[])
+    joined_contests = [c for c in _all_contests if c.get("my_status") == "approved"][:_JOINED_CONTESTS_LIMIT]
     roles = {
         "is_qg_admin": bool(session.get("is_qg_admin")),
         "is_company_account_admin": session.get("system_role") == "company_account_admin",
@@ -337,4 +351,7 @@ def get_dashboard(session: dict) -> dict:
         "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
         "incoming_join_requests": incoming_join_requests,  # FR-40（未処理の受信参加リクエスト・owner/quest_admin）
         "incoming_contest_requests": incoming_contest_requests,  # FR-46（未処理のコンテスト参加リクエスト・運営）
+        "recommended_quests": recommended_quests,  # Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
+        "open_contests": open_contests,            # Zone D 募集中のコンテスト（open・未参加・FR-46）
+        "joined_contests": joined_contests,        # Zone E 参加中のアイデアコンテスト（approved・FR-46）
     }

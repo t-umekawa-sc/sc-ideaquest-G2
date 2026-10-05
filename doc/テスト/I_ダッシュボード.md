@@ -21,6 +21,9 @@
 | I-TC-107 | api | 週間ランキング（上位≤3＋me） | 週内に XP 獲得（ログインXP） | `GET /dashboard` | `weekly_ranking.data[]`（上位≤3＝実装は get_rankings の `data`）＋`weekly_ranking.me`（rank/score≥1）＝G.5 の read | I.1／G.5 |
 | I-TC-108 | api | 最近の通知（limit＋未読数） | 未読通知あり | `GET /dashboard` | `notifications.data`（≤5・新着降順・取得時レンダリング body）＋`unread_count` | I.1／H.2 |
 | I-TC-109 | api | roles（管理導線出し分け） | 一般ユーザー | `GET /dashboard` | `roles={is_qg_admin:false,is_company_account_admin:false,is_system_admin:false}`（サーバー権威） | I.1／§8-⑯ |
+| I-TC-164 | int | Zone D 募集中のコンテスト（open・未参加のみ＝応募動線） | status=open のコンテスト2（me は一方に approved・他方は none）・draft コンテスト1 | `dashboard/application.get_dashboard`（`open_contests`） | `open_contests` に my_status=none かつ status=open のコンテストのみ（approved/draft は出ない）＝ダッシュボードから応募できる機会のみ | I.3／FR-46／再設計§3.1 D |
+| I-TC-165 | int | Zone E 参加中のアイデアコンテスト（approved のみ） | 承認済み参加コンテスト1・未参加(open)コンテスト1 | `dashboard/application.get_dashboard`（`joined_contests`） | `joined_contests` に my_status=approved のコンテストのみ（未参加は出ない）＝よく行く先 | I.3／FR-46／再設計§3.1 E |
+| I-TC-166 | int | Zone D おすすめのクエスト（発見カタログ my_state=none のみ） | discoverable クエスト3（me は member/following/none が各1） | `dashboard/application.get_dashboard`（`recommended_quests`） | `recommended_quests` に my_state=none（未参加・未フォロー・未申請）のクエストのみ（member/following/pending は出ない＝参加/フォロー済みはおすすめに出さない） | I.3／FR-40／再設計§3.1 D |
 
 ## 2. login_bonus（ワンショット・I.1/A.1/G.6）
 

@@ -155,3 +155,78 @@ def test_i_tc_163_dashboard_includes_approved_contest():
             ts.execute(_sqltext("DELETE FROM quests WHERE id=:q"), {"q": str(cqid)})
             ts.execute(_sqltext("DELETE FROM users WHERE id IN (:a,:b)"), {"a": str(me), "b": str(other)})
             ts.commit()
+
+
+def test_i_tc_164_165_166_zone_d_e_panels(client, factory):
+    """I-TC-164/165/166(int): Zone D/E 合成＝募集中コンテスト(open・未参加)／参加中コンテスト(approved)／おすすめクエスト(catalog my_state=none)。
+
+    get_dashboard を直接呼び、作成した特定 ID で絞り込みの正しさを検証（共有 seed DB 対応＝件数ではなく id の包含/除外）。
+    """
+    from sqlalchemy import text as _sqltext
+
+    from app.tenant.contests import repository as contest_repo
+    from app.tenant.dashboard import application as dash_app
+    from app.tenant.quests.orm import QuestFollow
+
+    acc, uid = _login_dash(client, factory)  # 会社DB の user ミラー＝uid（fresh アカウント＝何も参加/フォローしていない）
+    with control_session() as s:
+        company_id = str(s.query(Company).filter_by(company_code=SEED_COMPANY_CODE).one().id)
+    db = _db()
+
+    # コンテスト用の backing quest（器）＝他者 owner。
+    other = uuid.uuid4()
+    cq_none, cq_appr, cq_draft = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    # おすすめ用の discoverable クエスト（全社公開＝部署リンク0）。owner は other。
+    q_none, q_member, q_follow = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with get_tenant_session(db) as ts:
+        ts.add(User(id=other, account_id=uuid.uuid4(), display_name="主催者", locale="ja", status="active"))
+        # open×未参加／open×approved／draft の3コンテスト。
+        for cqid in (cq_none, cq_appr, cq_draft):
+            quests_repo.create_quest(ts, quest_id=cqid, owner_id=other, title="器", color="#6366F1", status="recruiting")
+        ts.flush()
+        c_none = contest_repo.create(ts, quest_id=cq_none, theme="募集中(未参加)", description=None, mode="bounded",
+                                     status="open", starts_at=None, ends_at=None, auto_archive_days=None,
+                                     prize_config=None, created_by_id=other, auto_approve=False)
+        c_appr = contest_repo.create(ts, quest_id=cq_appr, theme="参加中", description=None, mode="bounded",
+                                     status="open", starts_at=None, ends_at=None, auto_archive_days=None,
+                                     prize_config=None, created_by_id=other, auto_approve=False)
+        c_draft = contest_repo.create(ts, quest_id=cq_draft, theme="下書き", description=None, mode="bounded",
+                                      status="draft", starts_at=None, ends_at=None, auto_archive_days=None,
+                                      prize_config=None, created_by_id=other, auto_approve=False)
+        contest_repo.upsert_contest_participation(ts, c_appr.id, uid, status="approved")  # me＝参加承認済み
+        # discoverable クエスト（全社）＝my_state が member/following/none になる3件。
+        for qid in (q_none, q_member, q_follow):
+            q = quests_repo.create_quest(ts, quest_id=qid, owner_id=other, title="おすすめ候補", color="#3B82F6", status="recruiting")
+            q.discoverable = True
+        quests_repo.add_member(ts, q_member, uid, permissions=[])               # my_state=member（権限行は作らない＝teardown FK 回避）
+        ts.add(QuestFollow(id=uuid.uuid4(), quest_id=q_follow, user_id=uid))     # my_state=following
+        ts.commit()
+        cid_none, cid_appr, cid_draft = c_none.id, c_appr.id, c_draft.id
+    try:
+        result = dash_app.get_dashboard({"account_id": str(acc["id"]), "company_id": company_id})
+        open_ids = {c["id"] for c in result["open_contests"]}
+        joined_ids = {c["id"] for c in result["joined_contests"]}
+        rec_ids = {q["id"] for q in result["recommended_quests"]}
+        # I-TC-164 募集中＝open かつ未参加のみ（approved/draft は出ない）。
+        assert str(cid_none) in open_ids
+        assert str(cid_appr) not in open_ids
+        assert str(cid_draft) not in open_ids
+        # I-TC-165 参加中＝approved のみ（未参加は出ない）。
+        assert str(cid_appr) in joined_ids
+        assert str(cid_none) not in joined_ids
+        # I-TC-166 おすすめ＝catalog my_state=none のみ（member/following は出ない）。
+        assert str(q_none) in rec_ids
+        assert str(q_member) not in rec_ids
+        assert str(q_follow) not in rec_ids
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(_sqltext("DELETE FROM quest_follows WHERE quest_id=:q"), {"q": str(q_follow)})
+            ts.execute(_sqltext("DELETE FROM contest_participants WHERE contest_id=:c"), {"c": str(cid_appr)})
+            ts.execute(_sqltext("DELETE FROM contests WHERE id IN (:a,:b,:c)"),
+                       {"a": str(cid_none), "b": str(cid_appr), "c": str(cid_draft)})
+            for qid in (cq_none, cq_appr, cq_draft, q_none, q_member, q_follow):
+                ts.execute(_sqltext("DELETE FROM quest_members WHERE quest_id=:q"), {"q": str(qid)})
+                ts.execute(_sqltext("DELETE FROM quest_revisions WHERE quest_id=:q"), {"q": str(qid)})
+                ts.execute(_sqltext("DELETE FROM quests WHERE id=:q"), {"q": str(qid)})
+            ts.execute(_sqltext("DELETE FROM users WHERE id=:o"), {"o": str(other)})
+            ts.commit()

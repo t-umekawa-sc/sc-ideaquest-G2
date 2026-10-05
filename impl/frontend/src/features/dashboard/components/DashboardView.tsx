@@ -23,11 +23,11 @@ import { levelRank } from "@/lib/levelTitle";
 import { isMotionReduced } from "@/lib/motion";
 import { useScrollRestore } from "@/lib/scrollRestore";
 import { realtime } from "@/lib/realtime";
-import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { markChatFromDashboard } from "@/lib/nav";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
-import { unfollowQuest } from "@/features/quests/api";
+import { followQuest, unfollowQuest } from "@/features/quests/api";
+import { requestContestParticipation } from "@/features/contests/api";
 import { ContestJoinRequestDialog } from "@/features/contests/components/ContestJoinRequestDialog";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
@@ -186,37 +186,15 @@ export function DashboardView({
   const coin = hero?.coin_balance ?? balance.coin;
   const sp = hero?.skill_point_balance ?? balance.sp;
   const rank = levelRank(level); // #21: レベル→称号/ティア（オーラ色）
-  const today = todayISO(); // #24: 締切切迫度の基準日
 
   const drafts = data?.drafts ?? [];
   const unvoted = unvotedList ?? [];
   const quests = data?.quests ?? [];
-  // 「自分のクエスト」（作成/運営）を参加中と分離（ユーザー要望・2026-09-16）。is_owner は backend が付与。
-  const ownQuests = quests.filter((q) => q.is_owner);
+  // 参加中クエスト（他者作成で参加＝Zone E「参加中」）。自作クエスト(is_owner)はダッシュボードから撤去＝SC-10 一覧のスイッチへ移設（再設計 §6）。
   const joinedQuests = quests.filter((q) => !q.is_owner);
-  const renderQuestCard = (q: DashboardData["quests"][number]) => {
-    const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
-    return (
-      <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
-        <div className="between">
-          <span className="card-title">{q.title}</span>
-          <span className="badge">{questStatusLabel(q.status)}</span>
-        </div>
-        <div className="quest-card__meta">
-          {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
-          {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
-        </div>
-        <div className="quest-card__stats">
-          <span>👥 パーティ{q.member_count ?? 0}</span>
-          <span>💡 アイデア{q.idea_count ?? 0}</span>
-        </div>
-      </Link>
-    );
-  };
   const followed = (data?.followed_ideas ?? []).filter((f) => !unfollowed[f.id]);
-  // §4.6b フォロー中のクエスト（★解除は即時にリストから外す）／§4.6c 参加リクエスト状況。
+  // §4.6b フォロー中のクエスト（★解除は即時にリストから外す・Zone E「フォロー中」へ集約）。
   const followedQuests = (data?.followed_quests ?? []).filter((q) => !unfollowedQuests[q.id]);
-  const joinRequests = data?.join_requests ?? [];
   // 未処理の受信参加リクエスト（owner/quest_admin）＝処理済みは即リストから外す（楽観）。
   const [processedIncoming, setProcessedIncoming] = useState<Record<string, boolean>>({});
   const incomingJoinRequests = (data?.incoming_join_requests ?? []).filter(
@@ -266,7 +244,6 @@ export function DashboardView({
       snackbar({ type: "error", msg: "フォロー解除に失敗しました。" });
     }
   };
-  const JR_LABEL: Record<string, string> = { pending: "申請中", rejected: "却下" };
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
@@ -402,6 +379,101 @@ export function DashboardView({
   );
   const bHasAny = bCounts.vote + bCounts.req + bCounts.draft > 0;
 
+  // ===== Zone D 見つける／Zone E マイ（ダッシュボード再設計 Phase1・§3）=====
+  const D_PANEL = 3;   // Zone D パネルの初期表示（§3.1）
+  const E_PANEL = 5;   // Zone E パネルの初期表示（§3.1）
+  // Zone D 募集中のコンテスト（open・未参加）＝応募で楽観的にリストから除外。
+  const [appliedContests, setAppliedContests] = useState<Record<string, boolean>>({});
+  const openContests = (data?.open_contests ?? []).filter((c) => !appliedContests[c.id]);
+  // Zone D おすすめのクエスト（catalog my_state=none）＝★フォローで楽観的に除外（フォロー中へ移る）。
+  const [followedRec, setFollowedRec] = useState<Record<string, boolean>>({});
+  const recommended = (data?.recommended_quests ?? []).filter((q) => !followedRec[q.id]);
+  // Zone E 参加中＝参加クエスト（他者作成）＋承認済みアイデアコンテスト／フォロー中＝アイデア＋クエスト（§3 A案）。
+  const joinedContests = data?.joined_contests ?? [];
+  const joinedAll = [
+    ...joinedQuests.map((q) => ({ kind: "quest" as const, q })),
+    ...joinedContests.map((c) => ({ kind: "contest" as const, c })),
+  ];
+  const followingAll = [
+    ...followed.map((f) => ({ kind: "idea" as const, f })),
+    ...followedQuests.map((q) => ({ kind: "quest" as const, q })),
+  ];
+  const [eSeeAll, setESeeAll] = useState<null | "joined" | "following">(null);
+  const [eSeeAllN, setESeeAllN] = useState(15);
+  const E_TITLE = { joined: "参加中", following: "フォロー中" };
+
+  const applyContest = async (c: DashboardData["open_contests"][number]) => {
+    setAppliedContests((m) => ({ ...m, [c.id]: true }));  // 楽観＝応募したら募集中から外す
+    const res = await requestContestParticipation(c.id).catch(() => null);
+    if (!res) {
+      setAppliedContests((m) => { const n = { ...m }; delete n[c.id]; return n; });
+      snackbar({ type: "error", msg: "応募できませんでした。" });
+      return;
+    }
+    // public/DEMO は即 approved・社内は承認待ち（res.status）。文言を状態で出し分け。
+    snackbar({ type: "success", msg: res.status === "approved" ? "コンテストに参加しました。" : "応募しました（運営の承認待ち）。" });
+  };
+  const followRecommended = async (q: DashboardData["recommended_quests"][number]) => {
+    setFollowedRec((m) => ({ ...m, [q.id]: true }));  // 楽観＝フォローしたらおすすめから外す
+    const res = await followQuest(q.id).catch(() => null);
+    if (!res) {
+      setFollowedRec((m) => { const n = { ...m }; delete n[q.id]; return n; });
+      snackbar({ type: "error", msg: "フォローできませんでした。" });
+    }
+  };
+
+  // Zone D/E のコンパクト行（mock §19 準拠＝左に本文・右にアクション）。
+  const renderOpenContestRow = (c: DashboardData["open_contests"][number]) => (
+    <div key={c.id} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title"><Link href={`/contests/${c.id}`}>{c.theme}</Link></div>
+        <div className="dash-row__sub">{c.ends_at ? `締切 ${c.ends_at.slice(0, 10)} ・ ` : ""}参加 {c.participant_count ?? 0}人</div>
+      </div>
+      <button type="button" className="btn btn-sm btn-primary dash-row__action" onClick={() => applyContest(c)}>応募</button>
+    </div>
+  );
+  const renderRecommendedRow = (q: DashboardData["recommended_quests"][number]) => (
+    <div key={q.id} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title"><Link href={`/quests/${q.id}`}>{q.title}</Link></div>
+        <div className="dash-row__sub">{q.owner?.display_name ? `${q.owner.display_name} ・ ` : ""}👥 {q.member_count ?? 0}</div>
+      </div>
+      <button type="button" className="btn btn-sm btn-outline dash-row__action" onClick={() => followRecommended(q)}>★ フォロー</button>
+    </div>
+  );
+  const renderJoinedRow = (it: typeof joinedAll[number]) => it.kind === "quest" ? (
+    <div key={`q:${it.q.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title"><Link href={`/quests/${it.q.id}`}>{it.q.title}</Link></div>
+        <div className="dash-row__sub">{questStatusLabel(it.q.status)} ・ 👥 {it.q.member_count ?? 0} ・ 💡 {it.q.idea_count ?? 0}</div>
+      </div>
+    </div>
+  ) : (
+    <div key={`c:${it.c.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title"><Link href={`/contests/${it.c.id}`}>{it.c.theme}</Link> <span className="badge badge-muted">🏆 コンテスト</span></div>
+        <div className="dash-row__sub">公募中 ・ 参加 {it.c.participant_count ?? 0}人</div>
+      </div>
+    </div>
+  );
+  const renderFollowingRow = (it: typeof followingAll[number]) => it.kind === "idea" ? (
+    <div key={`i:${it.f.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title">💡 <Link href={`/ideas/${it.f.id}`}>{it.f.title}</Link></div>
+        <div className="dash-row__sub">アイデア ・ ▲{it.f.vote_summary.approve} / ▼{it.f.vote_summary.oppose}</div>
+      </div>
+      <button type="button" className="btn btn-sm btn-outline dash-row__action" aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => toggleFollow(it.f)}>★</button>
+    </div>
+  ) : (
+    <div key={`q:${it.q.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title">📜 <Link href="/quest-catalog">{it.q.title}</Link></div>
+        <div className="dash-row__sub">クエスト（非参加・ウォッチ）</div>
+      </div>
+      <button type="button" className="btn btn-sm btn-outline dash-row__action" aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => void unfollowQuestCard(it.q.id)}>★</button>
+    </div>
+  );
+
   return (
     <div className="dash-page stack">
       {/* レベルアップ祝福（ゲーム層演出）＝ゲームモード OFF では出さない（§4.11・レビュー#2）。 */}
@@ -410,7 +482,56 @@ export function DashboardView({
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
 
-      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B）。 */}
+      {/* D 見つける（新設）＝お知らせ／募集中コンテスト／おすすめクエスト（参加機会・告知／再設計 §3 Zone D・表示順1）。
+          個別パネルは0件でも枠を残し空状態メッセージ（§3.1 改訂）。ゾーン全体が空（募集中・おすすめとも0）なら非表示。 */}
+      {(openContests.length + recommended.length > 0) && (
+        <motion.section aria-label="見つける" {...flowMotion(1)}>
+          <div className="dash-3col">
+            {/* 📢 運営からのお知らせ（FR-49・Phase2）＝本体未実装のため空状態のみ（データ源が入り次第ここに最新3件）。 */}
+            <section className="card dash-zone-card" aria-label="運営からのお知らせ">
+              <div className="section-head"><h2>📢 運営からのお知らせ</h2></div>
+              <p className="dash-panel-empty">お知らせはまだありません。</p>
+            </section>
+            {/* 🏆 募集中のコンテスト＝open かつ未参加（応募できる機会）。応募で参加リクエスト。 */}
+            <section className="card dash-zone-card" aria-label="募集中のコンテスト">
+              <div className="section-head"><h2>🏆 募集中のコンテスト</h2>{openContests.length > D_PANEL && <Link className="muted text-sm" href="/contests">すべて見る →</Link>}</div>
+              {openContests.length > 0
+                ? openContests.slice(0, D_PANEL).map(renderOpenContestRow)
+                : <p className="dash-panel-empty">募集中のコンテストはありません。</p>}
+            </section>
+            {/* 🔎 おすすめのクエスト＝発見カタログで未参加・未フォロー（my_state=none）。公開モード会社は常に空（§3.1）。 */}
+            <section className="card dash-zone-card" aria-label="おすすめのクエスト">
+              <div className="section-head"><h2>🔎 おすすめのクエスト</h2><Link className="muted text-sm" href="/quest-catalog">クエストを探す →</Link></div>
+              {recommended.length > 0
+                ? recommended.slice(0, D_PANEL).map(renderRecommendedRow)
+                : <p className="dash-panel-empty">おすすめのクエストはありません。</p>}
+            </section>
+          </div>
+        </motion.section>
+      )}
+
+      {/* E マイ＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト・A案）。よく行く先（再設計 §3 Zone E・表示順2）。
+          全件は「すべて見る」→標準ダイアログ（混在型のため一覧ページに寄せきれない・§3）。ゾーン全体が空なら非表示。 */}
+      {(joinedAll.length + followingAll.length > 0) && (
+        <motion.section aria-label="マイ" {...flowMotion(1)}>
+          <div className="dash-2col">
+            <section className="card dash-zone-card" aria-label="参加中">
+              <div className="section-head"><h2>👣 参加中</h2>{joinedAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("joined"); }}>すべて見る（全{joinedAll.length}件）→</button>}</div>
+              {joinedAll.length > 0
+                ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
+                : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
+            </section>
+            <section className="card dash-zone-card" aria-label="フォロー中">
+              <div className="section-head"><h2>★ フォロー中 <span className="badge badge-muted">アイデア＋クエスト</span></h2>{followingAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("following"); }}>すべて見る（全{followingAll.length}件）→</button>}</div>
+              {followingAll.length > 0
+                ? followingAll.slice(0, E_PANEL).map(renderFollowingRow)
+                : <p className="dash-panel-empty">フォロー中のアイデア・クエストはありません。</p>}
+            </section>
+          </div>
+        </motion.section>
+      )}
+
+      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B・表示順3）。 */}
       {bHasAny && (
         <motion.section aria-label="あなたの番" {...flowMotion(1)}>
           <div className="section-head">
@@ -540,141 +661,11 @@ export function DashboardView({
 
       </motion.div>
 
-      {/* フォロー中のアイデア（0件なら非表示） */}
-      {followed.length > 0 && (
-        <motion.section aria-label="フォロー中のアイデア" {...flowMotion(4)}>
-          <div className="section-head">
-            <h2>フォロー中のアイデア</h2>
-            <span className="muted text-sm">動きがあると通知でお知らせ</span>
-          </div>
-          <div className="follow-grid">
-            {/* GF-AC-341: フォロー解除は対象カードを opacity(+わずかに縮小)でフェード退場し、残りのフォローカードが滑らかに繰り上がる。
-                mode="popLayout"＝退場開始と同時に対象を流れから外す（穴が残らない）／layout="position"＝残りが新位置へスライド。
-                以前は layout 不使用でスナップ詰まり＝「単純に再表示」に見えて NG だった。reduce-motion 時は layout 無効＋即時。 */}
-            <AnimatePresence initial={false} mode="popLayout">
-            {followed.map((f) => {
-              const frozen = f.quest.quest_status === "completed";
-              return (
-                <motion.div
-                  key={f.id}
-                  className="follow-card-wrap"
-                  layout={reduceAnim ? false : "position"}
-                  initial={reduceAnim ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.3, ease: "easeOut" }}
-                >
-                  {/* 未投票カードと同構造に統一＝カードは div、タイトルが詳細への Link。作成者行にチャット動線をインライン配置。
-                      ★（フォロー解除）は Link 入れ子回避のため別要素（絶対配置・右上）。退場アニメは外側ラッパ（framer）。 */}
-                  <div className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}>
-                    <div className="card-title idea-title-row">
-                      <QuestIcon name={f.title} color={f.quest.color} imageUrl={f.icon_image_url} size="sm" />
-                      <Link className="idea-title-row__txt follow-card__titlelink" href={`/ideas/${f.id}`}>{f.title}</Link>
-                    </div>
-                    <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
-                    <div className="follow-value">{f.value}</div>
-                    <div className="follow-card__poster poster">
-                      <Avatar name={f.poster.name} imageUrl={f.poster.avatar} size="sm" />
-                      <span className="name text-sm muted">投稿: {f.poster.name}</span>
-                      <Link className="dash-chat-link" href={`/ideas/${f.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
-                    </div>
-                    <div className="follow-stats">
-                      <span className="vote-agree">▲ {f.vote_summary.approve}</span>
-                      <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>
-                    </div>
-                    {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
-                  </div>
-                  <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow(f); }}>★</button>
-                </motion.div>
-              );
-            })}
-            </AnimatePresence>
-          </div>
-        </motion.section>
-      )}
+      {/* 旧「フォロー中のアイデア／自分のクエスト／参加中クエスト／フォロー中のクエスト／参加リクエストの状況」は
+          ダッシュボード再設計で Zone E（参加中＝クエスト＋コンテスト／フォロー中＝アイデア＋クエスト）へ集約・
+          「自分のクエスト」「参加リクエスト中」は SC-10 一覧のスイッチへ移設（§6）。 */}
 
-      {/* 自分のクエスト（作成/運営・0件なら非表示・ユーザー要望で参加中と分離） */}
-      {ownQuests.length > 0 && (
-        <motion.section aria-label="自分のクエスト" {...flowMotion(6)}>
-          <div className="section-head">
-            <h2>自分のクエスト</h2>
-            <Link href="/quests">すべて見る →</Link>
-          </div>
-          <div className="quest-grid">{ownQuests.map(renderQuestCard)}</div>
-        </motion.section>
-      )}
-
-      {/* 参加中クエスト（他者作成で参加・0件なら非表示） */}
-      {joinedQuests.length > 0 && (
-        <motion.section aria-label="参加中クエスト" {...flowMotion(7)}>
-          <div className="section-head">
-            <h2>参加中クエスト</h2>
-            <Link href="/quests">すべて見る →</Link>
-          </div>
-          <div className="quest-grid">{joinedQuests.map(renderQuestCard)}</div>
-        </motion.section>
-      )}
-
-      {/* §4.6b フォロー中のクエスト（非参加・watch・0件なら非表示・FR-40）＝メタカード。カードは発見カタログへ・★で解除。 */}
-      {followedQuests.length > 0 && (
-        <motion.section aria-label="フォロー中のクエスト" {...flowMotion(7)}>
-          <div className="section-head">
-            <h2>フォロー中のクエスト</h2>
-            <Link href="/quest-catalog">クエストを探す →</Link>
-          </div>
-          <div className="quest-grid">
-            {followedQuests.map((q) => {
-              const du = deadlineUrgency(q.deadline ?? null, today);
-              return (
-                <Link key={q.id} className="card card-accent quest-card" href="/quest-catalog" style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
-                  {/* ★＝フォロー中（クリックで解除）＝発見カタログのカードと同方針（.follow-star）。 */}
-                  <button type="button" className="follow-star" style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)", zIndex: 1 }}
-                    aria-pressed={true} aria-label="フォロー解除" title="フォロー中（クリックで解除）"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void unfollowQuestCard(q.id); }}>★</button>
-                  <div className="between">
-                    <span className="card-title">{q.title}</span>
-                    <span className="badge">{questStatusLabel(q.status)}</span>
-                  </div>
-                  <div className="quest-card__meta">
-                    {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
-                    {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
-                  </div>
-                  <div className="quest-card__stats">
-                    <span>👥 パーティ{q.member_count ?? 0}</span>
-                    <span>💡 アイデア{q.idea_count ?? 0}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </motion.section>
-      )}
-
-      {/* §4.6c 参加リクエストの状況（自分の申請・pending/rejected・0件なら非表示・FR-40）。 */}
-      {joinRequests.length > 0 && (
-        <motion.section aria-label="参加リクエストの状況" {...flowMotion(7)}>
-          <div className="section-head">
-            <h2>参加リクエストの状況</h2>
-            <Link href="/quest-catalog">クエストを探す →</Link>
-          </div>
-          <div className="quest-grid">
-            {joinRequests.map((q) => (
-              <Link key={q.id} className="card card-accent quest-card" href="/quest-catalog" style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
-                <div className="between">
-                  <span className="card-title">{q.title}</span>
-                  <span className={`badge ${q.my_state === "rejected" ? "badge-danger" : "badge-muted"}`}>{JR_LABEL[q.my_state ?? ""] ?? q.my_state}</span>
-                </div>
-                <div className="quest-card__stats">
-                  <span>👥 パーティ{q.member_count ?? 0}</span>
-                  <span>💡 アイデア{q.idea_count ?? 0}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </motion.section>
-      )}
-
-      {/* 最下部：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・業務パネルは上段に残す・ユーザー要望で末尾へ移動）。 */}
+      {/* A 最下段：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・再設計 §3 Zone A・表示順5）。 */}
       {gameEnabled && (
       <motion.div className="dash-top" {...flowMotion(6)}>
         <section className="pixel-panel hero" aria-label="あなたのステータス">
@@ -798,6 +789,30 @@ export function DashboardView({
           </ModalBody>
           <ModalFooter>
             <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setBSeeAll(null)}>閉じる</button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {/* E マイ「すべて見る」＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト）の全件ダイアログ（標準 Modal・混在型・§3）。 */}
+      {eSeeAll && (
+        <Modal open={!!eSeeAll} onClose={() => setESeeAll(null)} onClosed={() => setESeeAllN(15)}
+          title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : followingAll.length)}件）`} size="lg">
+          <ModalBody>
+            <div>
+              {eSeeAll === "joined" && joinedAll.slice(0, eSeeAllN).map(renderJoinedRow)}
+              {eSeeAll === "following" && followingAll.slice(0, eSeeAllN).map(renderFollowingRow)}
+            </div>
+            {(eSeeAll === "joined" ? joinedAll.length : followingAll.length) > eSeeAllN && (
+              <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
+                <button type="button" className="btn btn-outline" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る（残り{(eSeeAll === "joined" ? joinedAll.length : followingAll.length) - eSeeAllN}件）</button>
+              </div>
+            )}
+            <p className="dash-panel-empty" style={{ marginTop: "var(--space-4)" }}>
+              <Link href="/quests">クエスト一覧(SC-10)で見る →</Link>
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setESeeAll(null)}>閉じる</button>
           </ModalFooter>
         </Modal>
       )}

@@ -257,3 +257,22 @@
 /* B あなたの番「すべて見る」＝タブ行右のリンク風ボタン（再設計 §3.1）。 */
 .dash-page .dash-see-all { background: none; border: 0; padding: 0; color: var(--color-primary); font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .dash-page .dash-see-all:hover { text-decoration: underline; }
+
+/* ── Zone D 見つける（3カラム）／Zone E マイ（2カラム）＝コンパクト行の集約（再設計 §3・mock §19 移植）────
+   フルカードを増やさず「1見出し＋コンパクトなリスト」で密度を上げる。各カードは .card。 */
+.dash-page .dash-3col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.dash-page .dash-2col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); }
+@media (max-width: 920px) { .dash-page .dash-3col, .dash-page .dash-2col { grid-template-columns: 1fr; } }
+.dash-page .dash-zone-card .section-head { margin-bottom: var(--space-3); }
+.dash-page .dash-zone-card .section-head h2 { font-size: var(--text-base); }
+/* コンパクト行＝左に本文（タイトル＋サブ）・右にアクション（応募/★）。 */
+.dash-page .dash-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); }
+.dash-page .dash-row:first-child { border-top: 0; }
+.dash-page .dash-row__main { min-width: 0; flex: 1; }
+.dash-page .dash-row__title { font-weight: 500; font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.dash-page .dash-row__title a { color: var(--color-primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-page .dash-row__title a:hover { text-decoration: underline; }
+.dash-page .dash-row__sub { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+.dash-page .dash-row__action { flex: 0 0 auto; }
+/* 空状態メッセージ（パネルは残して中身だけ空状態＝D/E のグリッド崩れ回避・§3.1 改訂）。 */
+.dash-page .dash-panel-empty { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
