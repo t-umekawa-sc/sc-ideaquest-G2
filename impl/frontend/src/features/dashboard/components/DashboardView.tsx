@@ -409,6 +409,9 @@ export function DashboardView({
   const [eSeeAll, setESeeAll] = useState<null | "joined" | "following" | "requested">(null);
   const [eSeeAllN, setESeeAllN] = useState(15);
   const E_TITLE = { joined: "参加中", following: "フォロー中", requested: "参加リクエスト中" };
+  // Zone E「フォロー中／参加リクエスト中」はタブ集約（ユーザー要望・参加リクエストは通常0件のため既定＝フォロー中）。
+  const [eMyTab, setEMyTab] = useState<"following" | "requested">("following");
+  const eMyCounts = { following: followingAll.length, requested: requestedAll.length };
   const JR_LABEL: Record<string, string> = { pending: "申請中", rejected: "却下" };
 
   const applyContest = async (c: DashboardData["open_contests"][number]) => {
@@ -557,18 +560,27 @@ export function DashboardView({
                 ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
                 : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
             </section>
-            {/* 参加リクエスト中（クエスト申請中/却下＋コンテスト承認待ち）＝申請がある時だけ表示（ユーザー要望）。 */}
-            {requestedAll.length > 0 && (
-              <section className="card dash-zone-card" aria-label="参加リクエスト中">
-                <div className="section-head"><h2>✋ 参加リクエスト中</h2>{requestedAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("requested"); }}>すべて見る（全{requestedAll.length}件）→</button>}</div>
-                {requestedAll.slice(0, E_PANEL).map(renderRequestRow)}
-              </section>
-            )}
-            <section className="card dash-zone-card" aria-label="フォロー中">
-              <div className="section-head"><h2><span className="dash-star-y">★</span> フォロー中 <span className="badge badge-muted">アイデア＋クエスト</span></h2>{followingAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("following"); }}>すべて見る（全{followingAll.length}件）→</button>}</div>
-              {followingAll.length > 0
+            {/* フォロー中／参加リクエスト中＝タブ集約（ユーザー要望・Zone B と同じ segmented）。既定＝フォロー中（リクエストは通常0件）。 */}
+            <section className="card dash-zone-card" aria-label="フォロー中・参加リクエスト中">
+              <div className="section-head">
+                <div className="segmented" role="radiogroup" aria-label="マイの種別">
+                  {(["following", "requested"] as const).map((k) => (
+                    <label key={k}>
+                      <input type="radio" name="dash-etab" checked={eMyTab === k} onChange={() => setEMyTab(k)} />
+                      {k === "following" ? "★ フォロー中" : "✋ 参加リクエスト中"} <span className="seg-n">{eMyCounts[k]}</span>
+                    </label>
+                  ))}
+                </div>
+                {eMyCounts[eMyTab] > E_PANEL && (
+                  <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll(eMyTab); }}>すべて見る（全{eMyCounts[eMyTab]}件）→</button>
+                )}
+              </div>
+              {eMyTab === "following" && (followingAll.length > 0
                 ? followingAll.slice(0, E_PANEL).map(renderFollowingRow)
-                : <p className="dash-panel-empty">フォロー中のアイデア・クエストはありません。</p>}
+                : <p className="dash-panel-empty">フォロー中のアイデア・クエストはありません。</p>)}
+              {eMyTab === "requested" && (requestedAll.length > 0
+                ? requestedAll.slice(0, E_PANEL).map(renderRequestRow)
+                : <p className="dash-panel-empty">参加リクエスト中のクエスト・コンテストはありません。</p>)}
             </section>
           </div>
         </motion.section>
