@@ -388,6 +388,7 @@ export function DashboardView({
   // Zone D おすすめのクエスト（catalog my_state=none）＝★フォローで楽観的に除外（フォロー中へ移る）。
   const [followedRec, setFollowedRec] = useState<Record<string, boolean>>({});
   const recommended = (data?.recommended_quests ?? []).filter((q) => !followedRec[q.id]);
+  const announcements = data?.announcements ?? [];  // Zone D 運営からのお知らせ（§4.3a 選別済み）
   // Zone E 参加中＝参加クエスト（他者作成）＋承認済みアイデアコンテスト／フォロー中＝アイデア＋クエスト（§3 A案）。
   const joinedContests = data?.joined_contests ?? [];
   const joinedAll = [
@@ -485,14 +486,23 @@ export function DashboardView({
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
 
       {/* D 見つける（新設）＝お知らせ／募集中コンテスト／おすすめクエスト（参加機会・告知／再設計 §3 Zone D・表示順1）。
-          個別パネルは0件でも枠を残し空状態メッセージ（§3.1 改訂）。ゾーン全体が空（募集中・おすすめとも0）なら非表示。 */}
-      {(openContests.length + recommended.length > 0) && (
+          個別パネルは0件でも枠を残し空状態メッセージ（§3.1 改訂）。ゾーン全体が空（お知らせ・募集中・おすすめとも0）なら非表示。 */}
+      {(announcements.length + openContests.length + recommended.length > 0) && (
         <motion.section aria-label="見つける" {...flowMotion(1)}>
           <div className="dash-3col">
-            {/* 📢 運営からのお知らせ（FR-49・Phase2）＝本体未実装のため空状態のみ（データ源が入り次第ここに最新3件）。 */}
+            {/* 📢 運営からのお知らせ（FR-49・§4.3a 選別済み最大3）＝📌ピン/未読バッジ・すべて見る→SC-95。 */}
             <section className="card dash-zone-card" aria-label="運営からのお知らせ">
-              <div className="section-head"><h2>📢 運営からのお知らせ</h2></div>
-              <p className="dash-panel-empty">お知らせはまだありません。</p>
+              <div className="section-head"><h2>📢 運営からのお知らせ</h2><Link className="muted text-sm" href="/announcements">すべて見る →</Link></div>
+              {announcements.length > 0
+                ? announcements.map((a) => (
+                    <div key={a.id} className="dash-row">
+                      <div className="dash-row__main">
+                        <div className="dash-row__title">{a.pinned && <span title="ピン留め">📌</span>}<Link href={`/announcements/${a.id}`}>{a.title}</Link>{!a.is_read && <span className="badge badge-danger">未読</span>}</div>
+                        <div className="dash-row__sub">{a.excerpt}</div>
+                      </div>
+                    </div>
+                  ))
+                : <p className="dash-panel-empty">お知らせはありません。</p>}
             </section>
             {/* 🏆 募集中のコンテスト＝open かつ未参加（応募できる機会）。応募で参加リクエスト。 */}
             <section className="card dash-zone-card" aria-label="募集中のコンテスト">

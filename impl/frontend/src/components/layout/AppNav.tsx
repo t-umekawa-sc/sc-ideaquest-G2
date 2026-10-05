@@ -18,6 +18,7 @@ const BIZ: NavItem[] = [
   { href: "/contests", label: "アイデアコンテスト", icon: "🏆" },
   { href: "/projects", label: "プロジェクト", icon: "🛠" },
   { href: "/info-items", label: "情報インプット", icon: "🧭" },
+  { href: "/announcements", label: "お知らせ", icon: "📢" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
 const GAME: NavItem[] = [
@@ -34,6 +35,7 @@ export type AdminFlags = { systemAdmin: boolean; companyAdmin: boolean; qgAdmin:
 const adminItems = (a: AdminFlags): NavItem[] => [
   ...(a.systemAdmin ? [{ href: "/admin/companies", label: "システム管理（会社）", icon: "🏢" }] : []),
   ...(a.companyAdmin ? [{ href: "/admin/accounts", label: "アカウント管理（自社）", icon: "👥" }] : []),
+  ...(a.companyAdmin || a.systemAdmin ? [{ href: "/admin/announcements", label: "お知らせ管理", icon: "📢" }] : []),
   ...(a.companyAdmin || a.systemAdmin ? [{ href: "/strategy-documents", label: "経営資料", icon: "📕" }] : []),
   ...(a.qgAdmin ? [{ href: "/admin/quest-groups", label: "クエストグループ管理", icon: "🗂️" }] : []),
 ];

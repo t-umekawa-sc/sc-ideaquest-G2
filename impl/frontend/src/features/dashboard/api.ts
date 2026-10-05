@@ -73,6 +73,11 @@ export type ContestCard = {
   auto_approve?: boolean; participant_count?: number; my_status?: string;
 };
 
+// 運営からのお知らせ（Zone D・FR-49・§4.3a 選別済み最大3）。
+export type DashAnnouncement = {
+  id: string; title: string; excerpt: string; pinned: boolean; published_at: string | null; is_read: boolean;
+};
+
 export type RankRow = { rank: number; user: { id: string; name: string; avatar?: string | null; level?: number }; score: number; xp: number; coin: number };
 export type WeeklyRanking = { data: RankRow[]; me: { rank: number | null; score: number; xp: number; coin: number; total_users: number } };
 
@@ -95,6 +100,8 @@ export type DashboardData = {
   recommended_quests: WatchQuestCard[];  // Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
   open_contests: ContestCard[];          // Zone D 募集中のコンテスト（open・未参加・FR-46）
   joined_contests: ContestCard[];        // Zone E 参加中のアイデアコンテスト（approved・FR-46）
+  announcements: DashAnnouncement[];     // Zone D 運営からのお知らせ（§4.3a 選別・最大3・FR-49）
+  announcements_unread_count: number;    // お知らせ未読数（FR-49）
 };
 
 export function getDashboard(): Promise<DashboardData | null> {
