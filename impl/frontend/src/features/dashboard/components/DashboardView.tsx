@@ -575,12 +575,19 @@ export function DashboardView({
                   <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll(eMyTab); }}>すべて見る（全{eMyCounts[eMyTab]}件）→</button>
                 )}
               </div>
-              {eMyTab === "following" && (followingAll.length > 0
-                ? followingAll.slice(0, E_PANEL).map(renderFollowingRow)
-                : <p className="dash-panel-empty">フォロー中のアイデア・クエストはありません。</p>)}
-              {eMyTab === "requested" && (requestedAll.length > 0
-                ? requestedAll.slice(0, E_PANEL).map(renderRequestRow)
-                : <p className="dash-panel-empty">参加リクエスト中のクエスト・コンテストはありません。</p>)}
+              {/* 2タブを重ね置き＝高さは多い方のタブに固定（切替えても高さが変わらない）。 */}
+              <div className="dash-tabstack">
+                <div className="dash-tabpane" aria-hidden={eMyTab !== "following"}>
+                  {followingAll.length > 0
+                    ? followingAll.slice(0, E_PANEL).map(renderFollowingRow)
+                    : <p className="dash-panel-empty">フォロー中のアイデア・クエストはありません。</p>}
+                </div>
+                <div className="dash-tabpane" aria-hidden={eMyTab !== "requested"}>
+                  {requestedAll.length > 0
+                    ? requestedAll.slice(0, E_PANEL).map(renderRequestRow)
+                    : <p className="dash-panel-empty">参加リクエスト中のクエスト・コンテストはありません。</p>}
+                </div>
+              </div>
             </section>
           </div>
         </motion.section>
@@ -602,9 +609,24 @@ export function DashboardView({
               <button type="button" className="dash-see-all" onClick={() => { setBSeeAllN(15); setBSeeAll(bTab); }}>すべて見る（全{bCounts[bTab]}件）→</button>
             )}
           </div>
-          {bTab === "vote" && <div className="vote-grid">{unvoted.slice(0, B_PANEL).map(renderVoteCard)}</div>}
-          {bTab === "req" && <div className="quest-grid">{pendingReqs.slice(0, B_PANEL).map(renderReqCard)}</div>}
-          {bTab === "draft" && <div className="draft-grid">{drafts.slice(0, B_PANEL).map(renderDraftCard)}</div>}
+          {/* 全タブを重ね置き＝高さは最も高いタブに固定（切替えても高さが変わらない）。各タブは0件でも空状態を表示。 */}
+          <div className="dash-tabstack">
+            <div className="dash-tabpane vote-grid" aria-hidden={bTab !== "vote"}>
+              {unvoted.length > 0
+                ? unvoted.slice(0, B_PANEL).map(renderVoteCard)
+                : <p className="dash-panel-empty">未投票のアイデアはありません。</p>}
+            </div>
+            <div className="dash-tabpane quest-grid" aria-hidden={bTab !== "req"}>
+              {pendingReqs.length > 0
+                ? pendingReqs.slice(0, B_PANEL).map(renderReqCard)
+                : <p className="dash-panel-empty">承認待ちの参加リクエストはありません。</p>}
+            </div>
+            <div className="dash-tabpane draft-grid" aria-hidden={bTab !== "draft"}>
+              {drafts.length > 0
+                ? drafts.slice(0, B_PANEL).map(renderDraftCard)
+                : <p className="dash-panel-empty">下書きはありません。</p>}
+            </div>
+          </div>
         </motion.section>
       )}
       {/* 並び順（ユーザー要望・2026-09-15）＝新着の議論 → チームアクティビティ＋最近の通知 → 未投票 → フォロー中 → 下書き → 参加中クエスト。

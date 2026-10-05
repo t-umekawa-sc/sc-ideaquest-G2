@@ -276,5 +276,10 @@
 .dash-page .dash-row__action { flex: 0 0 auto; }
 /* 空状態メッセージ（パネルは残して中身だけ空状態＝D/E のグリッド崩れ回避・§3.1 改訂）。 */
 .dash-page .dash-panel-empty { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
+/* タブ本文は全ペインを同一セルに重ね置き＝高さは最も高いタブに揃い、切替えても変わらない（ユーザー要望）。
+   非アクティブは visibility:hidden で見えなくするが、レイアウトには残して高さを支える（display:none にしない）。 */
+.dash-page .dash-tabstack { display: grid; align-items: start; }
+.dash-page .dash-tabstack > .dash-tabpane { grid-area: 1 / 1; min-width: 0; }
+.dash-page .dash-tabstack > .dash-tabpane[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
 /* フォロー中パネル見出しの★＝金色（.follow-star と同色・ユーザー要望）。 */
 .dash-page .dash-star-y { color: var(--pixel-xp); }
