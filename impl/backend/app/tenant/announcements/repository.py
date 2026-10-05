@@ -57,15 +57,20 @@ def list_all_admin(session: Session) -> list[Announcement]:
 
 def read_ids_for(session: Session, user_id: uuid.UUID, announcement_ids: list[uuid.UUID]) -> set[uuid.UUID]:
     """指定ユーザーが既読のお知らせ id 集合（is_read 付与用）。"""
+    return set(read_map_for(session, user_id, announcement_ids).keys())
+
+
+def read_map_for(session: Session, user_id: uuid.UUID, announcement_ids: list[uuid.UUID]) -> dict[uuid.UUID, object]:
+    """指定ユーザーの既読 {announcement_id: read_at}（is_read＋既読日時の付与用）。"""
     if not announcement_ids:
-        return set()
+        return {}
     rows = session.execute(
-        select(AnnouncementRead.announcement_id).where(
+        select(AnnouncementRead.announcement_id, AnnouncementRead.read_at).where(
             AnnouncementRead.user_id == user_id,
             AnnouncementRead.announcement_id.in_(announcement_ids),
         )
-    ).scalars().all()
-    return set(rows)
+    ).all()
+    return {aid: read_at for aid, read_at in rows}
 
 
 def unread_count(session: Session, user_id: uuid.UUID) -> int:

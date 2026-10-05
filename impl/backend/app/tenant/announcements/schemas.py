@@ -10,10 +10,11 @@ from pydantic import BaseModel, Field
 class AnnouncementListItem(BaseModel):
     id: str
     title: str
-    excerpt: str                      # body_text の先頭抜粋（一覧用）
+    excerpt: str                      # body_text の先頭抜粋（カード表示用・一覧の列からは除外）
     pinned: bool = False
     published_at: datetime | None = None
     is_read: bool = False
+    read_at: datetime | None = None    # 閲覧者の既読日時（未読は null・SC-95 一覧列）
 
 
 class PageInfo(BaseModel):

@@ -153,6 +153,17 @@ export function AnnouncementAdminView() {
           exportName="お知らせ一覧"
           emptyText="お知らせはまだありません。「＋ お知らせを作成」から追加してください。"
           onRowClick={(x) => void openEdit(x)}
+          card={(x) => (
+            <>
+              <div className="between">
+                <span className="card-title">{x.pinned && "📌 "}{x.title}</span>
+                <span className={statusBadge(x.status)}>{STATUS_LABEL[x.status] ?? x.status}</span>
+              </div>
+              <div className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>
+                公開 {(x.published_at ?? "—").slice(0, 10)}　・　掲載 {(x.starts_at ?? "").slice(0, 10) || "—"}〜{(x.ends_at ?? "").slice(0, 10) || "—"}　・　既読 {x.read_count}
+              </div>
+            </>
+          )}
         />
       )}
 

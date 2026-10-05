@@ -1,26 +1,68 @@
 "use client";
 
-// SC-95 お知らせ一覧（全社閲覧・FR-49・U.1）。published・掲載期間内を pinned→公開日時降順。未読のみ絞り可。
+// SC-95 お知らせ一覧（全社閲覧・FR-49・U.1）。標準の一覧（DataTable＝カード/リスト切替・検索/絞込/ソート）。
+// 列＝タイトル/公開日/ピン/状態(未読・既読)/既読日時（本文抜粋は列から除外・カード表示にのみ使用）。
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
+import { DataTable } from "@/components/ui";
+import type { DataTableColumn } from "@/components/ui";
 import { useScrollRestore } from "@/lib/scrollRestore";
 import { listAnnouncements, type AnnouncementListItem } from "../api";
 
+type Row = {
+  id: string; title: string; excerpt: string;
+  published: string; publishedSort: string; pinned: boolean;
+  statusLabel: string; readAt: string; readAtSort: string;
+};
+
+const fmtDateTime = (iso: string | null | undefined): string =>
+  iso ? iso.slice(0, 16).replace("T", " ") : "—";
+
+function toRow(a: AnnouncementListItem): Row {
+  return {
+    id: a.id, title: a.title, excerpt: a.excerpt ?? "",
+    published: (a.published_at ?? "").slice(0, 10) || "—", publishedSort: a.published_at ?? "",
+    pinned: a.pinned, statusLabel: a.is_read ? "既読" : "未読",
+    readAt: fmtDateTime(a.read_at), readAtSort: a.read_at ?? "",
+  };
+}
+
+const PIN_OPTIONS: [string, string][] = [["📌 ピン", "📌 ピン"], ["—", "—"]];
+const STATUS_OPTIONS: [string, string][] = [["未読", "未読"], ["既読", "既読"]];
+
 export function AnnouncementsListView() {
-  const [items, setItems] = useState<AnnouncementListItem[] | null>(null);
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const router = useRouter();
+  const [rows, setRows] = useState<Row[] | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [err, setErr] = useState<string | null>(null);
-  useScrollRestore(items !== null);
+  useScrollRestore(rows !== null);
 
   useEffect(() => {
     const ac = new AbortController();
-    listAnnouncements({ limit: 50, unread: unreadOnly }, ac.signal)
-      .then((r) => { if (r) { setItems(r.data); setUnreadCount(r.unread_count); } })
+    listAnnouncements({ limit: 100 }, ac.signal)
+      .then((r) => { if (r) { setRows(r.data.map(toRow)); setUnreadCount(r.unread_count); } })
       .catch(() => setErr("お知らせの取得に失敗しました。"));
     return () => ac.abort();
-  }, [unreadOnly]);
+  }, []);
+
+  const columns = useMemo<DataTableColumn<Row>[]>(() => [
+    {
+      key: "title", label: "タイトル", locked: true, width: 320, sortable: true, filter: { type: "text" },
+      sortVal: (x) => x.title, searchVal: (x) => `${x.title} ${x.excerpt}`, csvVal: (x) => x.title,
+      render: (x) => (
+        <span className="row-center" style={{ gap: "var(--space-2)" }}>
+          {x.pinned && <span title="ピン留め">📌</span>}
+          <Link className="idea-title" href={`/announcements/${x.id}`}>{x.title}</Link>
+        </span>
+      ),
+    },
+    { key: "published", label: "公開日", width: 120, sortable: true, sortVal: (x) => x.publishedSort, csvVal: (x) => x.published, render: (x) => x.published },
+    { key: "pinned", label: "ピン", width: 90, sortable: true, filter: { type: "enum", options: PIN_OPTIONS }, sortVal: (x) => (x.pinned ? 1 : 0), filterVal: (x) => (x.pinned ? "📌 ピン" : "—"), render: (x) => (x.pinned ? "📌" : "—") },
+    { key: "status", label: "状態", width: 100, sortable: true, filter: { type: "enum", options: STATUS_OPTIONS }, sortVal: (x) => x.statusLabel, filterVal: (x) => x.statusLabel, render: (x) => <span className={x.statusLabel === "未読" ? "badge badge-danger" : "badge badge-muted"}>{x.statusLabel}</span> },
+    { key: "readAt", label: "既読日時", width: 160, sortable: true, sortVal: (x) => x.readAtSort, csvVal: (x) => x.readAt, render: (x) => x.readAt },
+  ], []);
 
   return (
     <section aria-label="お知らせ一覧">
@@ -28,33 +70,39 @@ export function AnnouncementsListView() {
       <div className="page-head">
         <h1>📢 運営からのお知らせ</h1>
       </div>
-      <div className="segmented" role="radiogroup" aria-label="絞り込み" style={{ marginBottom: "var(--space-4)" }}>
-        <label><input type="radio" name="ann-filter" checked={!unreadOnly} onChange={() => setUnreadOnly(false)} /> すべて</label>
-        <label><input type="radio" name="ann-filter" checked={unreadOnly} onChange={() => setUnreadOnly(true)} /> 未読のみ <span className="seg-n">{unreadCount}</span></label>
-      </div>
+      <p className="muted text-sm" style={{ marginBottom: "var(--space-4)" }}>
+        運営からの全社お知らせです（未読 {unreadCount} 件）。行をクリックで全文を開きます。
+      </p>
 
       {err ? (
         <p className="form-error" role="alert">{err}</p>
-      ) : items === null ? (
+      ) : rows === null ? (
         <p className="muted">読み込み中…</p>
-      ) : items.length === 0 ? (
-        <p className="muted">{unreadOnly ? "未読のお知らせはありません。" : "お知らせはありません。"}</p>
       ) : (
-        <ul className="notif-list">
-          {items.map((a) => (
-            <li key={a.id} className={a.is_read ? undefined : "unread"}>
-              <span className="notif-ico">{a.pinned ? "📌" : "📢"}</span>
-              <div className="notif-body">
-                <div className="notif-head">
-                  <Link className="notif-subject" href={`/announcements/${a.id}`}>{a.title}</Link>
-                  <span className="notif-time muted">{(a.published_at ?? "").slice(0, 10)}</span>
-                  {!a.is_read && <span className="badge badge-danger">未読</span>}
-                </div>
-                <div className="notif-ctx muted">{a.excerpt}</div>
+        <DataTable<Row>
+          storageKey="sc95-announcements"
+          data={rows}
+          columns={columns}
+          rowId={(x) => x.id}
+          unit="件"
+          perPage={12}
+          perPageOptions={[12, 24, 48]}
+          defaultView="list"
+          searchFields="タイトル・本文"
+          exportName="お知らせ一覧"
+          emptyText="お知らせはありません。"
+          onRowClick={(x) => router.push(`/announcements/${x.id}`)}
+          card={(x) => (
+            <>
+              <div className="between">
+                <span className="card-title">{x.pinned && "📌 "}{x.title}</span>
+                <span className={x.statusLabel === "未読" ? "badge badge-danger" : "badge badge-muted"}>{x.statusLabel}</span>
               </div>
-            </li>
-          ))}
-        </ul>
+              <div className="muted text-sm" style={{ margin: "var(--space-2) 0" }}>{x.excerpt}</div>
+              <div className="muted text-xs">公開 {x.published}　・　既読 {x.readAt}</div>
+            </>
+          )}
+        />
       )}
     </section>
   );

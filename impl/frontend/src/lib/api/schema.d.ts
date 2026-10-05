@@ -5011,6 +5011,8 @@ export interface components {
              * @default false
              */
             is_read: boolean;
+            /** Read At */
+            read_at?: string | null;
         };
         /** AnnouncementListResponse */
         AnnouncementListResponse: {

@@ -101,7 +101,8 @@ def test_u_tc_104_read_idempotent(client, factory):
         assert client.post(f"{BASE}/{a['id']}/read", headers=_csrf(client)).status_code == 200  # 冪等
         after = client.get(f"{BASE}?limit=50").json()
         assert after["unread_count"] == before - 1
-        assert next(x for x in after["data"] if x["id"] == a["id"])["is_read"] is True
+        item = next(x for x in after["data"] if x["id"] == a["id"])
+        assert item["is_read"] is True and item["read_at"]  # 既読日時が入る（SC-95 列・未読は null）
     finally:
         _cleanup(ids)
 

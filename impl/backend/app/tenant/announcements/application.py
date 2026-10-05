@@ -72,9 +72,9 @@ class _Row:
         return self.a.pinned
 
 
-def _item_dict(a: Announcement, is_read: bool) -> dict:
+def _item_dict(a: Announcement, is_read: bool, read_at=None) -> dict:
     return {"id": str(a.id), "title": a.title, "excerpt": (a.body_text or "")[:_EXCERPT],
-            "pinned": a.pinned, "published_at": a.published_at, "is_read": is_read}
+            "pinned": a.pinned, "published_at": a.published_at, "is_read": is_read, "read_at": read_at}
 
 
 def list_announcements(account_id: uuid.UUID, company_id: uuid.UUID, *,
@@ -89,13 +89,13 @@ def list_announcements(account_id: uuid.UUID, company_id: uuid.UUID, *,
             raise AppError(401, "unauthenticated")
         # +1 件多く取り has_next 判定。未読絞りは read 集合で後段フィルタ（件数は小さい前提）。
         rows = repo.list_visible(ts, limit=limit + 1 + offset, offset=0)
-        read_ids = repo.read_ids_for(ts, user.id, [a.id for a in rows])
-        view = [(a, a.id in read_ids) for a in rows]
+        read_map = repo.read_map_for(ts, user.id, [a.id for a in rows])
+        view = [(a, a.id in read_map, read_map.get(a.id)) for a in rows]
         if only_unread:
-            view = [(a, r) for (a, r) in view if not r]
+            view = [(a, r, rt) for (a, r, rt) in view if not r]
         page = view[offset:offset + limit]
         has_next = len(view) > offset + limit
-        data = [_item_dict(a, r) for (a, r) in page]
+        data = [_item_dict(a, r, rt) for (a, r, rt) in page]
         unread = repo.unread_count(ts, user.id)
     return {"data": data,
             "page_info": {"next_cursor": _enc_cursor(offset + limit) if has_next else None, "has_next": has_next},
