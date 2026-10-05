@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { ActivitySpark, Avatar, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, RowMenu, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -18,7 +18,7 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, deleteValidation, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
+  addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, deleteConcept, deleteValidation, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
   patchValidation, selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
   type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate, type Validation,
 } from "../api";
@@ -234,6 +234,20 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       setValSaving(false);
     }
   };
+  // コンセプト削除（詳細ヘッダー⋮・操作統一 §4.14）。edit 権限（owner/quest_admin）＝サーバー権威。削除後は由来クエストへ戻る。
+  const onDeleteConcept = async () => {
+    if (!concept) return;
+    const ok = await confirm({ variant: "danger", title: "コンセプトを削除", msg: `「${concept.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・評価等は監査のため保持されます）。` });
+    if (!ok) return;
+    try {
+      await deleteConcept(concept.id);
+      window.dispatchEvent(new Event(CONCEPTS_CHANGED_EVENT));
+      snack({ type: "success", title: "コンセプトを削除しました" });
+      router.push(`/quests/${concept.quest_id}`);
+    } catch {
+      snack({ type: "error", title: "削除できませんでした", msg: "権限が必要な場合があります。時間をおいて再度お試しください。" });
+    }
+  };
   const deleteValidationHandler = async (assumptionId: string, v: Validation) => {
     const ok = await confirm({ variant: "danger", title: "実績（検証）を削除", msg: `「${v.method}」（${v.validated_on}）の検証を削除しますか？（削除はコンセプトの版に記録されます）` });
     if (!ok) return;
@@ -291,8 +305,10 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               </div>
             )}
           </div>
-          <div className="idea-actions">
+          {/* 操作エリア統一（デザイン標準 §4.14）＝編集(権限時)→⋮(コンセプトを削除danger)。 */}
+          <div className="idea-actions detail-head__actions">
             {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
+            {perms.includes("edit") && <RowMenu items={[{ label: "コンセプトを削除", danger: true, onClick: () => void onDeleteConcept() }]} />}
           </div>
         </div>
         <div className="idea-meta">
