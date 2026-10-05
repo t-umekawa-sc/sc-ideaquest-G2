@@ -96,5 +96,22 @@ export function consumeContestFromList(): boolean {
   } catch { return false; }
 }
 
+// お知らせ詳細(SC-95)の戻るラベル/戻り先を文脈で出し分けるワンショット来歴。お知らせ一覧から詳細へ来た時だけ
+// 「← お知らせ一覧へ戻る」(戻り先=一覧)、それ以外（ダッシュボード Zone D/直リンク）は「← ダッシュボードへ戻る」(戻り先=/)。
+// 戻る動作自体は常に router.back()（backToListOr＝実際の遷移元へ復帰）。一覧の行クリックでだけ set。
+const ANNOUNCEMENT_FROM_LIST_KEY = "iq_announcement_from_list";
+
+export function markAnnouncementFromList(): void {
+  try { sessionStorage.setItem(ANNOUNCEMENT_FROM_LIST_KEY, "1"); } catch { /* SSR/未対応環境は無視 */ }
+}
+
+export function consumeAnnouncementFromList(): boolean {
+  try {
+    const v = sessionStorage.getItem(ANNOUNCEMENT_FROM_LIST_KEY);
+    if (v != null) sessionStorage.removeItem(ANNOUNCEMENT_FROM_LIST_KEY);
+    return v != null;
+  } catch { return false; }
+}
+
 // クエスト詳細のスクロール位置保存キー（一覧→詳細→戻る復元・§4.12）。QuestDetailView と ConceptTab で共有。
 export const QUEST_SCROLL_KEY = "iq_quest_detail_scroll:";

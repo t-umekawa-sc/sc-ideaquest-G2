@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DataTable } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { useScrollRestore } from "@/lib/scrollRestore";
+import { markAnnouncementFromList } from "@/lib/nav";
 import { listAnnouncements, type AnnouncementListItem } from "../api";
 
 type Row = {
@@ -51,10 +52,10 @@ export function AnnouncementsListView() {
     {
       key: "title", label: "タイトル", locked: true, width: 320, sortable: true, filter: { type: "text" },
       sortVal: (x) => x.title, searchVal: (x) => `${x.title} ${x.excerpt}`, csvVal: (x) => x.title,
+      // タイトル先頭の 📌 はダッシュボード表示時のみ（一覧はピン列で表現・ユーザー要望）。
       render: (x) => (
         <span className="row-center" style={{ gap: "var(--space-2)" }}>
-          {x.pinned && <span title="ピン留め">📌</span>}
-          <Link className="idea-title" href={`/announcements/${x.id}`}>{x.title}</Link>
+          <Link className="idea-title" href={`/announcements/${x.id}`} onClick={() => markAnnouncementFromList()}>{x.title}</Link>
         </span>
       ),
     },
@@ -91,11 +92,11 @@ export function AnnouncementsListView() {
           searchFields="タイトル・本文"
           exportName="お知らせ一覧"
           emptyText="お知らせはありません。"
-          onRowClick={(x) => router.push(`/announcements/${x.id}`)}
+          onRowClick={(x) => { markAnnouncementFromList(); router.push(`/announcements/${x.id}`); }}
           card={(x) => (
             <>
               <div className="between">
-                <span className="card-title">{x.pinned && "📌 "}{x.title}</span>
+                <span className="card-title">{x.title}</span>
                 <span className={x.statusLabel === "未読" ? "badge badge-danger" : "badge badge-muted"}>{x.statusLabel}</span>
               </div>
               <div className="muted text-sm" style={{ margin: "var(--space-2) 0" }}>{x.excerpt}</div>
