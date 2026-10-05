@@ -311,6 +311,11 @@ def get_dashboard(session: dict) -> dict:
         recent_chats = _safe(lambda: _recent_chats(ts, user), default=[])
         incoming_join_requests = _safe(lambda: _incoming_join_requests(ts, user), default=[])
         incoming_contest_requests = _safe(lambda: _incoming_contest_requests(ts, user), default=[])
+        # Zone D 運営からのお知らせ（FR-49・§4.3a 選別・最大3＋未読数）＝U の read を I.3 の殻から呼ぶ。
+        from app.tenant.announcements import application as announcements_app
+        _ann = _safe(lambda: announcements_app.dashboard_panel(ts, user.id), default={"data": [], "unread_count": 0})
+        announcements = _ann.get("data", [])
+        announcements_unread_count = _ann.get("unread_count", 0)
 
     # リッチパネルは各ドメイン application を再利用（自前セッション・best-effort）。
     quests = _safe(
@@ -354,4 +359,6 @@ def get_dashboard(session: dict) -> dict:
         "recommended_quests": recommended_quests,  # Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
         "open_contests": open_contests,            # Zone D 募集中のコンテスト（open・未参加・FR-46）
         "joined_contests": joined_contests,        # Zone E 参加中のアイデアコンテスト（approved・FR-46）
+        "announcements": announcements,            # Zone D 運営からのお知らせ（§4.3a 選別・最大3・FR-49）
+        "announcements_unread_count": announcements_unread_count,  # お知らせ未読数（FR-49）
     }

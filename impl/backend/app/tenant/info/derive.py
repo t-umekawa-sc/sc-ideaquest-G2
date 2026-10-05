@@ -10,14 +10,8 @@ from __future__ import annotations
 
 import re
 
-# 許可タグ（§N.7＝p/br/見出し/強調/リスト/リンク/引用/コード/表/画像）。属性は最小限（a=href, img=src/alt）。
-_ALLOWED_TAGS = {
-    "p", "br", "h1", "h2", "h3", "strong", "em", "u", "s", "ul", "ol", "li",
-    "a", "blockquote", "code", "pre", "table", "thead", "tbody", "tr", "th", "td", "img",
-}
-_ALLOWED_ATTRS = {"a": {"href", "title"}, "img": {"src", "alt"}}
-# URL スキームは http/https のみ許可（javascript: 等は除去）。
-_URL_SCHEMES = {"http", "https"}
+# リッチ本文の無害化/平文化は中立モジュール（お知らせ U と共用・DRY §2.3）へ移設。info は再エクスポートで後方互換。
+from app.core.richtext import sanitize_html, strip_tags as _strip_tags, to_plain_text  # noqa: F401
 
 # トークン抽出の内容語 POS とストップワード（頻出の機能語・ノイズを除外）。
 _CONTENT_POS = ("名詞", "動詞", "形容詞")
@@ -25,28 +19,6 @@ _STOPWORDS = {
     "する", "ある", "いる", "なる", "れる", "られる", "こと", "もの", "ため", "よう", "これ", "それ",
     "の", "ん", "さん", "很", "できる", "行う", "思う", "いう", "みる", "くる", "その", "この",
 }
-
-
-def sanitize_html(html: str | None) -> str:
-    """リッチ本文を許可リストで無害化（保存時・§N.7）。nh3 未導入時も安全側でタグ除去にフォールバック。"""
-    if not html:
-        return ""
-    try:
-        import nh3
-        return nh3.clean(html, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRS, url_schemes=_URL_SCHEMES)
-    except Exception:
-        return _strip_tags(html)  # 保険＝タグ全除去（安全側）
-
-
-def to_plain_text(html: str | None) -> str:
-    """サニタイズ済 HTML → 平文（body_text）。タグ除去＋空白正規化。"""
-    if not html:
-        return ""
-    return re.sub(r"\s+", " ", _strip_tags(html)).strip()
-
-
-def _strip_tags(html: str) -> str:
-    return re.sub(r"<[^>]+>", " ", html)
 
 
 def extract_tokens(text: str | None, *, limit: int = 50) -> list[tuple[str, int]]:

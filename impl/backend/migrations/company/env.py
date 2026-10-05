@@ -13,6 +13,7 @@ from app.tenant.tokens import orm as _company_tokens_orm  # noqa: F401  (§5.36b
 from app.tenant.strategy import orm as _company_strategy_orm  # noqa: F401  (§5.54-5.55 経営資料/整合 を metadata に登録)
 from app.tenant.info import orm as _company_info_orm  # noqa: F401  (§5.33-5.37 情報インプット＝ai_jobs.ref_info_item_id の FK 先)
 from app.tenant.ai_jobs import orm as _company_ai_jobs_orm  # noqa: F401  (§5.57-5.59 AIジョブ基盤 を metadata に登録)
+from app.tenant.announcements import orm as _company_announcements_orm  # noqa: F401  (§5.65-5.66 お知らせ を metadata に登録)
 
 target_metadata = CompanyBase.metadata
 

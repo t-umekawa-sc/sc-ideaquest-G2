@@ -4348,6 +4348,93 @@ export interface paths {
         patch: operations["decide_idea_participation_api_v1_ideas__idea_id__participation__uid__patch"];
         trace?: never;
     };
+    "/api/v1/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Announcements */
+        get: operations["list_announcements_api_v1_announcements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Announcement */
+        get: operations["get_announcement_api_v1_announcements__announcement_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read Announcement */
+        post: operations["read_announcement_api_v1_announcements__announcement_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Announcements */
+        get: operations["list_admin_announcements_api_v1_admin_announcements_get"];
+        put?: never;
+        /** Create Announcement */
+        post: operations["create_announcement_api_v1_admin_announcements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/announcements/{announcement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Announcement */
+        delete: operations["delete_announcement_api_v1_admin_announcements__announcement_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Announcement */
+        patch: operations["update_announcement_api_v1_admin_announcements__announcement_id__patch"];
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -4610,6 +4697,44 @@ export interface components {
              */
             coin_earned: number;
         };
+        /** AdminAnnouncementItem */
+        AdminAnnouncementItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Published At */
+            published_at?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /**
+             * Read Count
+             * @default 0
+             */
+            read_count: number;
+        };
+        /** AdminAnnouncementListResponse */
+        AdminAnnouncementListResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["AdminAnnouncementItem"][];
+            /**
+             * Can Manage
+             * @default false
+             */
+            can_manage: boolean;
+        };
         /** AdminModelCurrentMonth */
         AdminModelCurrentMonth: {
             /** Tokens */
@@ -4809,6 +4934,115 @@ export interface components {
             cost_micros: number;
             /** Count */
             count: number;
+        };
+        /** AnnouncementAuthor */
+        AnnouncementAuthor: {
+            /** Display Name */
+            display_name?: string | null;
+        };
+        /** AnnouncementCreateRequest */
+        AnnouncementCreateRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Body Html
+             * @default
+             */
+            body_html: string;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+        };
+        /** AnnouncementDetail */
+        AnnouncementDetail: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Body Html */
+            body_html: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Published At */
+            published_at?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** @default {} */
+            created_by: components["schemas"]["AnnouncementAuthor"];
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+        };
+        /** AnnouncementListItem */
+        AnnouncementListItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Excerpt */
+            excerpt: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /** Published At */
+            published_at?: string | null;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+        };
+        /** AnnouncementListResponse */
+        AnnouncementListResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["AnnouncementListItem"][];
+            /** @default {
+             *       "has_next": false
+             *     } */
+            page_info: components["schemas"]["app__tenant__announcements__schemas__PageInfo"];
+            /**
+             * Unread Count
+             * @default 0
+             */
+            unread_count: number;
+        };
+        /** AnnouncementUpdateRequest */
+        AnnouncementUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Body Html */
+            body_html?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Pinned */
+            pinned?: boolean | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
         };
         /** AssumptionCreateRequest */
         AssumptionCreateRequest: {
@@ -9648,15 +9882,6 @@ export interface components {
             /** Unread Count */
             unread_count: number;
         };
-        /** ReadResponse */
-        ReadResponse: {
-            /** Id */
-            id: string;
-            /** Is Read */
-            is_read: boolean;
-            /** Unread Count */
-            unread_count: number;
-        };
         /** RecentTaskChatDTO */
         RecentTaskChatDTO: {
             /** Task Id */
@@ -10236,6 +10461,24 @@ export interface components {
             /** Has Next */
             has_next: boolean;
         };
+        /** PageInfo */
+        app__tenant__announcements__schemas__PageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /** ReadResponse */
+        app__tenant__announcements__schemas__ReadResponse: {
+            /**
+             * Is Read
+             * @default true
+             */
+            is_read: boolean;
+        };
         /**
          * IdeaIconImageResponse
          * @description `PUT /ideas/{id}/icon-image` の応答（K.4 流儀・Phase 3）＝設定後の短TTL 署名URL（削除時は 204）。
@@ -10253,6 +10496,15 @@ export interface components {
              * @default false
              */
             has_next: boolean;
+        };
+        /** ReadResponse */
+        app__tenant__notifications__schemas__ReadResponse: {
+            /** Id */
+            id: string;
+            /** Is Read */
+            is_read: boolean;
+            /** Unread Count */
+            unread_count: number;
         };
         /** MemberAddRequest */
         app__tenant__solutions__schemas__MemberAddRequest: {
@@ -16994,7 +17246,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReadResponse"];
+                    "application/json": components["schemas"]["app__tenant__notifications__schemas__ReadResponse"];
                 };
             };
             /** @description Validation Error */
@@ -17025,7 +17277,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReadResponse"];
+                    "application/json": components["schemas"]["app__tenant__notifications__schemas__ReadResponse"];
                 };
             };
             /** @description Validation Error */
@@ -19217,6 +19469,222 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_announcements_api_v1_announcements_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_announcement_api_v1_announcements__announcement_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_announcement_api_v1_announcements__announcement_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__tenant__announcements__schemas__ReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_announcements_api_v1_admin_announcements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAnnouncementListResponse"];
+                };
+            };
+        };
+    };
+    create_announcement_api_v1_admin_announcements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_announcement_api_v1_admin_announcements__announcement_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_announcement_api_v1_admin_announcements__announcement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
