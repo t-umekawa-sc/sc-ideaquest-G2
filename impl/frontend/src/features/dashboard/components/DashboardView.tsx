@@ -438,7 +438,8 @@ export function DashboardView({
         <div className="dash-row__title"><Link href={`/quests/${q.id}`}>{q.title}</Link></div>
         <div className="dash-row__sub">{q.owner?.display_name ? `${q.owner.display_name} ・ ` : ""}👥 {q.member_count ?? 0}</div>
       </div>
-      <button type="button" className="btn btn-sm btn-outline dash-row__action" onClick={() => followRecommended(q)}>★ フォロー</button>
+      {/* フォローボタン＝アイデア詳細と同じ共有 .follow-toggle（OFF＝白抜き☆・金星はフォロー後。おすすめは押下で一覧から外れる）。 */}
+      <button type="button" className="follow-toggle dash-row__action" aria-pressed={false} onClick={() => followRecommended(q)}>☆ フォロー</button>
     </div>
   );
   const renderJoinedRow = (it: typeof joinedAll[number]) => it.kind === "quest" ? (
@@ -462,7 +463,8 @@ export function DashboardView({
         <div className="dash-row__title">💡 <Link href={`/ideas/${it.f.id}`}>{it.f.title}</Link></div>
         <div className="dash-row__sub">アイデア ・ ▲{it.f.vote_summary.approve} / ▼{it.f.vote_summary.oppose}</div>
       </div>
-      <button type="button" className="btn btn-sm btn-outline dash-row__action" aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => toggleFollow(it.f)}>★</button>
+      {/* フォロー中＝ON（金星）・アイデア詳細と同じ共有 .follow-toggle。クリックで解除。 */}
+      <button type="button" className="follow-toggle dash-row__action" aria-pressed={true} aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => toggleFollow(it.f)}>★ フォロー中</button>
     </div>
   ) : (
     <div key={`q:${it.q.id}`} className="dash-row">
@@ -470,7 +472,7 @@ export function DashboardView({
         <div className="dash-row__title">📜 <Link href="/quest-catalog">{it.q.title}</Link></div>
         <div className="dash-row__sub">クエスト（非参加・ウォッチ）</div>
       </div>
-      <button type="button" className="btn btn-sm btn-outline dash-row__action" aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => void unfollowQuestCard(it.q.id)}>★</button>
+      <button type="button" className="follow-toggle dash-row__action" aria-pressed={true} aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => void unfollowQuestCard(it.q.id)}>★ フォロー中</button>
     </div>
   );
 
