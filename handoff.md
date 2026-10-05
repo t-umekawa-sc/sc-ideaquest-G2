@@ -5,81 +5,53 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-05（セッション末）
-- ブランチ: `main`（作業は main 直 push が本プロジェクトの慣習）
-- 最新コミット: `4196b98f feat(dashboard): あなたの番ゾーン集約＋チームアクティビティにコンテスト活動統合（Phase1-3）`
-- **working tree: 未コミットの変更あり（本セッションのダッシュボード再設計 Phase1 増分2/3＝下記 §3）。まだ commit していない**（ユーザー未指示のため）。次回 commit するなら §3 のファイル群。
-- alembic heads: **本セッションで migration 追加なし**（dashboard 合成の read 拡張のみ）。control=`0019_company_access_mode` / company=`0053_contest_auto_approve`（変更なし）。
+- ブランチ: `main`（main 直 push が本プロジェクトの慣習・本セッションは都度 push 済）
+- 最新コミット: `d3621e48 docs: お知らせ Phase2＋ダッシュボード再設計の実装現況/遷移図を追随更新`
+- working tree: clean（全てコミット済み）
+- alembic heads: control=`0019_company_access_mode` / company=**`0054_announcements`（本セッション追加）**。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別 DB・ゲーミフィケーション付き）。
-現フェーズ＝**ダッシュボード再設計（5ゾーン化 D→E→B→C→A）＋お知らせ機能（FR-49）＋アイデアコンテスト統合（FR-46/47/48）**。設計正本＝`doc/設計ドラフト/ダッシュボード再設計・お知らせ_設計.md`／モック＝`doc/画面設計/mocks/style-guide.html`「19.」。
+直近フェーズ＝**ダッシュボード再設計（5ゾーン D→E→B→C→A）＋お知らせ機能（FR-49）＋アイデアコンテスト統合/参加運用（FR-46）＋詳細UI統一**。
 
-## 3. 今回やったこと（ダッシュボード再設計 Phase1 の増分2・3＝ゾーン再配置＋Zone D/E 構築＋SC-10 スイッチ）
+## 3. 今回やったこと（コミット順・いずれも main push 済）
+1. `00c3df50` ダッシュボード再設計 Phase1 増分2/3＝ゾーン順 **D→E→B→C→A**＋Zone D（お知らせ/募集中コンテスト/おすすめクエスト）・Zone E（参加中=クエスト+コンテスト/フォロー中=アイデア+クエスト）構築。`GET /dashboard` に `open_contests`/`joined_contests`/`recommended_quests` 合成（I.3）。自分のクエストは SC-10 スイッチ（すべて/所有者/参加中/参加リクエスト中/フォロー中）へ移設。TC＝I-TC-164/165/166・C-TC-306（red→green）。
+2. `989e85e7`/`2a65dece` ダッシュボードのフォローは**星マークのみ（枠なし）**＝`.follow-star`（ON=金★/OFF=白抜き☆）・フォロー中見出しの★も金色。
+3. `07f0b0b7` **詳細ヘッダー操作の横断統一（デザイン標準 §4.14 新設）**＝クエスト/アイデア/コンテスト/プロジェクトの4詳細で `.detail-head__actions`＝一次アクション→編集(権限時)→⋮(削除danger)。コンテスト詳細に編集ボタン新設（`ContestFormModal` を ContestListView から抽出し一覧/詳細で共用・DRY）。アイデア/プロジェクトは⋮に削除新設。
+4. `1ebcc031` 同統一を**コンセプト詳細**へ横展開（計5詳細）。
+5. `b4b33487` **コンテスト参加前はタブ非表示/参加後表示**＋ヘッダーで**参加⇄退席トグル（確認ダイアログ）**。自己退席 `DELETE /contests/{id}/participation`＝status `left`（decided_by=本人）／管理者排除 `rejected`（主体区別）。`ContestDetail.my_status` 追加。一覧 SC-53 に「参加方式」列（誰でも参加/承認制）。TC＝T-TC-202/203。
+6. `62e7ac66`（backend）＋`8b84e2c0`（frontend）＋`d3621e48`（docs）**お知らせ機能 Phase2（FR-49・新ドメイン U）**＝下記 §4。
 
-前セッションで Zone B 集約（増分3-1）が完了済。本セッションは**残りの②＝ゾーン順 D→E→B→C→A への再配置＋ Zone D/E 新設＋「自分のクエスト」SC-10 移設**を3増分で実施。設計書ファースト→モック一致→テスト先出し→red-green→目視で実施。
+## 4. お知らせ機能（FR-49・ドメイン U）の要点
+- **設計正本**＝`doc/設計ドラフト/ダッシュボード再設計・お知らせ_設計.md` §4。採番＝FR-49（要件定義）／データモデル §5.65 `announcements`・§5.66 `announcement_reads`／API `doc/API設計/U_お知らせ.md`／テスト `doc/テスト/U_お知らせ.md`（U-TC-101〜109）。
+- **backend**＝`app/tenant/announcements/`（ORM/repository/application/schemas/router）＋migration `0054_announcements`＋`app/core/richtext.py`（info/derive から sanitize_html/to_plain_text を抽出・info は再エクスポートで後方互換）。閲覧=全ユーザー（`GET /announcements`・`GET /{id}`・`POST /{id}/read` 冪等）／管理=管理者のみ（`/admin/announcements` POST/PATCH/DELETE・403二重防御）。body_html は保存時サニタイズ＋body_text 派生。論理削除・掲載期間・ピン・既読。`get_dashboard` に `announcements`（§4.3a 選別＝ピン優先→未読→既読非ピン除外・最大3）＋`announcements_unread_count` 合成。
+- **frontend**＝共有 `components/richtext/`（`RichTextView`＝サニタイズ済HTML表示／`RichTextEditor`＝ツールバー contentEditable／`richtext.css`）。ダッシュボード Zone D 📢パネル実データ。SC-95 `/announcements`（一覧＋`/[announcementId]` 詳細・開くと既読化）。SC-96 `/admin/announcements`（DataTable＋RowMenu 📌トグル/編集/削除＋作成/編集モーダル）。ナビに「お知らせ」(全員)・「お知らせ管理」(管理者)。
+- **検証済**＝U-TC-101〜109 red→green（router未登録で404のred確認）／info richtext 無破壊／build/vitest/tsc green／traceability 992／end-to-end DOM（作成201→管理一覧→Zone D〔📌/抜粋〕→SC-95一覧〔未読〕→詳細〔strong描画・script除去・既読化〕・API `/dashboard` announcements 2件）。
+- **残（follow-up）**＝(a) お知らせ本文の**画像再ホスト**は info 専用APIに依存＝共有 Editor では未対応。(b) **公開会社(access_mode=public)の外周403許可リストに announcements read を追加**（FR-48 連動・中央実装が未確立のため未対応／private 会社は一般も閲覧可）。(c) `doc/画面設計/screens/SC-95_*.md`・`SC-96_*.md` の画面設計書は未作成（遷移図には追加済み）。
 
-### 増分1（backend・`GET /dashboard` 合成に Zone D/E 用データ追加）
-- `impl/backend/app/tenant/dashboard/application.py`：`get_dashboard` に3キー追加（I.3 殻方針＝既存 application 再利用・新業務ロジックなし）。
-  - `open_contests`＝Zone D 募集中のコンテスト（`contests_app.list_contests(status="open")` の `my_status=="none"` のみ＝応募できる機会）。
-  - `joined_contests`＝Zone E 参加中のアイデアコンテスト（`list_contests()` の `my_status=="approved"` のみ）。
-  - `recommended_quests`＝Zone D おすすめのクエスト（既存 `_catalog`〔get_quest_catalog〕の `my_state=="none"` のみ）。
-  - 定数 `_RECOMMENDED_LIMIT/_OPEN_CONTESTS_LIMIT/_JOINED_CONTESTS_LIMIT = 30`（多めに取り frontend で slice）。
-- `impl/frontend/src/features/dashboard/api.ts`：`ContestCard` 型＋`recommended_quests/open_contests/joined_contests` を `DashboardData` に追加（`/dashboard` は response_model 無しの dict ＝ codegen 対象外・**型は手書き**）。
-- テスト：`doc/テスト/I_ダッシュボード.md` に **I-TC-164/165/166** 追加／`impl/backend/tests/dashboard/test_cross_domain.py::test_i_tc_164_165_166_zone_d_e_panels`（get_dashboard 直呼び・特定 id の包含/除外で検証）。**red（`KeyError: 'open_contests'`）→ green（1 passed）取得済**。
+## 5. 現在の状態（動く/テスト）
+- **動く**＝backend/frontend とも再ビルド済・全サービス稼働中。お知らせ/ダッシュボード/コンテストを end-to-end でブラウザ(DOM)確認済み。
+- **テスト**＝対象 backend（announcements 9・dashboard 15・contests 37）green／frontend build(41ページ)＋vitest green／tsc 変更分0／traceability ✅(992)。
+- **⚠ backend フルスイートの既知失敗＝`tests/info` 4件**（`test_n_tc_002/003/004`・`test_n_tc_105`）＝**共有 dev DB 非冪等**（info 検索/フィルタが蓄積データを拾う・**私の変更を stash しても同一失敗＝無関係**と確認済）。メモリ `e2e-full-not-idempotent-shared-db` 参照。
+- **画像目視の制約**＝本会話は画像枚数が上限に達し、スクショの目視取り込みが API 側で弾かれる。検証は **DOM/計算スタイル**（Playwright で locator count・innerText・computed style）に切替済み＝有効。
 
-### 増分2（frontend・`DashboardView` を D→E→B→C→A に再構成）
-- `impl/frontend/src/features/dashboard/components/DashboardView.tsx`：
-  - 表示順を **greeting → D 見つける → E マイ → B あなたの番 → C（議論2カラム＋チームアクティビティ/通知）→ A ステータス** に再配置。
-  - **Zone D（3カラム `.dash-3col`）**＝📢運営からのお知らせ（FR-49 Phase2 未実装＝空状態のみ）／🏆募集中のコンテスト（`open_contests`・行に「応募」`requestContestParticipation`）／🔎おすすめのクエスト（`recommended_quests`・「★フォロー」`followQuest`）。
-  - **Zone E（2カラム `.dash-2col`）**＝👣参加中（`joinedQuests`〔member〕＋`joined_contests`〔🏆バッジ〕混在）／★フォロー中（`followed`〔アイデア〕＋`followedQuests`〔クエスト〕混在）。各「すべて見る」→標準 Modal（混在型・もっと見る形式）。
-  - 個別パネル0件＝空状態メッセージ（§3.1）、ゾーン全体が空＝ゾーン非表示。
-  - **旧5セクション撤去**（フォロー中のアイデア/自分のクエスト/参加中クエスト/フォロー中のクエスト/参加リクエストの状況）＝Zone E へ集約・「自分のクエスト」「参加リクエスト中」は SC-10 へ移設（§6）。未使用になった `renderQuestCard`/`ownQuests`/`joinRequests`/`JR_LABEL`/`today`/deadline import も削除。
-  - 新コンパクト行 CSS を `impl/frontend/src/features/dashboard/dashboard.css` に追加（`.dash-3col/.dash-2col/.dash-row*/.dash-panel-empty`・mock §19 移植）。
+## 6. 詰まっている点（注意）
+- **backend/frontend はソースをベイク（volumes 無）**＝反映は `cd impl && docker compose up -d --build backend|frontend`。pytest で未コミット編集を反映するには `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path>`。
+- **新 migration を既存会社DBへ適用**＝`docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -c "from alembic import command; from alembic.config import Config; from app.core.config import get_settings; s=get_settings(); [ (lambda c: (c.set_main_option('sqlalchemy.url', s.server_dsn(db)), command.upgrade(c,'head')))(Config('alembic_company.ini')) for db in ['ideaquest_company_acme','ideaquest_company_acme2'] ]"`（bootstrap と同経路）。
+- **pytest をパイプ（`| grep | tail`）で流すと exit code が最後のコマンドのものになり失敗をマスク**＝フルは `pytest -q > /tmp/log 2>&1; echo $?` で直接 exit を取る。
+- **`/dashboard` は response_model 無しの dict**＝frontend `DashboardData` 型は**手書き**（codegen 対象外）。U ドメイン（announcements）の型は codegen で `schema.d.ts` に入る。
+- **詳細ヘッダー統一の共有CSS**＝`components.css .detail-head__actions`／フォロー星＝`components.css .follow-star`/`.follow-toggle`（ダッシュボードは star-only、詳細画面は toggle）。
 
-### 増分3（SC-10 クエスト一覧に絞り込みスイッチ＋「自分のクエスト」移設）
-- `impl/frontend/src/features/quests/questFilter.ts`（新規・純ロジック）＝`questRelation(my_state,is_owner)`／`matchQuestFilter(relation,filter)`。
-- `impl/frontend/src/features/quests/components/QuestListView.tsx`：スイッチ（すべて/自分が所有者/参加中/参加リクエスト中/フォロー中・既定すべて・件数ピル付き）追加。データ源＝`listQuests`（member+owner+draft）＋`fetchQuestCatalog`（`my_state` が pending/following のみ併合＝非参加のため一覧に出ないものを補完）。`toQuest` を両 DTO（`QuestCard`|`QuestCatalogCard`・共有フィールド同一）対応に一般化。
-- `impl/frontend/src/styles/design-system.css`：`.segmented .seg-n`（件数ピル）を追加（mock §19 移植・Zone B の件数表示にも効く）。
-- テスト：`doc/テスト/C_クエスト.md` に **C-TC-306** 追加／`impl/frontend/src/features/quests/questFilter.test.ts`（7 tests）。**red（owner が draft を含む assertion が失敗）→ green 取得済**。
-
-## 4. 現在の状態（動くもの/壊れ/テスト）
-- **動く**：backend 再ビルド済（`up -d --build backend`）＝新 `/dashboard` を配信。frontend 再ビルド済（`up -d --build frontend`）。全サービス稼働中。
-- **目視確認済（ブラウザ）**：セクション順 `見つける→マイ→あなたの番→議論/アクティビティ/通知→ステータス`＝D→E→B→C→A。Zone D（3カラム・応募/★フォローボタン）・Zone E（参加中＝クエスト＋🏆コンテスト混在／フォロー中＝空状態）・SC-10 スイッチ（件数ピル・絞り込み動作）すべて mock §19 どおり描画（崩れなし）。スクショ＝`/tmp/dashshot/30〜50-*.png`（ephemeral）。
-- **テスト（私の変更分は全て green）**：
-  - backend `tests/dashboard tests/contests` = **50 passed**。I-TC-164/165/166 red-green 済。
-  - frontend `npm run build` ✅／vitest（dashboard/quests）**24 passed**＋questFilter **7 passed**（C-TC-306 red-green 済）／`tsc --noEmit` は私の変更ファイル0エラー／`check_tc_traceability.py` ✅（code 981）。
-- **⚠ backend フルスイート＝950 passed / 4 failed**。失敗4件は**全て `tests/info/`（N 情報インプット＝今回未変更ドメイン）**＝`test_n_tc_105_full_text_search`／`test_n_tc_002_status_filter`／`test_n_tc_003_impact_class_filter`／`test_n_tc_004_full_text_search`。
-  - **私の変更を `git stash` しても同一失敗**を確認＝**既存の環境起因（共有 dev DB の蓄積で `_own(curated,user_id)` 等が余分な行を拾う非冪等）・本セッションの変更とは無関係**。メモリ `e2e-full-not-idempotent-shared-db` と同系（pytest int でも info ドメインは非冪等）。要対応だが②の範囲外。
-
-## 5. 詰まっている点（試して失敗/注意）
-- **backend/frontend はソースをベイク（volumes 無）**：反映は `cd impl && docker compose up -d --build backend|frontend`。pytest で未コミット編集を反映するには `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path>`（メモリ `backend-no-source-mount`）。
-- **`/dashboard` は response_model 無しの dict**＝OpenAPI は緩い型。frontend `DashboardData` は**手書き**（codegen 対象外）。Zone D/E の型追加は api.ts を直接編集した。
-- **pytest をパイプ（`| grep | tail`）で流すと exit code が最後のコマンドのものになり pytest の失敗をマスクする**（本セッションで一度ハマった）。フルスイートは `pytest ... > log 2>&1; echo $?` で直接 exit を取ること（メモリ `playwright-exit-code-serial-triage` と同趣旨）。
-- **info ドメインのフル実行 4 failed（上記 §4）**＝共有 dev DB 非冪等。フル前に acme/acme2 を drop→bootstrap するか、info_env フィクスチャの user スコープ漏れを直すのが筋（§7-2）。
-
-## 6. 決定事項と根拠
-- **ゾーン順 D→E→B→C→A**（前セッションのユーザー決定）。A=ゲーム風ステータスは完全現状踏襲で最下段。
-- **Zone D/E はコンパクト行（`.dash-row`）**＝フルカードを増やさず密度を上げる（mock §19・設計§3）。Zone B だけフルカード（要対応）。
-- **お知らせ（Zone D 📢）は Phase2 未実装＝空状態のみ**表示（データ源が入るまで）。
-- **コンテスト応募＝`requestContestParticipation`**（public/DEMO は即 approved・社内は承認待ち＝トースト文言を `res.status` で出し分け）。
-- **SC-10 スイッチの draft 畳み込み**＝「自分が所有者」は relation∈{owner,draft}（下書きは自作のため owner に含める）。スイッチ型 `QuestFilter` に draft は含めない（件数オブジェクトのキーと一致させるため）。
-- **`.seg-n` を design-system.css に移植**（mock では見本スコープ・本番未定義だった）＝Zone B の件数表示にも効く。
-
-## 7. 次にやること（優先順・具体的）
-1. **（任意）本セッションの変更を commit/push**（ユーザー指示があれば）。対象＝§3 のファイル群（backend application / dashboard api.ts / DashboardView.tsx / dashboard.css / design-system.css / QuestListView.tsx / questFilter.ts / questFilter.test.ts / test_cross_domain.py / I・C テストmd）。main 直 push が慣習。
-2. **Phase2＝お知らせ機能（FR-49・SC-95/96）**：richtext 共有部品抽出（`info/derive.py::sanitize_html`→`app/core/richtext.py`・`.rt__area`/`.rt-view`→`RichTextEditor`/`RichTextView`）→ `announcements`＋`announcement_reads` テーブル新設（既読/掲載期間/ピン）→ API → 管理画面（SC-96 RowMenu＋モーダル📌チェック）→ ダッシュボード Zone D パネルを空状態から実データへ。採番 FR-49・SC-95/96。設計§4。
-3. **（別件・既存不具合）info ドメインのフル実行 4 failed を解消**：共有 dev DB 非冪等（§4/§5）。info_env フィクスチャの user スコープ漏れ or フル前の drop→bootstrap。②とは独立。
-4. **Zone D/E の件数調整の最終確認**：`dashboard/application.py` の LIMIT と §3.1（D 各3・E 各5）の整合（frontend 側は D_PANEL=3/E_PANEL=5 で slice 済）。
-5. **デモデータの後始末**：本セッションで Zone B/D/E 目視用に `【DEMO-ZB】` マーカーのデモデータを共有 acme DB に投入済（ユーザー了承で残置）。不要になったら `/tmp/dashshot/_seed_zone_b.py`（冪等・再実行で再投入/クリーンアップのロジックあり）を使うか手動削除。user@acme（会社内 User.id=`fb802778-bb66-43e6-ad2c-2d542d9e6079`）に下書き4/メンバー4クエスト/所有1クエスト+pending申請4/コンテスト approved参加1+活動1 を付与。
+## 7. 次にやること（候補・優先順）
+1. **お知らせ follow-up**（§4 残）＝SC-95/96 の画面設計書 md 作成／公開会社 read 許可リスト（FR-48 連動）／画像再ホスト。
+2. **info ドメインのフルスイート4失敗の解消**＝共有DB非冪等（info_env フィクスチャの user スコープ漏れ or フル前 drop→bootstrap）。②とは独立の衛生作業。
+3. **デモデータ後始末**＝本セッションで目視用に acme DB へ投入したデモ（`【DEMO-ZB】` マーカーのアイデア/クエスト/コンテスト参加・`【検証】` お知らせ2件・user@acme の follow/コンテスト参加/クエスト owner,quest_admin 権限付与）。ユーザー了承で残置中。不要なら削除（`/tmp/dashshot/_seed_zone_b.py` は冪等再利用可）。
+4. 要望ベースで UI 統一の継続・他機能（FR-43 ソリューション開発／FR-42 コンセプト の深掘り 等）。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装は `impl/`、frontend は `impl/frontend`、backend は `impl/backend`）。
-- 起動：`cd impl && docker compose up -d`（backend/frontend/db/redis/mailhog/minio 等）。backend=`http://localhost:8000`、frontend=`http://localhost:3000`、openapi=`http://localhost:8000/openapi.json`。
-- 反映：`cd impl && docker compose up -d --build backend|frontend`。
-- テスト：
-  - backend（ベイク実行）：`cd impl && docker compose exec -T backend pytest <path> -q`。未コミット編集反映は `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`。**フルは `pytest -q > /tmp/log 2>&1; echo $?` で exit を直接取る**。
-  - frontend：`cd impl/frontend && npm run build`／`npx vitest run <path>`／`npx tsc --noEmit`。型再生成は backend 再ビルド後 `npm run codegen`（ただし `/dashboard` は dict ＝手書き型）。
-  - TC トレーサビリティ：`cd <repo root> && python3 scripts/check_tc_traceability.py`。
-- seed アカウント（会社=ACME-01）：一般 `user@acme.example`、管理 `kanri@acme`（company_account_admin）、OPS系 `admin@ops`（system_admin）。いずれも `Passw0rd!`（メモリ `admin-seed-accounts-exist`）。
-- 目視スクショ手順：`impl/frontend` で使い捨て `_shot.mjs`（Playwright chromium・ログイン→goto→screenshot）を書いて `node _shot.mjs`→`/tmp/dashshot/*.png` を Read。node_modules は `impl/frontend` にある。
-- e2e：`cd impl/frontend` で Playwright。フル e2e は共有dev DBに非冪等＝前に acme/acme2 drop→bootstrap（メモリ `e2e-full-not-idempotent-shared-db`）。
+- 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`、frontend `impl/frontend`、backend `impl/backend`）。
+- 起動：`cd impl && docker compose up -d`。backend=`http://localhost:8000`、frontend=`http://localhost:3000`、openapi=`http://localhost:8000/openapi.json`。
+- 反映：`cd impl && docker compose up -d --build backend|frontend`。型再生成は backend 再ビルド後 `cd impl/frontend && npm run codegen`。
+- テスト：backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`／未コミット反映は上記 `run --rm -v` マウント。frontend `cd impl/frontend && npm run build`／`npx vitest run <path>`／`npx tsc --noEmit`。TC トレーサビリティ `cd <repo root> && python3 scripts/check_tc_traceability.py`。
+- 目視：画像取り込みが不可の間は Playwright の使い捨て `_chk.mjs`（ログイン→goto→locator count/innerText/computed style を console.log）で DOM 検証。ログイン＝会社 `ACME-01`／一般 `user@acme.example`／管理 `kanri@acme.example`（company_account_admin）・いずれも `Passw0rd!`。
+- e2e：`cd impl/frontend` で Playwright。フル e2e は共有dev DB 非冪等＝前に acme/acme2 drop→bootstrap（メモリ `e2e-full-not-idempotent-shared-db`）。
