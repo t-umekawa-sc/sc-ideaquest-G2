@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, ActivitySpark, useSnackbar } from "@/components/ui";
+import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, RowMenu, SparkBurst, XpFloat, ActivitySpark, useConfirm, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { ApiError } from "@/lib/api/client";
 import { voteErrorMessage } from "../voteError";
@@ -23,7 +23,7 @@ import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@
 import { decideIdeaParticipation, getIdeaParticipation, requestIdeaParticipation, type IdeaParticipationContext } from "@/features/contests/api";
 import { RelatedInfoPanel } from "@/features/info-input";
 
-import { followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
+import { deleteIdea, followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { isVotingClosed, todayISODate, votePercents } from "../voting";
 import { IdeaForm } from "./IdeaForm";
 import { RevisionHistory } from "./RevisionHistory";
@@ -70,6 +70,7 @@ const ASPECT_LABELS: [string, string][] = [
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const snack = useSnackbar();
   const router = useRouter();
+  const confirm = useConfirm();
   // 戻るラベルの文脈判定（動的ラベル）＝クエストのアイデア一覧から来た時だけ「← {クエスト名}へ戻る」。
   // 来歴（sessionStorage）はマウント時に1回だけ消費（ref ガードで StrictMode 二重実行も防ぐ）。
   // 直アクセス（履歴なし）は戻る先＝クエスト（backToListOr の fallback）なのでクエスト名を出す。
@@ -294,6 +295,22 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     }
   }, [ideaId, following, followBusy, snack, idea?.quest?.status]);
 
+  // アイデア削除（詳細ヘッダー⋮・操作統一 §4.14）。投稿者本人（is_mine）＝ボタン表示、owner/quest_admin もサーバー権威。
+  // 削除後は所属クエスト詳細へ戻る（一覧・詳細から見えなくなる＝議論/投票は監査保持）。
+  const onDeleteIdea = useCallback(async () => {
+    if (!idea) return;
+    const ok = await confirm({ variant: "danger", title: "アイデアを削除", msg: `「${idea.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・投票等は監査のため保持されます）。` });
+    if (!ok) return;
+    try {
+      await deleteIdea(idea.id);
+      window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+      snack({ type: "success", title: "アイデアを削除しました" });
+      router.push(`/quests/${idea.quest.id}`);
+    } catch {
+      snack({ type: "error", title: "削除できませんでした", msg: "権限が必要な場合があります。時間をおいて再度お試しください。" });
+    }
+  }, [idea, confirm, snack, router]);
+
   // 選定/選定解除（F.3・owner/quest_admin）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
   const handleSelect = useCallback(async () => {
     if (selectBusy) return;
@@ -445,8 +462,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className="name">投稿: {authorName}</span>
             </div>
           </div>
-          <div className="idea-actions">
-            {/* フォロー（D.6・トグル）。completed は新規フォロー不可＝事前無効化（解除は可）＋サーバー 409 も権威。 */}
+          {/* 操作エリア統一（デザイン標準 §4.14）＝一次アクション(フォロー)→編集(権限時)→⋮(削除danger)。 */}
+          <div className="idea-actions detail-head__actions">
+            {/* フォロー（D.6・トグル）。詳細画面は枠付き星＋テキスト（.follow-toggle）。completed は新規フォロー不可＝事前無効化（解除は可）＋サーバー 409 も権威。 */}
             <button
               className="follow-toggle"
               type="button"
@@ -461,15 +479,19 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                 ボタンは投稿者本人のみ表示（is_mine・サーバー権威／SC-22 §4.5・決定 2026-09-06）。
                 完了クエストは事前無効化＝入力後に「保存できません」を避ける（選定/投票と同じ凍結UXに統一・サーバー 409 も権威）。 */}
             {idea.is_mine && (
-              <button
-                className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`}
-                type="button"
-                disabled={questCompleted}
-                title={questCompleted ? "完了したクエストでは編集できません" : undefined}
-                onClick={() => setEditOpen(true)}
-              >
-                編集
-              </button>
+              <>
+                <button
+                  className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`}
+                  type="button"
+                  disabled={questCompleted}
+                  title={questCompleted ? "完了したクエストでは編集できません" : undefined}
+                  onClick={() => setEditOpen(true)}
+                >
+                  編集
+                </button>
+                {/* 削除＝⋮の最下部（danger・操作統一§4.14）。削除は親クエスト依存をやめ詳細にも常設。 */}
+                <RowMenu items={[{ label: "アイデアを削除", danger: true, onClick: () => void onDeleteIdea() }]} />
+              </>
             )}
           </div>
         </div>

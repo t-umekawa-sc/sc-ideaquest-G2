@@ -12,7 +12,7 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { timeLabel } from "@/features/notifications/time";
-import { deleteTask, getProject, listProjectMembers, listProjectTasks, listRecentTaskChats, patchTask, PROJECTS_CHANGED_EVENT } from "../api";
+import { deleteProject, deleteTask, getProject, listProjectMembers, listProjectTasks, listRecentTaskChats, patchTask, PROJECTS_CHANGED_EVENT } from "../api";
 import type { RecentTaskChat } from "../api";
 import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
 import "@/features/dashboard/dashboard.css"; // 🕒最近の議論の一覧クラス（.unread-list/.unread-item）をダッシュボードから踏襲（§2.1c）
@@ -89,6 +89,22 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }
   }
 
+  // プロジェクト削除（詳細ヘッダー⋮・操作統一 §4.14）。削除後は一覧へ戻る。権限は起票者/owner＝サーバー 403 も権威。
+  async function onDeleteProject() {
+    if (!project) return;
+    const ok = await confirm({ variant: "danger", title: "プロジェクトを削除", msg: `「${project.title}」を削除しますか？ 一覧から見えなくなります（タスク・チャット等は監査のため保持されます）。` });
+    if (!ok) return;
+    try {
+      await deleteProject(project.id);
+      snack({ type: "success", title: "プロジェクトを削除しました" });
+      window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT));
+      router.push("/projects");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) snack({ type: "error", title: "権限がありません", msg: "削除は起票者/owner のみです。" });
+      else snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再試行してください。" });
+    }
+  }
+
   // ツリーを深さ付きで平坦化＝標準 DataTable の行に載せる（順序はツリー順・インデントで階層を表現）。
   const flatTasks: FlatTask[] = tasks ? flattenTasks(tasks) : [];
   // クイックフィルタ（アイデア一覧と同型）＝すべて/進行中/完了/ブロック/自分のタスク。
@@ -152,7 +168,13 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           {/* クエスト詳細と同じ既定フォント（.quest-head h1）＝page-title の pixel フォントは使わない（ユーザー要望）。 */}
           <h1 style={{ margin: 0 }}>{project.title}</h1>
           <span className={P_STATUS_CLS[project.status]}>{P_STATUS_LABEL[project.status]}</span>
-          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" style={{ marginLeft: "auto" }} onClick={() => router.push(`/projects/${projectId}/edit`)}>編集</button>}
+          {/* 操作エリア統一（§4.14）＝編集(権限時)→⋮(削除danger)。インライン marginLeft は共通クラスへ。 */}
+          {project.my_permissions.can_edit && (
+            <div className="detail-head__actions">
+              <button type="button" className="btn btn-outline" onClick={() => router.push(`/projects/${projectId}/edit`)}>編集</button>
+              <RowMenu items={[{ label: "プロジェクトを削除", danger: true, onClick: () => void onDeleteProject() }]} />
+            </div>
+          )}
         </div>
         {project.description && <p className="muted" style={{ marginTop: 6 }}>{project.description}</p>}
         <div className="proj-head__meta">

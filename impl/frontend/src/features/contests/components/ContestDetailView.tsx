@@ -12,6 +12,7 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeContestFromList } from "@/lib/nav";
 import { ContestJoinRequestDialog } from "./ContestJoinRequestDialog";
+import { ContestFormModal } from "./ContestFormModal";
 import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
@@ -61,6 +62,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（日次スパーク）
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);  // 編集フォーム（共有 ContestFormModal・操作統一§4.14）
   const [forbidden, setForbidden] = useState(false);  // 承認制×未参加＝backend 403（応募は一覧から）
   const [fromList, setFromList] = useState(false);     // 戻るラベル＝一覧から来たときだけ「← アイデアコンテスト一覧」（nav 来歴・one-shot）
   const [tab, setTab] = useState(CONTEST_IDEA_TABS[0].key);
@@ -449,7 +451,8 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         <div className="contest-head__top">
           <div className="contest-head__main">
             <div className="contest-head__titles">
-              <h1 className="page-title">{contest.theme}</h1>
+              {/* タイトルは既定 h1 に統一（他詳細と揃える・page-title の pixel 書体は使わない・デザイン標準 §4.14）。 */}
+              <h1>{contest.theme}</h1>
               <span className={`badge ${CONTEST_STATUS_BADGE[contest.status] ?? "badge-muted"}`}>
                 {contestStatusLabel(contest.status)}
               </span>
@@ -461,10 +464,12 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
               <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
             </dl>
           </div>
-          {/* ボタン＋運営メニューはパネル右上（クエスト詳細 .quest-actions と同配置）。権限が無ければサーバーが 403。 */}
-          <div className="contest-head__actions">
+          {/* 操作エリア統一（デザイン標準 §4.14）＝一次アクション(参加する)→編集(運営=can_manage)→⋮(ステータス遷移・削除danger)。権限が無ければサーバー 403。 */}
+          <div className="contest-head__actions detail-head__actions">
             {contest.status === "open" && <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>}
-            {(() => {
+            {/* 編集＝運営のみ（従来は一覧の⋮のみ＝詳細に導線なしだった。共有 ContestFormModal で詳細からも編集可に）。 */}
+            {contest.can_manage && <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>編集</button>}
+            {contest.can_manage && (() => {
               const idx = STATUS_ORDER.indexOf(contest.status);
               const next = idx >= 0 && idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : undefined;
               const prev = idx >= 1 ? STATUS_ORDER[idx - 1] : undefined;
@@ -823,6 +828,10 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           onDecided={() => setPartyReload((n) => n + 1)}
         />
       )}
+
+      {/* 編集フォーム（共有 ContestFormModal・一覧 SC-53 と共用・DRY）。保存後は詳細を再取得。 */}
+      <ContestFormModal open={editOpen} mode="edit" contestId={contestId}
+        onClose={() => setEditOpen(false)} onSaved={() => void load()} />
     </section>
   );
 }

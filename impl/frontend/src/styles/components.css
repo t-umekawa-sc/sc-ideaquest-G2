@@ -229,6 +229,11 @@
 .follow-toggle[aria-pressed="false"] { color: var(--color-text-muted); }
 .follow-toggle:disabled { opacity: .55; cursor: not-allowed; }
 
+/* --- 詳細画面ヘッダーの操作エリア（横断統一・デザイン標準 §4.14・決定 2026-10-05） ---
+   概要パネル右上に ［一次アクション(btn-primary)］［編集(btn-outline)］［⋮ RowMenu(ステータス・削除danger)］ を
+   この順で右寄せ配置。4詳細（クエスト/アイデア/コンテスト/プロジェクト）で共用。 */
+.detail-head__actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+
 /* --- 活発度スパーク（共有 ActivitySpark・SC-22 アイデア詳細／SC-13 発見カタログ） --- */
 .activity { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); background: var(--color-surface-alt); }
 .activity__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
