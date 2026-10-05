@@ -341,6 +341,8 @@ def get_dashboard(session: dict) -> dict:
     open_contests = [c for c in _open_contests_all if c.get("my_status") == "none"][:_OPEN_CONTESTS_LIMIT]
     _all_contests = _safe(lambda: contests_app.list_contests(account_id, company_id)["data"], default=[])
     joined_contests = [c for c in _all_contests if c.get("my_status") == "approved"][:_JOINED_CONTESTS_LIMIT]
+    # Zone E 参加リクエスト中（FR-46）＝自分が申請して承認待ち（requested）のコンテスト。クエスト申請中は join_requests（catalog pending）。
+    requested_contests = [c for c in _all_contests if c.get("my_status") == "requested"][:_JOINED_CONTESTS_LIMIT]
     roles = {
         "is_qg_admin": bool(session.get("is_qg_admin")),
         "is_company_account_admin": session.get("system_role") == "company_account_admin",
@@ -359,6 +361,7 @@ def get_dashboard(session: dict) -> dict:
         "recommended_quests": recommended_quests,  # Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
         "open_contests": open_contests,            # Zone D 募集中のコンテスト（open・未参加・FR-46）
         "joined_contests": joined_contests,        # Zone E 参加中のアイデアコンテスト（approved・FR-46）
+        "requested_contests": requested_contests,  # Zone E 参加リクエスト中のコンテスト（requested・FR-46）
         "announcements": announcements,            # Zone D 運営からのお知らせ（§4.3a 選別・最大3・FR-49）
         "announcements_unread_count": announcements_unread_count,  # お知らせ未読数（FR-49）
     }

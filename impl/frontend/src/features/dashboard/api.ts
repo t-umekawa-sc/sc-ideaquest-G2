@@ -100,6 +100,7 @@ export type DashboardData = {
   recommended_quests: WatchQuestCard[];  // Zone D おすすめのクエスト（発見カタログ my_state=none・再設計§3.1）
   open_contests: ContestCard[];          // Zone D 募集中のコンテスト（open・未参加・FR-46）
   joined_contests: ContestCard[];        // Zone E 参加中のアイデアコンテスト（approved・FR-46）
+  requested_contests: ContestCard[];     // Zone E 参加リクエスト中のアイデアコンテスト（requested・FR-46）
   announcements: DashAnnouncement[];     // Zone D 運営からのお知らせ（§4.3a 選別・最大3・FR-49）
   announcements_unread_count: number;    // お知らせ未読数（FR-49）
 };

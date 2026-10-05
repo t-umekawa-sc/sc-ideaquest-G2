@@ -399,9 +399,17 @@ export function DashboardView({
     ...followed.map((f) => ({ kind: "idea" as const, f })),
     ...followedQuests.map((q) => ({ kind: "quest" as const, q })),
   ];
-  const [eSeeAll, setESeeAll] = useState<null | "joined" | "following">(null);
+  // Zone E 参加リクエスト中＝自分が申請して承認待ち（クエスト=catalog pending／コンテスト=requested・FR-46/40）。
+  const joinRequests = data?.join_requests ?? [];          // クエスト申請中/却下（catalog my_state）
+  const requestedContests = data?.requested_contests ?? []; // コンテスト承認待ち（requested）
+  const requestedAll = [
+    ...joinRequests.map((q) => ({ kind: "quest" as const, q })),
+    ...requestedContests.map((c) => ({ kind: "contest" as const, c })),
+  ];
+  const [eSeeAll, setESeeAll] = useState<null | "joined" | "following" | "requested">(null);
   const [eSeeAllN, setESeeAllN] = useState(15);
-  const E_TITLE = { joined: "参加中", following: "フォロー中" };
+  const E_TITLE = { joined: "参加中", following: "フォロー中", requested: "参加リクエスト中" };
+  const JR_LABEL: Record<string, string> = { pending: "申請中", rejected: "却下" };
 
   const applyContest = async (c: DashboardData["open_contests"][number]) => {
     setAppliedContests((m) => ({ ...m, [c.id]: true }));  // 楽観＝応募したら募集中から外す
@@ -476,6 +484,22 @@ export function DashboardView({
       <button type="button" className="follow-star dash-row__action" aria-pressed={true} aria-label="フォロー解除" title="フォロー中（クリックで解除）" onClick={() => void unfollowQuestCard(it.q.id)}>★</button>
     </div>
   );
+  // 参加リクエスト中の行＝クエスト（申請中/却下）＋コンテスト（承認待ち）。処理は各詳細/カタログで（ここは状況表示）。
+  const renderRequestRow = (it: typeof requestedAll[number]) => it.kind === "quest" ? (
+    <div key={`q:${it.q.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title">📜 <Link href="/quest-catalog">{it.q.title}</Link></div>
+        <div className="dash-row__sub">クエスト ・ <span className={`badge ${it.q.my_state === "rejected" ? "badge-danger" : "badge-muted"}`}>{JR_LABEL[it.q.my_state ?? ""] ?? "申請中"}</span></div>
+      </div>
+    </div>
+  ) : (
+    <div key={`c:${it.c.id}`} className="dash-row">
+      <div className="dash-row__main">
+        <div className="dash-row__title"><Link href={`/contests/${it.c.id}`}>{it.c.theme}</Link> <span className="badge badge-muted">🏆 コンテスト</span></div>
+        <div className="dash-row__sub">⏳ 承認待ち</div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="dash-page stack">
@@ -524,7 +548,7 @@ export function DashboardView({
 
       {/* E マイ＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト・A案）。よく行く先（再設計 §3 Zone E・表示順2）。
           全件は「すべて見る」→標準ダイアログ（混在型のため一覧ページに寄せきれない・§3）。ゾーン全体が空なら非表示。 */}
-      {(joinedAll.length + followingAll.length > 0) && (
+      {(joinedAll.length + followingAll.length + requestedAll.length > 0) && (
         <motion.section aria-label="マイ" {...flowMotion(1)}>
           <div className="dash-2col">
             <section className="card dash-zone-card" aria-label="参加中">
@@ -533,6 +557,13 @@ export function DashboardView({
                 ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
                 : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
             </section>
+            {/* 参加リクエスト中（クエスト申請中/却下＋コンテスト承認待ち）＝申請がある時だけ表示（ユーザー要望）。 */}
+            {requestedAll.length > 0 && (
+              <section className="card dash-zone-card" aria-label="参加リクエスト中">
+                <div className="section-head"><h2>✋ 参加リクエスト中</h2>{requestedAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("requested"); }}>すべて見る（全{requestedAll.length}件）→</button>}</div>
+                {requestedAll.slice(0, E_PANEL).map(renderRequestRow)}
+              </section>
+            )}
             <section className="card dash-zone-card" aria-label="フォロー中">
               <div className="section-head"><h2><span className="dash-star-y">★</span> フォロー中 <span className="badge badge-muted">アイデア＋クエスト</span></h2>{followingAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("following"); }}>すべて見る（全{followingAll.length}件）→</button>}</div>
               {followingAll.length > 0
@@ -808,15 +839,16 @@ export function DashboardView({
       {/* E マイ「すべて見る」＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト）の全件ダイアログ（標準 Modal・混在型・§3）。 */}
       {eSeeAll && (
         <Modal open={!!eSeeAll} onClose={() => setESeeAll(null)} onClosed={() => setESeeAllN(15)}
-          title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : followingAll.length)}件）`} size="lg">
+          title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length)}件）`} size="lg">
           <ModalBody>
             <div>
               {eSeeAll === "joined" && joinedAll.slice(0, eSeeAllN).map(renderJoinedRow)}
               {eSeeAll === "following" && followingAll.slice(0, eSeeAllN).map(renderFollowingRow)}
+              {eSeeAll === "requested" && requestedAll.slice(0, eSeeAllN).map(renderRequestRow)}
             </div>
-            {(eSeeAll === "joined" ? joinedAll.length : followingAll.length) > eSeeAllN && (
+            {(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length) > eSeeAllN && (
               <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
-                <button type="button" className="btn btn-outline" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る（残り{(eSeeAll === "joined" ? joinedAll.length : followingAll.length) - eSeeAllN}件）</button>
+                <button type="button" className="btn btn-outline" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る</button>
               </div>
             )}
             <p className="dash-panel-empty" style={{ marginTop: "var(--space-4)" }}>

@@ -24,6 +24,7 @@
 | I-TC-164 | int | Zone D 募集中のコンテスト（open・未参加のみ＝応募動線） | status=open のコンテスト2（me は一方に approved・他方は none）・draft コンテスト1 | `dashboard/application.get_dashboard`（`open_contests`） | `open_contests` に my_status=none かつ status=open のコンテストのみ（approved/draft は出ない）＝ダッシュボードから応募できる機会のみ | I.3／FR-46／再設計§3.1 D |
 | I-TC-165 | int | Zone E 参加中のアイデアコンテスト（approved のみ） | 承認済み参加コンテスト1・未参加(open)コンテスト1 | `dashboard/application.get_dashboard`（`joined_contests`） | `joined_contests` に my_status=approved のコンテストのみ（未参加は出ない）＝よく行く先 | I.3／FR-46／再設計§3.1 E |
 | I-TC-166 | int | Zone D おすすめのクエスト（発見カタログ my_state=none のみ） | discoverable クエスト3（me は member/following/none が各1） | `dashboard/application.get_dashboard`（`recommended_quests`） | `recommended_quests` に my_state=none（未参加・未フォロー・未申請）のクエストのみ（member/following/pending は出ない＝参加/フォロー済みはおすすめに出さない） | I.3／FR-40／再設計§3.1 D |
+| I-TC-167 | int | Zone E 参加リクエスト中のアイデアコンテスト（requested のみ） | open コンテストに me が requested・別に approved/未参加 | `dashboard/application.get_dashboard`（`requested_contests`） | `requested_contests` に my_status=requested のコンテストのみ（approved/未参加/draft は出ない）＝申請中が一目で分かる。クエストの参加申請中は `join_requests`（catalog pending）で表示 | I.3／FR-46／SC-01 Zone E |
 
 ## 2. login_bonus（ワンショット・I.1/A.1/G.6）
 
