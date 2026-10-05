@@ -276,3 +276,5 @@
 .dash-page .dash-row__action { flex: 0 0 auto; }
 /* 空状態メッセージ（パネルは残して中身だけ空状態＝D/E のグリッド崩れ回避・§3.1 改訂）。 */
 .dash-page .dash-panel-empty { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
+/* フォロー中パネル見出しの★＝金色（.follow-star と同色・ユーザー要望）。 */
+.dash-page .dash-star-y { color: var(--pixel-xp); }
