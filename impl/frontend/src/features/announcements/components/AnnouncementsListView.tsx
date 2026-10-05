@@ -38,6 +38,8 @@ export function AnnouncementsListView() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+  // すべて/未読/既読 スイッチ（ユーザー要望・既定＝すべて）。
+  const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
   useScrollRestore(rows !== null);
 
   useEffect(() => {
@@ -65,6 +67,18 @@ export function AnnouncementsListView() {
     { key: "readAt", label: "既読日時", width: 160, sortable: true, sortVal: (x) => x.readAtSort, csvVal: (x) => x.readAt, render: (x) => x.readAt },
   ], []);
 
+  // スイッチの件数と絞り込み後の表示データ（状態＝statusLabel で判定）。
+  const counts = useMemo(() => {
+    const all = rows ?? [];
+    const read = all.filter((x) => x.statusLabel === "既読").length;
+    return { all: all.length, unread: all.length - read, read };
+  }, [rows]);
+  const visibleRows = useMemo(
+    () => (rows ?? []).filter((x) => readFilter === "all" || (readFilter === "read" ? x.statusLabel === "既読" : x.statusLabel === "未読")),
+    [rows, readFilter],
+  );
+  const R_FILTERS: [typeof readFilter, string][] = [["all", "すべて"], ["unread", "未読"], ["read", "既読"]];
+
   return (
     <section aria-label="お知らせ一覧">
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
@@ -75,6 +89,18 @@ export function AnnouncementsListView() {
         運営からの全社お知らせです（未読 {unreadCount} 件）。行をクリックで全文を開きます。
       </p>
 
+      {/* 既読状態スイッチ（すべて/未読/既読・ユーザー要望）。 */}
+      {rows !== null && !err && (
+        <div className="segmented" role="radiogroup" aria-label="既読状態の絞り込み" style={{ marginBottom: "var(--space-4)" }}>
+          {R_FILTERS.map(([k, label]) => (
+            <label key={k}>
+              <input type="radio" name="ann-read-filter" checked={readFilter === k} onChange={() => setReadFilter(k)} />
+              {label} <span className="seg-n">{counts[k]}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
       {err ? (
         <p className="form-error" role="alert">{err}</p>
       ) : rows === null ? (
@@ -82,7 +108,7 @@ export function AnnouncementsListView() {
       ) : (
         <DataTable<Row>
           storageKey="sc95-announcements"
-          data={rows}
+          data={visibleRows}
           columns={columns}
           rowId={(x) => x.id}
           unit="件"
