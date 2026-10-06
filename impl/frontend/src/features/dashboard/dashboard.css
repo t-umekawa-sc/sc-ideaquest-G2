@@ -101,9 +101,9 @@
 .dash-page .follow-card.is-frozen .card-title { color: var(--color-text-muted); }
 .dash-page .follow-frozen-note { margin-top: var(--space-2); }
 
-/* 下段：通知＋ショートカット */
-.dash-page .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
-/* 議論の2カラム行＝💬新着の議論（左）＋🕒最近の議論（右・更新順の別動線・SC-01 §4.8c）。
+/* C キャッチアップ row1＝議論タブカード（💬新着/🕒最近を1枚に集約）＋🔔最近の通知の2カラム（モック Zone C 一致）。
+   row2 のチームアクティビティは .dash-actrow（全幅・既定ブロック）で .stack の余白に従う。
+   align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。
    align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。
    minmax(0,1fr)＝1fr の暗黙 min-width:auto が nowrap 子（.unread-item__title 等）で
    トラックを content 幅まで膨張させ横スクロール（狭幅で切れる）を生む問題を防ぐガード。 */
@@ -149,7 +149,6 @@
 
 @media (max-width: 860px) {
   .dash-page .dash-top { grid-template-columns: 1fr; }
-  .dash-page .dash-bottom { grid-template-columns: 1fr; }
   .dash-page .dash-discuss { grid-template-columns: minmax(0, 1fr); }
 }
 
