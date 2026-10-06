@@ -700,7 +700,7 @@ export function DashboardView({
 
         <section className="card" aria-label="最近の通知">
           <div className="section-head">
-            <h2 style={{ fontSize: "var(--text-lg)" }}>🔔 最近の通知</h2>
+            <h2 style={{ fontSize: "var(--text-base)" }}>🔔 最近の通知</h2>
             <Link className="dash-head-link" href="/notifications" aria-label="すべての通知" title="すべての通知"><span className="dash-head-link__text">すべての通知 →</span><span className="dash-head-link__icon" aria-hidden="true">→</span></Link>
           </div>
           <ul className="notif-list">
@@ -745,7 +745,7 @@ export function DashboardView({
       {/* C キャッチアップ row2（全幅）＝📣 チームアクティビティ＝左フィード＋右「活動の活発さ」spark（SC-01 §4.8b・FR-36・モック Zone C）。 */}
       <motion.div className="dash-actrow" {...flowMotion(2)}>
         <section className="card" aria-label="チームアクティビティ">
-          <div className="section-head"><h2 style={{ fontSize: "var(--text-lg)" }}>📣 チームアクティビティ</h2></div>
+          <div className="section-head"><h2 style={{ fontSize: "var(--text-base)" }}>📣 チームアクティビティ</h2></div>
           <div className="dash-actwrap">
             <div>
               <ActivityFeed title="" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />

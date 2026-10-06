@@ -305,7 +305,7 @@
 /* ゾーンパネルのタブ（Zone B/E）＝canonical `.tab`（quest詳細）と同じ下線タブの見た目を
    カード内ゾーン向けに軽量スコープ化（page全幅の sticky `.tabs` は重いので流用しない・ユーザー要望でセグメント→タブ化）。
    タブ行はカード上辺の見出し帯＝下線でコンテンツと区切る。右端に「すべて見る」。 */
-.dash-page .dash-tabs { display: flex; align-items: flex-end; gap: var(--space-1); flex-wrap: wrap; border-bottom: 2px solid var(--color-border); margin-bottom: var(--space-4); }
+.dash-page .dash-tabs { display: flex; align-items: flex-end; gap: var(--space-1); row-gap: var(--space-2); flex-wrap: wrap; border-bottom: 2px solid var(--color-border); margin-bottom: var(--space-4); }
 .dash-page .dash-tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-2) var(--space-3); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background .12s, color .12s; }
 .dash-page .dash-tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
 .dash-page .dash-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary-soft); }
@@ -321,6 +321,8 @@
 .dash-seeall .vote-grid,
 .dash-seeall .quest-grid,
 .dash-seeall .draft-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* 未投票カードは賛成/反対ボタン・投稿者・本文で情報量が多く3列は窮屈＝全件ダイアログは2列でゆったり（承認待ち/下書きは3列のまま）。 */
+.dash-seeall .vote-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 760px) {
   .dash-seeall .vote-grid,
   .dash-seeall .quest-grid,
