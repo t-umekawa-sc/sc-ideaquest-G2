@@ -37,6 +37,7 @@ from app.tenant.ai_jobs.router import router as ai_jobs_router
 from app.tenant.capabilities.router import router as capabilities_router
 from app.tenant.contests.router import router as contests_router
 from app.tenant.announcements.router import router as announcements_router
+from app.core.access_gate import access_mode_gate
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -118,6 +119,9 @@ app.include_router(announcements_router)  # テナントプレーン（ドメイ
 
 # 冪等キー（§1.9）＝add_request_id の内側（request_id 設定後）に置く。header 無し POST は素通し。
 app.middleware("http")(idempotency_middleware)
+
+# 公開モード外周アクセスゲート（FR-48 §8.0）＝public 会社は許可リスト外を 403。add_request_id の内側（request_id 済）。
+app.middleware("http")(access_mode_gate)
 
 
 @app.middleware("http")

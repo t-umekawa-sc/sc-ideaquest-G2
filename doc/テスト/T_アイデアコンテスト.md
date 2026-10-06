@@ -47,6 +47,15 @@
 | T-TC-139 | api | backing quest は**クエストとして発見/参加/詳細不可**（器を内部に閉じる・サーバーガード） | contest（backing quest あり） | `GET /quests/{backing}`／`POST /quests/{backing}/join-request`／`POST /quests/{backing}/follow` | 詳細=404・参加リクエスト=404（存在秘匿・`can_discover_quest`）・フォロー=404／アイデア一覧 `GET /quests/{backing}/ideas` は従来どおり可（コンテスト内部経路は can_access_quest 経由で無影響） | §2.2／FR-46 |
 | T-TC-141 | api | 参加リクエスト承認の判断材料プロフィール＝運営のみ・コンテスト内活動＋ゲーム層・申請のない user は404 | 承認制 contest・requested 済み・運営/一般 | `GET /contests/{id}/participation/{uid}/profile` | 運営=200（posted_idea_count/vote_count/chat_message_count＋game〔モードON時〕）／一般（運営でない）=403／未申請 user=404（存在秘匿） | T.2／C.9.1／SC-01/SC-54 |
 
+## 2b. 公開モード外周アクセスゲート（FR-48 §8.0・決定O・2026-10-04）
+
+> `companies.access_mode='public'`（コンテスト専用テナント）＝役割別許可リスト外のEPをサーバーで 403（UI非依存・§1.6）。可視ゲート（§2.3）とは直交する2段目の外周ガード。実装＝`app/core/access_gate.py`（middleware・全/api/v1 一律）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| T-TC-204 | unit | 許可判定（純関数）＝コンテスト許可リストは全ロール可／管理許可リストは管理者のみ追加／業務EPは管理者でも不可（決定O） | `access_gate.is_path_allowed(sub, is_admin)` | contest系（/contests・/ideas・/chat-messages・/search・/me・/notifications）／admin系（/companies・/accounts・/admin）／業務系（/quests・/concepts・/dashboard）を general/admin で判定 | contest系＝general/admin とも True／admin系＝admin のみ True・general False／業務系＝general/admin とも False（公開会社はコンテスト専用） | §8.0／決定O |
+| T-TC-205 | int | public 会社は許可リスト外を 403・コンテスト系は素通し／private は不変（middleware 外周ガード） | シード会社を access_mode=public とみなす（`access_gate._resolve` を monkeypatch）・一般ログイン | `GET /quests`（業務）／`GET /contests`（コンテスト）を public で／private（非patch）で `GET /quests` | public×general＝`/quests` 403 `forbidden`・`/contests` は 403 以外（ゲート非該当）／private＝`/quests` は 403 にならない（従来どおり） | §8.0／§1.6 |
+
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
