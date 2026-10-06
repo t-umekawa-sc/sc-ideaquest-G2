@@ -560,17 +560,14 @@ export function DashboardView({
                 ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
                 : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
             </section>
-            {/* フォロー中／参加リクエスト中＝タブ集約（ユーザー要望・Zone B と同じ segmented）。既定＝フォロー中（リクエストは通常0件）。 */}
+            {/* フォロー中／参加リクエスト中＝タブ集約（ユーザー要望・Zone B と同じ下線タブ）。既定＝フォロー中（リクエストは通常0件）。 */}
             <section className="card dash-zone-card" aria-label="フォロー中・参加リクエスト中">
-              <div className="section-head">
-                <div className="segmented" role="radiogroup" aria-label="マイの種別">
-                  {(["following", "requested"] as const).map((k) => (
-                    <label key={k}>
-                      <input type="radio" name="dash-etab" checked={eMyTab === k} onChange={() => setEMyTab(k)} />
-                      {k === "following" ? "★ フォロー中" : "✋ 参加リクエスト中"} <span className="seg-n">{eMyCounts[k]}</span>
-                    </label>
-                  ))}
-                </div>
+              <div className="dash-tabs" role="tablist" aria-label="マイの種別">
+                {(["following", "requested"] as const).map((k) => (
+                  <button key={k} type="button" className={`dash-tab${eMyTab === k ? " is-active" : ""}`} role="tab" aria-selected={eMyTab === k} onClick={() => setEMyTab(k)}>
+                    {k === "following" ? "★ フォロー中" : "✋ 参加リクエスト中"} <span className="seg-n">{eMyCounts[k]}</span>
+                  </button>
+                ))}
                 {eMyCounts[eMyTab] > E_PANEL && (
                   <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll(eMyTab); }}>すべて見る（全{eMyCounts[eMyTab]}件）→</button>
                 )}
@@ -593,24 +590,23 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B・表示順3）。 */}
+      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B・表示順3）。
+          ユーザー要望でセグメント→下線タブ＋カード枠で囲う。 */}
       {bHasAny && (
         <motion.section aria-label="あなたの番" {...flowMotion(1)}>
-          <div className="section-head">
-            <div className="segmented" role="radiogroup" aria-label="要対応の種別">
+          <section className="card dash-zone-card">
+            <div className="dash-tabs" role="tablist" aria-label="要対応の種別">
               {(["vote", "req", "draft"] as const).map((k) => (
-                <label key={k}>
-                  <input type="radio" name="dash-btab" checked={bTab === k} onChange={() => setBTab(k)} />
+                <button key={k} type="button" className={`dash-tab${bTab === k ? " is-active" : ""}`} role="tab" aria-selected={bTab === k} onClick={() => setBTab(k)}>
                   {k === "vote" ? "未投票" : k === "req" ? "承認待ち" : "下書き"} <span className="seg-n">{bCounts[k]}</span>
-                </label>
+                </button>
               ))}
+              {bCounts[bTab] > B_PANEL && (
+                <button type="button" className="dash-see-all" onClick={() => { setBSeeAllN(15); setBSeeAll(bTab); }}>すべて見る（全{bCounts[bTab]}件）→</button>
+              )}
             </div>
-            {bCounts[bTab] > B_PANEL && (
-              <button type="button" className="dash-see-all" onClick={() => { setBSeeAllN(15); setBSeeAll(bTab); }}>すべて見る（全{bCounts[bTab]}件）→</button>
-            )}
-          </div>
-          {/* 全タブを重ね置き＝高さは最も高いタブに固定（切替えても高さが変わらない）。各タブは0件でも空状態を表示。 */}
-          <div className="dash-tabstack">
+            {/* 全タブを重ね置き＝高さは最も高いタブに固定（切替えても高さが変わらない）。各タブは0件でも空状態を表示。 */}
+            <div className="dash-tabstack">
             <div className="dash-tabpane vote-grid" aria-hidden={bTab !== "vote"}>
               {unvoted.length > 0
                 ? unvoted.slice(0, B_PANEL).map(renderVoteCard)
@@ -626,7 +622,8 @@ export function DashboardView({
                 ? drafts.slice(0, B_PANEL).map(renderDraftCard)
                 : <p className="dash-panel-empty">下書きはありません。</p>}
             </div>
-          </div>
+            </div>
+          </section>
         </motion.section>
       )}
       {/* 並び順（ユーザー要望・2026-09-15）＝新着の議論 → チームアクティビティ＋最近の通知 → 未投票 → フォロー中 → 下書き → 参加中クエスト。
