@@ -81,6 +81,14 @@ export type DashAnnouncement = {
 export type RankRow = { rank: number; user: { id: string; name: string; avatar?: string | null; level?: number }; score: number; xp: number; coin: number };
 export type WeeklyRanking = { data: RankRow[]; me: { rank: number | null; score: number; xp: number; coin: number; total_users: number } };
 
+// 📣 チームアクティビティ「活動の活発さ」＝参加クエスト横断の日次活動件数（直近14日・今日含む）＋今週/先週/増減率（SC-01 §4.8b）。
+export type TeamActivitySpark = {
+  daily: { date: string; count: number }[];
+  this_week: number;
+  prev_week: number;
+  delta_pct: number | null;
+};
+
 export type DashboardData = {
   hero: DashHero | null;
   drafts: Draft[];
@@ -89,6 +97,7 @@ export type DashboardData = {
   followed_ideas: FollowedIdea[];
   unread_chats: UnreadChatIdea[];
   recent_chats: UnreadChatIdea[];  // 🕒 最近の議論（更新順・既読/未読問わず・別動線）
+  team_activity_spark: TeamActivitySpark | null;  // 📣 チームアクティビティ 活動の活発さ（SC-01 §4.8b）
   weekly_ranking: WeeklyRanking | null;
   notifications: { data: NotificationDTO[]; unread_count: number } | null;
   roles: { is_qg_admin: boolean; is_company_account_admin: boolean; is_system_admin: boolean };

@@ -87,7 +87,7 @@ export function ActivityFeed({
 
   return (
     <div className="feed">
-      <h3 className="feed__title">{title}</h3>
+      {title ? <h3 className="feed__title">{title}</h3> : null}
       {ready && items.length === 0 ? (
         <EmptyState icon="📣" title={emptyText} />
       ) : (

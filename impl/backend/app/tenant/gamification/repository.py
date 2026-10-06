@@ -162,6 +162,30 @@ def list_team_feed(session: Session, quest_ids, *,
     return list(session.execute(stmt).scalars().all())
 
 
+# 📣 チームアクティビティ「活動の活発さ」の集計対象＝クエスト内の“場の活動”（投稿/投票/チャット/評価）。
+# 私的・全社系（login/shop_purchase/spell_unlock/achievement_reward/levelup/contest_award 等）は除外＝
+# クエストに紐づく協働の密度だけを可視化（集計は件数のみ＝投票の匿名性 FR-23 は破らない）。SC-01 §4.8b。
+TEAM_ACTIVITY_REASONS = ("idea_post", "vote", "concept_vote", "chat", "evaluation", "selection")
+
+
+def daily_activity_counts(session: Session, quest_ids, *, reasons, since: datetime) -> list[tuple]:
+    """参加クエスト横断の日次活動件数（活動の活発さ・SC-01 §4.8b）。返り値＝[(date, count)]（created_at の日単位・昇順）。
+    quest_id が scope 内かつ reason∈reasons かつ created_at≥since の Activity 行のみを日ごとに数える（全メンバー分）。
+    """
+    ids = list(quest_ids)
+    if not ids:
+        return []
+    day = func.date_trunc("day", Activity.created_at)
+    rows = session.execute(
+        select(day.label("d"), func.count()).where(
+            Activity.quest_id.in_(ids),
+            Activity.reason.in_(tuple(reasons)),
+            Activity.created_at >= since,
+        ).group_by(day).order_by(day)
+    ).all()
+    return [(d, int(n)) for d, n in rows]
+
+
 def exists_ref(
     session: Session, user_id: uuid.UUID, kind: str, reason: str,
     ref_type: str | None, ref_id: uuid.UUID | None,

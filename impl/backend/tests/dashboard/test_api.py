@@ -6,6 +6,7 @@ throwaway 実アカウントでログインして集約結果を照合。全て�
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -14,6 +15,8 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.evaluations import repository as evals_repo
+from app.tenant.gamification import repository as gami_repo
+from app.tenant.gamification.orm import Activity
 from app.tenant.evaluations.orm import Evaluation, EvaluationScore
 from app.tenant.ideas.orm import Follow, Idea, Vote
 from app.tenant.notifications.orm import Notification
@@ -208,3 +211,70 @@ def test_i_tc_121_unauthenticated(client):
     """I-TC-121 未認証は 401。"""
     client.cookies.clear()
     assert client.get(DASH).status_code == 401
+
+
+def _mk_activity(ts, *, user_id, quest_id, reason, created_at):
+    ts.add(Activity(id=uuid.uuid4(), user_id=user_id, kind="xp_gain", amount=0,
+                    reason=reason, quest_id=quest_id, created_at=created_at))
+
+
+def test_i_tc_168_daily_activity_counts(client, factory):
+    """I-TC-168 日次活動件数＝quest/reason/期間フィルタ（投稿/投票/チャット/評価のみ・参加クエスト・since 以降）。"""
+    db = _db()
+    qid, other_qid, uid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    today = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    yday = today - timedelta(days=1)
+    since = (now - timedelta(days=14)).replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        with get_tenant_session(db) as ts:
+            ts.add(User(id=uid, account_id=uuid.uuid4(), display_name="Act", locale="ja", status="active"))
+            ts.flush()  # activities.user_id は users への FK＝実ユーザーが要る
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="idea_post", created_at=today)
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="vote", created_at=today)
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="chat", created_at=yday)
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="login", created_at=today)        # 対象外 reason
+            _mk_activity(ts, user_id=uid, quest_id=other_qid, reason="idea_post", created_at=today)  # scope 外
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="idea_post", created_at=now - timedelta(days=30))  # 期間外
+            ts.commit()
+        with get_tenant_session(db) as ts:
+            rows = gami_repo.daily_activity_counts(
+                ts, [qid], reasons=gami_repo.TEAM_ACTIVITY_REASONS, since=since)
+        bymap = {(d.date() if hasattr(d, "date") else d).isoformat(): n for d, n in rows}
+        assert bymap.get(today.date().isoformat()) == 2   # idea_post + vote（login/別quest/期間外は除外）
+        assert bymap.get(yday.date().isoformat()) == 1     # chat
+        assert sum(bymap.values()) == 3
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(Activity.__table__.delete().where(Activity.quest_id.in_([qid, other_qid])))
+            ts.execute(User.__table__.delete().where(User.id == uid))
+            ts.commit()
+
+
+def test_i_tc_169_team_activity_spark(client, factory, seeded):
+    """I-TC-169 /dashboard の team_activity_spark＝14日 daily（0埋め）＋today/yday 反映＋stats。"""
+    acc, uid = _login_dash(client, factory)
+    seeded["build"](uid)
+    qid = seeded["ids"]["qid"]
+    now = datetime.now(timezone.utc)
+    today = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    yday = today - timedelta(days=1)
+    try:
+        with get_tenant_session(_db()) as ts:
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="idea_post", created_at=today)
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="chat", created_at=today)
+            _mk_activity(ts, user_id=uid, quest_id=qid, reason="evaluation", created_at=yday)
+            ts.commit()
+        spark = client.get(DASH).json()["team_activity_spark"]
+        assert spark is not None
+        assert len(spark["daily"]) == 14                         # 14日 0埋め
+        assert spark["daily"][-1]["date"] > spark["daily"][0]["date"]  # 昇順
+        by = {d["date"]: d["count"] for d in spark["daily"]}
+        assert by[today.date().isoformat()] == 2                 # idea_post + chat
+        assert by[yday.date().isoformat()] == 1                  # evaluation
+        assert spark["this_week"] >= 3                           # 直近7日に3件（ログインXP等が混じる可能性で >=）
+        assert "prev_week" in spark and "delta_pct" in spark
+    finally:
+        with get_tenant_session(_db()) as ts:
+            ts.execute(Activity.__table__.delete().where(Activity.quest_id == qid))
+            ts.commit()

@@ -12,7 +12,7 @@ import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-import { Avatar, CountUp, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, CountUp, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { DashboardFx, type DashboardFxHandle } from "./DashboardFx";
 import { getTeamFeed } from "@/features/feed/api";
@@ -248,6 +248,7 @@ export function DashboardView({
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
   const recentChats = data?.recent_chats ?? [];  // 🕒 最近の議論（更新順・既読/未読問わず・別動線）
+  const spark = data?.team_activity_spark ?? null;  // 📣 活動の活発さ（直近14日・今週/先週比）
 
   // 最近の通知をクリック＝SC-02 と同様に既読化（楽観更新＋サーバー・未読数も減算）。realtime でベルも追随。
   const markNotifRead = (id: string, wasRead: boolean) => {
@@ -741,11 +742,29 @@ export function DashboardView({
 
       </motion.div>
 
-      {/* C キャッチアップ row2（全幅）＝📣 チームアクティビティ（参加クエスト横断の場の活動・SC-01 §4.8b・FR-36）。 */}
+      {/* C キャッチアップ row2（全幅）＝📣 チームアクティビティ＝左フィード＋右「活動の活発さ」spark（SC-01 §4.8b・FR-36・モック Zone C）。 */}
       <motion.div className="dash-actrow" {...flowMotion(2)}>
         <section className="card" aria-label="チームアクティビティ">
-          {/* (b) 見た目をモックに寄せる＝見出しに 📣。スパークライン「活動の活発さ」は (a) で backend 集計を足して後日追加。 */}
-          <ActivityFeed title="📣 チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />
+          <div className="section-head"><h2 style={{ fontSize: "var(--text-lg)" }}>📣 チームアクティビティ</h2></div>
+          <div className="dash-actwrap">
+            <div>
+              <ActivityFeed title="" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />
+            </div>
+            {spark && (
+              <div className="dash-actwrap__graph">
+                <ActivitySpark
+                  daily={spark.daily}
+                  label="📈 活動の活発さ"
+                  recentCount={3}
+                  legend="棒＝日次の活動件数（投稿/投票/チャット/評価・直近14日・濃い3本＝直近3日）"
+                />
+                <div className="dash-spark-stats">
+                  <div><b>{spark.this_week}</b> 件<div className="muted text-xs">今週の活動</div></div>
+                  <div><b>{spark.delta_pct == null ? "—" : `${spark.delta_pct > 0 ? "+" : ""}${spark.delta_pct}%`}</b><div className="muted text-xs">先週比</div></div>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </motion.div>
 

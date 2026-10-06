@@ -48,6 +48,8 @@
 | I-TC-142 | int | D 横断 read＝未投票（参加クエスト・自票なし・締切内） | 参加/非参加・投票済/未投票混在 | `list_unvoted_published_ideas` | 参加クエストの published で自票なしのみ | I.3 |
 | I-TC-143 | int | F 横断 read＝本人下書き評価（進捗 scored/5） | 下書き評価（scored 2）＋確定評価 | `list_draft_evaluations_by_evaluator` | 下書きのみ・progress scored=2/total=5 | I.3 |
 | I-TC-163 | int | 議論/未投票スコープに**参加承認済みコンテスト**の backing quest を含む・未参加は含まない（FR-46 統合・Phase1） | 承認制コンテスト＋backing quest に公開アイデア・me は approved 参加者／別 me2 は未参加 | `contests/repository.approved_participation_quest_ids`／`dashboard/application._scope_quest_ids`／`_unvoted` | approved の me＝scope に backing quest を含み `_unvoted` に当該アイデアが出る／未参加 me2＝scope に含まない（auto_approve でも未参加は不可＝参加状態のみ） | §2.3／FR-46／I.3 |
+| I-TC-168 | int | 📣 チームアクティビティ「活動の活発さ」＝参加クエスト横断の**日次活動件数**集計（reason/quest/期間フィルタ） | 参加クエストに活動 Activity（idea_post/vote/chat/evaluation）を複数日・別クエスト（非参加）にも活動／期間外も作成 | `gamification/repository.daily_activity_counts(quest_ids, reasons, since)` | 参加クエスト かつ `reason∈{idea_post,vote,concept_vote,chat,evaluation}` かつ `created_at≥since` の行のみ日単位で集計＝[(date,count)]（非参加クエスト・対象外reason・期間外は除外・login/shop等の私的reasonも除外） | SC-01 §4.8b／FR-36／I.3 |
+| I-TC-169 | int | 📣 チームアクティビティ spark を `/dashboard` が返す（直近14日 daily 0埋め＋今週/先週/増減率） | 参加クエストに直近数日の活動を seed | `dashboard/application._team_activity_spark`／`GET /dashboard` | `team_activity_spark.daily` が14要素（抜け日は count=0 で0埋め・date 昇順）／`this_week`＝直近7日合計・`prev_week`＝その前7日合計・`delta_pct`＝`round((this-prev)/prev*100)`（prev=0 は null）／参加0件は daily 全0・stats 0 | SC-01 §4.8b／I.1 |
 
 ## 5. 画面 e2e（SC-01・最近の通知）
 

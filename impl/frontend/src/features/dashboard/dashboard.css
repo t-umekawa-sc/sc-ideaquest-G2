@@ -108,6 +108,14 @@
    minmax(0,1fr)＝1fr の暗黙 min-width:auto が nowrap 子（.unread-item__title 等）で
    トラックを content 幅まで膨張させ横スクロール（狭幅で切れる）を生む問題を防ぐガード。 */
 .dash-page .dash-discuss { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); align-items: stretch; }
+/* 📣 チームアクティビティ row2（全幅）＝左フィード＋右「活動の活発さ」spark（モック Zone C sg-actwrap 一致）。 */
+.dash-page .dash-actwrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-6); align-items: start; }
+@media (max-width: 820px) { .dash-page .dash-actwrap { grid-template-columns: minmax(0, 1fr); } }
+.dash-page .dash-actwrap__graph { border-left: 1px solid var(--color-border); padding-left: var(--space-6); }
+@media (max-width: 820px) { .dash-page .dash-actwrap__graph { border-left: 0; padding-left: 0; border-top: 1px solid var(--color-border); padding-top: var(--space-4); } }
+.dash-page .dash-spark-stats { display: flex; gap: var(--space-5); margin-top: var(--space-3); flex-wrap: wrap; }
+.dash-page .dash-spark-stats b { font-size: var(--text-lg); color: var(--color-text); margin-right: 2px; }
+
 .dash-page .notif-list { list-style: none; margin: 0; padding: 0; }
 .dash-page .notif-list li { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
 .dash-page .notif-list li:first-child { border-top: 0; }

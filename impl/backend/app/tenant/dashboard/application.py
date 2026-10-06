@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 from app.control_plane.auth.orm import Company
@@ -20,6 +21,7 @@ from app.tenant.dashboard import login_bonus
 from app.tenant.chat import repository as chat_repo
 from app.tenant.evaluations import repository as evals_repo
 from app.tenant.gamification import application as gami_app
+from app.tenant.gamification import repository as gami_repo
 from app.tenant.gamification.level import level_progress
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.notifications import application as notif_app
@@ -141,6 +143,29 @@ def _scope_quest_ids(ts, user: User) -> list:
     ids = list(quests_repo.list_member_quest_ids(ts, user.id))
     ids += contest_repo.approved_participation_quest_ids(ts, user.id)
     return list(dict.fromkeys(ids))
+
+
+_SPARK_DAYS = 14  # 📣 活動の活発さ＝直近14日の日次（濃い3本＝直近3日・mock Zone C）。
+
+
+def _team_activity_spark(ts, user: User) -> dict:
+    """📣 チームアクティビティ「活動の活発さ」＝参加クエスト横断の日次活動件数（投稿/投票/チャット/評価・直近14日）＋
+    今週（直近7日）合計・先週（その前7日）合計・増減率。抜け日は 0 埋めして14本の棒を必ず返す（SC-01 §4.8b）。
+    """
+    quest_ids = _scope_quest_ids(ts, user)
+    # 直近14日＝今日を含む（start＝13日前の0時〜今日）。this_week＝直近7日・prev_week＝その前7日。
+    start = (datetime.now(timezone.utc) - timedelta(days=_SPARK_DAYS - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    rows = gami_repo.daily_activity_counts(
+        ts, quest_ids, reasons=gami_repo.TEAM_ACTIVITY_REASONS, since=start)
+    bycount = {(d.date() if hasattr(d, "date") else d).isoformat(): n for d, n in rows}
+    daily = [{"date": (start + timedelta(days=i)).date().isoformat(),
+              "count": bycount.get((start + timedelta(days=i)).date().isoformat(), 0)}
+             for i in range(_SPARK_DAYS)]
+    this_week = sum(x["count"] for x in daily[-7:])
+    prev_week = sum(x["count"] for x in daily[:7])
+    delta_pct = None if prev_week == 0 else round((this_week - prev_week) / prev_week * 100)
+    return {"daily": daily, "this_week": this_week, "prev_week": prev_week, "delta_pct": delta_pct}
 
 
 def _unvoted(ts, user: User) -> list[dict]:
@@ -309,6 +334,7 @@ def get_dashboard(session: dict) -> dict:
         followed = _safe(lambda: _followed(ts, user), default=[])
         unread_chats = _safe(lambda: _unread_chats(ts, user), default=[])
         recent_chats = _safe(lambda: _recent_chats(ts, user), default=[])
+        team_activity_spark = _safe(lambda: _team_activity_spark(ts, user))  # 📣 活動の活発さ（SC-01 §4.8b・I.4 で失敗時 null）
         incoming_join_requests = _safe(lambda: _incoming_join_requests(ts, user), default=[])
         incoming_contest_requests = _safe(lambda: _incoming_contest_requests(ts, user), default=[])
         # Zone D 運営からのお知らせ（FR-49・§4.3a 選別・最大3＋未読数）＝U の read を I.3 の殻から呼ぶ。
@@ -354,6 +380,8 @@ def get_dashboard(session: dict) -> dict:
     return {
         "hero": hero, "drafts": drafts, "unvoted_ideas": unvoted, "quests": quests,
         "followed_ideas": followed, "unread_chats": unread_chats, "recent_chats": recent_chats, "weekly_ranking": weekly_ranking,
+        "team_activity_spark": team_activity_spark,  # 📣 チームアクティビティ 活動の活発さ（SC-01 §4.8b）
+
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
         "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
         "incoming_join_requests": incoming_join_requests,  # FR-40（未処理の受信参加リクエスト・owner/quest_admin）
