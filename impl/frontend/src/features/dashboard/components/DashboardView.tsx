@@ -699,12 +699,13 @@ export function DashboardView({
 
         <section className="card" aria-label="最近の通知">
           <div className="section-head">
-            <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>
+            <h2 style={{ fontSize: "var(--text-lg)" }}>🔔 最近の通知</h2>
             <Link className="dash-head-link" href="/notifications" aria-label="すべての通知" title="すべての通知"><span className="dash-head-link__text">すべての通知 →</span><span className="dash-head-link__icon" aria-hidden="true">→</span></Link>
           </div>
           <ul className="notif-list">
             {notifs.length === 0 && <li className="muted text-sm">新しい通知はありません</li>}
-            {notifs.map((n) => {
+            {/* glance パネル＝直近5件のみ（既読も含む recent・全件は「すべての通知」→SC-02）。ユーザー決定2026-10-06。 */}
+            {notifs.slice(0, 5).map((n) => {
               const href = notificationHref(n);
               // 件名＝body（参照先があればリンク）。メッセージ＝context はパネル全幅で下に表示（ユーザー要望）。
               const title = href ? (
@@ -743,7 +744,8 @@ export function DashboardView({
       {/* C キャッチアップ row2（全幅）＝📣 チームアクティビティ（参加クエスト横断の場の活動・SC-01 §4.8b・FR-36）。 */}
       <motion.div className="dash-actrow" {...flowMotion(2)}>
         <section className="card" aria-label="チームアクティビティ">
-          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />
+          {/* (b) 見た目をモックに寄せる＝見出しに 📣。スパークライン「活動の活発さ」は (a) で backend 集計を足して後日追加。 */}
+          <ActivityFeed title="📣 チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中のクエスト・アイデアコンテストの新しい活動はまだありません。" />
         </section>
       </motion.div>
 
