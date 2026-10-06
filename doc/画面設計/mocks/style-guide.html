@@ -5661,11 +5661,19 @@
   /* タイトルのリンク化（アイデア/クエスト/コンテスト詳細への動線）。 */
   .sg-dash a.card-title, .sg-dash .sg-row__title a, .sg-dash .sg-ann .sg-row__title a { color: var(--color-primary); text-decoration: none; }
   .sg-dash a.card-title:hover, .sg-dash .sg-row__title a:hover { text-decoration: underline; }
-  /* B「あなたの番」タブ切替（CSS ラジオ・JS不要）＝選択タブのパネルだけ表示＋ラベル強調。 */
+  /* B/C/E タブ切替（CSS ラジオ・JS不要）＝選択タブのパネルだけ表示＋ラベル強調。
+     見た目は canonical .tab（quest詳細）＝本番 .dash-tabs と同じ下線タブに統一（セグメント→タブ・ユーザー要望）。 */
   .sg-dash .sg-btab-radio { position: absolute; opacity: 0; width: 1px; height: 1px; }
-  .sg-dash #sgb-vote:checked ~ .sg-btabhead .segmented label[for="sgb-vote"],
-  .sg-dash #sgb-req:checked ~ .sg-btabhead .segmented label[for="sgb-req"],
-  .sg-dash #sgb-draft:checked ~ .sg-btabhead .segmented label[for="sgb-draft"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  .sg-dash .sg-dtabs { display: flex; align-items: flex-end; gap: var(--space-1); border-bottom: 2px solid var(--color-border); flex-wrap: wrap; }
+  .sg-dash .sg-dtabs > label { font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-2) var(--space-3); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .sg-dash .sg-dtabs > label:hover { color: var(--color-text); background: var(--color-surface-alt); }
+  .sg-dash #sgb-vote:checked ~ .sg-btabhead .sg-dtabs label[for="sgb-vote"],
+  .sg-dash #sgb-req:checked ~ .sg-btabhead .sg-dtabs label[for="sgb-req"],
+  .sg-dash #sgb-draft:checked ~ .sg-btabhead .sg-dtabs label[for="sgb-draft"],
+  .sg-dash #sgc-new:checked ~ .sg-dash-2col .sg-dtabs label[for="sgc-new"],
+  .sg-dash #sgc-recent:checked ~ .sg-dash-2col .sg-dtabs label[for="sgc-recent"],
+  .sg-dash #sge-follow:checked ~ .sg-dash-2col .sg-dtabs label[for="sge-follow"],
+  .sg-dash #sge-req:checked ~ .sg-dash-2col .sg-dtabs label[for="sge-req"] { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
   /* タブ行＝左にタブ・右に「すべて見る」（アクティブタブのぶんだけ表示）。 */
   .sg-dash .sg-btabhead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
   .sg-dash .sg-seeall-top a { color: var(--color-primary); text-decoration: none; font-size: var(--text-sm); font-weight: 600; display: none; }
@@ -5679,6 +5687,13 @@
   .sg-dash #sgb-vote:checked ~ .sg-bpanels .sg-bpanel[data-p="vote"],
   .sg-dash #sgb-req:checked ~ .sg-bpanels .sg-bpanel[data-p="req"],
   .sg-dash #sgb-draft:checked ~ .sg-bpanels .sg-bpanel[data-p="draft"] { visibility: visible; }
+  /* Zone C 議論（新着/最近）・Zone E マイ（フォロー/リクエスト）のタブパネルも重ね置き＝高さは高い方に固定（切替で変わらない）。 */
+  .sg-dash .sg-cpanels, .sg-dash .sg-epanels { display: grid; }
+  .sg-dash .sg-cpanel, .sg-dash .sg-epanel { grid-area: 1 / 1; visibility: hidden; }
+  .sg-dash #sgc-new:checked ~ .sg-dash-2col .sg-cpanel[data-p="new"],
+  .sg-dash #sgc-recent:checked ~ .sg-dash-2col .sg-cpanel[data-p="recent"],
+  .sg-dash #sge-follow:checked ~ .sg-dash-2col .sg-epanel[data-p="follow"],
+  .sg-dash #sge-req:checked ~ .sg-dash-2col .sg-epanel[data-p="req"] { visibility: visible; }
   /* 承認待ち＝申請者ベース（本番 .incoming-jr-card）。クエスト/コンテスト名＋誰が参加希望か。 */
   .sg-dash .incoming-jr-card { text-align: left; }
   .sg-dash .incoming-jr-card__applicant { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
@@ -5729,7 +5744,7 @@
     <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-req">
     <input class="sg-btab-radio" type="radio" name="sg-b" id="sgb-draft">
     <div class="sg-btabhead">
-      <div class="segmented" role="radiogroup" aria-label="要対応の種別">
+      <div class="sg-dtabs" role="tablist" aria-label="要対応の種別">
         <label for="sgb-vote">未投票 <span class="seg-n">18</span></label>
         <label for="sgb-req">承認待ち <span class="seg-n">16</span></label>
         <label for="sgb-draft">下書き <span class="seg-n">17</span></label>
@@ -5913,14 +5928,28 @@
   <!-- Zone C -->
   <div class="sg-zone" style="--z:var(--sg-zone-c)">
     <div class="sg-zone__label" style="--z:var(--sg-zone-c)">C キャッチアップ<span class="sg-zone__note">議論（新着/最近をタブ・コンテストも含める）＋チームアクティビティ＋最近の通知</span></div>
+    <!-- 議論＝新着/最近を下線タブで1枚に集約（CSS ラジオ・JSなし／本番 .dash-tabs 相当）。コンテストのアイデアも含む。 -->
+    <input class="sg-btab-radio" type="radio" name="sg-c" id="sgc-new" checked>
+    <input class="sg-btab-radio" type="radio" name="sg-c" id="sgc-recent">
     <div class="sg-dash-2col">
       <div class="card">
-        <div class="segmented" role="radiogroup" aria-label="議論の種別" style="margin-bottom:var(--space-3)">
-          <label><input type="radio" name="sg-c" checked> 💬 新着の議論 <span class="seg-n">6</span></label>
-          <label><input type="radio" name="sg-c"> 🕒 最近の議論</label>
+        <div class="sg-dtabs" role="tablist" aria-label="議論の種別" style="margin-bottom:var(--space-3)">
+          <label for="sgc-new">💬 新着の議論 <span class="seg-n">6</span></label>
+          <label for="sgc-recent">🕒 最近の議論</label>
         </div>
-        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">棚卸しの自動化</a></div><div class="sg-row__sub">在庫クエスト</div></div><span class="badge badge-danger">💬 +3</span></div>
-        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">受付のデジタル化</a> <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆</span></div><div class="sg-row__sub">コンテスト（参加中）</div></div><span class="badge badge-danger">💬 +1</span></div>
+        <div class="sg-cpanels">
+          <!-- 新着＝未読のみ（既読で消える）。 -->
+          <div class="sg-cpanel" data-p="new">
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">棚卸しの自動化</a></div><div class="sg-row__sub">在庫クエスト</div></div><span class="badge badge-danger">💬 +3</span></div>
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">受付のデジタル化</a> <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆</span></div><div class="sg-row__sub">コンテスト（参加中）</div></div><span class="badge badge-danger">💬 +1</span></div>
+          </div>
+          <!-- 最近＝更新順（既読/未読問わず・恒久導線）。 -->
+          <div class="sg-cpanel" data-p="recent">
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">配送ルート最適化</a></div><div class="sg-row__sub">配送効率化クエスト</div></div><span class="muted text-xs">10分前</span></div>
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">受付のデジタル化</a> <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆</span></div><div class="sg-row__sub">コンテスト（参加中）</div></div><span class="badge badge-danger">💬 +1</span></div>
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">会議室予約の改善</a></div><div class="sg-row__sub">総務デジタル化クエスト</div></div><span class="muted text-xs">1時間前</span></div>
+          </div>
+        </div>
       </div>
       <div class="card">
         <div class="section-head"><h3>🔔 最近の通知</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
@@ -5992,6 +6021,9 @@
   <!-- Zone E -->
   <div class="sg-zone" style="--z:var(--sg-zone-e)">
     <div class="sg-zone__label" style="--z:var(--sg-zone-e)">E マイ ・ よく行く先／フォロー<span class="sg-zone__note">参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト＝A案で集約）</span></div>
+    <!-- フォロー中／参加リクエスト中＝下線タブで1枚に集約（CSS ラジオ・JSなし／本番 .dash-tabs 相当）。既定＝フォロー中。 -->
+    <input class="sg-btab-radio" type="radio" name="sg-e" id="sge-follow" checked>
+    <input class="sg-btab-radio" type="radio" name="sg-e" id="sge-req">
     <div class="sg-dash-2col">
       <div class="card">
         <div class="section-head"><h3>👣 参加中</h3><a href="#" class="muted text-sm">すべて見る →</a></div>
@@ -5999,9 +6031,23 @@
         <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">業務改善アイデア大募集</a> <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆 コンテスト</span></div><div class="sg-row__sub">公募中 ・ 💡 24</div></div></div>
       </div>
       <div class="card">
-        <div class="section-head"><h3>★ フォロー中 <span class="badge badge-muted">アイデア＋クエスト</span></h3><a href="#" class="muted text-sm">すべて見る →</a></div>
-        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">💡 <a href="#">受付のデジタル化</a></div><div class="sg-row__sub">アイデア ・ ▲12 / ▼2</div></div><button class="btn btn-sm btn-outline">★</button></div>
-        <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">📜 <a href="#">採用広報の強化</a></div><div class="sg-row__sub">クエスト（非参加・ウォッチ）</div></div><button class="btn btn-sm btn-outline">★</button></div>
+        <div class="sg-dtabs" role="tablist" aria-label="マイの種別" style="margin-bottom:var(--space-3)">
+          <label for="sge-follow">★ フォロー中 <span class="seg-n">2</span></label>
+          <label for="sge-req">✋ 参加リクエスト中 <span class="seg-n">1</span></label>
+          <a href="#" class="muted text-sm" style="margin-left:auto;align-self:center">すべて見る →</a>
+        </div>
+        <div class="sg-epanels">
+          <!-- フォロー中＝アイデア＋クエスト（A案で集約）。 -->
+          <div class="sg-epanel" data-p="follow">
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">💡 <a href="#">受付のデジタル化</a></div><div class="sg-row__sub">アイデア ・ ▲12 / ▼2</div></div><button class="btn btn-sm btn-outline">★</button></div>
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">📜 <a href="#">採用広報の強化</a></div><div class="sg-row__sub">クエスト（非参加・ウォッチ）</div></div><button class="btn btn-sm btn-outline">★</button></div>
+          </div>
+          <!-- 参加リクエスト中＝自分が申請して承認待ち（クエスト参加＋コンテスト参加）。 -->
+          <div class="sg-epanel" data-p="req">
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title">📜 <a href="#">新オフィス移転クエスト</a></div><div class="sg-row__sub">クエスト ・ <span class="badge badge-muted">申請中</span></div></div></div>
+            <div class="sg-row"><div class="sg-row__main"><div class="sg-row__title"><a href="#">新規事業アイデアコンテスト</a> <span class="badge" style="background:#EDE9FE;color:#6D28D9">🏆 コンテスト</span></div><div class="sg-row__sub">コンテスト ・ <span class="badge badge-muted">承認待ち</span></div></div></div>
+          </div>
+        </div>
       </div>
     </div>
     <p class="sg-row__sub" style="margin-top:var(--space-3)">
