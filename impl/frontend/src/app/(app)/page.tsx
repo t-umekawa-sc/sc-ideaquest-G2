@@ -13,6 +13,8 @@ export default async function HomePage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
   const me = await getServerMe();
+  // 公開（コンテスト専用）モード（FR-48 §8.0・決定P）＝SC-01 を描画せず SC-50 コンテスト一覧へ着地（全ロール）。
+  if (me?.company.access_mode === "public") redirect("/contests");
   // /me が取れない稀ケース（セッション有効中の消失）だけ最小フォールバック。
   const balance = me
     ? heroBalance(me.balance)

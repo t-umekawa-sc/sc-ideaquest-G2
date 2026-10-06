@@ -24,10 +24,12 @@ type Props = {
   gameEnabled?: boolean;
   // 管理導線（ロール保持者のみ）をサイドバー（AppNav）に出すためのフラグ。app 層から供給。
   admin?: AdminFlags;
+  // 公開（コンテスト専用）モード（FR-48 §8.0）。true でナビをコンテスト系のみに封鎖（決定P）。
+  publicMode?: boolean;
   children: React.ReactNode; // .usermenu__list の中身（<li>…</li>）
 };
 
-export function AppHeader({ user, balance, unreadCount = 0, aiActive = 0, gameEnabled = true, admin, children }: Props) {
+export function AppHeader({ user, balance, unreadCount = 0, aiActive = 0, gameEnabled = true, admin, publicMode = false, children }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -83,7 +85,7 @@ export function AppHeader({ user, balance, unreadCount = 0, aiActive = 0, gameEn
         <div className="header-left">
           {/* グローバルナビ（☰→ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1）。
               gameEnabled でゲーム群の出し分け（§4.11・レビュー#2）。 */}
-          <AppNav gameEnabled={gameEnabled} admin={admin} />
+          <AppNav gameEnabled={gameEnabled} admin={admin} publicMode={publicMode} />
           <Link href="/" className="brand" aria-label="ideaquest ホーム">
             <Image className="brand-logo" src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={88} height={40} priority />
           </Link>

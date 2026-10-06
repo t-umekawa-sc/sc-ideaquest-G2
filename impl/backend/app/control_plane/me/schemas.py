@@ -79,6 +79,11 @@ class MeGameModeDTO(BaseModel):
     company_default: bool  # 会社既定（companies.game_mode_default）
 
 
+class MeCompanyDTO(BaseModel):
+    """会社の公開/非公開モード（FR-48 §8.0）＝frontend の着地/ナビ分岐の権威（403 の権威は backend 外周ゲート）。"""
+    access_mode: str  # "private" | "public"
+
+
 class MeResponse(BaseModel):
     """`GET /me`（正準・K.1）＝identity＋プロフィール＋残高＋ゲームモード。ダッシュボード hero も同読取（I.1 と両立）。"""
     account: MeAccountDTO
@@ -86,6 +91,7 @@ class MeResponse(BaseModel):
     balance: MeBalanceDTO
     game_mode: MeGameModeDTO
     system_role: str
+    company: MeCompanyDTO
 
 
 class MeActivityDTO(BaseModel):

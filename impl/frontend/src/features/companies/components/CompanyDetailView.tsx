@@ -85,6 +85,20 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
     }
   }
 
+  // 公開/非公開モード（FR-48 §8.0・system_admin のみ）＝public はコンテスト専用テナント（業務EPを 403・SC-50 着地）。
+  async function saveAccessMode(mode: "private" | "public") {
+    setError(null);
+    try {
+      const updated = await updateCompanySettings(companyId, { access_mode: mode });
+      setCompany(updated);
+      snack({ type: "success", title: mode === "public" ? "公開（コンテスト専用）モードにしました" : "非公開モードにしました" });
+    } catch {
+      const msg = "公開モードの更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
+    }
+  }
+
   // 会社ロード/保存後に server の一致率しきい値（比率 0..1）を % 表示へ同期（スライダー/数値の初期・確定値）。
   useEffect(() => {
     if (company) setThPct(Math.round((company.auto_link_threshold ?? 0.12) * 100));
@@ -339,6 +353,19 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
             <input type="checkbox" aria-label="ゲームモード（会社既定）" checked={company.game_mode_default} onChange={(e) => toggle("game_mode_default", e.target.checked)} />
             <span className="switch__track"><span className="switch__thumb" /></span>
             <span className="switch__state">{company.game_mode_default ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+
+        {/* 公開/非公開モード（FR-48 §8.0・system_admin のみ）＝public はデモ用コンテスト専用テナント。 */}
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">公開（コンテスト専用）モード</div>
+            <div className="setting-row__desc">ON=デモ用の公開テナント。一般ユーザーは<strong>コンテストのみ操作可</strong>（クエスト等の業務機能はサーバーで 403・ホームは SC-50 コンテスト一覧に着地）。管理者も業務機能は使えずコンテスト＋管理のみ。OFF（既定）=通常の社内モード。</div>
+          </div>
+          <label className="switch">
+            <input type="checkbox" aria-label="公開（コンテスト専用）モード" checked={company.access_mode === "public"} onChange={(e) => saveAccessMode(e.target.checked ? "public" : "private")} />
+            <span className="switch__track"><span className="switch__thumb" /></span>
+            <span className="switch__state">{company.access_mode === "public" ? "公開" : "非公開"}</span>
           </label>
         </div>
 

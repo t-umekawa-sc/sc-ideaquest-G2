@@ -5500,6 +5500,8 @@ export interface components {
             auto_link_threshold: number;
             /** Alignment Method */
             alignment_method: string;
+            /** Access Mode */
+            access_mode: string;
             /** Account Count */
             account_count: number;
         };
@@ -5569,6 +5571,8 @@ export interface components {
             auto_link_threshold?: number | null;
             /** Alignment Method */
             alignment_method?: string | null;
+            /** Access Mode */
+            access_mode?: string | null;
         };
         /** ConceptAssumptionDTO */
         ConceptAssumptionDTO: {
@@ -8269,6 +8273,14 @@ export interface components {
             skill_point_balance: number;
         };
         /**
+         * MeCompanyDTO
+         * @description 会社の公開/非公開モード（FR-48 §8.0）＝frontend の着地/ナビ分岐の権威（403 の権威は backend 外周ゲート）。
+         */
+        MeCompanyDTO: {
+            /** Access Mode */
+            access_mode: string;
+        };
+        /**
          * MeGameModeDTO
          * @description ゲームモードの実効配信（レビュー#2・§4.11・K.1）。
          *
@@ -8313,6 +8325,7 @@ export interface components {
             game_mode: components["schemas"]["MeGameModeDTO"];
             /** System Role */
             system_role: string;
+            company: components["schemas"]["MeCompanyDTO"];
         };
         /**
          * MeUpdateRequest

@@ -182,6 +182,7 @@ class CompanyDetail(BaseModel):
     notify_email_enabled: bool  # 業務通知メール会社既定（FR-40・§4）
     auto_link_threshold: float  # 自動関連付けの一致率しきい値（N.6・§5.36b・cosine 0..1）
     alignment_method: str  # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）
+    access_mode: str  # 公開/非公開モード（FR-48 §8.0・private/public・system_admin のみ切替）
     account_count: int
 
 
@@ -226,6 +227,8 @@ class CompanySettingsUpdateRequest(BaseModel):
     auto_link_threshold: float | None = None
     # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）。enum 検証は application 側（422）。
     alignment_method: str | None = None
+    # 公開/非公開モード（FR-48 §8.0・private/public）。enum 検証は application 側（422）。system_admin のみ（EP が require_system_admin）。
+    access_mode: str | None = None
 
 
 # --- QG管理者 API（B.4・SC-90） ------------------------------------------------------------

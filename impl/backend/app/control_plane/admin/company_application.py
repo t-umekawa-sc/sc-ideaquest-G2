@@ -20,7 +20,8 @@ from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled", "auto_link_threshold", "alignment_method")
+_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled", "auto_link_threshold", "alignment_method", "access_mode")
+_ACCESS_MODES = ("private", "public")  # 公開/非公開モード（FR-48 §8.0・system_admin のみ切替）
 _ALIGNMENT_METHODS = ("keyword", "embedding", "hybrid")  # 経営資料整合の類似度方式（FR-44・A-2）
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
@@ -64,6 +65,7 @@ def _detail(c: Company, account_count: int) -> dict:
         "notify_email_enabled": c.notify_email_enabled,  # 業務通知メール会社既定（FR-40・§4）
         "auto_link_threshold": float(c.auto_link_threshold),  # 自動関連付けの一致率しきい値（N.6・§5.36b・0..1）
         "alignment_method": c.alignment_method,  # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）
+        "access_mode": c.access_mode,  # 公開/非公開モード（FR-48 §8.0・private/public）
     }
 
 
@@ -456,6 +458,10 @@ def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
         if "alignment_method" in changes and changes["alignment_method"] not in _ALIGNMENT_METHODS:
             raise AppError(422, "validation_error", detail="整合方式は keyword/embedding/hybrid のいずれかです",
                            errors=[{"field": "alignment_method"}])
+        # 公開/非公開モードは private/public のホワイトリスト（未知は 422・FR-48 §8.0）。
+        if "access_mode" in changes and changes["access_mode"] not in _ACCESS_MODES:
+            raise AppError(422, "validation_error", detail="公開モードは private/public のいずれかです",
+                           errors=[{"field": "access_mode"}])
         method_changed = ("alignment_method" in changes
                           and changes["alignment_method"] != company.alignment_method)
         applied = [f for f in _SETTINGS_FIELDS if f in changes]

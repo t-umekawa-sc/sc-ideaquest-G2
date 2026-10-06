@@ -21,6 +21,11 @@ const BIZ: NavItem[] = [
   { href: "/announcements", label: "お知らせ", icon: "📢" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
+// 公開（コンテスト専用）モードの業務ナビ＝コンテスト＋通知のみ（クエスト等の業務リンクは出さない・FR-48 §8.0 決定P）。
+const BIZ_PUBLIC: NavItem[] = [
+  { href: "/contests", label: "アイデアコンテスト", icon: "🏆" },
+  { href: "/notifications", label: "通知", icon: "🔔" },
+];
 const GAME: NavItem[] = [
   { href: "/shop", label: "ショップ", icon: "🛒" },
   { href: "/avatar", label: "きせかえ", icon: "🧍" },
@@ -43,7 +48,7 @@ const adminItems = (a: AdminFlags): NavItem[] => [
 const PIN_KEY = "iq_nav_pinned";
 const WIDE = "(min-width: 1024px)";
 
-export function AppNav({ gameEnabled = true, admin }: { gameEnabled?: boolean; admin?: AdminFlags }) {
+export function AppNav({ gameEnabled = true, admin, publicMode = false }: { gameEnabled?: boolean; admin?: AdminFlags; publicMode?: boolean }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -195,15 +200,19 @@ export function AppNav({ gameEnabled = true, admin }: { gameEnabled?: boolean; a
                 )}
               </div>
               <nav className="appnav__menu menu-pixel">
+                {/* 公開モード＝業務ナビはコンテスト＋通知のみ（§8.0 決定P）。管理は /admin 系のみ（経営資料など業務EPは 403 ゆえ出さない）。ゲーム群も非表示。 */}
                 <div className="appnav__grp">業務</div>
-                {BIZ.map(renderItem)}
-                {admin && adminItems(admin).length > 0 && (
-                  <>
-                    <div className="appnav__grp">管理</div>
-                    {adminItems(admin).map(renderItem)}
-                  </>
-                )}
-                {gameEnabled && (
+                {(publicMode ? BIZ_PUBLIC : BIZ).map(renderItem)}
+                {admin && (() => {
+                  const items = adminItems(admin).filter((it) => !publicMode || it.href.startsWith("/admin"));
+                  return items.length > 0 ? (
+                    <>
+                      <div className="appnav__grp">管理</div>
+                      {items.map(renderItem)}
+                    </>
+                  ) : null;
+                })()}
+                {gameEnabled && !publicMode && (
                   <>
                     <div className="appnav__grp appnav__grp--game">ゲーム</div>
                     {GAME.map(renderItem)}

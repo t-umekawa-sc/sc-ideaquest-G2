@@ -58,7 +58,8 @@ def _image_url(path: str | None) -> str | None:
     return get_storage().presigned_get(path) if path else None
 
 
-def _me(account: Account, user: "User | None", company_default: bool = True) -> dict:
+def _me(account: Account, user: "User | None", company_default: bool = True,
+        access_mode: str = "private") -> dict:
     """K.1 正準形（account／profile／balance／system_role）。
 
     identity・display_name の源泉は accounts（§4.2・K.6）。残高は会社DB `users`（読み取り専用・K.0）で
@@ -91,6 +92,8 @@ def _me(account: Account, user: "User | None", company_default: bool = True) -> 
             "company_default": company_default,
         },
         "system_role": account.system_role,
+        # 会社の公開/非公開モード（FR-48 §8.0）＝frontend の着地/ナビ分岐の権威（403 は backend 外周ゲート）。
+        "company": {"access_mode": access_mode},
     }
 
 
@@ -112,7 +115,8 @@ def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
             raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
         company = session.get(Company, company_id)
         company_default = company.game_mode_default if company else True  # ゲームモード会社既定（§4.11）
-    return _me(account, _tenant_user(company_id, account_id), company_default)
+        access_mode = company.access_mode if company else "private"        # 公開/非公開モード（FR-48 §8.0）
+    return _me(account, _tenant_user(company_id, account_id), company_default, access_mode)
 
 
 # --- プロフィール画像・背景画像（K.4・MinIO・§1.10）。会社DB users 直接更新（identity ではない＝outbox なし） ---

@@ -12,17 +12,17 @@ from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
 def test_t_tc_204_is_path_allowed():
     """許可判定（純関数）＝コンテスト許可=全ロール／管理許可=管理者のみ／業務EPは管理者でも不可（決定O）。"""
-    # コンテスト許可リスト＝general/admin とも True
+    # コンテスト許可リスト（実パス）＝general/admin とも True。auth は /auth/* に集約（ログイン後の /auth/session 含む）。
     for sub in ("/contests", "/contests/x/ranking", "/ideas/x/vote", "/chat-messages/x",
-                "/search", "/me", "/notifications/unread-count"):
+                "/attachments/x/download", "/me", "/notifications/unread-count", "/auth/session"):
         assert gate.is_path_allowed(sub, is_admin=False) is True, sub
         assert gate.is_path_allowed(sub, is_admin=True) is True, sub
-    # 管理許可リスト＝admin のみ True・general False
-    for sub in ("/companies", "/accounts/x", "/admin/accounts", "/capabilities"):
+    # 管理許可リスト＝admin のみ True・general False（会社/アカウント/所属/能力は全て /admin/* 配下）。
+    for sub in ("/admin/companies", "/admin/accounts/x", "/admin/quest-groups", "/admin/accounts/x/capabilities"):
         assert gate.is_path_allowed(sub, is_admin=False) is False, sub
         assert gate.is_path_allowed(sub, is_admin=True) is True, sub
-    # 業務EP＝general/admin とも False（公開会社はコンテスト専用・決定O）
-    for sub in ("/quests", "/quests/x", "/concepts", "/dashboard", "/strategy-documents", "/projects"):
+    # 業務EP＝general/admin とも False（公開会社はコンテスト専用・決定O）。全文検索 /quests/{id}/search も業務扱い。
+    for sub in ("/quests", "/quests/x/search", "/concepts", "/dashboard", "/strategy-documents", "/projects"):
         assert gate.is_path_allowed(sub, is_admin=False) is False, sub
         assert gate.is_path_allowed(sub, is_admin=True) is False, sub
 

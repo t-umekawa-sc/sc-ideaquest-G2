@@ -16,10 +16,11 @@ type Props = {
   initialUnread?: number;
   gameEnabled?: boolean; // ゲームモード実効値（§4.11・レビュー#2）。AppHeader へ素通し。
   admin?: AdminFlags; // 管理導線（サイドバー）用フラグ。AppHeader へ素通し。
+  publicMode?: boolean; // 公開（コンテスト専用）モード（FR-48 §8.0）。AppHeader へ素通し。
   children: React.ReactNode;
 };
 
-export function LiveAppHeader({ user, balance, initialUnread = 0, gameEnabled = true, admin, children }: Props) {
+export function LiveAppHeader({ user, balance, initialUnread = 0, gameEnabled = true, admin, publicMode = false, children }: Props) {
   const live = useRealtimeUnread();
   // AIジョブの自分の active 件数（queued+running）＝ヘッダー導線バッジ用。マウント時取得＋
   // AI_JOBS_CHANGED_EVENT（クライアント操作＝enqueue/cancel）＋WS `ai_job.changed`（投入/開始/完了/
@@ -36,7 +37,7 @@ export function LiveAppHeader({ user, balance, initialUnread = 0, gameEnabled = 
     return () => { alive = false; window.removeEventListener(AI_JOBS_CHANGED_EVENT, load); off(); };
   }, []);
   return (
-    <AppHeader user={user} balance={balance} unreadCount={live ?? initialUnread} aiActive={aiActive} gameEnabled={gameEnabled} admin={admin}>
+    <AppHeader user={user} balance={balance} unreadCount={live ?? initialUnread} aiActive={aiActive} gameEnabled={gameEnabled} admin={admin} publicMode={publicMode}>
       {children}
     </AppHeader>
   );

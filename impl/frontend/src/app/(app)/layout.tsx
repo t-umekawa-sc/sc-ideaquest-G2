@@ -31,6 +31,8 @@ export default async function AppLayout({
   // ゲームモード実効値（レビュー#2・§4.11）＝GET /me の game_mode.effective（= override ?? company_default）。
   // false でゲーム層UI（ナビのゲーム群・ヘッダー残高/円環・ゲーム系通知/演出）を非表示。既定 true（me 取得不可時も）。
   const gameEnabled = me?.game_mode.effective ?? true;
+  // 公開（コンテスト専用）モード（FR-48 §8.0）＝true でナビをコンテスト系のみに封鎖（決定P・SC-50 着地は各ページで）。
+  const publicMode = me?.company.access_mode === "public";
   const backgroundUrl = me?.profile.background_image_url ?? null;  // K.4・全認証画面に反映（FR-30）
   // ヘッダーのユーザーアイコン/表示名は GET /me を源泉にする（アバター/表示名の変更が router.refresh で即反映。
   // session.user はログイン時スナップショットで陳腐化するため）。me 取得不可時のみ session へフォールバック。
@@ -63,6 +65,7 @@ export default async function AppLayout({
           companyAdmin: session.system_role === "company_account_admin",
           qgAdmin: session.is_qg_admin,
         }}
+        publicMode={publicMode}
       >
         {/* メニュー項目は app 層が features から差し込む */}
         <li role="none">
