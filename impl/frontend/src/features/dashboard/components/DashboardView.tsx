@@ -354,14 +354,17 @@ export function DashboardView({
     <button key={bReqKey(r)} type="button" className="card card-accent quest-card incoming-jr-card"
       style={{ ["--accent" as string]: r.it.quest.color ?? "#3B82F6" } as React.CSSProperties}
       onClick={() => { setBSeeAll(null); openIncoming(r.it); }}>
-      <div className="between"><span className="card-title">{r.it.quest.title}</span><span className="badge badge-danger">未処理</span></div>
+      {/* 種別アイコン＋ラベルをカード上部に表示（クエスト/コンテストの判別・ユーザー要望）。未処理バッジは同行右。 */}
+      <div className="incoming-jr-card__type between"><span className="badge badge-muted">📜 クエスト</span><span className="badge badge-danger">未処理</span></div>
+      <div className="card-title">{r.it.quest.title}</div>
       <div className="incoming-jr-card__applicant"><Avatar name={r.it.user.display_name} imageUrl={r.it.user.avatar_image_url ?? undefined} size="sm" noTooltip /><span className="incoming-jr-card__name">{r.it.user.display_name} さんが参加を希望</span></div>
       {r.it.message && <p className="incoming-jr-card__msg">{r.it.message}</p>}
     </button>
   ) : (
     <button key={bReqKey(r)} type="button" className="card card-accent quest-card incoming-jr-card"
       onClick={() => { setBSeeAll(null); openContestReq(r.it); }}>
-      <div className="between"><span className="card-title">🏆 {r.it.contest.theme}</span><span className="badge badge-danger">未処理</span></div>
+      <div className="incoming-jr-card__type between"><span className="badge badge-muted">🏆 コンテスト</span><span className="badge badge-danger">未処理</span></div>
+      <div className="card-title">{r.it.contest.theme}</div>
       <div className="incoming-jr-card__applicant"><Avatar name={r.it.user.display_name} imageUrl={r.it.user.avatar_image_url ?? undefined} size="sm" noTooltip /><span className="incoming-jr-card__name">{r.it.user.display_name} さんが参加を希望</span></div>
     </button>
   );
@@ -519,7 +522,7 @@ export function DashboardView({
           <div className="dash-3col">
             {/* 📢 運営からのお知らせ（FR-49・§4.3a 選別済み最大3）＝📌ピン/未読バッジ・すべて見る→SC-95。 */}
             <section className="card dash-zone-card" aria-label="運営からのお知らせ">
-              <div className="section-head"><h2>📢 運営からのお知らせ</h2><Link className="muted text-sm" href="/announcements">すべて見る →</Link></div>
+              <div className="section-head"><h2>📢 運営からのお知らせ</h2><Link className="muted text-sm dash-head-link" href="/announcements" aria-label="すべて見る" title="すべて見る"><span className="dash-head-link__text">すべて見る →</span><span className="dash-head-link__icon" aria-hidden="true">→</span></Link></div>
               {announcements.length > 0
                 ? announcements.map((a) => (
                     <div key={a.id} className="dash-row">
@@ -533,14 +536,20 @@ export function DashboardView({
             </section>
             {/* 🏆 募集中のコンテスト＝open かつ未参加（応募できる機会）。応募で参加リクエスト。 */}
             <section className="card dash-zone-card" aria-label="募集中のコンテスト">
-              <div className="section-head"><h2>🏆 募集中のコンテスト</h2>{openContests.length > D_PANEL && <Link className="muted text-sm" href="/contests">すべて見る →</Link>}</div>
+              <div className="section-head"><h2>🏆 募集中のコンテスト</h2>{openContests.length > D_PANEL && <Link className="muted text-sm dash-head-link" href="/contests" aria-label="すべて見る" title="すべて見る"><span className="dash-head-link__text">すべて見る →</span><span className="dash-head-link__icon" aria-hidden="true">→</span></Link>}</div>
               {openContests.length > 0
                 ? openContests.slice(0, D_PANEL).map(renderOpenContestRow)
                 : <p className="dash-panel-empty">募集中のコンテストはありません。</p>}
             </section>
             {/* 🔎 おすすめのクエスト＝発見カタログで未参加・未フォロー（my_state=none）。公開モード会社は常に空（§3.1）。 */}
             <section className="card dash-zone-card" aria-label="おすすめのクエスト">
-              <div className="section-head"><h2>🔎 おすすめのクエスト</h2><Link className="muted text-sm" href="/quest-catalog">クエストを探す →</Link></div>
+              {/* 「クエストを探す」＝カード幅が狭いと折り返すため、section-head 幅（container query）で「→」アイコンに畳む（ツールチップで補完・ユーザー要望）。 */}
+              <div className="section-head"><h2>🔎 おすすめのクエスト</h2>
+                <Link className="muted text-sm dash-head-link" href="/quest-catalog" aria-label="クエストを探す" title="クエストを探す">
+                  <span className="dash-head-link__text">クエストを探す →</span>
+                  <span className="dash-head-link__icon" aria-hidden="true">→</span>
+                </Link>
+              </div>
               {recommended.length > 0
                 ? recommended.slice(0, D_PANEL).map(renderRecommendedRow)
                 : <p className="dash-panel-empty">おすすめのクエストはありません。</p>}
@@ -695,7 +704,7 @@ export function DashboardView({
         <section className="card" aria-label="最近の通知">
           <div className="section-head">
             <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>
-            <Link href="/notifications">すべての通知 →</Link>
+            <Link className="dash-head-link" href="/notifications" aria-label="すべての通知" title="すべての通知"><span className="dash-head-link__text">すべての通知 →</span><span className="dash-head-link__icon" aria-hidden="true">→</span></Link>
           </div>
           <ul className="notif-list">
             {notifs.length === 0 && <li className="muted text-sm">新しい通知はありません</li>}
@@ -848,12 +857,16 @@ export function DashboardView({
 
       {/* B あなたの番「すべて見る」＝全件ダイアログ（標準 Modal・初期15＋もっと見る・§3.1/§Zone B）。 */}
       {bSeeAll && (
-        <Modal open={!!bSeeAll} onClose={() => setBSeeAll(null)} onClosed={() => setBSeeAllN(15)} title={`${B_TITLE[bSeeAll]}（全${bCounts[bSeeAll]}件）`} size="lg">
+        <Modal open={!!bSeeAll} onClose={() => setBSeeAll(null)} onClosed={() => setBSeeAllN(15)} title={`${B_TITLE[bSeeAll]}（全${bCounts[bSeeAll]}件）`} size="xl">
           <ModalBody>
+            {/* Modal は portal で body 直下に描画＝.dash-page スコープのカード/グリッド指定が効かない（DFT）。
+                .dash-page でラップして復活させ、.dash-seeall で1行3カードに固定（ユーザー要望・§Zone B）。 */}
+            <div className="dash-page dash-seeall">
             <div className={bSeeAll === "vote" ? "vote-grid" : bSeeAll === "draft" ? "draft-grid" : "quest-grid"}>
               {bSeeAll === "vote" && unvoted.slice(0, bSeeAllN).map(renderVoteCard)}
               {bSeeAll === "req" && pendingReqs.slice(0, bSeeAllN).map(renderReqCard)}
               {bSeeAll === "draft" && drafts.slice(0, bSeeAllN).map(renderDraftCard)}
+            </div>
             </div>
             {bCounts[bSeeAll] > bSeeAllN && (
               <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
@@ -872,7 +885,8 @@ export function DashboardView({
         <Modal open={!!eSeeAll} onClose={() => setESeeAll(null)} onClosed={() => setESeeAllN(15)}
           title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length)}件）`} size="lg">
           <ModalBody>
-            <div>
+            {/* Modal は portal で body 直下＝.dash-page スコープが効かないため行スタイルを復活させるラップ（DFT）。 */}
+            <div className="dash-page">
               {eSeeAll === "joined" && joinedAll.slice(0, eSeeAllN).map(renderJoinedRow)}
               {eSeeAll === "following" && followingAll.slice(0, eSeeAllN).map(renderFollowingRow)}
               {eSeeAll === "requested" && requestedAll.slice(0, eSeeAllN).map(renderRequestRow)}

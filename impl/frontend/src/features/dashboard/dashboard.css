@@ -51,6 +51,8 @@
 
 /* 未処理の参加リクエスト（owner/quest_admin・クリックで承認/却下ダイアログ・FR-40） */
 .dash-page .incoming-jr-card { cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit; }
+.dash-page .incoming-jr-card__type { margin-bottom: var(--space-2); }
+.dash-page .incoming-jr-card .card-title { display: block; }
 .dash-page .incoming-jr-card__applicant { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
 .dash-page .incoming-jr-card__name { font-size: var(--text-sm); font-weight: 600; }
 .dash-page .incoming-jr-card__msg { margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -276,6 +278,23 @@
 .dash-page .dash-row__action { flex: 0 0 auto; }
 /* 空状態メッセージ（パネルは残して中身だけ空状態＝D/E のグリッド崩れ回避・§3.1 改訂）。 */
 .dash-page .dash-panel-empty { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
+
+/* セクション見出しの「すべて見る／探す」リンク＝カード幅が狭いと折り返すため、section-head 幅（container query）で
+   判定し、狭いときは「→」アイコンチップのみに畳む（ツールチップ=title/aria-label で補完・ユーザー要望）。
+   しきい値292px＝見出し168+gap12+リンク115≒295 の実測（section-head 内寸 272 折返し／302 収まる）。
+   畳んだ矢印は視認性のため丸背景（primary）＋白抜き太字のチップにする（ユーザー要望）。 */
+.dash-page .section-head { container-type: inline-size; }
+.dash-page .dash-head-link { display: inline-flex; align-items: baseline; gap: 4px; text-decoration: none; white-space: nowrap; }
+.dash-page .dash-head-link__icon { display: none; }
+@container (max-width: 292px) {
+  .dash-page .dash-head-link__text { display: none; }
+  .dash-page .dash-head-link__icon {
+    display: inline-flex; align-self: center; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 999px;
+    background: var(--color-primary); color: #fff; font-weight: 800; font-size: var(--text-base); line-height: 1;
+  }
+  .dash-page .dash-head-link:hover .dash-head-link__icon { background: var(--color-primary-hover, var(--color-primary)); filter: brightness(0.95); }
+}
 /* ゾーンパネルのタブ（Zone B/E）＝canonical `.tab`（quest詳細）と同じ下線タブの見た目を
    カード内ゾーン向けに軽量スコープ化（page全幅の sticky `.tabs` は重いので流用しない・ユーザー要望でセグメント→タブ化）。
    タブ行はカード上辺の見出し帯＝下線でコンテンツと区切る。右端に「すべて見る」。 */
@@ -288,6 +307,18 @@
 .dash-page .dash-tab.is-active .seg-n { background: rgba(255, 255, 255, .6); color: var(--color-primary); }
 /* タブ行の「すべて見る」＝下線の上に揃えて右寄せ。 */
 .dash-page .dash-tabs .dash-see-all { margin-left: auto; align-self: center; padding-bottom: var(--space-1); }
+
+/* すべて見る全件ダイアログ＝Modal は portal（body 直下）で .dash-page 外に描画されるため、
+   JSX 側で .dash-page でラップしてカード/グリッド指定を復活させる（DFT: ダイアログでグリッドが効かず崩れていた）。
+   .dash-seeall は中身を1行3カード固定（ユーザー要望・§Zone B）。狭い画面は1列に畳む。 */
+.dash-seeall .vote-grid,
+.dash-seeall .quest-grid,
+.dash-seeall .draft-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .dash-seeall .vote-grid,
+  .dash-seeall .quest-grid,
+  .dash-seeall .draft-grid { grid-template-columns: 1fr; }
+}
 
 /* タブ本文は全ペインを同一セルに重ね置き＝高さは最も高いタブに揃い、切替えても変わらない（ユーザー要望）。
    非アクティブは visibility:hidden で見えなくするが、レイアウトには残して高さを支える（display:none にしない）。 */
