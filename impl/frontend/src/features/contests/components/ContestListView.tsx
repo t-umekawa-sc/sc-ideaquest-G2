@@ -43,6 +43,18 @@ const MODE_OPTIONS: [string, string][] = Object.values(CONTEST_MODE_LABEL).map((
 const JOIN_MODE_OPTIONS: [string, string][] = [["誰でも参加", "誰でも参加"], ["承認制", "承認制"]];
 const joinModeLabel = (x: ContestRow): string => (x.autoApprove ? "誰でも参加" : "承認制");
 
+// 自分の参加状況（my_status・ログインユーザー視点）＝一覧で「参加中／リクエスト中」が一目で分かる列（ユーザー要望）。
+// backend `_list_item.my_status`（contest_participants）＝approved/requested/left/rejected/none。
+const MY_PART: Record<string, { label: string; cls: string }> = {
+  approved: { label: "参加中", cls: "badge-success" },
+  requested: { label: "リクエスト中", cls: "badge-pop" },
+  left: { label: "退席済", cls: "badge-muted" },
+};
+const myPartLabel = (x: ContestRow): string => MY_PART[x.myStatus]?.label ?? "—";
+const MY_PART_OPTIONS: [string, string][] = [
+  ["参加中", "参加中"], ["リクエスト中", "リクエスト中"], ["退席済", "退席済"], ["—", "—"],
+];
+
 type FormMode = "create" | "edit" | "duplicate";
 
 // publicMode＝会社が公開（コンテスト専用）モード（FR-48 §8.0・決定P）。SSR で算出し prop で受ける。
@@ -157,6 +169,8 @@ export function ContestListView({ publicMode = false }: { publicMode?: boolean }
     { key: "mode", label: "種別", width: 170, sortable: true, filter: { type: "enum", options: MODE_OPTIONS }, sortVal: (x) => x.modeLabel, filterVal: (x) => x.modeLabel, render: (x) => x.modeLabel },
     { key: "status", label: "状態", width: 120, sortable: true, sortVal: (x) => x.statusLabel, filterVal: (x) => x.statusLabel, render: (x) => <span className={`badge ${CONTEST_STATUS_BADGE[x.status] ?? "badge-muted"}`}>{x.statusLabel}</span> },
     { key: "join", label: "参加方式", width: 130, sortable: true, filter: { type: "enum", options: JOIN_MODE_OPTIONS }, sortVal: (x) => joinModeLabel(x), filterVal: (x) => joinModeLabel(x), csvVal: (x) => joinModeLabel(x), render: (x) => <span className={x.autoApprove ? "badge badge-success" : "badge badge-muted"} title={x.autoApprove ? "誰でも即参加（自動承認）" : "参加には運営の承認が必要"}>{joinModeLabel(x)}</span> },
+    // 自分の参加状況（ログインユーザー視点・ユーザー要望）＝参加中/リクエスト中が一目で分かる。
+    { key: "my_part", label: "参加状況", width: 120, sortable: true, filter: { type: "enum", options: MY_PART_OPTIONS }, sortVal: (x) => myPartLabel(x), filterVal: (x) => myPartLabel(x), csvVal: (x) => myPartLabel(x), render: (x) => { const m = MY_PART[x.myStatus]; return m ? <span className={`badge ${m.cls}`}>{m.label}</span> : <span className="muted">—</span>; } },
     { key: "starts", label: "開始", width: 120, sortable: true, sortVal: (x) => x.starts, csvVal: (x) => x.starts, render: (x) => x.starts },
     { key: "ends", label: "締切", width: 120, sortable: true, sortVal: (x) => x.ends, csvVal: (x) => x.ends, render: (x) => x.ends },
     { key: "_actions", label: "", actions: true, locked: true, width: 64, render: (x) => <RowMenu items={menu(x)} /> },
@@ -209,6 +223,7 @@ export function ContestListView({ publicMode = false }: { publicMode?: boolean }
               <div className="contest-card__meta">
                 <span className="badge badge-muted">{x.modeLabel}</span>
                 <span className={x.autoApprove ? "badge badge-success" : "badge badge-muted"}>{joinModeLabel(x)}</span>
+                {MY_PART[x.myStatus] && <span className={`badge ${MY_PART[x.myStatus].cls}`}>{MY_PART[x.myStatus].label}</span>}
                 <span>⏳ {x.starts} 〜 {x.ends}</span>
               </div>
             </>
