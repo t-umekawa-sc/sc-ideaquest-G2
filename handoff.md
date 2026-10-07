@@ -4,9 +4,9 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-07（セッション末・ユーザー指摘txtの「小さい不具合」一括＋F8＋フローティング重なりまで）
+- 更新: 2026-10-07（⑤ 承認制×非参加運営の詳細表示制御まで完了）
 - ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済み）
-- 最新コミット: `5dfccd84 fix(datatable): 会社名/列名フローティングの重なり解消`
+- 最新コミット: `74ce919f feat(contests): SC-54 承認制×非参加運営の詳細表示制御（受入指摘⑤）`
 - working tree: **clean**・`origin/main` 同期済み。
 - alembic heads（ファイル基準・**本セッションで新規 migration なし**）: control=`0020_signup_challenges`／company=`0056_info_curators_into_user_capabilities`。
 - 本セッションのコミット（古→新・すべて push 済み）: `05d00a40`(⑦⑧非公開折返し+403→404)／`e98d3075`(⑥ⓘ残り幅展開)／`afaea8a6`(⑨整合=縦ラジオ)／`c081d5e6`(F8メディアプロキシ)／`5dfccd84`(⑭フローティング重なり)。
@@ -25,6 +25,9 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **⑨** 会社詳細「経営資料との整合の測り方」を `<select>`→**縦ラジオ** `.radio-list`（design-system.css 新設）。DRY＝評価の公開範囲(`.vis-opt`)も同共有クラスへ統合し evaluations.css の重複撤去。style-guide「4e」＋shared.css 追加（`afaea8a6`・B-TC-181・sc-25-eval 11 passed 回帰OK）。
 - **F8** リッチ本文インライン画像の恒久表示＝**安定配信プロキシ `GET /api/v1/media/{key}`**（`require_me`→インライン画像prefix検証→都度再署名→302・`app/tenant/media/router.py`）。rehost(info N.2/お知らせ U-8)は `storage.media_proxy_path(key)`（`/api/v1/media/<key>`・env非依存相対パス）を返し body_html に安定パス保存。`access_gate` 許可リストに `/media` 追加。**frontend 無改修**（RichTextEditor が返却urlをimg srcに挿入・Next rewrite `/api/v1/*`→backend）。`sanitize_html`(nh3) は相対URL素通し。（`c081d5e6`・U-TC-110/113/114/115・N-TC-125）。
 - **⑭（会話追加指摘）** 会社詳細で会社名バナー(`.ctx` sticky)と列見出しフローティング(DataTable floatHead)の重なり解消＝floatHead の top 計算に `.ctx` を考慮（下端＋余白8pxへ）。ロジックを純関数 `belowStuckBar`(`components/ui/floatHeadTop.ts`)に抽出し `.tabs`/`.ctx` 共用。（`5dfccd84`・M-TC-019・実画面 overlap=false 確認）。
+
+### 完了（実装群）
+- **⑤ 承認制×非参加運営の詳細表示制御**（SC-54・frontend のみ・backend/可視ポリシー無改修）＝`74ce919f`。承認制(`auto_approve=false`)でも運営(`can_manage`)は `can_view_contest` を通り 200＝既に全タブが見える問題。**非参加の運営**（`can_manage && my_status!="approved" && auto_approve==false`）に限り、ヘッダー/運営導線は全表示・パーティタブ機能（初期タブ）・アイデア/全文検索タブは中身をガード（件数/説明/参加導線のみ）・表彰台/新着議論/活動/アクティビティは秘匿（対象データは fetch しない）。露出＝件数/説明は可・特定ユーザが分かるレベルは非表示（ユーザー決定）。適用外=参加者は全表示／`auto_approve=true` の非参加運営は会社全体公開で全表示（一般 invite が表彰台を見るのと逆転させない）／一般未参加は従来どおり。単一ソース=`features/contests/viewMode.ts`（純関数）。**決定Q**＝`アイデアコンテスト機能_設計.md`／テスト §7 `T-TC-206/207`（unit 8 passed）。実機（承認制=podium/活動/新着ゼロ+3タブ+ガード／公開=全表示）をスクショ目視。
 
 ## 4. 現在の状態（動作/テスト）
 - **backend pytest**（-v マウント／ベイク exec とも）＝`tests/announcements tests/info` **68 passed**（F8 分含む）。他ドメイン未回帰確認（F8 は storage/access_gate 触るが低リスク・full は未実行）。
@@ -48,14 +51,14 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **⑭ floatHead は sticky バー(.tabs/.ctx)の下へ**＝`belowStuckBar`（張り付き判定＝`bottom>top && top<=top+4`→`bottom+gap`）。
 
 ## 7. 次にやること（優先順・ユーザー確定の実装群→討議）
-> **「小さい不具合を先に」は消化済み。残りは実装群（中〜大）→ 討議(④③)**。着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。
-1. **⑤ コンテストの参加承認前のタブ表示整理**＝会社アカウント管理者が承認前でも、パーティタブは可視のまま／**アイデア・全文検索タブも「タブは表示」するが中身は「操作権限がない旨のメッセージのみ」**にする。現状は `ContestDetailView.tsx` が `forbidden`(403)で全体を閉じる（SC-54・`features/contests/components/ContestDetailView.tsx`）。承認制×未参加の見せ方の再設計＝タブ枠は出し中身をガードメッセージに。
-2. **（新）全能力の汎用付与UI**（ユーザー決定＝quest_create 単体でなく**全能力**）＝`info_curator`/`quest_create`/`contest_create`/`contest_evaluator` を会社アカウント管理(SC-93系)で付与/剥奪する汎用UI。**backend EP は実装済み**＝`GET/POST/DELETE /api/v1/admin/accounts/{uid}/capabilities`(`capabilities/router.py`)。frontend は現状 `accounts/components/InfoCuratorSection.tsx`(info_curator専用)のみ→汎用化（§7-6 info_curators統合の総仕上げも兼ねる）。
-3. **① AIモデルのクライアント選択UI**＝AI処理のモデルをクライアント側で選べるUIが無い。LLMゲートウェイ基盤あり（memory `fr45-llm-foundation-formalized`・`local-llm-integration-design`）。SC-04/94 周辺。着手前に gateway のモデル指定経路を裏取り。
-4. **#13 アイデア作成者向け 評価詳細（コメント＋得点）閲覧画面**＝作成者が評価者のコメント・得点詳細を確認できる画面。評価ドメイン(F)。着手時に既存の評価可視範囲(visibility=party/limited・F.1集計)をコードで裏取りしてスコープ確定（SC-22/SC-25 周辺）。
-5. **② AI処理状況のリアルタイム反映 E2E**＝他ユーザのジョブ開始/待機数/自分の番がリロード無しで反映・進捗率更新、を Playwright で確認（SC-04 ai-jobs・realtime L/WS）。共有DB非冪等注意（memory `e2e-full-not-idempotent-shared-db`）。
-6. **④【討議】おすすめクエスト選出アルゴリズム**＝ユーザー案「参加可×経営資料整合率高×直近活発×管理者お勧めマーク、得点上位をパネル最大件数」への意見を返す→合意後に実装。
-7. **③【討議】アイデアのLLM自動評価＋RAG**＝評価パネルに「AI評価」ボタン→背景ジョブでLLM採点＋コメント、必要ならRAG。将来は情報インプットの内部情報をRAG（社内Q&A/サポート）。**大型＝FR採番→データモデル→API→画面から**。
+> **「小さい不具合を先に」＋⑤ は消化済み。残りは実装群（中〜大）→ 討議(④③)**。着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。
+> ⑤ の実測メモ＝承認制×「非参加の一般」は backend 403 のまま（現状不変・ユーザー確定）／⑤ は「非参加の**運営**」に限った frontend 表示制御だった（当初 handoff の「操作権限がない旨」より踏み込み＝識別情報は秘匿・件数/説明は可）。
+1. **（新）全能力の汎用付与UI**（ユーザー決定＝quest_create 単体でなく**全能力**）＝`info_curator`/`quest_create`/`contest_create`/`contest_evaluator` を会社アカウント管理(SC-93系)で付与/剥奪する汎用UI。**backend EP は実装済み**＝`GET/POST/DELETE /api/v1/admin/accounts/{uid}/capabilities`(`capabilities/router.py`)。frontend は現状 `accounts/components/InfoCuratorSection.tsx`(info_curator専用)のみ→汎用化（§7-6 info_curators統合の総仕上げも兼ねる）。
+2. **① AIモデルのクライアント選択UI**＝AI処理のモデルをクライアント側で選べるUIが無い。LLMゲートウェイ基盤あり（memory `fr45-llm-foundation-formalized`・`local-llm-integration-design`）。SC-04/94 周辺。着手前に gateway のモデル指定経路を裏取り。
+3. **#13 アイデア作成者向け 評価詳細（コメント＋得点）閲覧画面**＝作成者が評価者のコメント・得点詳細を確認できる画面。評価ドメイン(F)。着手時に既存の評価可視範囲(visibility=party/limited・F.1集計)をコードで裏取りしてスコープ確定（SC-22/SC-25 周辺）。
+4. **② AI処理状況のリアルタイム反映 E2E**＝他ユーザのジョブ開始/待機数/自分の番がリロード無しで反映・進捗率更新、を Playwright で確認（SC-04 ai-jobs・realtime L/WS）。共有DB非冪等注意（memory `e2e-full-not-idempotent-shared-db`）。
+5. **④【討議】おすすめクエスト選出アルゴリズム**＝ユーザー案「参加可×経営資料整合率高×直近活発×管理者お勧めマーク、得点上位をパネル最大件数」への意見を返す→合意後に実装。
+6. **③【討議】アイデアのLLM自動評価＋RAG**＝評価パネルに「AI評価」ボタン→背景ジョブでLLM採点＋コメント、必要ならRAG。将来は情報インプットの内部情報をRAG（社内Q&A/サポート）。**大型＝FR採番→データモデル→API→画面から**。
 
 ### 前セッションからの持ち越し（txt指摘とは別・未着手）
 - Turnstile `size:flexible` 幅の実ブラウザ目視（`.env` の `#TURNSTILE_*` を外して `/signup` 確認・確認後 dev既定へ戻す）。
