@@ -159,6 +159,35 @@ def test_a_tc_100_worker_process_registers_fk_targets():
     assert "OK" in r.stdout
 
 
+def test_a_tc_135_send_failure_is_logged(set_sender, monkeypatch, caplog):
+    """A-TC-135 送信失敗を握りつぶさず必ずログ記録＝各試行 WARNING(exc_info)・上限到達 ERROR。根拠 ADR-0007 §2.4/§2.5。
+
+    回帰防止＝`signup_verify` 未知カテゴリ（古いワーカ）/SMTP 不達が黙殺され MailHog に OTP が
+    届かない障害（例外が `_send_one` の except で捨てられログに出なかった）の再発を防ぐ。
+    """
+    set_sender(_FailingSender())
+    monkeypatch.setenv("MAIL_OUTBOX_MAX_ATTEMPTS", "1")  # 1 回失敗で即端末失敗（WARNING＋ERROR 両方を1巡で観測）
+    get_settings.cache_clear()
+    try:
+        rid = _enqueue("u135@x.example", CATEGORY_OTP, secret="123456")
+        with caplog.at_level("WARNING", logger="mail_outbox"):
+            process_mail_outbox_once()
+
+        recs = [r for r in caplog.records if r.name == "mail_outbox"]
+        warns = [r for r in recs if r.levelname == "WARNING"]
+        errors = [r for r in recs if r.levelname == "ERROR"]
+        # 各試行の WARNING＝例外トレース付き・突合キー（宛先/カテゴリ）を含む（握りつぶさない）。
+        assert warns, "送信失敗が WARNING で記録されていない（握りつぶし）"
+        assert warns[0].exc_info is not None, "exc_info（トレース）が付いていない"
+        assert "u135@x.example" in warns[0].getMessage()
+        # 上限到達＝ERROR（端末失敗＝要手動対応）。
+        assert errors, "端末失敗が ERROR で記録されていない"
+        assert "u135@x.example" in errors[0].getMessage()
+        assert _get(rid).status == "failed"
+    finally:
+        get_settings.cache_clear()
+
+
 def test_a_tc_097_cleanup_done_retention(monkeypatch):
     """A-TC-097 retention 超の done のみ削除・retention 内の done と failed は残す。根拠 ADR-0007 §2.7。"""
     monkeypatch.setenv("MAIL_OUTBOX_DONE_RETENTION_SECONDS", "100")

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -20,6 +21,8 @@ from app.control_plane.mail_outbox.templates import render
 from app.core.config import get_settings
 from app.db.control import control_session
 from app.infra.mail import get_mail_sender
+
+logger = logging.getLogger("mail_outbox")
 
 
 def process_mail_outbox_once() -> dict:
@@ -80,6 +83,10 @@ def _send_one(entry_id: uuid.UUID) -> str:
         subject, body = render(category, secret, locale, params)
         get_mail_sender().send(to_email, subject, body)
     except Exception:
+        # 送信失敗は**決して握りつぶさない**（例＝未知カテゴリ/SMTP 不達）。exc_info でトレースを残し、
+        # category/宛先/entry で突合できるようにする（§2.4 1通の失敗は他を止めない・運用はログで検知）。
+        logger.warning("mail send failed (category=%s to=%s entry=%s)", category, to_email, entry_id,
+                       exc_info=True, extra={"event": "mail_send_failed", "category": category})
         return _mark_failure(entry_id)
 
     # 3) 成功＝done＋secret NULL 化
@@ -99,7 +106,9 @@ def _mark_failure(entry_id: uuid.UUID) -> str:
     with control_session() as session:
         entry = session.get(MailOutboxEntry, entry_id)
         entry.attempts += 1
-        if entry.attempts >= s.mail_outbox_max_attempts:
+        terminal = entry.attempts >= s.mail_outbox_max_attempts
+        attempts, category, to_email = entry.attempts, entry.category, entry.to_email
+        if terminal:
             entry.status = "failed"  # 端末失敗＝要手動対応（監視/アラート対象）
             entry.secret = None      # 秘匿値を破棄（手動再送は新規 enqueue でやり直す）
             entry.processed_at = datetime.now(timezone.utc)
@@ -107,6 +116,11 @@ def _mark_failure(entry_id: uuid.UUID) -> str:
             entry.status = "pending"  # 次巡で再送
         entry.claimed_at = None
         session.commit()
+    if terminal:
+        # 端末失敗（上限到達）＝監視/アラート対象。WARNING（各試行）より高い ERROR で確実に拾う。
+        logger.error("mail send permanently failed (category=%s to=%s entry=%s attempts=%s) — requires manual action",
+                     category, to_email, entry_id, attempts,
+                     extra={"event": "mail_send_terminal", "category": category})
     return "failed"
 
 
