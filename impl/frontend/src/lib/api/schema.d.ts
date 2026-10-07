@@ -5311,6 +5311,8 @@ export interface components {
              * @default false
              */
             self_signup_available: boolean;
+            /** Turnstile Site Key */
+            turnstile_site_key?: string | null;
         };
         /** CapabilityGrantRequest */
         CapabilityGrantRequest: {
@@ -10117,6 +10119,8 @@ export interface components {
             display_name: string;
             /** Password */
             password: string;
+            /** Captcha Token */
+            captcha_token?: string | null;
         };
         /** SignupVerifyRequest */
         SignupVerifyRequest: {

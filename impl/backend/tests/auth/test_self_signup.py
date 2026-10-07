@@ -15,6 +15,10 @@ from app.control_plane.auth.orm import Account, Company, SignupChallenge
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.core.config import get_settings
 from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.infra.cache import get_redis
+from app.tenant.notifications.orm import Notification
+from app.tenant.profile.orm import User
 
 BOOTSTRAP = "/api/v1/public/bootstrap"
 SIGNUP = "/api/v1/public/signup"
@@ -63,9 +67,53 @@ def _account_for(email: str) -> Account | None:
         return s.execute(select(Account).where(Account.email == email)).scalars().one_or_none()
 
 
-def _demo_company_id() -> uuid.UUID:
+def _demo_company() -> Company:
     with control_session() as s:
-        return s.execute(select(Company).where(Company.company_code == "DEMO")).scalars().one().id
+        return s.execute(select(Company).where(Company.company_code == "DEMO")).scalars().one()
+
+
+def _demo_company_id() -> uuid.UUID:
+    return _demo_company().id
+
+
+def _demo_admin_user_id() -> uuid.UUID:
+    """DEMO 会社の運営 admin@demo.example の会社DB user id（通知の受信者）。"""
+    demo = _demo_company()
+    with control_session() as s:
+        acc = s.execute(select(Account).where(Account.login_id == "admin@demo.example")).scalars().one()
+    with get_tenant_session(demo.db_identifier) as ts:
+        return ts.execute(select(User).where(User.account_id == acc.id)).scalars().one().id
+
+
+def _signup_registered_count(admin_user_id: uuid.UUID) -> int:
+    demo = _demo_company()
+    with get_tenant_session(demo.db_identifier) as ts:
+        return ts.execute(
+            select(func.count()).select_from(Notification).where(
+                Notification.recipient_id == admin_user_id, Notification.type == "signup_registered"
+            )
+        ).scalar_one()
+
+
+def _clear_signup_notifs(admin_user_id: uuid.UUID) -> None:
+    demo = _demo_company()
+    with get_tenant_session(demo.db_identifier) as ts:
+        ts.execute(Notification.__table__.delete().where(
+            Notification.recipient_id == admin_user_id, Notification.type == "signup_registered"
+        ))
+        ts.commit()
+
+
+def _signup_and_verify(client) -> str:
+    """フル signup→verify（コードは mail_outbox.secret）＝accounts 確定。確定した email を返す。"""
+    email = _uniq_email()
+    assert client.post(SIGNUP, json={
+        "company_code": "DEMO", "login_id": email, "email": email,
+        "display_name": "通知テスト", "password": "Str0ng-Uniq-9x!",
+    }).status_code == 202
+    code = _latest_signup_code(email)
+    assert client.post(VERIFY, json={"company_code": "DEMO", "email": email, "code": code}).status_code == 200
+    return email
 
 
 def test_a_tc_120_bootstrap_default_company_code(client, monkeypatch):
@@ -152,6 +200,89 @@ def test_a_tc_130_password_min_length_422(client):
         "display_name": "x", "password": "short",
     })
     assert r.status_code == 422, r.text
+
+
+def test_a_tc_131_pwned_password_rejected(client, monkeypatch):
+    """A-TC-131: 漏洩PW拒否（SEC D・HIBP・env-gated）＝漏洩は422 field=password・非漏洩は202・pending作らない。"""
+    import app.control_plane.public.application as app_mod
+    # HIBP を Fake（外部未接続）＝特定PWだけ漏洩扱い。
+    monkeypatch.setattr(app_mod, "is_pwned_password", lambda pw: pw == "Passw0rd!")
+    email = _uniq_email()
+    r = client.post(SIGNUP, json={
+        "company_code": "DEMO", "login_id": email, "email": email,
+        "display_name": "x", "password": "Passw0rd!",
+    })
+    assert r.status_code == 422, r.text
+    assert any(e.get("field") == "password" for e in (r.json().get("errors") or []))
+    assert _pending_for(email) is None  # 漏洩PW は pending を作らない
+    # 非漏洩PW は通常どおり 202。
+    email2 = _uniq_email()
+    try:
+        r2 = client.post(SIGNUP, json={
+            "company_code": "DEMO", "login_id": email2, "email": email2,
+            "display_name": "x", "password": "Str0ng-Uniq-9x!",
+        })
+        assert r2.status_code == 202, r2.text
+    finally:
+        _cleanup_email(email2)
+
+
+def test_a_tc_132_disposable_email_rejected(client):
+    """A-TC-132: 使い捨てメールドメイン拒否（SEC G・ローカル blocklist）＝422 field=email・pending作らない。"""
+    email = f"throwaway-{uuid.uuid4().hex[:8]}@mailinator.com"  # 同梱 blocklist のドメイン
+    r = client.post(SIGNUP, json={
+        "company_code": "DEMO", "login_id": email, "email": email,
+        "display_name": "x", "password": "Str0ng-Uniq-9x!",
+    })
+    assert r.status_code == 422, r.text
+    assert any(e.get("field") == "email" for e in (r.json().get("errors") or []))
+    assert _pending_for(email) is None
+
+
+def test_a_tc_133_admin_signup_notify_cooldown(client, monkeypatch):
+    """A-TC-133: 新規登録の管理者通知（SEC H）＝初回は即送・クールダウン中はカウントのみ（まとめ件数）。"""
+    s = get_settings()
+    monkeypatch.setattr(s, "signup_admin_notify_enabled", True)
+    demo_id = _demo_company_id()
+    r = get_redis()
+    cd_key, pend_key = f"signup_notify_cd:{demo_id}", f"signup_notify_pending:{demo_id}"
+    r.delete(cd_key); r.delete(pend_key)  # 前回 run の残留を除去（冪等）
+    admin = _demo_admin_user_id()
+    _clear_signup_notifs(admin)
+    before = _signup_registered_count(admin)
+    e1 = _signup_and_verify(client)  # 1通目＝即送
+    e2 = _signup_and_verify(client)  # 2通目＝クールダウン中＝カウントのみ
+    try:
+        assert _signup_registered_count(admin) - before == 1   # 通知は1件だけ（ダイジェスト化）
+        assert int(r.get(pend_key) or 0) == 1                  # 2通目は pending に積まれる
+    finally:
+        _cleanup_email(e1); _cleanup_email(e2)
+        _clear_signup_notifs(admin)
+        r.delete(cd_key); r.delete(pend_key)
+
+
+def test_a_tc_134_captcha_turnstile(client, monkeypatch):
+    """A-TC-134: CAPTCHA（Turnstile・env-gated）＝検証失敗で400・成功で202・未設定はスキップ（既存テストで担保）。"""
+    import app.control_plane.public.application as app_mod
+    # 有効化相当＝verify_turnstile を Fake（外部 siteverify を叩かない）。
+    monkeypatch.setattr(app_mod, "verify_turnstile", lambda token, ip: token == "good-token")
+    bad = _uniq_email()
+    r = client.post(SIGNUP, json={
+        "company_code": "DEMO", "login_id": bad, "email": bad,
+        "display_name": "x", "password": "Str0ng-Uniq-9x!", "captcha_token": "bad",
+    })
+    assert r.status_code == 400, r.text
+    assert r.json().get("code") == "captcha_failed"
+    assert _pending_for(bad) is None  # ボット判定失敗は pending を作らない
+    good = _uniq_email()
+    try:
+        r2 = client.post(SIGNUP, json={
+            "company_code": "DEMO", "login_id": good, "email": good,
+            "display_name": "x", "password": "Str0ng-Uniq-9x!", "captcha_token": "good-token",
+        })
+        assert r2.status_code == 202, r2.text
+    finally:
+        _cleanup_email(good)
 
 
 def test_a_tc_122_verify_creates_account_server_authoritative(client):

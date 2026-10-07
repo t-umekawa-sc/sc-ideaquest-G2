@@ -16,6 +16,7 @@ export function getBootstrap(): Promise<BootstrapResponse | null> {
 // A.11.3＝サインアップ要求。列挙耐性のため成否に関わらず一律 202（呼び出し側は成否を区別しない）。
 export function signup(input: {
   company_code?: string; login_id: string; email: string; display_name: string; password: string;
+  captcha_token?: string;
 }): Promise<SignupAcceptedResponse | null> {
   return apiFetch<SignupAcceptedResponse>("/public/signup", {
     method: "POST",

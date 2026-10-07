@@ -7,7 +7,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -46,6 +46,11 @@ export function SignupForm() {
   const [pending, setPending] = useState(false);
   const [resendInfo, setResendInfo] = useState<string | null>(null);
 
+  // CAPTCHA（Turnstile）＝bootstrap で site key が返る時だけ有効（prod）。未設定（dev）は出さない。
+  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string>("");
+  const captchaRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     getBootstrap()
       .then((b) => {
@@ -53,9 +58,35 @@ export function SignupForm() {
           setDefaultCode(b.default_company_code);
           setCompanyCode(b.default_company_code);
         }
+        if (b?.turnstile_site_key) setSiteKey(b.turnstile_site_key);
       })
       .catch(() => {});
   }, []);
+
+  // Turnstile ウィジェット描画（site key 有＋完了前）。入力/認証コード両フェーズで共有＝再送でも新トークンを得る
+  // （Turnstile は単回トークンを callback で自動更新）。
+  useEffect(() => {
+    if (!siteKey || phase === "done") return;
+    const SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    const render = () => {
+      const ts = (window as unknown as { turnstile?: { render: (el: HTMLElement, opts: object) => void } }).turnstile;
+      if (ts && captchaRef.current && captchaRef.current.childElementCount === 0) {
+        ts.render(captchaRef.current, {
+          sitekey: siteKey,
+          callback: (token: string) => setCaptchaToken(token),
+          "error-callback": () => setCaptchaToken(""),
+          "expired-callback": () => setCaptchaToken(""),
+        });
+      }
+    };
+    if (!document.querySelector(`script[src="${SRC}"]`)) {
+      const sc = document.createElement("script");
+      sc.src = SRC; sc.async = true; sc.defer = true; sc.onload = render;
+      document.head.appendChild(sc);
+    } else {
+      render();
+    }
+  }, [siteKey, phase]);
 
   const effectiveCompanyCode = () => (defaultCode ?? companyCode).trim().toUpperCase();
 
@@ -76,6 +107,10 @@ export function SignupForm() {
     e.preventDefault();
     setError(null);
     if (!validate()) return;
+    if (siteKey && !captchaToken) {
+      setError("ボット対策の確認を完了してください。");
+      return;
+    }
     setPending(true);
     try {
       const res = await signup({
@@ -84,6 +119,7 @@ export function SignupForm() {
         email: email.trim(),
         display_name: displayName.trim(),
         password,
+        captcha_token: captchaToken || undefined,
       });
       // 列挙耐性＝一律 202。成否に関わらず認証コード入力へ進む（SEC B）。
       // PW は state に保持する（再送＝同入力で /signup を再POSTするため）。確定成功時に破棄。
@@ -149,9 +185,9 @@ export function SignupForm() {
         login_id: loginId.trim(),
         email: email.trim(),
         display_name: displayName.trim(),
-        // 再送は同入力で pending を置換（PW は保持していないため再入力不要にするため、ここでは
-        // 直前のフォーム入力を使う）。PW を保持していない場合はフォームに戻す。
+        // 再送は同入力で pending を置換。PW は OTP 段でも state 保持（確定成功時に破棄）。
         password: password || "",
+        captcha_token: captchaToken || undefined,
       });
       setResendInfo("認証コードを再送しました。");
     } catch {
@@ -169,6 +205,11 @@ export function SignupForm() {
           <h1>アカウント作成</h1>
 
           {error && <div className="form-error" role="alert">{error}</div>}
+
+          {/* CAPTCHA（Turnstile）＝site key 設定時のみ。入力/認証コード両フェーズで表示（再送のトークン用）。 */}
+          {siteKey && phase !== "done" && (
+            <div ref={captchaRef} className="cf-turnstile-box" style={{ margin: "var(--space-3) 0" }} />
+          )}
 
           {phase === "form" && (
             <form onSubmit={onSubmitForm} noValidate>

@@ -255,4 +255,8 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-127 | api | CSRF/Origin・レート制限（SEC G） | 未認証POST | Origin 不一致／大量作成 | Origin/Sec-Fetch 検証で弾く・IP/メール単位レート制限＋時間窓上限 | A.11.4／SEC G |
 | A-TC-128 | api | 確定後は自動ログインしない（SEC I・決定2026-10-07） | signup pending 済み | `POST /public/signup/verify`（正コード） | 200 `{status:"created", company_code, login_id}`＝**セッション Cookie を発行しない**（未認証EPからのセッション発行を避け固定化リスク最小化）。確定後は SC-00 ログインへ誘導 | A.11.3／SEC I |
 | A-TC-129 | api | pending は単回＝確定成功で used_at 打刻し再利用不可（SEC A/C） | 確定済み pending（used_at あり） | 同じ `signup_challenges` の code で `verify` 再呼び | 410（使用済み）＝二重 accounts 作成を防ぐ。期限切れ/試行超過も当該 pending 失効 | データモデル §4.4a／SEC C |
-| A-TC-130 | api | PW 最低文字数の形式検証は 422（SEC D・漏洩PW拒否は follow-up） | — | `POST /public/signup`（短すぎる password） | 422 `validation_error`（field=password・§4.7）。※会社存在/重複は 422 にしない（列挙耐性）。漏洩PW拒否〔HIBP〕は外部依存で follow-up | A.11.3／SEC D |
+| A-TC-130 | api | PW 最低文字数の形式検証は 422（SEC D） | — | `POST /public/signup`（短すぎる password） | 422 `validation_error`（field=password・§4.7）。※会社存在/重複は 422 にしない（列挙耐性） | A.11.3／SEC D |
+| A-TC-131 | api | 漏洩PW拒否（SEC D・HIBP・env-gated・k-匿名性） | `hibp_enabled`＋HIBP を Fake（漏洩判定を注入） | `POST /public/signup`（漏洩PW／非漏洩PW） | 漏洩＝422 `validation_error`（field=password）・pending 作らない／非漏洩＝202。外部障害は fail-open（通す） | A.11.4／SEC D |
+| A-TC-132 | api | 使い捨てメールドメイン拒否（SEC G・ローカル blocklist） | `signup_disposable_email_block=true`＋blocklist に対象ドメイン | `POST /public/signup`（使い捨て／通常ドメイン） | 使い捨て＝422 `validation_error`（field=email）／通常＝202 | A.11.4／SEC G |
+| A-TC-133 | api | 新規登録の管理者通知（SEC H・クールダウンでまとめ件数） | `signup_admin_notify_enabled=true`・会社に company_account_admin 有 | 連続 signup verify（確定×複数） | 初回で管理者へ `signup_registered` 通知／クールダウン中はカウントのみ→次回通知に「ほか N 件」。本人には出さない | A.11.4／SEC H |
+| A-TC-134 | api | CAPTCHA 検証（SEC G・Turnstile・env-gated） | `turnstile_secret_key` 設定＋siteverify を Fake | `POST /public/signup`（トークン無/不正／正当） | キー未設定＝検証スキップ（現行）／設定時はトークン不正で 400・正当で 202 | A.11.4／SEC G |

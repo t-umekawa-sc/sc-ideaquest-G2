@@ -21,6 +21,8 @@ class BootstrapResponse(BaseModel):
     default_company_code: str | None = None
     # 既定会社があり self_signup_enabled=true の時のみ true（会社コードを隠す public デプロイのUI出し分け用）。
     self_signup_available: bool = False
+    # CAPTCHA（Turnstile）site key（公開）。設定時のみフロントがウィジェットを出す。未設定は null（CAPTCHA 無効）。
+    turnstile_site_key: str | None = None
 
 
 class SignupRequest(BaseModel):
@@ -29,7 +31,8 @@ class SignupRequest(BaseModel):
     login_id: str = Field(min_length=1, max_length=255)
     email: str = Field(min_length=3, max_length=255)
     display_name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=8, max_length=256)  # 最低文字数（SEC D・漏洩PW拒否は follow-up）
+    password: str = Field(min_length=8, max_length=256)  # 最低文字数（SEC D）
+    captcha_token: str | None = None  # Turnstile トークン（CAPTCHA 有効時のみ必須・SEC G）
 
     _v_email = field_validator("email")(_validate_email)
 

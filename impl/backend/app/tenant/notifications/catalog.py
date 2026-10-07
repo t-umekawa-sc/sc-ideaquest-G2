@@ -31,6 +31,7 @@ ICON = {
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
     "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
     "contest_join_request_received": "📩", "contest_join_request_decided": "✅",
+    "signup_registered": "🆕",
     "quest_watch_update": "👀", "info_refuting_raised": "⚠️",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
     "ai_task_done": "🤖", "ai_task_failed": "⚠️",
@@ -213,6 +214,15 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
                     else f"クエスト「{qt}」への参加リクエストが却下されました")
         context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
         tag = "Join request" if en else "参加リクエスト"
+    elif t == "signup_registered":
+        name = p.get("display_name") or ("A new user" if en else "新しいユーザー")
+        extra = int(p.get("extra_count") or 0)
+        if en:
+            body = f"{name} signed up" + (f" (and {extra} more)" if extra else "")
+        else:
+            body = f"{name} さんが新規登録しました" + (f"（ほか {extra} 件）" if extra else "")
+        context = "Sign-up" if en else "新規登録"
+        tag = "Sign-up" if en else "新規登録"
     elif t == "contest_join_request_received":
         theme = _contest_theme(session, p.get("contest_id"), en)
         body = (f'{actor} requested to join the contest "{theme}"' if en

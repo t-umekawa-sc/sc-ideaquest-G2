@@ -34,7 +34,7 @@ def signup(request: Request, body: SignupRequest) -> SignupAcceptedResponse:
     result = public_service.signup(
         get_redis(), get_client_ip(request),
         company_code=body.company_code, login_id=body.login_id, email=body.email,
-        display_name=body.display_name, password=body.password,
+        display_name=body.display_name, password=body.password, captcha_token=body.captcha_token,
     )
     return SignupAcceptedResponse(**result)
 

@@ -83,6 +83,20 @@ class Settings(BaseSettings):
     signup_request_rate_limit_max: int = 5
     signup_request_rate_limit_window_seconds: int = 600
 
+    # セルフサインアップ強化（FR-48② SEC D/G/H・follow-up）。既定は安全側（外部依存/副作用は OFF・本番で有効化）。
+    # 漏洩PW拒否（SEC D・外部 HIBP range API・k-匿名性＝PW先頭5hexのみ送信）。prod で true。外部障害は fail-open（通す）。
+    hibp_enabled: bool = False
+    hibp_timeout_seconds: float = 2.0
+    # 使い捨てメールドメイン拒否（SEC G・ローカル同梱 blocklist・外部不要）。既定 ON（test メールは非該当）。
+    signup_disposable_email_block: bool = True
+    # 新規登録の管理者通知（SEC H・既存 notifications/mail 基盤）。prod で true。クールダウンでまとめ件数。
+    signup_admin_notify_enabled: bool = False
+    signup_admin_notify_cooldown_seconds: int = 3600
+    # CAPTCHA（SEC G・Cloudflare Turnstile）。site（公開）/secret（秘匿）とも空なら無効（dev/test）。prod で設定。
+    turnstile_site_key: str = Field(default="", validation_alias="TURNSTILE_SITE_KEY")
+    turnstile_secret_key: str = Field(default="", validation_alias="TURNSTILE_SECRET_KEY")
+    turnstile_timeout_seconds: float = 3.0
+
     # メール変更のダブルオプトイン（ADR-0008）。確認リンクトークン TTL（24時間・単回・otp_challenges purpose=email_change）
     email_change_ttl_seconds: int = 86400
     # メールアドレス確認（ADR-0009・管理者 opt-in）。確認リンクトークン TTL（72時間・単回・otp_challenges purpose=email_verify）
