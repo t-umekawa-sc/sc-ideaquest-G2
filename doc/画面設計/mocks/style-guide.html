@@ -711,18 +711,19 @@
         position:absolute; top:0; bottom:auto; height:var(--sp-h, 30px); left:100%; transform:none;
         margin-left:0; /* ベース右端に密着＝一体ピル */
         display:inline-flex; align-items:center; gap:var(--space-2);
-        max-width:0; overflow:hidden; opacity:0; pointer-events:none; white-space:nowrap;
+        /* 展開は width 駆動＝内容幅ではなく算出した「ホストの残り幅いっぱい」(--sp-vp) まで必ず広げる（共通仕様・ユーザー指摘）。 */
+        width:0; overflow:hidden; opacity:0; pointer-events:none; white-space:nowrap;
         padding:0; color:var(--color-text-muted); background:var(--color-surface-alt);
         border-width:0 1px; border-style:solid; border-color:var(--color-border); /* 左右のみ実ボーダー・左辺＝継ぎ目 */
         box-shadow:inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border); /* 上下線 */
         border-top-left-radius:0; border-bottom-left-radius:0;
         border-top-right-radius:var(--radius-full); border-bottom-right-radius:var(--radius-full);
-        transition:max-width .2s ease, opacity .15s ease, padding .2s ease;
+        transition:width .2s ease, opacity .15s ease, padding .2s ease;
         z-index:30;
       }
       .screen-purpose:hover .screen-purpose__pop,
       .screen-purpose:focus-within .screen-purpose__pop{
-        max-width:var(--sp-vp, 460px); opacity:1; pointer-events:auto;
+        width:var(--sp-vp, 460px); opacity:1; pointer-events:auto;
         padding:0 var(--space-3); border-color:var(--color-border-strong); border-left-color:var(--color-border-strong);
         box-shadow:inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong);
       }
@@ -857,14 +858,15 @@
         function isStatic() {
           return window.matchMedia('(prefers-reduced-motion: reduce)').matches || spDemo.classList.contains('sp-force-static');
         }
-        // フローティング配置＝在来フローを動かさず、ホスト（.sp-host）の右端までに“地続き”で伸ばす（折り返さず・見切れさせず）。展開幅（--sp-vp）を返す。上限 460。
+        // フローティング配置＝在来フローを動かさず、ホスト（.sp-host）の右端までの「残り幅いっぱい」に広げる（折り返さず・見切れさせず）。
+        // 内容の長さは考慮しない（DIV のように余白を埋める・共通仕様）＝従来の 460px 固定上限は撤去。下限 140px は極小スペース保険。
         function place(band) {
           const host = band.closest('.sp-host') || band.parentElement;
           const b = band.getBoundingClientRect();
           const h = host.getBoundingClientRect();
           const margin = 16;
           const rightRoom = Math.floor(h.right - b.right - margin);
-          const cap = Math.max(140, Math.min(460, rightRoom));
+          const cap = Math.max(140, rightRoom);
           band.style.setProperty('--sp-vp', cap + 'px');
           return cap;
         }

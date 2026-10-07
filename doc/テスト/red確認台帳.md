@@ -789,3 +789,15 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | B-TC-180（⑦ 折り返し） | `.switch__state` を `white-space:normal` へ戻すと、行方向（幅≥645px）で状態語「非公開」の高さが **38px（2行）** に膨らみ `stateH<28` が失敗＝折り返し再現（幅 645/680/760/900/1100 すべてで 38px を実測）。`white-space:nowrap` 復元で **19px（1行）** → green。 |
 | B-TC-180（⑧ 文言） | 補足文を修正前「クエスト等の業務機能はサーバーで 403」に戻すと `toContainText("404")` が不一致で失敗・`not.toContainText("403")` も失敗＝誤文言再現。「404＝存在秘匿」へ復元で green（**B-TC-180 1 passed**・回帰 sc-92 系 green）。 |
+
+## 受入指摘 ガイダンス ⓘ(ScreenPurpose) の残り幅展開（C-TC-308・2026-10-07・§4.13）
+
+> ブラウザ受入（指摘txt＋画像）で検出＝ⓘ ガイダンス（`.screen-purpose`・デザイン標準 §4.13）が hover 時、本文が
+> **内容の長さぶんしか広がらない**（「ものすごく短くしか広がりません」）＝(1) CSS が `max-width:var(--sp-vp)` 駆動で
+> 内容が短いと内容幅で停止／(2) `data-sp-host` が内容幅の `.filters` だった。修正＝(1) `width:var(--sp-vp)` 駆動＋
+> `place()` の 460px 固定上限を撤去（ホスト右端までの残り幅いっぱい）／(2) 検索ツールバーの `data-sp-host` を全幅の
+> `.list-toolbar` へ移動（共通仕様・contest/quest 両画面）。表示ガード＝e2e（§5.3・純ロジック無し）。
+
+| TC-ID | 観測 red（修正差戻し時の actual）→ green |
+| --- | --- |
+| C-TC-308 | 実測＝**修正前**は展開 pop 幅 **140px**（floor・内容幅/狭い `.filters` で停止）でホスト右端から大きく離れる（`.filters` を基準にすると -139px はみ出し）＝「残り幅いっぱい」不成立。**修正後**は pop 幅 **649px**（ホスト `.list-toolbar` 幅 1077px）・右端との余白 **17px**＝残り幅を埋める → e2e `6≤gap≤48` で green（**C-TC-308 1 passed**）。 |

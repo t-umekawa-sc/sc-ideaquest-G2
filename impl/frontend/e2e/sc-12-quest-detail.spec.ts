@@ -34,6 +34,36 @@ test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page 
   }
 });
 
+// C-TC-308（回帰・受入指摘）ガイダンス ⓘ(ScreenPurpose・§4.13) が hover でホスト行の残り幅いっぱいに展開する。
+// 受入不具合＝内容が短いと内容幅で止まり「ものすごく短くしか広がらない」＝(1)CSS が max-width 駆動で内容幅で停止
+//   (2)data-sp-host が内容幅の .filters だった。修正＝width 駆動＋460px 上限撤去＋host を全幅の .list-toolbar に。
+// 判定＝展開した pop の右端が .list-toolbar 右端の近く（余白≒16px）＝残り幅を埋めている。表示ガード＝e2e（§5.3）。
+test("C-TC-308 SC-12 search-tab guidance band fills host row width on hover", async ({ page }) => {
+  await gotoAuthed(page);
+  const title = `E2ESPバンド_${Date.now().toString().slice(-8)}`;
+  const id = await createRecruiting(page, title);
+  try {
+    await page.goto(`/quests/${id}`);
+    await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15000 });
+    await page.getByRole("tab", { name: /全文検索/ }).click();
+    const sp = page.locator(".screen-purpose").first();
+    await expect(sp).toBeVisible();
+    await sp.hover();
+    await page.waitForTimeout(350); // width 展開アニメ（.2s）を待つ
+    const gap = await page.evaluate(() => {
+      const el = document.querySelector(".screen-purpose")!;
+      const toolbar = el.closest(".list-toolbar")!; // 全幅ホスト（＝残り幅いっぱいの基準）
+      const pop = el.querySelector(".screen-purpose__pop")!;
+      return Math.round(toolbar.getBoundingClientRect().right - pop.getBoundingClientRect().right);
+    });
+    // pop 右端がツールバー右端の近く（≒16px 余白）＝行の残り幅を埋めている（内容幅や狭い .filters で止まらない）。
+    expect(gap, "pop が行の残り幅いっぱいに展開（ツールバー右端との余白）").toBeGreaterThanOrEqual(6);
+    expect(gap, "pop がツールバー右端を大きく超えない").toBeLessThanOrEqual(48);
+  } finally {
+    await deleteQuiet(page, id);
+  }
+});
+
 // 状態遷移（recruiting→in_progress）と削除（→一覧へ）。owner のみの ⋯ アクション。
 test("C-TC-206 SC-12 transition forward then delete", async ({ page }) => {
   // 注：N=7 密集時に主フロー（遷移→削除）が稀にストールする残存フレーク。test.slow() は救済にならず

@@ -34,12 +34,14 @@ function applyMarquee(band: HTMLElement, vpWidth: number): void {
 }
 
 // フローティング配置＝在来フローを動かさず、ホスト（[data-sp-host] or 親）の右端までに収める（折返さず・見切れさせず）。
+// 展開幅＝ホスト右端までの「残り幅いっぱい」（内容の長さは考慮しない・DIV のように余白を埋める・共通仕様・ユーザー指摘）。
+// 上限は設けない（従来の 460px 固定上限を撤去）＝短い本文でも親の残り幅まで広げる。下限 140px は極小スペース保険。
 function place(band: HTMLElement): number {
   const host = (band.closest("[data-sp-host]") as HTMLElement | null) ?? band.parentElement ?? band;
   const b = band.getBoundingClientRect();
   const h = host.getBoundingClientRect();
   const rightRoom = Math.floor(h.right - b.right - 16);
-  const cap = Math.max(140, Math.min(460, rightRoom));
+  const cap = Math.max(140, rightRoom);
   band.style.setProperty("--sp-vp", `${cap}px`);
   return cap;
 }

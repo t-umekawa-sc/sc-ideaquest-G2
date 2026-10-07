@@ -892,8 +892,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       {/* 全文検索（J・実接続＝GET /quests/{id}/search・PGroonga） */}
       {tab === "search" && (
         <section aria-label="全文検索">
-          <div className="list-toolbar">
-            <div className="filters" data-sp-host>
+          {/* ガイダンス ⓘ(ScreenPurpose) は data-sp-host の行幅いっぱいに展開＝全幅の .list-toolbar をホストにする（§4.13・共通仕様） */}
+          <div className="list-toolbar" data-sp-host>
+            <div className="filters">
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
               <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
                 <option value="">対象: すべて</option>

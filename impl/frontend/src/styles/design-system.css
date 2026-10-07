@@ -2506,17 +2506,19 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   position: absolute; top: 0; bottom: auto; height: var(--sp-h, 30px); left: 100%; transform: none;
   margin-left: 0;
   display: inline-flex; align-items: center; gap: var(--space-2);
-  max-width: 0; overflow: hidden; opacity: 0; pointer-events: none; white-space: nowrap;
+  /* 展開は width 駆動＝内容幅ではなく算出した「親の残り幅いっぱい」(--sp-vp) まで必ず広げる（共通仕様・ユーザー指摘）。
+     max-width では内容が短いと内容幅で止まる（＝短くしか広がらない）ため width を使う。 */
+  width: 0; overflow: hidden; opacity: 0; pointer-events: none; white-space: nowrap;
   padding: 0; color: var(--color-text-muted); background: var(--color-surface-alt);
   border-width: 0 1px; border-style: solid; border-color: var(--color-border); /* 左右のみ実ボーダー・左辺＝継ぎ目 */
   box-shadow: inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border); /* 上下線 */
   border-top-left-radius: 0; border-bottom-left-radius: 0;
   border-top-right-radius: var(--radius-full); border-bottom-right-radius: var(--radius-full);
-  transition: max-width .2s ease, opacity .15s ease, padding .2s ease;
+  transition: width .2s ease, opacity .15s ease, padding .2s ease;
   z-index: 30;
 }
 .screen-purpose:hover .screen-purpose__pop, .screen-purpose:focus-within .screen-purpose__pop{
-  max-width: var(--sp-vp, 460px); opacity: 1; pointer-events: auto;
+  width: var(--sp-vp, 460px); opacity: 1; pointer-events: auto;
   padding: 0 var(--space-3); border-color: var(--color-border-strong); border-left-color: var(--color-border-strong);
   box-shadow: inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong);
 }

@@ -132,6 +132,7 @@
 | C-TC-204 | e2e | 下書き作成→一覧反映 | 必須入力→下書き保存 | 一覧に作成タイトルが出る | C.2／SC-10 |
 | C-TC-205 | e2e | 詳細の実データ描画 | 詳細を開く | ヘッダー（カテゴリ badge・🗂参加部署）/パーティーが実データ（作成者バッジ）。「概要」タブはレビュー#3で廃止＝ヘッダーに集約 | C.1／SC-12 |
 | C-TC-206 | e2e | 遷移→削除 | ⋯ステータスを進める→⋯削除 | in_progress に更新／削除で一覧へ・タイトル消失 | C.5／C.2 |
+| C-TC-308 | e2e | ガイダンス ⓘ（ScreenPurpose）が hover でホスト行の残り幅いっぱいに展開（受入指摘の回帰・内容幅で止まらない・§5.3） | recruiting クエスト作成→詳細の「🔍 全文検索」タブ→ⓘ を hover | 展開した `.screen-purpose__pop` の右端が全幅ホスト `.list-toolbar` の右端近く（余白≒16px）＝残り幅いっぱいに広がる（内容が短くても内容幅で止まらない）。作成した quest は後始末で削除 | デザイン標準 §4.13（展開幅＝ホスト残り幅いっぱい）／SC-12 |
 | C-TC-284 | e2e | 編集で無変更保存＝API を呼ばず info「変更はありません」（保存ボタン統一・成功通知を誤発火しない） | API で recruiting クエストを作成（作成者=user@acme＝編集可）→`/quests/{id}/edit` | 何も編集せず「保存する」（edit-save） | `info`「変更はありません」が出て成功「クエストを保存しました」は出ない＝無変更で updateQuest を呼ばない。作成した quest は後始末で削除 | デザイン標準 §14／C.2 |
 | C-TC-285 | api | **クエストの関連情報**（`GET /quests/{id}/related-info`・FR-41・SC-12 上部ストリップ）＝一致度 `score` 降順・`rejected`/archived 除外・**manual は `linked_by`（関連付けた人）** | recruiting クエスト＋`info_links` を直接 seed（auto`supporting`score0.90／manual`refuting`score無／rejected auto／archived 情報） | `GET /quests/{id}/related-info` | 200・`data` に auto/manual を含み rejected/archived は除外・auto(0.90) が manual(NULL) より前（score降順）・auto は `linked_by=None`（system）／manual は `kind=refuting`・`linked_by.user_id=作成者`・`source_url` を返す | C.8b／N.1／§5.35 |
 | C-TC-286 | api | 関連情報の門番＝クエスト詳細と同一（範囲外/不明は 404＝存在秘匿） | seed 非参加のクエスト（他人 owner・自分パーティー外）／不明 ID | `GET /quests/{id}/related-info` | いずれも **404**（`can_access_quest`・C.0） | C.8b／C.0 |
