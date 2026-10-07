@@ -360,7 +360,7 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
         <div className="setting-row">
           <div className="setting-row__info">
             <div className="setting-row__name">公開（コンテスト専用）モード</div>
-            <div className="setting-row__desc">ON=デモ用の公開テナント。一般ユーザーは<strong>コンテストのみ操作可</strong>（クエスト等の業務機能はサーバーで 403・ホームは SC-50 コンテスト一覧に着地）。管理者も業務機能は使えずコンテスト＋管理のみ。OFF（既定）=通常の社内モード。</div>
+            <div className="setting-row__desc">ON=デモ用の公開テナント。一般ユーザーは<strong>コンテストのみ操作可</strong>（クエスト等の業務機能はサーバーで 404＝存在秘匿・ホームは SC-50 コンテスト一覧に着地）。管理者も業務機能は使えずコンテスト＋管理のみ。OFF（既定）=通常の社内モード。</div>
           </div>
           <label className="switch">
             <input type="checkbox" aria-label="公開（コンテスト専用）モード" checked={company.access_mode === "public"} onChange={(e) => saveAccessMode(e.target.checked ? "public" : "private")} />

@@ -1134,7 +1134,7 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
 .switch:has(input:disabled) { color: var(--color-text-subtle); cursor: not-allowed; }
 .switch__text { font-size: var(--text-sm); }
 /* ON/OFF の状態語（任意。data-on/data-off をトラック横に出す用途はJSで切替） */
-.switch__state { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); min-width: 2.4em; }
+.switch__state { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); min-width: 2.4em; white-space: nowrap; }
 .switch > input:checked ~ .switch__state { color: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { .switch__track, .switch__thumb { transition: none; } }
 

@@ -42,6 +42,28 @@ test("B-TC-113 company detail settings toggle persists", { tag: "@serial" }, asy
   await expect(page.getByRole("checkbox", { name: /MFA/ })).toBeChecked({ checked: !before });
 });
 
+// B-TC-180（回帰・受入指摘）公開（コンテスト専用）モード行の表示崩れ/文言。
+// ①受入不具合＝行方向レイアウトで状態語「非公開」(3字>min-width 2.4em) が折り返して2行高に膨らむ
+//   → 共有 `.switch__state{white-space:nowrap}` で1行固定（修正前は高さ ~38px=2行／修正後 ~19px=1行）。
+// ②補足文の「サーバーで 403」は誤り＝公開会社の業務EPは外周ガード(access_gate)で 404＝存在秘匿（決定P'）。
+// 表示/文言ガード＝e2e（テスト規約 §5.3）。ACME-01 を一覧APIで解決し詳細へ直接遷移（新規会社を作らない）。
+test("B-TC-180 public-mode row: state word single-line + desc says 404", { tag: "@serial" }, async ({ page }) => {
+  await formLogin(page, OPS);
+  const list = await (await page.request.get(`/api/v1/admin/companies?q=ACME-01&per_page=100`)).json();
+  const co = (list.data ?? []).find((c: { company_code: string }) => c.company_code === "ACME-01");
+  expect(co, "ACME-01 が一覧APIに現れる").toBeTruthy();
+  await page.goto(`/admin/companies/${co.company_id}`);
+
+  const row = page.locator(".setting-row", { hasText: "公開（コンテスト専用）モード" });
+  await expect(row).toBeVisible();
+  // ② 補足文は 404（存在秘匿）＝403 ではない。
+  await expect(row.locator(".setting-row__desc")).toContainText("404");
+  await expect(row.locator(".setting-row__desc")).not.toContainText("403");
+  // ① 状態語「非公開」が単一行（折り返すと高さが約2倍＝~38px になる）。
+  const stateH = await row.locator(".switch__state").evaluate((el) => Math.round(el.getBoundingClientRect().height));
+  expect(stateH, "状態語が折り返さず単一行").toBeLessThan(28);
+});
+
 // B-TC-121: 一般ユーザーは SC-92 会社詳細に入れない（サーバーガード＝/ へリダイレクト）。
 // ※ガードは system_role!=="system_admin" で一律 redirect＝company_account_admin も同じ分岐（backend SoD は B-TC-095）。
 test("B-TC-121 general user cannot access SC-92 detail", { tag: "@serial" }, async ({ page }) => {

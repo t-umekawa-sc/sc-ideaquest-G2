@@ -776,3 +776,16 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（`is_curator` を `return False` にスタブ化した時の actual）→ green |
 | --- | --- |
 | N curator ゲート群（代表 N-TC-011 他・計7件） | `is_curator` を常に False に壊すと、キュレータ付与済みでも属性付与/triage/一覧等の curator 能力判定が全拒否＝**7 failed, 73 passed**（curator 依存テストのみ赤）。`caps_repo.has_capability(..., 'info_curator')` を復元で **tests/info+capabilities 82 passed**（回帰ゼロ）。 |
+
+## 受入指摘 SC-92 公開モード行（折り返し/文言）e2e 回帰（B-TC-180・2026-10-07）
+
+> ブラウザ受入（指摘txt）で検出＝(⑦) 会社詳細「公開（コンテスト専用）モード」の状態語「非公開」(3字>min-width 2.4em) が
+> **行方向レイアウトで2行に折り返す**／(⑧) 補足文の「サーバーで 403」は誤り＝公開会社の業務EPは外周ガード
+> `access_gate` で **404＝存在秘匿**（決定P'・2026-10-07）。修正＝共有 `.switch__state{white-space:nowrap}`（全スイッチ改善）
+> ＋補足文を「404＝存在秘匿」へ。後追いのため §5.3 の反転/文言差戻しで behavior-red を目視（CSS は実行時 style 注入で
+> `white-space:normal` へ戻して実測）。表示/文言ガード＝e2e（純ロジック無し）。
+
+| TC-ID | 観測 red（反転/差戻し時の actual）→ green |
+| --- | --- |
+| B-TC-180（⑦ 折り返し） | `.switch__state` を `white-space:normal` へ戻すと、行方向（幅≥645px）で状態語「非公開」の高さが **38px（2行）** に膨らみ `stateH<28` が失敗＝折り返し再現（幅 645/680/760/900/1100 すべてで 38px を実測）。`white-space:nowrap` 復元で **19px（1行）** → green。 |
+| B-TC-180（⑧ 文言） | 補足文を修正前「クエスト等の業務機能はサーバーで 403」に戻すと `toContainText("404")` が不一致で失敗・`not.toContainText("403")` も失敗＝誤文言再現。「404＝存在秘匿」へ復元で green（**B-TC-180 1 passed**・回帰 sc-92 系 green）。 |
