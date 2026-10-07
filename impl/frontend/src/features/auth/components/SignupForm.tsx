@@ -73,6 +73,7 @@ export function SignupForm() {
       if (ts && captchaRef.current && captchaRef.current.childElementCount === 0) {
         ts.render(captchaRef.current, {
           sitekey: siteKey,
+          size: "flexible",  // コンテナ幅に追従（入力欄と同幅）＝既定 normal の固定300px だと幅が揃わない
           callback: (token: string) => setCaptchaToken(token),
           "error-callback": () => setCaptchaToken(""),
           "expired-callback": () => setCaptchaToken(""),
