@@ -29,6 +29,7 @@
 | U-8 | `POST /admin/announcements/images` | 本文貼付画像の再ホスト（自社 MinIO・署名URL） | 管理者 | multipart `file`。応答＝`{url}`＝自社ホスト署名URL。検証＝`validate_image_upload`（MIME allowlist＋サイズ＋シグネチャ・§1.10）。エディタが返却 URL で `img src` を置換（外部参照・`data:` を持ち込まない）。静的パス＝`/admin/announcements/{id}` より前に定義 |
 
 > 画像再ホストの理由＝`sanitize_html` の許可スキームは http/https のみ（`data:` 画像は保存時に除去）。貼付/ドロップ画像は本EPで自社ホストへ再ホストし、`<img src="署名URL">` として本文に残す（`img` は許可タグ・N.7/U.4 と同一基準）。認可は投稿権限と同じ**管理者のみ**（情報インプット N.2 の再ホストは全ユーザーだが、お知らせは管理者のみが起稿するため）。
+> **既知の follow-up（恒久表示）**＝署名URL は短TTL（約300秒）のため本文に埋め込んだ URL は時間経過で失効し得る（情報 N.2 と共通の latent 課題）。恒久化の方針は [バックログ F8](../バックログ/未実装・ギャップ一覧.md#2-機能-follow-up実装済み機能の残タスク)（推奨＝安定配信プロキシEP）に集約。
 
 ## U.3 ダッシュボード合成（I.3）
 
