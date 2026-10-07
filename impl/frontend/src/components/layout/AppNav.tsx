@@ -21,9 +21,11 @@ const BIZ: NavItem[] = [
   { href: "/announcements", label: "お知らせ", icon: "📢" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
-// 公開（コンテスト専用）モードの業務ナビ＝コンテスト＋通知のみ（クエスト等の業務リンクは出さない・FR-48 §8.0 決定P）。
+// 公開（コンテスト専用）モードの業務ナビ＝コンテスト＋お知らせ＋通知（クエスト等の業務リンクは出さない・FR-48 §8.0 決定P）。
+// お知らせ read は公開会社でも許可（会社DBスコープ＝他社漏れなし・SC-95 §4.6・外周ゲート許可リスト /announcements）。
 const BIZ_PUBLIC: NavItem[] = [
   { href: "/contests", label: "アイデアコンテスト", icon: "🏆" },
+  { href: "/announcements", label: "お知らせ", icon: "📢" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
 const GAME: NavItem[] = [

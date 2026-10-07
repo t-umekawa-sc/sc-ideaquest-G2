@@ -13,10 +13,15 @@ from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 def test_t_tc_204_is_path_allowed():
     """許可判定（純関数）＝コンテスト許可=全ロール／管理許可=管理者のみ／業務EPは管理者でも不可（決定O）。"""
     # コンテスト許可リスト（実パス）＝general/admin とも True。auth は /auth/* に集約（ログイン後の /auth/session 含む）。
+    # /announcements＝お知らせ read（閲覧/既読）も全ロール許可（会社DBスコープ・SC-95 §4.6）。
     for sub in ("/contests", "/contests/x/ranking", "/ideas/x/vote", "/chat-messages/x",
-                "/attachments/x/download", "/me", "/notifications/unread-count", "/auth/session"):
+                "/attachments/x/download", "/me", "/notifications/unread-count",
+                "/announcements", "/announcements/x", "/announcements/x/read", "/auth/session"):
         assert gate.is_path_allowed(sub, is_admin=False) is True, sub
         assert gate.is_path_allowed(sub, is_admin=True) is True, sub
+    # お知らせ管理（作成/編集）は /admin/announcements＝管理者のみ（general は不可・read とは別）。
+    assert gate.is_path_allowed("/admin/announcements", is_admin=False) is False
+    assert gate.is_path_allowed("/admin/announcements", is_admin=True) is True
     # 管理許可リスト＝admin のみ True・general False（会社/アカウント/所属/能力は全て /admin/* 配下）。
     for sub in ("/admin/companies", "/admin/accounts/x", "/admin/quest-groups", "/admin/accounts/x/capabilities"):
         assert gate.is_path_allowed(sub, is_admin=False) is False, sub

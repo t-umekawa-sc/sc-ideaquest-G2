@@ -31,9 +31,11 @@ _API = "/api/v1"
 # コンテスト許可リスト（全ロール）。パスは /api/v1 以降の実パス接頭辞（auth は /auth/* に集約）。
 # アイデア/投票/評価は /ideas 配下に集約（コンテスト配下のみ可視ゲート §2.3 で担保）。添付DLは /attachments。
 # 全文検索は /quests/{id}/search 配下（業務扱い）＝public のコンテスト内検索は当面不可（許容・将来コンテスト専用EP化）。
+# /announcements＝お知らせの read（閲覧/詳細/既読）は全ロール許可（会社DBスコープ＝他社漏れなし・SC-95 §4.6）。
+# 管理（作成/編集）は /admin/announcements（＝/admin 許可リスト＝管理者のみ）で別管理。
 _CONTEST_ALLOW = (
     "/contests", "/ideas", "/chat-messages", "/attachments",
-    "/me", "/notifications", "/realtime", "/auth",
+    "/me", "/notifications", "/announcements", "/realtime", "/auth",
 )
 # 管理許可リスト（system_admin / company_account_admin のみ追加）。会社/アカウント/所属/能力の管理は全て /admin/* に集約（32本）。
 _ADMIN_ALLOW = ("/admin",)

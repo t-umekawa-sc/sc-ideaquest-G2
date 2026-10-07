@@ -53,7 +53,7 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-TC-204 | unit | 許可判定（純関数）＝コンテスト許可リストは全ロール可／管理許可リストは管理者のみ追加／業務EPは管理者でも不可（決定O） | `access_gate.is_path_allowed(sub, is_admin)`（実パスは /api/v1 以降・auth は /auth/*・管理系は /admin/*） | contest系（/contests・/ideas・/chat-messages・/attachments・/me・/notifications・/auth/session）／admin系（/admin/companies・/admin/accounts・/admin/quest-groups）／業務系（/quests・/quests/{id}/search・/concepts・/dashboard）を general/admin で判定 | contest系＝general/admin とも True／admin系＝admin のみ True・general False／業務系＝general/admin とも False（公開会社はコンテスト専用・コンテスト内検索は /quests 配下ゆえ当面不可） | §8.0／決定O |
+| T-TC-204 | unit | 許可判定（純関数）＝コンテスト許可リストは全ロール可／管理許可リストは管理者のみ追加／業務EPは管理者でも不可（決定O） | `access_gate.is_path_allowed(sub, is_admin)`（実パスは /api/v1 以降・auth は /auth/*・管理系は /admin/*） | contest系（/contests・/ideas・/chat-messages・/attachments・/me・/notifications・/announcements〔read〕・/auth/session）／admin系（/admin/companies・/admin/accounts・/admin/quest-groups・/admin/announcements〔管理〕）／業務系（/quests・/quests/{id}/search・/concepts・/dashboard）を general/admin で判定 | contest系＝general/admin とも True（お知らせ read 含む）／admin系＝admin のみ True・general False（お知らせ管理 /admin/announcements 含む）／業務系＝general/admin とも False（公開会社はコンテスト専用・コンテスト内検索は /quests 配下ゆえ当面不可） | §8.0／決定O／SC-95 §4.6 |
 | T-TC-205 | int | public 会社は許可リスト外を 404＝存在秘匿・コンテスト系は素通し／private は不変（middleware 外周ガード） | シード会社を access_mode=public とみなす（`access_gate._resolve` を monkeypatch）・一般ログイン | `GET /quests`（業務）／`GET /contests`（コンテスト）を public で／private（非patch）で `GET /quests` | public×general＝`/quests` 404 `not_found`・`/contests` は 404 以外（ゲート非該当）／private＝`/quests` は 404 にならない（従来どおり） | §8.0／§1.6／決定P' |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
