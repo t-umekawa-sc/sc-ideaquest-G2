@@ -20,6 +20,12 @@ def _own(stmt, user_id):
     return stmt.where(InfoItem.created_by_id == user_id)
 
 
+def _mine(stmt, env):
+    """フィクスチャが作成した info に限定（共有dev DB には同一 seed ユーザーのデモ/受入 info が残存するため
+    author 絞りだけでは hermetic にならない。test_n_tc_005 と同じ ID 限定で検証を決定化する）。"""
+    return stmt.where(InfoItem.id.in_(env.item_ids))
+
+
 def test_n_tc_001_default_excludes_archived_newest_first(info_env):
     """N-TC-001: 既定＝archived 除外・created_at DESC。"""
     with get_tenant_session(info_env.db_identifier) as ts:
@@ -38,23 +44,24 @@ def test_n_tc_002_status_filter(info_env):
     """N-TC-002: status フィルタ（多値 OR・archived 明示時のみ含む）。"""
     with get_tenant_session(info_env.db_identifier) as ts:
         curated, _ = repo.build_info_list_query(statuses=["curated"])
-        assert _ids(ts, _own(curated, info_env.user_id)) == [info_env.ids.a]
+        assert _ids(ts, _mine(curated, info_env)) == [info_env.ids.a]
         archived, _ = repo.build_info_list_query(statuses=["archived"])
-        assert _ids(ts, _own(archived, info_env.user_id)) == [info_env.ids.c]
+        assert _ids(ts, _mine(archived, info_env)) == [info_env.ids.c]
 
 
 def test_n_tc_003_impact_class_filter(info_env):
     """N-TC-003: impact_class 多値 OR フィルタ。"""
     with get_tenant_session(info_env.db_identifier) as ts:
         threat, _ = repo.build_info_list_query(impact_classes=["threat"])
-        assert _ids(ts, _own(threat, info_env.user_id)) == [info_env.ids.b]
+        assert _ids(ts, _mine(threat, info_env)) == [info_env.ids.b]
 
 
 def test_n_tc_004_full_text_search(info_env):
     """N-TC-004: 全文検索 q（PGroonga &@~・title＋body_text）。"""
     with get_tenant_session(info_env.db_identifier) as ts:
         hit, _ = repo.build_info_list_query(q="ブロックチェーン")
-        assert _ids(ts, hit) == [info_env.ids.b]
+        # 共有dev DB には同語を含むデモ/受入 info が残存し得るため、フィクスチャ集合内で b だけがヒットすることを検証。
+        assert _ids(ts, _mine(hit, info_env)) == [info_env.ids.b]
 
 
 def test_n_tc_005_offset_paging_stable(info_env):

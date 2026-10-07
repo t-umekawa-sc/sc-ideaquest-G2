@@ -88,7 +88,8 @@ def info_env():
         ts.add(EntityToken(owner_type="info", owner_id=ids.c, token="アーカイブ語", count=99))  # 除外されるべき
         ts.commit()
 
-    yield SimpleNamespace(db_identifier=db_identifier, user_id=user_id, ids=ids)
+    yield SimpleNamespace(db_identifier=db_identifier, user_id=user_id, ids=ids,
+                          item_ids=created_items)
 
     with get_tenant_session(db_identifier) as ts:
         ts.execute(InfoAttachment.__table__.delete().where(InfoAttachment.info_item_id.in_(created_items)))

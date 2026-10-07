@@ -179,7 +179,9 @@ def test_n_tc_105_full_text_search(client, info_env):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     r = client.get(INFO, params={"q": "ブロックチェーン"})
     assert r.status_code == 200, r.text
-    ids = {c["id"] for c in r.json()["data"]}
+    # 共有dev DB には同語を含むデモ/受入 info が残存し得るため、フィクスチャ集合内で b だけがヒットすることを検証。
+    fx = {str(x) for x in info_env.item_ids}
+    ids = {c["id"] for c in r.json()["data"]} & fx
     assert ids == {str(info_env.ids.b)}
 
 
