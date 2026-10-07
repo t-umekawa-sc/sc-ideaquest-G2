@@ -210,6 +210,29 @@ stateDiagram-v2
 - 既存の **email_verify OTP＋MFA画面（SC-00 状態C）を再利用**（UIを増やさない）。PW は登録時入力のため `password_setup` リンク不要。
 - 許可条件（決定M）＝会社フラグ `self_signup_enabled`（既定 `false`・`public`/`private` 問わず opt-in）。現行 FR-03「管理者発行のみ」をこの opt-in で限定緩和。
 
+#### A.11.3 詳細（pending＝`signup_challenges`・決定 2026-10-07）
+
+**pending 保持＝新規テーブル `signup_challenges`**（データモデル §4.4a）。`otp_challenges` は `account_id NOT NULL` ＋ pending 入力列が無く**流用不可**のため新設（決定A・構造）。
+
+- **`GET /public/bootstrap`**（未認証）
+  - out `200`: `{ "default_company_code": string | null, "self_signup_available": boolean }`。`default_company_code`＝env `IQ_DEFAULT_COMPANY_CODE`（あれば SC-00 の会社コード欄を非表示＋自動セット）。`self_signup_available`＝既定会社がありその `self_signup_enabled=true` の時 true（会社コードを隠す public デプロイ向けのUI出し分け用。既定会社が無い通常デプロイは `false`＝SC-00 の「アカウント作成」リンク表示判断は会社コード入力後の `/signup` 一律202に委ねる＝会社の存在は明かさない・SEC B）。
+
+- **`POST /public/signup`**（未認証・Origin/Sec-Fetch 検証・IP/メール レート制限）
+  - in: `{ "company_code": string, "login_id": string, "email": string, "display_name": string, "password": string }`（public デプロイで既定会社コードがある場合 `company_code` 省略可＝サーバーが env 値で補完）。
+  - **422（形式不正のみ）**＝必須欠落・email 形式・password 最低文字数（§4.7 準拠・field エラー）。※**会社の存在/`self_signup_enabled`/login_id・email の重複は 422 にしない**（列挙耐性・SEC B）。
+  - out **一律 `202`**: `{ "status": "verification_sent", "masked_to": string, "expires_in": 600, "resend_available_in": number }`（`masked_to`＝入力メールのマスク表示＝状態C 用。内部条件を満たさない場合も**同一の 202**を返し、行作成・メール送信はしない／既存アカウントには out-of-band 通知）。
+  - 内部: 会社コード→会社解決→`self_signup_enabled=true` 再検証（SEC F）→ email が既存 `accounts` に無いか確認（有れば out-of-band「既にアカウントがあります」メール・SEC B）→ PW 即 Argon2id（SEC D）→ `signup_challenges` に 1 行（10分・単回・`attempts=0`）＋ 6桁OTP をメール送信。
+  - **再送**＝同入力で `POST /public/signup` を再呼び（直近 pending を置換＝最新のみ有効・`resend_available_in` 内は 429 相当だが応答は一律 202 を保ちつつ送信抑制・SEC C）。
+
+- **`POST /public/signup/verify`**（未認証・Origin 検証）
+  - in: `{ "company_code": string, "email": string, "code": string }`（pending の引当キー＝company+email・`code`＝6桁）。
+  - **成功 `200`**: `{ "status": "created", "company_code": string, "login_id": string }`（**自動ログインしない**＝決定・確定後は SC-00 ログイン画面へ会社コード/ログインIDをプリフィルして誘導。SEC I＝未認証EPからのセッション発行を避け固定化リスクを最小化）。確定処理＝データモデル §4.4a「確定」（同一 Tx で `accounts` INSERT＋`used_at`＋outbox＋Tier1＋管理者通知）。
+  - **失敗**＝コード誤り/期限切れ/試行超過/使用済み＝状態C で再入力/再送を促す（`attempts` 上限で当該 pending 失効・SEC C）。一意性違反（login_id/email 先約）は in-band で明かさず**汎用失敗**＋out-of-band 通知（SEC B）。
+  - 監査（SEC J）＝`signup.request`/`signup.verify`（成否）を request_id/tenant 付きで記録・PW/コードは出力しない。
+
+- **確定後の遷移（決定）**＝**ログイン画面へプリフィル誘導**（自動ログインしない）。SC-05 → 成功 → SC-00 状態A（会社コード/ログインID 充填・PW 入力）。
+- **外部依存 SEC は follow-up（決定 2026-10-07）**＝CAPTCHA（SEC G）・漏洩PW拒否〔HIBP〕（SEC D）・使い捨てメールドメイン判定（SEC G）は外部サービス依存のため MVP 対象外（設計に残置）。MVP は A/B/C/E/F/I/J＋レート制限（既存再利用）＋Origin 検証（既存再利用）＋PW 最低文字数。
+
 ### A.11.4 セキュリティ必須要件（SEC A〜J・FR-48 実装の受入条件）
 
 | # | 項目 | 要件 |
@@ -224,3 +247,5 @@ stateDiagram-v2
 | **H** | 即 active の濫用面 | 新規アカウントの投稿レート制限・モデレーション・通報。管理者通知の大量化（サインアップ爆撃）をレート制限/ダイジェスト化 |
 | **I** | セッション | 自動ログインするなら新規セッション発行（固定化対策）。`email_verify` トークンで既存アカウントのセッションを取得できないよう purpose を厳格分離 |
 | **J** | ログ・監査・PII | PW/コードをログに出さない・試行を request_id/tenant 付きで監査・public はデータ保持/削除方針（デモ後クリーンアップ）・PII最小化（表示名以外を要求しない） |
+
+- **MVP 実装境界（決定 2026-10-07）**＝**実装**＝A（検証前に作らない・`signup_challenges`）／B（一律 202・out-of-band）／C（OTP 短命・単回・試行ロック・再送レート制限）／E（権限固定）／F（会社コード再検証）／I（自動ログインしない＝確定後ログイン誘導）／J（監査/PII 最小化）＋レート制限（既存再利用）＋Origin/Sec-Fetch（既存再利用）＋PW 最低文字数。**follow-up（外部サービス依存）**＝**D の漏洩PW拒否〔HIBP〕**・**G の CAPTCHA**・**G の使い捨てメールドメイン判定**（いずれも外部サービス/外部呼び出しのため後続・設計には残置）。

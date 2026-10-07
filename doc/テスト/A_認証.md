@@ -246,10 +246,13 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | A-TC-120 | api | 公開ブートストラップ＝既定会社コードの有無 | env `IQ_DEFAULT_COMPANY_CODE` 設定/未設定 | `GET /public/bootstrap`（未認証） | 設定時 `{default_company_code}` を返す／未設定は null（会社コード欄を出す）。`DEMO` をコードに焼かない | A.11.2／決定L |
-| A-TC-121 | api | 検証前にアカウントを作らない（SEC A・最重要）＝signup は pending のみ | `self_signup_enabled=true` 会社 | `POST /public/signup`（会社コード/ID/メール/PW） | 202（一律）・**accounts は未作成**（pending を otp_challenges/署名トークンで保持・PW は Argon2id）・メールへ認証コード | A.11.3／SEC A |
+| A-TC-121 | api | 検証前にアカウントを作らない（SEC A・最重要）＝signup は pending のみ | `self_signup_enabled=true` 会社 | `POST /public/signup`（会社コード/ID/メール/表示名/PW） | 202（一律）・**accounts は未作成**（pending を専用 `signup_challenges` に保持＝account_id 不在・PW は Argon2id）・メールへ認証コード | A.11.3／SEC A／データモデル §4.4a |
 | A-TC-122 | api | 検証成功で初めて accounts INSERT＝role/company/status はサーバー権威 | signup pending 済み | `POST /public/signup/verify`（正コード） | accounts 1行（role=general・company_id=解決値・status=active・email_verified）・会社DBミラー・Tier1 自動approved・管理者通知／client の role/company_id/capability は無視（SEC E） | A.11.3／決定N/G／SEC E |
 | A-TC-123 | api | 列挙耐性（SEC B）＝会社コード/重複を in-band で明かさない | 既存 login_id/email・非対象会社 | `POST /public/signup`（重複/非対象） | 一律 202（成功と区別不能）・既存メールへ out-of-band 通知・会社コード誤り/`self_signup_enabled=false` も一律 reject で区別不能 | A.11.3／SEC B |
 | A-TC-124 | api | テナント/会社コード改竄の再検証（SEC F） | `self_signup_enabled=false` 会社コードを送信 | `POST /public/signup`（private 会社コード） | 一様 reject（`private` 会社への勝手な登録を防止）・サーバーが対象会社の self_signup_enabled を再検証 | A.11.3／SEC F |
 | A-TC-125 | api | OTP ブルート耐性＋再送レート制限（SEC C） | signup pending | 誤コード連打／再送連打 | 試行回数ロック・定数時間比較・短命単回・再送レート制限（メール爆撃防止） | A.11.4／SEC C |
 | A-TC-126 | api | self_signup_enabled=false の会社は signup 不可（opt-in・決定M） | `self_signup_enabled=false` | `POST /public/signup` | 一様 reject（アカウント作られない） | §8.2／決定M |
 | A-TC-127 | api | CSRF/Origin・レート制限（SEC G） | 未認証POST | Origin 不一致／大量作成 | Origin/Sec-Fetch 検証で弾く・IP/メール単位レート制限＋時間窓上限 | A.11.4／SEC G |
+| A-TC-128 | api | 確定後は自動ログインしない（SEC I・決定2026-10-07） | signup pending 済み | `POST /public/signup/verify`（正コード） | 200 `{status:"created", company_code, login_id}`＝**セッション Cookie を発行しない**（未認証EPからのセッション発行を避け固定化リスク最小化）。確定後は SC-00 ログインへ誘導 | A.11.3／SEC I |
+| A-TC-129 | api | pending は単回＝確定成功で used_at 打刻し再利用不可（SEC A/C） | 確定済み pending（used_at あり） | 同じ `signup_challenges` の code で `verify` 再呼び | 410（使用済み）＝二重 accounts 作成を防ぐ。期限切れ/試行超過も当該 pending 失効 | データモデル §4.4a／SEC C |
+| A-TC-130 | api | PW 最低文字数の形式検証は 422（SEC D・漏洩PW拒否は follow-up） | — | `POST /public/signup`（短すぎる password） | 422 `validation_error`（field=password・§4.7）。※会社存在/重複は 422 にしない（列挙耐性）。漏洩PW拒否〔HIBP〕は外部依存で follow-up | A.11.3／SEC D |
