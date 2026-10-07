@@ -131,6 +131,24 @@ export function CapabilitiesSection() {
     } finally { setBusy(false); }
   };
 
+  // 対象者（絞り込み結果）全員に、選択中の権限をまとめて付与（確認必須・大量操作のため件数を明示）。
+  const grantAll = async () => {
+    if (grantCaps.length === 0 || candidates.length === 0) return;
+    const names = grantCaps.map((k) => CAPS.find((c) => c.key === k)?.noun ?? k).join("・");
+    const ok = await confirm({ title: "全員に付与", msg: `対象者 ${candidates.length} 名すべてに ${names} を付与しますか？`, confirmLabel: "付与する" });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await Promise.all(candidates.flatMap((a) => grantCaps.map((c) =>
+        grantCapability(a.account_id, c).catch((e) => { if (!(e instanceof ApiError && e.status === 409)) throw e; }))));
+      snack({ type: "success", title: `${candidates.length} 名に ${names} を付与しました` });
+      await reload(cap);
+    } catch {
+      snack({ type: "error", title: "一部の付与に失敗しました", msg: "時間をおいて再度お試しください。" });
+      void reload(cap);
+    } finally { setBusy(false); }
+  };
+
   // 剥奪ダイアログの一括剥奪＝対象が保持する「選択中の権限」をまとめて剥奪（確認ダイアログ必須）。
   const revokeMany = async (accountId: string, name: string) => {
     const held = heldByAccount.get(accountId) ?? new Set<CapabilityKey>();
@@ -151,6 +169,30 @@ export function CapabilitiesSection() {
       await reload(cap);
     } catch {
       snack({ type: "error", title: "剥奪できませんでした", msg: "時間をおいて再度お試しください。" });
+    } finally { setBusy(false); }
+  };
+
+  // 対象者（選択権限の保有者）全員から、保持する選択中の権限をまとめて剥奪（確認必須）。
+  const revokeAll = async () => {
+    if (revokeCaps.length === 0 || revokeCandidates.length === 0) return;
+    const names = revokeCaps.map((k) => CAPS.find((c) => c.key === k)?.noun ?? k).join("・");
+    const ok = await confirm({ variant: "danger", title: "全員から剥奪", msg: `対象者 ${revokeCandidates.length} 名すべてから（保持する）${names} を剥奪しますか？（付与済みの成果・判定は残ります）`, confirmLabel: "剥奪する" });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await Promise.all(revokeCandidates.flatMap((a) => {
+        const held = heldByAccount.get(a.account_id) ?? new Set<CapabilityKey>();
+        return revokeCaps.filter((c) => held.has(c)).map((c) => revokeCapability(a.account_id, c));
+      }));
+      snack({ type: "success", title: `${revokeCandidates.length} 名から ${names} を剥奪しました` });
+      setHeldByAccount((prev) => {
+        const m = new Map(prev);
+        for (const a of revokeCandidates) { const s = new Set(m.get(a.account_id)); revokeCaps.forEach((c) => s.delete(c)); if (s.size) m.set(a.account_id, s); else m.delete(a.account_id); }
+        return m;
+      });
+      await reload(cap);
+    } catch {
+      snack({ type: "error", title: "一部の剥奪に失敗しました", msg: "時間をおいて再度お試しください。" });
     } finally { setBusy(false); }
   };
 
@@ -198,7 +240,7 @@ export function CapabilitiesSection() {
       <div className="caps-toolbar">
         <p className="hint" style={{ margin: 0 }}>{meta.hint}</p>
         <div className="caps-toolbar__actions">
-          <button className="btn btn-outline" type="button" onClick={() => setRevokeOpen(true)}>− 権限を剥奪する</button>
+          <button className="btn btn-danger" type="button" onClick={() => setRevokeOpen(true)}>− 権限を剥奪する</button>
           <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>＋ 権限を付与する</button>
         </div>
       </div>
@@ -293,6 +335,9 @@ export function CapabilitiesSection() {
           </ModalBody>
           <ModalFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>閉じる</Button>
+            <Button type="button" variant="primary" disabled={busy || grantCaps.length === 0 || candidates.length === 0} onClick={() => void grantAll()}>
+              対象者 {candidates.length} 名すべてに付与
+            </Button>
           </ModalFooter>
         </Modal>
       )}
@@ -374,6 +419,9 @@ export function CapabilitiesSection() {
           </ModalBody>
           <ModalFooter>
             <Button type="button" variant="outline" onClick={() => setRevokeOpen(false)}>閉じる</Button>
+            <Button type="button" variant="danger" disabled={busy || revokeCaps.length === 0 || revokeCandidates.length === 0} onClick={() => void revokeAll()}>
+              対象者 {revokeCandidates.length} 名すべてから剥奪
+            </Button>
           </ModalFooter>
         </Modal>
       )}
