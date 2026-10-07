@@ -1786,7 +1786,8 @@ a.quest-card:active { transform: translateY(1px); }
    横スクロール（.dt-scroll の overflow-x:auto）と操作列の sticky を保ったまま、ページ縦スクロール中は
    列見出しを画面上部（app-header 直下＝--dt-head-top 既定 --header-h）へ JS で translateY 固定する
    （DataTable の floatHead 効果）。sticky/overflow の CSS 制約を回避しつつ、自テーブル内で完結＝最終行で
-   自然に解除・複数一覧でも重ならない。文脈バナー等がある画面は --dt-head-top を上書き（別途考慮ケース）。 */
+   自然に解除・複数一覧でも重ならない。戻るピル(.backlink--float)・タブ(.tabs)・文脈バナー(.ctx＝会社詳細の
+   会社名フローティング)が上部固定中なら JS がその下端まで見出しを下げる（重なり回避）＝個別に --dt-head-top 上書き不要。 */
 .dt-scroll thead { position: relative; z-index: 3; will-change: transform; }
 /* フローティング中は戻るピル(§4.10・z:9)の「下」に固定する（JS が --dt-head-top にピル高を加算）ため
    重ならない。z-index はピルより下（8）＝万一の接触時もピルを前面に保つ（app-header z:10 の下）。 */

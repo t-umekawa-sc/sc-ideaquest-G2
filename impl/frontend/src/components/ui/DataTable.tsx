@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReadonlyURLSearchParams } from "next/navigation";
 import { Modal, ModalBody, ModalFooter } from "./Modal";
+import { belowStuckBar } from "./floatHeadTop";
 
 export type SortDir = "asc" | "desc";
 export type SortKey = { key: string; dir: SortDir };
@@ -521,13 +522,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
       // 見出しを下げてピルの下へ固定する（重ならない＝ユーザー要望 2026-09-20）。ピルが無いページは加算なし。
       const pill = document.querySelector(".backlink--float") as HTMLElement | null;
       if (pill) top += pill.offsetHeight + 16; // ピル高＋上下余白（space-2*2 相当）
-      // sticky なタブバー（クエスト詳細の .tabs）が上部固定表示中なら、その下端まで見出しを下げる
-      // ＝タブと浮動列見出しの重なりを回避（埋め込み一覧・2026-09-26 ユーザー指摘）。他ページは .tabs 不在で無影響。
-      const tabs = document.querySelector(".tabs") as HTMLElement | null;
-      if (tabs) {
-        const r = tabs.getBoundingClientRect();
-        if (r.bottom > top && r.top <= top + 4) top = r.bottom; // タブが固定位置に張り付いている時だけ潜り込ませる
-      }
+      // 上部固定中の sticky バー（タブ .tabs・文脈バナー .ctx）の下へ見出しを潜り込ませる＝重なり回避
+      // （belowStuckBar＝純ロジック・単体テスト M-TC-019）。他ページは当該要素不在で無影響。
+      //  .tabs＝クエスト詳細のタブ（埋め込み一覧・2026-09-26 指摘）／.ctx＝会社詳細の会社名フローティング（2026-10-07 指摘）。
+      const rectOf = (sel: string) => {
+        const el = document.querySelector(sel) as HTMLElement | null;
+        return el ? el.getBoundingClientRect() : null;
+      };
+      top = belowStuckBar(top, rectOf(".tabs"));          // タブは下端ちょうど
+      top = belowStuckBar(top, rectOf(".ctx"), 8);        // 会社バナーは下端＋余白
       return top;
     };
     let raf = 0;
