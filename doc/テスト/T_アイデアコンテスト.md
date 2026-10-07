@@ -64,6 +64,7 @@
 | T-TC-121 | api | 能力付与/剥奪＝管理者のみ・UNIQUE(user,capability) WHERE revoked_at NULL | admin／一般 | `POST /admin/accounts/{uid}/capabilities`（contest_evaluator）／`DELETE .../{capability}` | admin=200（1行有効）・一般=403・剥奪は論理（revoked_at）・二重付与は1行 | T.4／§5.63 |
 | T-TC-122 | int | `info_curator` も user_capabilities へ統合（情報判定が能力レジストリで引ける） | 旧 info_curator 相当 | `user_capabilities(capability='info_curator')` 判定 | 情報インプットの判定権限が本表で解決（統合・移行整合） | §5.3／§5.63 |
 | T-TC-123 | api | `quest_create` ゲート＝保持者のみクエスト作成（移行は既存作成者に自動付与） | quest_create 保持/非保持 | `POST /quests` | 保持=201・非保持=403／移行で既存クエスト作成者は保持（決定K） | §7／§5.3 |
+| T-TC-208 | api | 能力保有者一覧（汎用付与UI・SC-93）＝任意能力の保有者を account_id/氏名/付与者/付与日で返す・管理者のみ | admin／一般・付与済みユーザー | `GET /admin/capabilities/{capability}/holders`（contest_create を付与→取得→剥奪→消える） | admin=200（付与者名＋付与日時つき・付与日時降順）・一般=403・未知能力=422・剥奪後は一覧から消える（revoked_at） | T.4／§5.63／FR-47 |
 
 ## 4. 表彰・ランキング（T.1 finalize/T.3・§6・既存基盤再利用）
 

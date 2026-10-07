@@ -125,16 +125,20 @@ export function listOwnCompanyQuestGroups(): Promise<QuestGroupListResponse | nu
   return apiFetch<QuestGroupListResponse>("/admin/company-quest-groups");
 }
 
-// 情報判定権限（info_curator・N.5）＝会社アカウント管理者/system_admin。SC-93 に同居。account_id で識別。
-export interface InfoCurator { account_id: string; display_name: string; granted_by: string | null; granted_at: string; }
-export function listInfoCurators(): Promise<{ data: InfoCurator[] } | null> {
-  return apiFetch<{ data: InfoCurator[] }>("/info-curators");
+// ②会社レベル能力（capability）の保有者管理（SC-93・API設計 T.4・FR-47）＝会社アカウント管理者/system_admin。
+// 汎用付与UI（CapabilitiesSection）＝info_curator/quest_create/contest_create/contest_evaluator を account_id で付与/剥奪。
+export type CapabilityKey = "info_curator" | "quest_create" | "contest_create" | "contest_evaluator";
+export interface CapabilityHolder { account_id: string; display_name: string; granted_by: string | null; granted_at: string; }
+// 保有者一覧（能力別・付与者/付与日つき）。
+export function listCapabilityHolders(capability: CapabilityKey): Promise<{ data: CapabilityHolder[] } | null> {
+  return apiFetch<{ data: CapabilityHolder[] }>(`/admin/capabilities/${capability}/holders`);
 }
-export function grantInfoCurator(accountId: string): Promise<{ data: InfoCurator[] } | null> {
-  return apiFetch<{ data: InfoCurator[] }>("/info-curators", { method: "POST", body: JSON.stringify({ account_id: accountId }) });
+// 付与/剥奪は per-account EP（応答は当該ユーザーの能力配列＝一覧は別途再取得する）。
+export function grantCapability(accountId: string, capability: CapabilityKey): Promise<{ capabilities: string[] } | null> {
+  return apiFetch<{ capabilities: string[] }>(`/admin/accounts/${encodeURIComponent(accountId)}/capabilities`, { method: "POST", body: JSON.stringify({ capability }) });
 }
-export async function revokeInfoCurator(accountId: string): Promise<void> {
-  await apiFetch(`/info-curators/${encodeURIComponent(accountId)}`, { method: "DELETE" });
+export async function revokeCapability(accountId: string, capability: CapabilityKey): Promise<void> {
+  await apiFetch(`/admin/accounts/${encodeURIComponent(accountId)}/capabilities/${capability}`, { method: "DELETE" });
 }
 
 export function disableOwnAccount(accountId: string): Promise<AccountResponse | null> {

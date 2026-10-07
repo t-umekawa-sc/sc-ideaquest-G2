@@ -9,9 +9,10 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.tenant.capabilities.orm import UserCapability
+from app.tenant.profile.orm import User
 
 
 def has_capability(session: Session, user_id: uuid.UUID, capability: str) -> bool:
@@ -43,6 +44,25 @@ def list_holders(session: Session, capability: str) -> list[uuid.UUID]:
         )
     ).scalars().all()
     return list(dict.fromkeys(rows))
+
+
+def list_capability_holders(session: Session, capability: str) -> list[dict]:
+    """当該能力の保有者一覧（未剥奪のみ）＝account_id/display_name/付与者名/付与日時（汎用付与UI・SC-93）。
+
+    `info/repository.list_curators` を能力パラメータ化した汎用版（DRY＝情報判定も本関数で引ける）。
+    """
+    grantor = aliased(User)
+    rows = session.execute(
+        select(User.account_id, User.display_name, grantor.display_name, UserCapability.granted_at)
+        .join(User, User.id == UserCapability.user_id)
+        .join(grantor, grantor.id == UserCapability.granted_by_id, isouter=True)
+        .where(UserCapability.capability == capability, UserCapability.revoked_at.is_(None))
+        .order_by(UserCapability.granted_at.desc())
+    ).all()
+    return [
+        {"account_id": str(acc_id), "display_name": name, "granted_by": gname, "granted_at": granted_at}
+        for acc_id, name, gname, granted_at in rows
+    ]
 
 
 def grant(session: Session, user_id: uuid.UUID, capability: str, *, granted_by_id: uuid.UUID | None) -> bool:

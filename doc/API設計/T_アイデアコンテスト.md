@@ -68,8 +68,9 @@
 | `GET /admin/accounts/{uid}/capabilities`（管理者） | 当該ユーザーの有効能力一覧 | `info_curator`/`quest_create`/`contest_create`/`contest_evaluator` |
 | `POST /admin/accounts/{uid}/capabilities`（管理者） | 能力付与（`{capability}`） | `UNIQUE(user_id,capability) WHERE revoked_at IS NULL`。付与=`company_account_admin`/`system_admin` |
 | `DELETE /admin/accounts/{uid}/capabilities/{capability}`（管理者） | 能力剥奪（論理・`revoked_at`） | 行は残す（監査） |
+| `GET /admin/capabilities/{capability}/holders`（管理者） | 当該能力の保有者一覧（汎用付与UI・SC-93） | `{data:[{account_id, display_name, granted_by, granted_at}]}`＝付与日時降順。未知能力は 422。旧 `GET /info-curators` を能力パラメータ化した汎用版（DRY） |
 
-- **単一レジストリ `user_capabilities`**（§5.63）＝既存 `info_curators` を統合（`capability='info_curator'`）。付与UIは会社アカウント管理（SC-93）系を踏襲（新規UIを増やさない）。
+- **単一レジストリ `user_capabilities`**（§5.63）＝既存 `info_curators` を統合（`capability='info_curator'`）。付与UIは会社アカウント管理（SC-93）系を踏襲（新規UIを増やさない）＝**汎用 `CapabilitiesSection`**（能力セレクタで info_curator/quest_create/contest_create/contest_evaluator を切替え・保有者一覧＋付与/剥奪）。保有者一覧は `GET /admin/capabilities/{capability}/holders`、付与/剥奪は per-account EP。旧 info_curator 専用 UI（`InfoCuratorSection`）は本汎用UIへ統合（決定D の総仕上げ）。
 - **評価者ゲート**＝`contest_evaluator` 保持者のみコンテストアイデア評価可（会社横断・決定J'）。**クエスト作成**＝`quest_create`（移行は既存クエスト作成者に自動付与で維持・決定K）。
 
 ## T.5 アイデア→クエスト昇格（社内・FR-47）

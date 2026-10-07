@@ -12,9 +12,21 @@ from fastapi import APIRouter, Depends, Request
 from app.control_plane.admin.deps import require_company_account_admin
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.capabilities import application as service
-from app.tenant.capabilities.schemas import CapabilityGrantRequest, CapabilityListResponse
+from app.tenant.capabilities.schemas import (
+    CapabilityGrantRequest,
+    CapabilityHoldersResponse,
+    CapabilityListResponse,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["capabilities"])
+
+
+@router.get("/admin/capabilities/{capability}/holders", response_model=CapabilityHoldersResponse)
+def list_capability_holders(capability: str, request: Request,
+                            session: dict = Depends(require_company_account_admin)):
+    """当該能力の保有者一覧（汎用付与UI・SC-93）＝account_id/氏名/付与者/付与日時。管理者のみ。"""
+    return service.list_capability_holders(uuid.UUID(session["account_id"]),
+                                           uuid.UUID(session["company_id"]), capability)
 
 
 @router.get("/admin/accounts/{uid}/capabilities", response_model=CapabilityListResponse)

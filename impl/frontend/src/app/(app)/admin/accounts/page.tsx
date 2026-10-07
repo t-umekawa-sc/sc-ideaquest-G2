@@ -1,7 +1,7 @@
 // SC-93 会社アカウント管理者（自社アカウント管理）ページ。company_account_admin 専用＋system_admin 上位互換。
 import { redirect } from "next/navigation";
 
-import { AccountSelfSection, InfoCuratorSection } from "@/features/accounts";
+import { AccountSelfSection, CapabilitiesSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { getServerSession } from "@/lib/session";
 
@@ -12,9 +12,9 @@ export default async function OwnAccountsPage() {
   if (session.system_role !== "company_account_admin" && session.system_role !== "system_admin") redirect("/");
   // 自社コンテキスト表示用に会社コードを渡す（会社表示名は session 未提供＝将来拡張。当面はコード）。
   // クエストグループ CRUD は会社アカ管理者へ委任（B.2.1・2026-09-06）＝自社スコープ（scope="own"）で同画面に配置。
-  // 並び＝見出し/自社バナー → クエストグループ（children＝表の前）→ アカウント表 → 情報判定権限（after＝表の後・SC-92 と統一）。
+  // 並び＝見出し/自社バナー → クエストグループ（children＝表の前）→ アカウント表 → 能力（capability）付与（after＝表の後・SC-92 と統一）。
   return (
-    <AccountSelfSection companyCode={session.company_code} after={<InfoCuratorSection />}>
+    <AccountSelfSection companyCode={session.company_code} after={<CapabilitiesSection />}>
       <QuestGroupSection scope="own" />
     </AccountSelfSection>
   );

@@ -4140,6 +4140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/capabilities/{capability}/holders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Capability Holders
+         * @description 当該能力の保有者一覧（汎用付与UI・SC-93）＝account_id/氏名/付与者/付与日時。管理者のみ。
+         */
+        get: operations["list_capability_holders_api_v1_admin_capabilities__capability__holders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/accounts/{uid}/capabilities": {
         parameters: {
             query?: never;
@@ -4535,6 +4555,26 @@ export interface paths {
         head?: never;
         /** Update Announcement */
         patch: operations["update_announcement_api_v1_admin_announcements__announcement_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/media/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Media
+         * @description インライン画像キーを都度再署名して 302（短TTL署名URLへ）。対象 prefix 外は 404（存在秘匿）。
+         */
+        get: operations["get_media_api_v1_media__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/healthz": {
@@ -5376,6 +5416,28 @@ export interface components {
         CapabilityGrantRequest: {
             /** Capability */
             capability: string;
+        };
+        /**
+         * CapabilityHolderDTO
+         * @description 能力保有者の1行（汎用付与UI・SC-93）＝account_id で識別＋付与者名/付与日時（旧 info_curator と同形）。
+         */
+        CapabilityHolderDTO: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Granted By */
+            granted_by?: string | null;
+            /**
+             * Granted At
+             * Format: date-time
+             */
+            granted_at: string;
+        };
+        /** CapabilityHoldersResponse */
+        CapabilityHoldersResponse: {
+            /** Data */
+            data: components["schemas"]["CapabilityHolderDTO"][];
         };
         /** CapabilityListResponse */
         CapabilityListResponse: {
@@ -19117,6 +19179,37 @@ export interface operations {
             };
         };
     };
+    list_capability_holders_api_v1_admin_capabilities__capability__holders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityHoldersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_account_capabilities_api_v1_admin_accounts__uid__capabilities_get: {
         parameters: {
             query?: never;
@@ -20043,6 +20136,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_media_api_v1_media__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -44,6 +44,16 @@ def list_capabilities(account_id: uuid.UUID, company_id: uuid.UUID, target_accou
         return {"capabilities": repo.list_for_user(ts, user.id)}
 
 
+def list_capability_holders(account_id: uuid.UUID, company_id: uuid.UUID, capability: str) -> dict:
+    """当該能力の保有者一覧（汎用付与UI・SC-93）。未知能力は 422（列挙外の探索を弾く）。"""
+    _require_known_capability(capability)
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        return {"data": repo.list_capability_holders(ts, capability)}
+
+
 def grant_capability(account_id: uuid.UUID, company_id: uuid.UUID, target_account_id: str,
                      *, capability: str) -> dict:
     _require_known_capability(capability)
