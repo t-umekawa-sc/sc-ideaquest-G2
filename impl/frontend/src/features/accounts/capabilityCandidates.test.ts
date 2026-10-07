@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterCapabilityCandidates, type CandidateAccount } from "./capabilityCandidates";
+import { filterCapabilityCandidates, filterRevokeCandidates, type CandidateAccount } from "./capabilityCandidates";
 
 const A = (over: Partial<CandidateAccount>): CandidateAccount => ({
   account_id: "a1", display_name: "山田 太郎", login_id: "yamada@acme", status: "active",
@@ -39,5 +39,35 @@ describe("filterCapabilityCandidates (T-TC-209)", () => {
   it("検索とグループは AND で効く", () => {
     expect(filterCapabilityCandidates(base, { ...empty, q: "山田", groupIds: ["g2"] })).toEqual([]);
     expect(filterCapabilityCandidates(base, { ...empty, q: "山田", groupIds: ["g1"] }).map((a) => a.account_id)).toEqual(["a1"]);
+  });
+});
+
+// T-TC-210: 剥奪候補の絞り込み（純関数・付与の逆）＝active かつ選択権限のいずれかを保持＋検索/グループ。
+describe("filterRevokeCandidates (T-TC-210)", () => {
+  const base = [
+    A({ account_id: "a1", display_name: "山田 太郎", login_id: "yamada@acme", memberships: [{ group_id: "g1" }] }),
+    A({ account_id: "a2", display_name: "鈴木 花子", login_id: "suzuki@acme", memberships: [{ group_id: "g2" }] }),
+    A({ account_id: "a3", display_name: "無効 次郎", login_id: "jiro@acme", status: "disabled" }),
+  ];
+  const held = new Map<string, Set<string>>([
+    ["a1", new Set(["info_curator", "quest_create"])],
+    ["a2", new Set(["quest_create"])],
+    ["a3", new Set(["info_curator"])],
+  ]);
+  const empty = { heldByAccount: held, revokeCaps: [] as string[], q: "", groupIds: [] as string[] };
+
+  it("選択権限のいずれかを保持する active のみ", () => {
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["info_curator"] }).map((a) => a.account_id)).toEqual(["a1"]); // a3 は無効で除外
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["quest_create"] }).map((a) => a.account_id)).toEqual(["a1", "a2"]);
+  });
+  it("複数権限は OR（いずれか保持で候補）", () => {
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["info_curator", "quest_create"] }).map((a) => a.account_id)).toEqual(["a1", "a2"]);
+  });
+  it("未保持の権限だけなら候補ゼロ", () => {
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["contest_evaluator"] })).toEqual([]);
+  });
+  it("検索・グループと AND", () => {
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["quest_create"], q: "鈴木" }).map((a) => a.account_id)).toEqual(["a2"]);
+    expect(filterRevokeCandidates(base, { ...empty, revokeCaps: ["quest_create"], groupIds: ["g1"] }).map((a) => a.account_id)).toEqual(["a1"]);
   });
 });
