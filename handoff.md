@@ -4,87 +4,75 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-07（セッション末・アイデアコンテストの昇格機能＋出典URL＋info_curators統合まで）
+- 更新: 2026-10-07（セッション末・ユーザー指摘txtの「小さい不具合」一括＋F8＋フローティング重なりまで）
 - ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済み）
-- 最新コミット: `99452673 refactor(info): info_curators を user_capabilities へ統合（クリーン移行・FR-47・決定D）`
-- working tree: **clean**・`origin/main` と同期済み（`git status` で確認）。
-- alembic heads（ファイル基準）: control=`0020_signup_challenges`／company=`0056_info_curators_merge`（本セッションで `0055_quest_source_url`・`0056_info_curators_merge` を追加）。
-- 本セッションのコミット（古→新・すべて push 済み）: `35339f93`（昇格 promote-to-quest）/`1c6a7dc9`（一覧の参加状況列）/`922a1572`（投稿後の一覧即反映 fix＋⋮最右）/`accebb24`（クエスト出典URL）/`99452673`（info_curators 統合）。
+- 最新コミット: `5dfccd84 fix(datatable): 会社名/列名フローティングの重なり解消`
+- working tree: **clean**・`origin/main` 同期済み。
+- alembic heads（ファイル基準・**本セッションで新規 migration なし**）: control=`0020_signup_challenges`／company=`0056_info_curators_into_user_capabilities`。
+- 本セッションのコミット（古→新・すべて push 済み）: `05d00a40`(⑦⑧非公開折返し+403→404)／`e98d3075`(⑥ⓘ残り幅展開)／`afaea8a6`(⑨整合=縦ラジオ)／`c081d5e6`(F8メディアプロキシ)／`5dfccd84`(⑭フローティング重なり)。
 
 ## 2. プロジェクトのゴール
-ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズはアイデアコンテスト（FR-46）＋会社レベル能力/昇格（FR-47）＋セルフサインアップ/公開モード（FR-48）周辺の未実装つぶしと細部改善。
+ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝**ユーザー指摘txt の消化**（受入不具合の改修＋仕様確定済み未実装）。
 
-## 3. 今回やったこと（変更ファイルと理由）
-### A. アイデア→クエスト昇格（FR-47・T.5・決定H・commit `35339f93`）
-- **理由**＝裏取りの結果、アイデアコンテスト機能で唯一明確に未実装だったのが「アイデア→クエスト昇格」。設計（`doc/設計ドラフト/アイデアコンテスト機能_設計.md` §7・`doc/API設計/T_アイデアコンテスト.md` T.5）は確定済み・`quests.origin_idea_id` カラムと ORM は存在したが EP/ロジックが皆無だった。
-- backend＝`app/tenant/quests/repository.py::create_quest` に `origin_idea_id`/`source_url` 引数追加／`app/tenant/quests/application.py::promote_idea_to_quest`（public 会社は明示 404 存在秘匿／`quest_create` or 管理者ゲート＝通常作成と同一 `_can_create_quest`／アイデアの title・本文＋狙う価値を種継ぎ・owner 投入・初版リビジョン・トークン）＋`_compose_promote_purpose`／`app/tenant/quests/router.py` に `POST /ideas/{idea_id}/promote-to-quest`／`app/tenant/ideas/application.py::get_idea_detail` に `can_promote` 算出（`is_contest`×非public×`_can_create_quest`）・`app/tenant/ideas/schemas.py::IdeaDetailDTO` に `can_promote` 追加。
-- frontend＝`src/features/ideas/api.ts::promoteIdeaToQuest`／`src/features/ideas/components/IdeaDetailView.tsx` に「🚀 クエストへ昇格」導線（`can_promote` 時のみ・確認→POST→新クエストへ遷移）。
-- tests＝`tests/contests/test_promote.py`（T-TC-140 成功/403・140b public404・140c can_promote・140d source_url）。
-- docs＝`doc/API設計/T_アイデアコンテスト.md` T.5／`doc/テスト/T_アイデアコンテスト.md`／`impl/README.md`。
+## 3. 今回やったこと（指摘txt起点・全てテスト同梱＋実画面目視）
+> 指摘の出所＝ユーザーの Windows デスクトップ `C:\Users\t-umekawa\Desktop\無題1_20261003_090605.txt`（WSL パス `/mnt/c/Users/t-umekawa/Desktop/無題1_20261003_090605.txt`）。10項目＋会話中の追加指摘。**作業方針（ユーザー決定）＝「小さい不具合を先に」→ 実装群 → 討議(④③)は実装群の後**。
 
-### B. コンテスト一覧の参加状況列（commit `1c6a7dc9`・ユーザー要望）
-- `src/features/contests/components/ContestListView.tsx` に「参加状況」列（`my_status`＝approved→参加中/requested→リクエスト中/left→退席済/他→—・enum 絞り込み・カードにもバッジ）。backend は既存 `_list_item.my_status` をそのまま利用（API 変更なし）。
-
-### C. 不具合修正＋⋮位置（commit `922a1572`・ユーザー指摘）
-- **不具合**＝コンテスト詳細（SC-54）でアイデア投稿後、一覧がリロードしないと出ない。**原因**＝`ContestDetailView.tsx` が `IDEAS_CHANGED_EVENT`（window・跨ルート）を未購読だった（SC-12 `QuestDetailView` は購読済み）。**修正**＝`ContestDetailView.tsx` に同イベント購読 effect を追加し `load()` 再取得。
-- `IdeaDetailView.tsx` で「クエストへ昇格」ボタンを編集/⋮ブロックより**前**に移動＝⋮（削除danger）を最右に戻す（操作統一 §4.14）。
-
-### D. クエスト出典URL（FR-47・commit `accebb24`・ユーザー要望）
-- **理由**＝クエスト登録フォームに任意「出典URL」を追加し、昇格時は由来アイデアへの可視リンクを貼る（人間向け・機械リンク `origin_idea_id` と併存）。UIは情報インプットの登録ダイアログの出典URL欄に合わせる。
-- backend＝`quests.source_url`（migration `0055_quest_source_url`・text・NULL可）／`app/tenant/quests/orm.py` にカラム／`schemas.py` の QuestCreate/Update/Publish/Detail に `source_url`／`application.py::_validate_source_url`（http/https または `/` 始まり内部パスを許容・`//`/`javascript:` は 422・open-redirect 防止）を create/update(`_apply_content`)/promote/`_build_detail` に配線。昇格は `source_url=/ideas/{origin_idea_id}` 自動設定。
-- frontend＝`src/features/quests/components/QuestForm.tsx` に出典URL欄（情報ダイアログ同形の Field/hint/placeholder・内部パス許容のため `type=text inputMode=url`・`questContentSig`/payload/prefill に配線）／`QuestDetailView.tsx` に出典リンク（内部パスは `<Link>`・http(s) は新規タブ）。
-- tests＝C-TC-307（`tests/quests/test_sc11_api.py`・round-trip＋422検証）・T-TC-140d。docs＝データモデル §5.6／`doc/API設計/C_クエスト・パーティー・権限.md`／T.5。
-
-### E. info_curators → user_capabilities 統合（FR-47・決定D・commit `99452673`）
-- **理由**＝②会社レベル能力を単一レジストリ `user_capabilities` に集約する設計方針（§3.1/§5.63）。info_curator だけ独自テーブル `info_curators` に残っていた（1能力1テーブルの増殖）。
-- migration `0056_info_curators_merge`＝既存 `info_curators` 行を `user_capabilities(capability='info_curator')` へデータ移行（`granted_by_id`/`granted_at`/`revoked_at` 保持）→旧テーブル DROP（**クリーンカットオーバー**・ユーザー選択）。
-- `app/tenant/info/repository.py` の `is_curator`/`list_curators`/`grant_curator`/`revoke_curator` を `app/tenant/capabilities/repository.py`（caps）経由へ差し替え＋`app/tenant/info/orm.py` の `InfoCurator` クラス撤去。
-- 管理EP `GET/POST /info-curators`（N.5・account_id ベース）は**内部実装のみ差し替えて応答互換を維持**（frontend 無改修・ユーザー選択）。
-- tests＝`tests/info/test_api.py`・`tests/info/test_repository.py`（N-TC-011 他）の curator seed を `UserCapability` へ更新。docs＝データモデル §5.37/§5.63・`doc/テスト/red確認台帳.md`・`impl/README.md`。
+### 完了（小さい不具合＋F8＋フローティング）
+- **⑩ red確認の規約是正**（監査のみ・コード不変）＝今セッション分の red 証跡（昇格/出典/info_curators）は §5.1 準拠を確認。**ただし過去5件が未是正で残存**＝`red確認台帳.md:393(D.3)/427(D.4)/445(F)/465(E)` と `B_会社・アカウント.md:239` が「未実装/未登録の404/405 を自然 red」と記述（§5.1 が名指しで不可とするパターン・B-TC-080〜093 のような retro 是正が未）。ユーザー判断＝**今回は現状報告のみ**（是正は別途）。
+- **⑦** 会社詳細「公開(コンテスト専用)モード」の状態語「非公開」折返し解消＝共有 `.switch__state{white-space:nowrap}`（`05d00a40`・B-TC-180）。
+- **⑧** 同補足文「サーバーで 403」→「404＝存在秘匿」是正（public会社の業務EPは `access_gate` が404・決定P'）（`05d00a40`・B-TC-180）。
+- **⑥** ガイダンス ⓘ(`ScreenPurpose`・§4.13) を hover で**ホスト行の残り幅いっぱい**に展開（内容幅で止めない）＝`max-width`→`width`駆動＋`place()`460px上限撤去＋検索ツールバーの `data-sp-host` を内容幅`.filters`→全幅`.list-toolbar`へ（contest/quest 両画面・共通仕様）。§4.13/style-guide/shared.css 同期（`e98d3075`・C-TC-308）。
+- **⑨** 会社詳細「経営資料との整合の測り方」を `<select>`→**縦ラジオ** `.radio-list`（design-system.css 新設）。DRY＝評価の公開範囲(`.vis-opt`)も同共有クラスへ統合し evaluations.css の重複撤去。style-guide「4e」＋shared.css 追加（`afaea8a6`・B-TC-181・sc-25-eval 11 passed 回帰OK）。
+- **F8** リッチ本文インライン画像の恒久表示＝**安定配信プロキシ `GET /api/v1/media/{key}`**（`require_me`→インライン画像prefix検証→都度再署名→302・`app/tenant/media/router.py`）。rehost(info N.2/お知らせ U-8)は `storage.media_proxy_path(key)`（`/api/v1/media/<key>`・env非依存相対パス）を返し body_html に安定パス保存。`access_gate` 許可リストに `/media` 追加。**frontend 無改修**（RichTextEditor が返却urlをimg srcに挿入・Next rewrite `/api/v1/*`→backend）。`sanitize_html`(nh3) は相対URL素通し。（`c081d5e6`・U-TC-110/113/114/115・N-TC-125）。
+- **⑭（会話追加指摘）** 会社詳細で会社名バナー(`.ctx` sticky)と列見出しフローティング(DataTable floatHead)の重なり解消＝floatHead の top 計算に `.ctx` を考慮（下端＋余白8pxへ）。ロジックを純関数 `belowStuckBar`(`components/ui/floatHeadTop.ts`)に抽出し `.tabs`/`.ctx` 共用。（`5dfccd84`・M-TC-019・実画面 overlap=false 確認）。
 
 ## 4. 現在の状態（動作/テスト）
-- **backend pytest**（本セッションで実行・green・baked backend に `-v` マウントで実行）＝`tests/quests tests/contests tests/ideas` **263 passed**／`tests/info tests/capabilities` **82 passed**／`tests/contests/test_promote.py` 単体も baked backend（`docker compose exec`）で 3 passed 確認。
-- **frontend**＝`npm run build` ✅（複数回）。codegen 済（`promote-to-quest`・`can_promote`・`source_url` 取込）。
-- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅（code 1013 件）。
-- **ブラウザ受入＝OK**（ユーザー確認済み・昇格ボタン/⋮位置/一覧即反映/参加状況列/出典URL）。
-- **コンテナ**＝`backend`/`db`/`frontend`/`mailhog`/`minio`/`redis` が稼働。backend/frontend は本セッションの変更を `--build` 反映済み。**worker/mail-worker は停止中**（本セッションは起動していない）。
-- **dev 会社DBのマイグレーション**＝`0055`・`0056` を全会社DB（acme/acme2/demo/ops）に適用済み（§8 の手順で実施）。
-- 壊れているもの＝**無し**（確認した範囲）。
+- **backend pytest**（-v マウント／ベイク exec とも）＝`tests/announcements tests/info` **68 passed**（F8 分含む）。他ドメイン未回帰確認（F8 は storage/access_gate 触るが低リスク・full は未実行）。
+- **frontend**＝`npm run build` ✅（複数回）。`npx vitest run floatHeadTop.test.ts` 4 passed。e2e＝B-TC-180/181(sc-92)・C-TC-308(sc-12)・sc-25-eval 11 passed を実行し green。
+- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅（code 1020 件）。
+- **コンテナ**＝backend/db/frontend/mailhog/minio/redis 稼働・本セッションの変更を `--build` 反映済み。**worker/mail-worker は停止中**。
+- 壊れているもの＝**無し**（確認範囲）。
 
-## 5. 詰まっている点（試して失敗/注意）
-- **【重要・再発防止】TC-ID は採番前に既存 max を確認する**＝本セッション、昇格の表示フラグ用テストを `T-TC-141` で採番したが、既に `T-TC-141`（参加リクエスト判断材料プロフィール・`tests/contests/test_contests.py`）が使用済みで衝突。`scripts/check_tc_traceability.py` は重複を検出しない（memory `tc-id-traceability-no-uniqueness`）。→ `T-TC-140c` へ改番して解消。**新規採番は `grep -rhoE '<DOMAIN>-TC-[0-9]+' doc/テスト/` で max を見てから**。
-- **【重要】red-green は「対象に到達した behavior-red」でないと規約違反**（テスト規約 §5.1）＝ルート未定義の 404 や KeyError は NG。新規EPは**スタブ（501  or 誤値）を先に置き**、期待値との差分（例 `501≠201`・`False≠True`）で red を目視してから本実装。本セッションは最初この手順を飛ばして指摘され、スタブ方式で取り直した。storage 置換の refactor（info_curators 統合）は後追いのため**スタブ手技＋`doc/テスト/red確認台帳.md` 記録**で代替した。
-- **frontend にコンポーネント描画テスト基盤が無い**＝vitest は `environment: "node"`・`@testing-library/react`/jsdom 未導入。SC-54 のアイデア投稿→一覧即反映（commit `922a1572`）の回帰テストは**単体化不可**で、本来の担保は e2e（未実装＝follow-up・§7-1）。コミットメッセージにも明記済み。
-- **baked backend の pytest は未コミット編集を反映しない**＝`docker compose up -d --build backend` か `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest …`（-v マウント）。本セッションは一貫して -v マウントで red/green を回した。
-- **新規 migration は dev 会社DBへ手動適用が要る**＝§8 のワンライナー（`scripts.bootstrap.migrate_company` を全 `db_identifier` に適用）。backend 再ビルドだけでは既存DBのスキーマは変わらない。
-- **worker/mail-worker は `--build` しないと古いベイクコードで動く**（前セッションからの既知落とし穴・本セッションでは worker 未使用）。起動時は `docker compose --profile workers up -d --build worker mail-worker`。
+## 5. 詰まっている点（注意）
+- **TC-ID 採番は既存 max 確認後**（`grep -rhoE '<D>-TC-[0-9]+' doc/テスト/` で max→+1）。本セッションで採番＝B-TC-180/181・C-TC-308・M-TC-019・U-TC-113/114/115。※`check_tc_traceability.py` は**重複を検出しない**。なお `tests/info/test_api.py` に **N-TC-125 が2つ存在**（pin_ids と rehost・pre-existing の重複・未是正＝将来 renumber 候補）。
+- **frontend にコンポーネント描画テスト基盤が無い**（vitest=node env・testing-library/jsdom 未導入）＝UI 構造/レイアウトの回帰は e2e か「純ロジック抽出→unit」で担保（⑭は後者＝belowStuckBar）。
+- **UI レイアウト/崩れ系は報告前に必ず実画面スクショ目視**（テスト規約§5.5・memory `verify-ui-visually-before-done`）。本セッションは使い捨て `impl/frontend/_*.mjs`(Playwright chromium)で計測＋スクショ→削除、を徹底。
+- **baked backend の pytest は未コミット編集を反映しない**＝`-v` マウント run か `up -d --build backend`。
+- **frontend はビルドをベイク**＝CSS/TSX 変更は `up -d --build frontend` まで実ブラウザ/e2e に反映されない。
+- **新規EPの red は §5.1＝スタブ(501/誤値)先置き→差分で behavior-red**（ルート未定義404はNG・handoff で過去に指摘済み）。F8 はこの手順で実施（台帳記録）。
 
-## 6. 決定事項と根拠（不採用案も）
-- **昇格EPのゲート＝通常のクエスト作成と同一**（`quests.application._can_create_quest`＝`quest_create` 能力 or 管理者）＝一か所で一致（DRY）。能力なしは 403（`capability_required`）。
-- **昇格は社内のみ＝public 会社では application で明示 404（存在秘匿）**＝`/ideas` 配下は公開モード外周ガード（`app/core/access_gate.py`）の許可リストに含まれ素通りするため、業務機能である昇格を application 側で 404 にする（決定O/P' 整合・管理者でも不可）。
-- **出典URL は汎用の任意URL欄**（ユーザー選択）＝外部URLも可。昇格時のみ内部パス `/ideas/{id}` を自動入力。**内部パス形式を採用**（ユーザー選択）＝環境非依存（ホスト名を焼かない）・アプリ内 `<Link>` でシームレス遷移。http/https のみに縛る情報インプットより緩和（内部リンクを張れるようにするため）。`//`（プロトコル相対）は open-redirect 防止で拒否。入力 `type` は情報側の `url` ではなく `text`（内部パスが native url 検証で誤無効にならないよう）＝見た目・ラベル・ヒント・placeholder は情報ダイアログに合わせる。
-- **参照資格の無いユーザーが出典（内部リンク）を踏むと 404（存在秘匿）**＝`GET /ideas/{id}` の門番 `can_access_quest_id`（コンテスト配下は `can_view_contest`）が 403 でなく 404 を返す（情報漏洩なし・切れたリンクに見えるのは許容）。
-- **info_curators は DROP（クリーンカットオーバー）**（ユーザー選択）＝互換ビュー/二重書きは採らず、DRY の終状態に一本化。管理EP（N.5）は内部実装のみ差し替えて応答互換を維持（frontend 無改修）＝統合EP `POST /admin/accounts/{uid}/capabilities` への寄せは今回スコープ外。
+## 6. 決定事項と根拠
+- **F8＝案(b)安定配信プロキシ採用**（バックログF8推奨）＝認可/監査/キャッシュ制御を1点集約。安定パスは**相対**（ホスト名を焼かない）＝ⅰ nh3 が相対URL素通し ⅱ Next rewrite で同一オリジン→backend。プロキシ対象は**インライン画像prefixのみ**(`announcement-images`/`info-images`)＝添付/アバターの踏み台防止・対象外は404存在秘匿。認可は `require_me`（粗粒度・キーは sha256+乱数で列挙耐性＝現 presigned と同等の保護水準）。
+- **⑥ ⓘ展開幅＝ホスト残り幅いっぱい**（内容長を考慮しない・ユーザー要望）＝`width`駆動。ホストは**全幅の行**を指す（検索は `.filters`でなく`.list-toolbar`に `data-sp-host`）。
+- **⑨ 縦ラジオは共有 `.radio-list`**＝横の`.segmented`より選択肢が長い/各肢に説明が要る単一選択向け。評価の公開範囲(`.vis-opt`)も統合（DRY・CSS同一＝視覚不変）。
+- **⑭ floatHead は sticky バー(.tabs/.ctx)の下へ**＝`belowStuckBar`（張り付き判定＝`bottom>top && top<=top+4`→`bottom+gap`）。
 
-## 7. 次にやること（優先順・ファイル/関数レベル）
-1. **（任意・回帰補強）SC-54 アイデア投稿→一覧即反映の e2e** ＝commit `922a1572` の修正に対する自動回帰が無い（§5 の infra 制約）。`impl/frontend/e2e` に Playwright で「コンテスト配下アイデアを投稿→詳細のアイデア一覧にリロードせず出る」を1本。共有DB非冪等に注意（専用シード垢・memory `e2e-full-not-idempotent-shared-db`）。
-2. **アイデアコンテストの残り（Phase2）**＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md` §6.4 の「妥当性」解析・自動表彰スケジューラ（bounded の `ends_at` 経過自動 closed／rolling の `auto_shelve_expired` の定期実行トリガ）。いずれも MVP スコープ外＝LLM/スケジューラ基盤前提。着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。
-3. **Turnstile `size:flexible` 幅の実ブラウザ目視**（前セッション持ち越し・未実施）＝CAPTCHA を再有効化（`impl/.env` の `#TURNSTILE_*` を外す＋`IQ_DEFAULT_COMPANY_CODE=DEMO`＋backend 再起動）して `/signup` で「成功しました!」ボックスが認証コード入力欄と同幅か確認。ズレたら `src/features/auth/components/SignupForm.tsx`。確認後 `.env` を dev 既定へ戻す。
-4. **バックログ F8＝リッチ本文インライン画像の恒久表示**（前セッション持ち越し・未着手）＝`doc/バックログ/未実装・ギャップ一覧.md` F8。安定配信プロキシEP（`GET /media/{key}` が都度署名して 302・認可付き）を新設し、情報 N.2（`info/application.rehost_image`）とお知らせ U-8（`announcements/application.rehost_image`）の短TTL署名URL 直埋めを置換。
-5. **SC-01 設計書 §3〜9 を5ゾーンに整合**（前セッション持ち越し・`doc/画面設計/screens/SC-01_ダッシュボード.md` 本文が再設計前のまま）。
-6. **（任意）info_curators 統合の総仕上げ**＝管理UI/EP を統合EP `POST /admin/accounts/{uid}/capabilities`（ドメインT）へ寄せるか（今回は N.5 EP 互換維持で据え置き）。DRY 観点の follow-up。
+## 7. 次にやること（優先順・ユーザー確定の実装群→討議）
+> **「小さい不具合を先に」は消化済み。残りは実装群（中〜大）→ 討議(④③)**。着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。
+1. **⑤ コンテストの参加承認前のタブ表示整理**＝会社アカウント管理者が承認前でも、パーティタブは可視のまま／**アイデア・全文検索タブも「タブは表示」するが中身は「操作権限がない旨のメッセージのみ」**にする。現状は `ContestDetailView.tsx` が `forbidden`(403)で全体を閉じる（SC-54・`features/contests/components/ContestDetailView.tsx`）。承認制×未参加の見せ方の再設計＝タブ枠は出し中身をガードメッセージに。
+2. **（新）全能力の汎用付与UI**（ユーザー決定＝quest_create 単体でなく**全能力**）＝`info_curator`/`quest_create`/`contest_create`/`contest_evaluator` を会社アカウント管理(SC-93系)で付与/剥奪する汎用UI。**backend EP は実装済み**＝`GET/POST/DELETE /api/v1/admin/accounts/{uid}/capabilities`(`capabilities/router.py`)。frontend は現状 `accounts/components/InfoCuratorSection.tsx`(info_curator専用)のみ→汎用化（§7-6 info_curators統合の総仕上げも兼ねる）。
+3. **① AIモデルのクライアント選択UI**＝AI処理のモデルをクライアント側で選べるUIが無い。LLMゲートウェイ基盤あり（memory `fr45-llm-foundation-formalized`・`local-llm-integration-design`）。SC-04/94 周辺。着手前に gateway のモデル指定経路を裏取り。
+4. **#13 アイデア作成者向け 評価詳細（コメント＋得点）閲覧画面**＝作成者が評価者のコメント・得点詳細を確認できる画面。評価ドメイン(F)。着手時に既存の評価可視範囲(visibility=party/limited・F.1集計)をコードで裏取りしてスコープ確定（SC-22/SC-25 周辺）。
+5. **② AI処理状況のリアルタイム反映 E2E**＝他ユーザのジョブ開始/待機数/自分の番がリロード無しで反映・進捗率更新、を Playwright で確認（SC-04 ai-jobs・realtime L/WS）。共有DB非冪等注意（memory `e2e-full-not-idempotent-shared-db`）。
+6. **④【討議】おすすめクエスト選出アルゴリズム**＝ユーザー案「参加可×経営資料整合率高×直近活発×管理者お勧めマーク、得点上位をパネル最大件数」への意見を返す→合意後に実装。
+7. **③【討議】アイデアのLLM自動評価＋RAG**＝評価パネルに「AI評価」ボタン→背景ジョブでLLM採点＋コメント、必要ならRAG。将来は情報インプットの内部情報をRAG（社内Q&A/サポート）。**大型＝FR採番→データモデル→API→画面から**。
+
+### 前セッションからの持ち越し（txt指摘とは別・未着手）
+- Turnstile `size:flexible` 幅の実ブラウザ目視（`.env` の `#TURNSTILE_*` を外して `/signup` 確認・確認後 dev既定へ戻す）。
+- SC-01 設計書 §3〜9 を5ゾーン再設計に整合（`doc/画面設計/screens/SC-01_ダッシュボード.md`）。
+- アイデアコンテスト Phase2（妥当性解析・自動表彰スケジューラ＝LLM/スケジューラ基盤前提・MVP外）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。
 - 起動：`cd impl && docker compose up -d`。backend=`http://localhost:8000`・frontend=`http://localhost:3000`・openapi=`http://localhost:8000/openapi.json`・MailHog=`http://localhost:8025`。
 - **workers（必ず `--build`）**：`cd impl && docker compose --profile workers up -d --build worker mail-worker`。確認後 `docker compose stop worker mail-worker`。
-- 反映（ソースベイク・volumes 無）：`cd impl && docker compose up -d --build backend|frontend`。型再生成＝backend 再ビルド後 `cd impl/frontend && npm run codegen`。
-- **新規 migration を dev 会社DBへ適用**（本セッションで多用）：`cd impl` した上で `docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -c "<SCRIPT>"` を実行。`<SCRIPT>` の中身＝`scripts.bootstrap.migrate_company` を全会社DBに回す（`app.db.control.control_session` を with で開き `Company` 全件の `db_identifier` を取り、各 `d` に `migrate_company(d)` を適用）。control DB は `scripts.bootstrap.migrate_control()`。この -v マウント run は実行中の `db` コンテナ（＝同一 Postgres）に効くので、再ビルドした backend/worker も同じスキーマを見る。backend 再ビルドだけではスキーマは変わらない点に注意。
+- 反映（ソースベイク・volumes無）：`cd impl && docker compose up -d --build backend|frontend`。型再生成＝backend 再ビルド後 `cd impl/frontend && npm run codegen`。
+- DB直接：`docker compose exec -T db psql -U ideaquest -d ideaquest_control`（control）／`-d ideaquest_company_acme`（会社）。資格＝`ideaquest`/`ideaquest`。
 - テスト：
-  - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`。
-  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（-v マウント）。
+  - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`／e2e `npx playwright test <spec> -g "<TC>" --workers=1`（e2e は専用 bootstrap DB・db.reset.ts が走る）。
+  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット反映は** `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`。
   - TC トレーサビリティ：`cd /home/t-umekawa/sc-ideaquest-G2 && python3 scripts/check_tc_traceability.py`。
-- `.env`（`impl/.env`・gitignore 追跡外）現状＝**dev 共有スタック既定**＝`IQ_DEFAULT_COMPANY_CODE=`（空）・`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` はコメントアウト（CAPTCHA 無効）。CAPTCHA/公開登録を検証する時だけ該当行を有効化し backend 再起動。
-- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin・会社 `OPS`）／MFA `ACME-02`/`mfa@acme2.example`（MFA ON）／**DEMO会社** `DEMO`/`admin@demo.example`（public＋self_signup）。会社DB＝`ideaquest_company_acme`／`ideaquest_company_demo`。
-- 昇格機能の手動確認：管理者 `kanri@acme` でコンテスト作成（「誰でも参加可」＝auto_approve）→配下にアイデア投稿→アイデア詳細に「🚀 クエストへ昇格」→確認→新クエスト（下書き）へ遷移＋クエスト詳細の「🔗 出典」が元アイデアを指す。
-- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り、**使い終わったら削除**。
+- `.env`（`impl/.env`・gitignore 追跡外）現状＝dev 共有スタック既定（`IQ_DEFAULT_COMPANY_CODE=`空・`TURNSTILE_*` コメントアウト＝CAPTCHA無効）。
+- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin・会社`OPS`）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`（public＋self_signup）。
+- dev 会社id（control DB companies）：ACME-01=`debba8dc-7f32-4705-abd8-61f2d77e23c1`／OPS=`d249a8ea-5109-4974-ad46-e0da36a546e6`／DEMO=`a5e28360-043a-4b61-b659-664ab0107f2f`。
+- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`(Playwright chromium・`deviceScaleFactor` 上げて計測/スクショ)を作り**使い終わったら削除**。ログインは `#company_code`/`#login_id`/`#password` に fill→「ログイン」click。
