@@ -6,7 +6,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-07（⑤ 詳細表示制御＋全能力の汎用付与UI まで完了）
 - ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済み）
-- 最新コミット: `93ab6913 feat(capabilities): 全能力の汎用付与UI（CapabilitiesSection）＋保有者一覧EP（SC-93・FR-47）`
+- 最新コミット: `a935085b fix(datatable): フローティング列見出しを会社バナーの下へ（z-index 8→4・受入指摘）`
 - working tree: **clean**・`origin/main` 同期済み。
 - alembic heads（ファイル基準・**本セッションで新規 migration なし**）: control=`0020_signup_challenges`／company=`0056_info_curators_into_user_capabilities`。
 - 本セッションのコミット（古→新・すべて push 済み）: `05d00a40`(⑦⑧非公開折返し+403→404)／`e98d3075`(⑥ⓘ残り幅展開)／`afaea8a6`(⑨整合=縦ラジオ)／`c081d5e6`(F8メディアプロキシ)／`5dfccd84`(⑭フローティング重なり)。
@@ -25,6 +25,10 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **⑨** 会社詳細「経営資料との整合の測り方」を `<select>`→**縦ラジオ** `.radio-list`（design-system.css 新設）。DRY＝評価の公開範囲(`.vis-opt`)も同共有クラスへ統合し evaluations.css の重複撤去。style-guide「4e」＋shared.css 追加（`afaea8a6`・B-TC-181・sc-25-eval 11 passed 回帰OK）。
 - **F8** リッチ本文インライン画像の恒久表示＝**安定配信プロキシ `GET /api/v1/media/{key}`**（`require_me`→インライン画像prefix検証→都度再署名→302・`app/tenant/media/router.py`）。rehost(info N.2/お知らせ U-8)は `storage.media_proxy_path(key)`（`/api/v1/media/<key>`・env非依存相対パス）を返し body_html に安定パス保存。`access_gate` 許可リストに `/media` 追加。**frontend 無改修**（RichTextEditor が返却urlをimg srcに挿入・Next rewrite `/api/v1/*`→backend）。`sanitize_html`(nh3) は相対URL素通し。（`c081d5e6`・U-TC-110/113/114/115・N-TC-125）。
 - **⑭（会話追加指摘）** 会社詳細で会社名バナー(`.ctx` sticky)と列見出しフローティング(DataTable floatHead)の重なり解消＝floatHead の top 計算に `.ctx` を考慮（下端＋余白8pxへ）。ロジックを純関数 `belowStuckBar`(`components/ui/floatHeadTop.ts`)に抽出し `.tabs`/`.ctx` 共用。（`5dfccd84`・M-TC-019・実画面 overlap=false 確認）。
+
+### 完了（受入フィードバック・2巡目）
+- **能力付与UIのタブ形式化＋クエストグループ絞り込み**（`fbb38524`）＝セレクタを segmented→タブ（.tabs 共用・.caps-section で sticky を static 上書き）／「＋権限を付与する」を admin-toolbar→タブ内(.caps-toolbar)へ／付与ダイアログに quest group select（`account.memberships[].group_id` で絞る）。候補絞り込みは純関数 `filterCapabilityCandidates`（T-TC-209・unit）。
+- **フローティング列見出しの z-order 是正**（`a935085b`）＝`.dt-head--floating` を z:8→**4**（.ctx/.tabs=5 より下・行2/ヘッダ相対3 より上）＝一覧領域の端で見出しが会社バナーの上に乗る問題を是正（下に潜る）。実機で floatZ=4 < ctxZ=5 を確認。
 
 ### 完了（実装群）
 - **全能力の汎用付与UI（CapabilitiesSection）**（SC-93/92・FR-47・決定D総仕上げ）＝`93ab6913`。info_curator 専用だった `InfoCuratorSection` を全能力（info_curator/quest_create/contest_create/contest_evaluator）の汎用UIに統合＝能力セレクタ＋保有者一覧＋付与/剥奪。backend は保有者一覧EP `GET /admin/capabilities/{capability}/holders` を追加（旧 `/info-curators` を能力パラメータ化・DRY・未知能力422・管理者のみ・T-TC-208）。付与/剥奪は実装済み per-account EP。SC-93(`/admin/accounts`)・SC-92(自社詳細) の差し込みを差し替え、`InfoCuratorSection`＋info_curator 専用 api を撤去。**フォロー候補**＝backend `/info-curators` EP とその N.5 テストは今や未使用（将来 retire 可・情報判定の判定ロジック自体は `user_capabilities` 経由で不変）。検証＝backend capabilities/info 83 passed・vitest 239・build・traceability 1023・SC-93 実機スクショ目視。
