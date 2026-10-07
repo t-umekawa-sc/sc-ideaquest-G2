@@ -4,76 +4,87 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-07（セッション末・お知らせ画像再ホスト＋メール送信失敗ログ化＋サインアップUI微修正3点まで完了）
-- ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済）
-- 最新コミット: `4ff7d89b fix(auth): サインアップのTurnstileウィジェット幅を入力欄に合わせる（size:flexible）`
+- 更新: 2026-10-07（セッション末・アイデアコンテストの昇格機能＋出典URL＋info_curators統合まで）
+- ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済み）
+- 最新コミット: `99452673 refactor(info): info_curators を user_capabilities へ統合（クリーン移行・FR-47・決定D）`
 - working tree: **clean**・`origin/main` と同期済み（`git status` で確認）。
-- alembic heads（ファイル基準・本セッションでの追加なし）: control=`0020_signup_challenges`／company=`0054_announcements`。
-- 本セッションのコミット（古→新・すべて push 済み）: `3a0ae599`（お知らせ画像再ホスト U-8）/`a73039e1`（バックログ F8 起票）/`3669b86c`（mail_outbox 送信失敗ログ化 A-TC-135）/`85493660`（OTPリンク間隔）/`a9ecd425`（OTP入力センタリング）/`4ff7d89b`（Turnstile 幅）。※`fd015bf0`・`63d90872` は前セッション。
+- alembic heads（ファイル基準）: control=`0020_signup_challenges`／company=`0056_info_curators_merge`（本セッションで `0055_quest_source_url`・`0056_info_curators_merge` を追加）。
+- 本セッションのコミット（古→新・すべて push 済み）: `35339f93`（昇格 promote-to-quest）/`1c6a7dc9`（一覧の参加状況列）/`922a1572`（投稿後の一覧即反映 fix＋⋮最右）/`accebb24`（クエスト出典URL）/`99452673`（info_curators 統合）。
 
 ## 2. プロジェクトのゴール
-ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近はアイデアコンテスト（FR-46）＋公開/非公開モード＋セルフサインアップ（FR-48）＋お知らせ（FR-49）。
+ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズはアイデアコンテスト（FR-46）＋会社レベル能力/昇格（FR-47）＋セルフサインアップ/公開モード（FR-48）周辺の未実装つぶしと細部改善。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-### A. お知らせ本文画像の再ホスト（U-8・commit `3a0ae599`）
-- **理由**＝`app/core/richtext.sanitize_html` の許可スキームは http/https のみ＝貼付の `data:` 画像は保存時に落ちる。自社ホスト署名URL へ再ホストしてから本文に残す必要がある（情報インプット N.2 と同課題）。
-- backend＝`app/tenant/announcements/application.py` に `rehost_image`（`_require_admin`→`app/infra/storage.validate_image_upload`→`storage.put(prefix="announcement-images")`→`presigned_get`）／`schemas.py` に `AnnouncementImageUploadResponse`／`router.py` に `POST /admin/announcements/images`（**静的パスを `/{id}` より前に定義**＝405 回避）。
-- frontend＝共有 `src/components/richtext/RichTextEditor.tsx` に**任意 `uploadImage` 注入prop** を追加（渡された時だけ「🖼 画像」挿入＋paste＋ドロップ・未指定なら従来どおり＝info 側は無改修で DRY）／`richtext.css` に `.rt__err`・`.rt__bar button:disabled`／`features/announcements/api.ts` に `uploadAnnouncementImageApi`／`AnnouncementAdminView.tsx` で `uploadImage` 配線／`api.test.ts`（U-TC-112）／`lib/api/schema.d.ts` は codegen 再生成。
-- docs＝`doc/API設計/U_お知らせ.md`（U-8＋F8参照注記）／`doc/テスト/U_お知らせ.md`（U-TC-110/111/112）／`doc/設計ドラフト/ダッシュボード再設計・お知らせ_設計.md` §4.2／`doc/画面設計/screens/SC-96_お知らせ管理.md`／`impl/README.md`。
+### A. アイデア→クエスト昇格（FR-47・T.5・決定H・commit `35339f93`）
+- **理由**＝裏取りの結果、アイデアコンテスト機能で唯一明確に未実装だったのが「アイデア→クエスト昇格」。設計（`doc/設計ドラフト/アイデアコンテスト機能_設計.md` §7・`doc/API設計/T_アイデアコンテスト.md` T.5）は確定済み・`quests.origin_idea_id` カラムと ORM は存在したが EP/ロジックが皆無だった。
+- backend＝`app/tenant/quests/repository.py::create_quest` に `origin_idea_id`/`source_url` 引数追加／`app/tenant/quests/application.py::promote_idea_to_quest`（public 会社は明示 404 存在秘匿／`quest_create` or 管理者ゲート＝通常作成と同一 `_can_create_quest`／アイデアの title・本文＋狙う価値を種継ぎ・owner 投入・初版リビジョン・トークン）＋`_compose_promote_purpose`／`app/tenant/quests/router.py` に `POST /ideas/{idea_id}/promote-to-quest`／`app/tenant/ideas/application.py::get_idea_detail` に `can_promote` 算出（`is_contest`×非public×`_can_create_quest`）・`app/tenant/ideas/schemas.py::IdeaDetailDTO` に `can_promote` 追加。
+- frontend＝`src/features/ideas/api.ts::promoteIdeaToQuest`／`src/features/ideas/components/IdeaDetailView.tsx` に「🚀 クエストへ昇格」導線（`can_promote` 時のみ・確認→POST→新クエストへ遷移）。
+- tests＝`tests/contests/test_promote.py`（T-TC-140 成功/403・140b public404・140c can_promote・140d source_url）。
+- docs＝`doc/API設計/T_アイデアコンテスト.md` T.5／`doc/テスト/T_アイデアコンテスト.md`／`impl/README.md`。
 
-### B. バックログ F8 起票（commit `a73039e1`）
-- `doc/バックログ/未実装・ギャップ一覧.md` §2 に **F8**＝リッチ本文インライン画像の恒久表示（情報 N.2・お知らせ U-8 共通）。**理由**＝再ホスト画像は短TTL（約300秒）署名URL を `body_html` に直接埋め込むため、TTL 経過後に後から見ると署名失効で画像が壊れる（latent）。推奨対応＝安定配信プロキシEP（下記 §7-2）。
+### B. コンテスト一覧の参加状況列（commit `1c6a7dc9`・ユーザー要望）
+- `src/features/contests/components/ContestListView.tsx` に「参加状況」列（`my_status`＝approved→参加中/requested→リクエスト中/left→退席済/他→—・enum 絞り込み・カードにもバッジ）。backend は既存 `_list_item.my_status` をそのまま利用（API 変更なし）。
 
-### C. mail_outbox 送信失敗のログ化（commit `3669b86c`）
-- `app/control_plane/mail_outbox/application.py`＝`_send_one` の `except` が例外を黙殺していたのを、`logger.warning(..., exc_info=True)`（各試行・`category`/宛先/`entry` 付き）に改修。`_mark_failure` の端末失敗（上限到達）で `logger.error(...)` を追加。
-- `tests/mail_outbox/test_mail_outbox.py` に **A-TC-135**（`caplog` で WARNING/ERROR と `exc_info` を検証）／`doc/テスト/A_認証.md` に A-TC-135＋§7.1 追補。
-- **理由**＝本セッションで「mail-worker が古いコードで `signup_verify` テンプレ未知→送信失敗」が**ログに全く出ず**MailHog 調査まで気付けなかった（§5 参照）。再発防止。
+### C. 不具合修正＋⋮位置（commit `922a1572`・ユーザー指摘）
+- **不具合**＝コンテスト詳細（SC-54）でアイデア投稿後、一覧がリロードしないと出ない。**原因**＝`ContestDetailView.tsx` が `IDEAS_CHANGED_EVENT`（window・跨ルート）を未購読だった（SC-12 `QuestDetailView` は購読済み）。**修正**＝`ContestDetailView.tsx` に同イベント購読 effect を追加し `load()` 再取得。
+- `IdeaDetailView.tsx` で「クエストへ昇格」ボタンを編集/⋮ブロックより**前**に移動＝⋮（削除danger）を最右に戻す（操作統一 §4.14）。
 
-### D. サインアップ画面 UI 微修正3点
-- `features/auth/auth.css` `.login-links` を `display:flex`＋`gap:8px 16px`＋中央寄せ（commit `85493660`）＝「コードを再送信/入力し直す」等の隣接リンクのくっつき解消（ログイン画面の2リンクも共通で改善）。
-- `features/auth/components/SignupForm.tsx` 認証コード入力に `otp-input` クラス付与（commit `a9ecd425`）＝MFA と同じ `text-align:center`/`letter-spacing:8px`/`font-size:20px`。
-- `SignupForm.tsx` Turnstile 描画に `size:"flexible"`（commit `4ff7d89b`）＝既定 normal の固定300px を入力欄幅に追従させる。
+### D. クエスト出典URL（FR-47・commit `accebb24`・ユーザー要望）
+- **理由**＝クエスト登録フォームに任意「出典URL」を追加し、昇格時は由来アイデアへの可視リンクを貼る（人間向け・機械リンク `origin_idea_id` と併存）。UIは情報インプットの登録ダイアログの出典URL欄に合わせる。
+- backend＝`quests.source_url`（migration `0055_quest_source_url`・text・NULL可）／`app/tenant/quests/orm.py` にカラム／`schemas.py` の QuestCreate/Update/Publish/Detail に `source_url`／`application.py::_validate_source_url`（http/https または `/` 始まり内部パスを許容・`//`/`javascript:` は 422・open-redirect 防止）を create/update(`_apply_content`)/promote/`_build_detail` に配線。昇格は `source_url=/ideas/{origin_idea_id}` 自動設定。
+- frontend＝`src/features/quests/components/QuestForm.tsx` に出典URL欄（情報ダイアログ同形の Field/hint/placeholder・内部パス許容のため `type=text inputMode=url`・`questContentSig`/payload/prefill に配線）／`QuestDetailView.tsx` に出典リンク（内部パスは `<Link>`・http(s) は新規タブ）。
+- tests＝C-TC-307（`tests/quests/test_sc11_api.py`・round-trip＋422検証）・T-TC-140d。docs＝データモデル §5.6／`doc/API設計/C_クエスト・パーティー・権限.md`／T.5。
+
+### E. info_curators → user_capabilities 統合（FR-47・決定D・commit `99452673`）
+- **理由**＝②会社レベル能力を単一レジストリ `user_capabilities` に集約する設計方針（§3.1/§5.63）。info_curator だけ独自テーブル `info_curators` に残っていた（1能力1テーブルの増殖）。
+- migration `0056_info_curators_merge`＝既存 `info_curators` 行を `user_capabilities(capability='info_curator')` へデータ移行（`granted_by_id`/`granted_at`/`revoked_at` 保持）→旧テーブル DROP（**クリーンカットオーバー**・ユーザー選択）。
+- `app/tenant/info/repository.py` の `is_curator`/`list_curators`/`grant_curator`/`revoke_curator` を `app/tenant/capabilities/repository.py`（caps）経由へ差し替え＋`app/tenant/info/orm.py` の `InfoCurator` クラス撤去。
+- 管理EP `GET/POST /info-curators`（N.5・account_id ベース）は**内部実装のみ差し替えて応答互換を維持**（frontend 無改修・ユーザー選択）。
+- tests＝`tests/info/test_api.py`・`tests/info/test_repository.py`（N-TC-011 他）の curator seed を `UserCapability` へ更新。docs＝データモデル §5.37/§5.63・`doc/テスト/red確認台帳.md`・`impl/README.md`。
 
 ## 4. 現在の状態（動作/テスト）
-- **backend pytest**（本セッションで実行・green）＝`tests/announcements` 11 passed（U-TC-110/111 を red→green 確認）／`tests/mail_outbox` 8 passed（A-TC-135 含む）。
-- **frontend**＝`npm run build` ✅（複数回）／`npx vitest run src/features/announcements/api.test.ts` 1 passed（U-TC-112）。codegen 済（`/admin/announcements/images` 型取込）。
-- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅（code 1011 件）。
-- **コンテナ**＝`backend`/`db`/`frontend`/`mailhog`/`minio`/`redis` が稼働（`docker compose up -d` 構成）。**worker/mail-worker は停止済み**（セッション末に `docker compose stop`）。
-- backend/frontend は本セッションの変更を `--build` 反映済み。worker/mail-worker は検証用に一時起動→停止（再起動時は §5 の `--build` 必須）。
+- **backend pytest**（本セッションで実行・green・baked backend に `-v` マウントで実行）＝`tests/quests tests/contests tests/ideas` **263 passed**／`tests/info tests/capabilities` **82 passed**／`tests/contests/test_promote.py` 単体も baked backend（`docker compose exec`）で 3 passed 確認。
+- **frontend**＝`npm run build` ✅（複数回）。codegen 済（`promote-to-quest`・`can_promote`・`source_url` 取込）。
+- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅（code 1013 件）。
+- **ブラウザ受入＝OK**（ユーザー確認済み・昇格ボタン/⋮位置/一覧即反映/参加状況列/出典URL）。
+- **コンテナ**＝`backend`/`db`/`frontend`/`mailhog`/`minio`/`redis` が稼働。backend/frontend は本セッションの変更を `--build` 反映済み。**worker/mail-worker は停止中**（本セッションは起動していない）。
+- **dev 会社DBのマイグレーション**＝`0055`・`0056` を全会社DB（acme/acme2/demo/ops）に適用済み（§8 の手順で実施）。
 - 壊れているもの＝**無し**（確認した範囲）。
 
 ## 5. 詰まっている点（試して失敗/注意）
-- **【重要】worker/mail-worker は `--build` しないと古いベイクコードで動く**＝本セッション最大の落とし穴。`docker compose --profile workers up -d worker mail-worker`（`--build` 無し）だと FR-48② 追加前のイメージで動き、`signup_verify` テンプレ未知で OTP メール送信が毎回失敗していた（例外は改修前は黙殺）。**正**＝`docker compose --profile workers up -d --build worker mail-worker`。memory `backend-no-source-mount` の通りソースはイメージにベイク。
-- **mail_outbox の送信失敗はログに出るようになった（§3-C）**＝WARNING（各試行・exc_info）／ERROR（端末失敗）。デバッグは `docker compose logs mail-worker` を見る。失敗行は `MAIL_OUTBOX_MAX_ATTEMPTS`（既定5）到達で `status=failed`＋`secret` NULL＝以後再送されない（手動再送は新規 enqueue）。
-- **Turnstile `size:flexible` の実見た目は未検証**＝サードパーティ iframe のためヘッドレス Playwright で正確に測れず。入力欄と端が揃うかは実ブラウザで要目視（§7-1）。
-- **signup 検証/会社DBミラーは account_sync worker 依存**＝verify は accounts 作成＋`account_sync_outbox` に積むだけ。worker 未起動だとミラー未適用でログイン不可。E2E でログインまで見るなら worker を `--build` 起動。
-- **baked backend の pytest は未コミット編集を反映しない**＝`docker compose up -d --build backend` か `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest …`（-v マウント）。
+- **【重要・再発防止】TC-ID は採番前に既存 max を確認する**＝本セッション、昇格の表示フラグ用テストを `T-TC-141` で採番したが、既に `T-TC-141`（参加リクエスト判断材料プロフィール・`tests/contests/test_contests.py`）が使用済みで衝突。`scripts/check_tc_traceability.py` は重複を検出しない（memory `tc-id-traceability-no-uniqueness`）。→ `T-TC-140c` へ改番して解消。**新規採番は `grep -rhoE '<DOMAIN>-TC-[0-9]+' doc/テスト/` で max を見てから**。
+- **【重要】red-green は「対象に到達した behavior-red」でないと規約違反**（テスト規約 §5.1）＝ルート未定義の 404 や KeyError は NG。新規EPは**スタブ（501  or 誤値）を先に置き**、期待値との差分（例 `501≠201`・`False≠True`）で red を目視してから本実装。本セッションは最初この手順を飛ばして指摘され、スタブ方式で取り直した。storage 置換の refactor（info_curators 統合）は後追いのため**スタブ手技＋`doc/テスト/red確認台帳.md` 記録**で代替した。
+- **frontend にコンポーネント描画テスト基盤が無い**＝vitest は `environment: "node"`・`@testing-library/react`/jsdom 未導入。SC-54 のアイデア投稿→一覧即反映（commit `922a1572`）の回帰テストは**単体化不可**で、本来の担保は e2e（未実装＝follow-up・§7-1）。コミットメッセージにも明記済み。
+- **baked backend の pytest は未コミット編集を反映しない**＝`docker compose up -d --build backend` か `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest …`（-v マウント）。本セッションは一貫して -v マウントで red/green を回した。
+- **新規 migration は dev 会社DBへ手動適用が要る**＝§8 のワンライナー（`scripts.bootstrap.migrate_company` を全 `db_identifier` に適用）。backend 再ビルドだけでは既存DBのスキーマは変わらない。
+- **worker/mail-worker は `--build` しないと古いベイクコードで動く**（前セッションからの既知落とし穴・本セッションでは worker 未使用）。起動時は `docker compose --profile workers up -d --build worker mail-worker`。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **お知らせ画像アップEP は管理者のみ**（`POST /admin/announcements/images`）＝お知らせは管理者のみが起稿するため。情報インプット N.2 の再ホストは全ユーザー（情報は全員が起票）だが、お知らせは権限境界を投稿権限に揃えた。
-- **共有 RichTextEditor に `uploadImage` 注入prop を足す（DRY）**＝info-input は独自 contentEditor を内蔵しており共有 RichTextEditor を使っていない。info を共有エディタへ移行するのはスコープ外とし、共有側は注入で画像対応（未指定なら無改修）。
-- **`.login-links` は flex+gap 中央寄せ**（「適切なマージン」案）を採用＝左右振り分け案も可だったが、リンク数が1でも2でも破綻せず既存の中央寄せデザインを保てるため。
-- **Turnstile は `size:flexible`**＝CSS で iframe を拡大する hack より公式オプションが堅牢。
-- **`.env` の Turnstile キーはコメントアウトで保存**（削除しない）＝次の CAPTCHA 検証時に `#` を外すだけ。dev 共有スタックは CAPTCHA 無効が既定（pytest のトークン無しテストを落とさない）。
+- **昇格EPのゲート＝通常のクエスト作成と同一**（`quests.application._can_create_quest`＝`quest_create` 能力 or 管理者）＝一か所で一致（DRY）。能力なしは 403（`capability_required`）。
+- **昇格は社内のみ＝public 会社では application で明示 404（存在秘匿）**＝`/ideas` 配下は公開モード外周ガード（`app/core/access_gate.py`）の許可リストに含まれ素通りするため、業務機能である昇格を application 側で 404 にする（決定O/P' 整合・管理者でも不可）。
+- **出典URL は汎用の任意URL欄**（ユーザー選択）＝外部URLも可。昇格時のみ内部パス `/ideas/{id}` を自動入力。**内部パス形式を採用**（ユーザー選択）＝環境非依存（ホスト名を焼かない）・アプリ内 `<Link>` でシームレス遷移。http/https のみに縛る情報インプットより緩和（内部リンクを張れるようにするため）。`//`（プロトコル相対）は open-redirect 防止で拒否。入力 `type` は情報側の `url` ではなく `text`（内部パスが native url 検証で誤無効にならないよう）＝見た目・ラベル・ヒント・placeholder は情報ダイアログに合わせる。
+- **参照資格の無いユーザーが出典（内部リンク）を踏むと 404（存在秘匿）**＝`GET /ideas/{id}` の門番 `can_access_quest_id`（コンテスト配下は `can_view_contest`）が 403 でなく 404 を返す（情報漏洩なし・切れたリンクに見えるのは許容）。
+- **info_curators は DROP（クリーンカットオーバー）**（ユーザー選択）＝互換ビュー/二重書きは採らず、DRY の終状態に一本化。管理EP（N.5）は内部実装のみ差し替えて応答互換を維持（frontend 無改修）＝統合EP `POST /admin/accounts/{uid}/capabilities` への寄せは今回スコープ外。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-1. **Turnstile 幅の実ブラウザ目視**（§5）＝CAPTCHA を再有効化（`.env` の `#TURNSTILE_*` を外す＋`IQ_DEFAULT_COMPANY_CODE=DEMO`＋`docker compose up -d backend`）して `/signup` で「成功しました!」ボックスが認証コード入力欄と同幅か確認。ズレていれば `SignupForm.tsx` の container（`.cf-turnstile-box`）幅を調整。確認後は §8 の手順で dev を元に戻す。
-2. **バックログ F8＝リッチ本文インライン画像の恒久表示**＝推奨(b)＝安定配信プロキシEP（`GET /media/{key}` が都度署名して 302・認可付き）を新設し、`RichTextEditor` 挿入時は本文に安定パスを残す／`RichTextView` 描画前に `img src` を解決。info N.2（`info/application.rehost_image`）とお知らせ U-8（`announcements/application.rehost_image`）の**両方**をまとめて移行。`validate_image_upload`/MinIO 保存は現状流用。正本＝`doc/バックログ/未実装・ギャップ一覧.md` F8。
-3. **（任意）`doc/本番デプロイ要件.md` §6.7 に注記追加**＝「worker/mail-worker イメージも最新コードで `--build` して配備する」。本セッションで露見した運用落とし穴（§5）。**§6.7 に既記載かは未確認**＝着手前に本文を開いて確認。
-4. **アイデアコンテストの他 未実装**＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md` の正式反映残／Phase2（妥当性解析 §6.4 等）。着手前にコードで現況裏取り（memory「未実装記述は done が多い」）。
-5. **SC-01 設計書 §3〜9 を5ゾーンに整合**（持ち越し・`doc/画面設計/screens/SC-01_ダッシュボード.md` 本文は再設計前のまま）。
-- **消化済みの前handoff項目**＝「公開デプロイ既定会社コードの供給検証」は本セッションで実機確認済（`.env IQ_DEFAULT_COMPANY_CODE=DEMO`→`/signup` の会社コード欄が消え自動補完・bootstrap が `default_company_code:"DEMO"` 返却）。
+1. **（任意・回帰補強）SC-54 アイデア投稿→一覧即反映の e2e** ＝commit `922a1572` の修正に対する自動回帰が無い（§5 の infra 制約）。`impl/frontend/e2e` に Playwright で「コンテスト配下アイデアを投稿→詳細のアイデア一覧にリロードせず出る」を1本。共有DB非冪等に注意（専用シード垢・memory `e2e-full-not-idempotent-shared-db`）。
+2. **アイデアコンテストの残り（Phase2）**＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md` §6.4 の「妥当性」解析・自動表彰スケジューラ（bounded の `ends_at` 経過自動 closed／rolling の `auto_shelve_expired` の定期実行トリガ）。いずれも MVP スコープ外＝LLM/スケジューラ基盤前提。着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。
+3. **Turnstile `size:flexible` 幅の実ブラウザ目視**（前セッション持ち越し・未実施）＝CAPTCHA を再有効化（`impl/.env` の `#TURNSTILE_*` を外す＋`IQ_DEFAULT_COMPANY_CODE=DEMO`＋backend 再起動）して `/signup` で「成功しました!」ボックスが認証コード入力欄と同幅か確認。ズレたら `src/features/auth/components/SignupForm.tsx`。確認後 `.env` を dev 既定へ戻す。
+4. **バックログ F8＝リッチ本文インライン画像の恒久表示**（前セッション持ち越し・未着手）＝`doc/バックログ/未実装・ギャップ一覧.md` F8。安定配信プロキシEP（`GET /media/{key}` が都度署名して 302・認可付き）を新設し、情報 N.2（`info/application.rehost_image`）とお知らせ U-8（`announcements/application.rehost_image`）の短TTL署名URL 直埋めを置換。
+5. **SC-01 設計書 §3〜9 を5ゾーンに整合**（前セッション持ち越し・`doc/画面設計/screens/SC-01_ダッシュボード.md` 本文が再設計前のまま）。
+6. **（任意）info_curators 統合の総仕上げ**＝管理UI/EP を統合EP `POST /admin/accounts/{uid}/capabilities`（ドメインT）へ寄せるか（今回は N.5 EP 互換維持で据え置き）。DRY 観点の follow-up。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。
 - 起動：`cd impl && docker compose up -d`。backend=`http://localhost:8000`・frontend=`http://localhost:3000`・openapi=`http://localhost:8000/openapi.json`・MailHog=`http://localhost:8025`。
 - **workers（必ず `--build`）**：`cd impl && docker compose --profile workers up -d --build worker mail-worker`。確認後 `docker compose stop worker mail-worker`。
 - 反映（ソースベイク・volumes 無）：`cd impl && docker compose up -d --build backend|frontend`。型再生成＝backend 再ビルド後 `cd impl/frontend && npm run codegen`。
+- **新規 migration を dev 会社DBへ適用**（本セッションで多用）：`cd impl` した上で `docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -c "<SCRIPT>"` を実行。`<SCRIPT>` の中身＝`scripts.bootstrap.migrate_company` を全会社DBに回す（`app.db.control.control_session` を with で開き `Company` 全件の `db_identifier` を取り、各 `d` に `migrate_company(d)` を適用）。control DB は `scripts.bootstrap.migrate_control()`。この -v マウント run は実行中の `db` コンテナ（＝同一 Postgres）に効くので、再ビルドした backend/worker も同じスキーマを見る。backend 再ビルドだけではスキーマは変わらない点に注意。
 - テスト：
   - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`。
-  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。未コミット反映は `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`。
+  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（-v マウント）。
   - TC トレーサビリティ：`cd /home/t-umekawa/sc-ideaquest-G2 && python3 scripts/check_tc_traceability.py`。
-- `.env`（`impl/.env`・gitignore 追跡外）現状＝**dev 共有スタック既定**＝`IQ_DEFAULT_COMPANY_CODE=`（空）・`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` はコメントアウト（CAPTCHA 無効）。CAPTCHA/公開登録を検証する時だけ該当行を有効化し backend 再起動（＋signup e2e は workers を `--build` 起動）。
-- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin・会社 `OPS`）／MFA `ACME-02`/`mfa@acme2.example`（MFA ON）／**DEMO会社** `DEMO`/`admin@demo.example`（public＋self_signup・セルフサインアップのデモ）。会社DB＝`ideaquest_company_acme`／`ideaquest_company_demo`。
-- お知らせ画像を手動確認するなら：管理者で `/admin/announcements`→作成モーダルの本文エディタ「🖼 画像」or 貼付/ドロップ→`announcement-images/...` 署名URL が `<img>` に入る（MinIO は `docker compose up -d` で稼働）。
-- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り、**使い終わったら削除**（本セッションは削除済）。
+- `.env`（`impl/.env`・gitignore 追跡外）現状＝**dev 共有スタック既定**＝`IQ_DEFAULT_COMPANY_CODE=`（空）・`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` はコメントアウト（CAPTCHA 無効）。CAPTCHA/公開登録を検証する時だけ該当行を有効化し backend 再起動。
+- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin・会社 `OPS`）／MFA `ACME-02`/`mfa@acme2.example`（MFA ON）／**DEMO会社** `DEMO`/`admin@demo.example`（public＋self_signup）。会社DB＝`ideaquest_company_acme`／`ideaquest_company_demo`。
+- 昇格機能の手動確認：管理者 `kanri@acme` でコンテスト作成（「誰でも参加可」＝auto_approve）→配下にアイデア投稿→アイデア詳細に「🚀 クエストへ昇格」→確認→新クエスト（下書き）へ遷移＋クエスト詳細の「🔗 出典」が元アイデアを指す。
+- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り、**使い終わったら削除**。
