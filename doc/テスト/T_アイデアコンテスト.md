@@ -89,3 +89,12 @@
 | T-TC-150 | api | public×general は非コンテストEPを 404＝存在秘匿（許可リスト外） | `access_mode=public`・role=general | 非コンテストEP（例 `GET /quests`）呼び出し | 404 `not_found`／コンテスト系（T・配下 D/E/F）は 200 | §8.0／README §1.6／決定P' |
 | T-TC-151 | api | public でも管理者は管理系EP保持（決定O・業務EPは管理者でも 404） | `access_mode=public`・company_account_admin | 管理系EP／業務EP | 管理系＝200／業務系＝404 `not_found`（決定O） | §8.0／決定O／決定P' |
 | T-TC-201 | e2e | public 会社はSC-53 着地・SC-01 を出さない・クエスト系リンク非表示（決定P） | public 会社ログイン | ログイン後の着地/ナビ確認 | SC-53 着地・SC-01 非描画・クエスト系 `<Link>` なし（UIと403の二重封鎖） | §8.0／決定P |
+
+## 7. SC-54 非参加運営の表示制御（frontend 純関数・⑤・受入指摘）
+
+> 承認制×未参加でも **運営（can_manage）は `can_view_contest` を通り 200**＝既に全タブが見える。⑤はこれを「パーティは機能／アイデア・全文検索は中身をガード／特定ユーザが分かるパネル（表彰台・新着議論・活動）は秘匿」に絞る**frontend のみの表示制御**。backend・可視ポリシーは無改修。一般ユーザー（invite）・参加者（participant）は現状不変。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| T-TC-206 | unit | 閲覧モード判定（純関数）＝参加者/非参加運営/非参加一般・**ガードは承認制のみ** | `contestViewMode({can_manage, my_status, auto_approve})` | approved／(can_manage×非approved×auto_approve真偽)／(非can_manage×非approved) を判定 | approved→`participant`／**承認制(auto_approve=false)×can_manage×未参加→`manager-guard`**／**auto_approve=true×can_manage×未参加→`participant`**（公開＝運営も全表示・一般invite が表彰台を見えるのと逆転させない）／非運営×未参加→`invite`（my_status 未設定は none 扱い） | SC-54／⑤ |
+| T-TC-207 | unit | モード別表示フラグ（純関数）＝DRY の単一ソース（描画側が参照） | `contestViewFlags(...)` | 各モードの showTabs/showIdentifying/guardContent/fetchContent | participant=(t,t,f,t)／manager-guard=(t,**f**,**t**,**f**)＝パネル秘匿+タブ中身ガード+識別データ非取得／invite=(f,t,f,t)＝一般は現状不変 | SC-54／⑤ |

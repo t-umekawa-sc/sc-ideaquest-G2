@@ -5,7 +5,7 @@
 // 認可はサーバー権威（参加/確定は権限が無ければ 403＝スナックバーで案内・UIは非表示に依存しない）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
@@ -46,6 +46,7 @@ import {
   CONTEST_STATUS_BADGE,
   contestStatusLabel,
 } from "../types";
+import { contestViewFlags } from "../viewMode";
 import "../contests.css";
 
 const fmtDate = (v: string | null | undefined) => (v ? v.slice(0, 10) : "—");
@@ -98,6 +99,13 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     }
     if (!c) { setNotFound(true); setLoading(false); return; }
     setContest(c);
+    // 非参加の運営（manager-guard・⑤）＝識別情報を含むアイデア一覧/ランキング/活動はそもそも取得しない
+    // （プライバシー優先＝クライアントに渡さない・パーティ管理は別取得で継続）。
+    if (!contestViewFlags(c).fetchContent) {
+      setIdeas([]); setRankings({}); setActivity(null);
+      setLoading(false);
+      return;
+    }
     const [list, ...ranks] = await Promise.all([
       listIdeas(c.quest_id, { limit: 100 }).catch(() => null),
       ...CONTEST_RANKING_AXES.map((a) => getContestRanking(contestId, a.key, signal).catch(() => null)),
@@ -234,6 +242,14 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
 
   // 戻るラベルの来歴を1回だけ消費（一覧→詳細のときだけ「← アイデアコンテスト一覧」・それ以外は「← 戻る」）。
   useEffect(() => { setFromList(consumeContestFromList()); }, []);
+
+  // 非参加の運営（manager-guard）はアイデア/全文検索がガードされるので、初期タブを機能するパーティへ（1回だけ）。
+  const didInitView = useRef(false);
+  useEffect(() => {
+    if (!contest || didInitView.current) return;
+    didInitView.current = true;
+    if (contestViewFlags(contest).guardContent) setView("party");
+  }, [contest]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -475,15 +491,18 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
   // 参加状態（my_status）でタブ出し分け・参加/退席トグル（ユーザー要望）。
   const myStatus = contest.my_status ?? "none";
   const isParticipant = myStatus === "approved";
+  // 閲覧モード別フラグ（⑤・単一ソース）＝タブ表示/識別パネル可視/タブ中身ガード。
+  const flags = contestViewFlags(contest);
   // タブ（アイデア/全文検索/パーティ）は参加後のみ表示（運営は管理のため常時可）。
-  const showTabs = isParticipant || contest.can_manage;
+  const showTabs = flags.showTabs;
 
   return (
     <section className="contest-detail">
       <Link className="backlink backlink--float" href="/contests" onClick={onBack}>{backLabel}</Link>
 
-      {/* 概要（左）＋コンテスト内アクティビティ（右）を2段組（クエスト詳細 .quest-top と同構成）。 */}
-      <div className="contest-top">
+      {/* 概要（左）＋コンテスト内アクティビティ（右）を2段組（クエスト詳細 .quest-top と同構成）。
+          非参加の運営（manager-guard・⑤）はアクティビティを秘匿＝ヘッダーを全幅に。 */}
+      <div className={flags.showIdentifying ? "contest-top" : undefined}>
       <header className="card contest-head">
         <div className="contest-head__top">
           <div className="contest-head__main">
@@ -498,7 +517,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
             <dl className="contest-meta">
               <div><dt>種別</dt><dd>{CONTEST_MODE_LABEL[contest.mode] ?? contest.mode}</dd></div>
               <div><dt>会期</dt><dd>{period}</dd></div>
-              <div><dt>応募数</dt><dd>{ideas.length} 件</dd></div>
+              <div><dt>応募数</dt><dd>{flags.fetchContent ? ideas.length : contest.idea_count} 件</dd></div>
             </dl>
           </div>
           {/* 操作エリア統一（デザイン標準 §4.14）＝一次アクション(参加する)→編集(運営=can_manage)→⋮(ステータス遷移・削除danger)。権限が無ければサーバー 403。 */}
@@ -530,13 +549,17 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         </div>
       </header>
 
-        <section className="card contest-activity" aria-label="コンテスト内アクティビティ">
-          <ActivityFeed title="コンテスト内アクティビティ" load={loadFeed}
-                        emptyText="このコンテストの活動はまだありません。" />
-        </section>
+        {flags.showIdentifying && (
+          <section className="card contest-activity" aria-label="コンテスト内アクティビティ">
+            <ActivityFeed title="コンテスト内アクティビティ" load={loadFeed}
+                          emptyText="このコンテストの活動はまだありません。" />
+          </section>
+        )}
       </div>
 
-      {/* 💬 新着の議論（自分が参加するアイデアの未読・左）＋ 📈 活動の活発さ（右）を2段組。 */}
+      {/* 💬 新着の議論（自分が参加するアイデアの未読・左）＋ 📈 活動の活発さ（右）を2段組。
+          非参加の運営（manager-guard・⑤）は特定ユーザが分かるため秘匿。 */}
+      {flags.showIdentifying && (
       <div className="contest-grid-2">
         <section className="card unread-panel" aria-label="新着の議論">
           <div className="section-head">
@@ -571,7 +594,10 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           />
         </section>
       </div>
+      )}
 
+      {/* 表彰台（ランキング・氏名表示）も非参加の運営には秘匿（⑤・プライバシー優先）。 */}
+      {flags.showIdentifying && (
       <section className="contest-podium" aria-label="表彰台（ランキング）">
         {CONTEST_RANKING_AXES.map((axis) => {
           const rows = (rankings[axis.key] ?? []).slice(0, 3);
@@ -595,6 +621,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           );
         })}
       </section>
+      )}
 
       {/* 参加前はタブ（アイデア/全文検索/パーティ）非表示＝参加誘導のみ（ユーザー要望）。参加後（approved）or 運営は表示。 */}
       {!showTabs && (
@@ -621,7 +648,20 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         ))}
       </div>}
 
-      {showTabs && view === "ideas" && (
+      {/* 非参加の運営（manager-guard・⑤）はアイデア一覧の中身をガード（件数・案内のみ＝個別アイデアは秘匿）。 */}
+      {showTabs && view === "ideas" && flags.guardContent && (
+        <section className="card contest-guard" aria-label="アイデア（参加が必要）">
+          <p className="hint">応募アイデアの閲覧・管理には、このコンテストへの参加が必要です（現在 {contest.idea_count} 件）。</p>
+          <p className="muted text-sm" style={{ margin: 0 }}>👥 パーティタブでは参加者の承認・審査員設定・退出が管理できます。</p>
+          {myStatus === "requested"
+            ? <p className="muted text-sm" style={{ margin: "var(--space-3) 0 0" }}>⏳ 参加リクエストは承認待ちです。</p>
+            : contest.status === "open"
+              ? <div style={{ marginTop: "var(--space-3)" }}><Button variant="primary" onClick={join} disabled={busy}>参加する</Button></div>
+              : null}
+        </section>
+      )}
+
+      {showTabs && view === "ideas" && !flags.guardContent && (
         <>
           <div className="ideas-tab-toolbar" style={{ marginTop: "var(--space-3)" }}>
             <div className="segmented contest-seg" role="radiogroup" aria-label="アイデアの絞り込み">
@@ -670,8 +710,20 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
         </>
       )}
 
+      {/* 非参加の運営（manager-guard・⑤）は全文検索もガード（チャット本文等＝特定ユーザが分かるため秘匿）。 */}
+      {showTabs && view === "search" && flags.guardContent && (
+        <section className="card contest-guard" aria-label="全文検索（参加が必要）">
+          <p className="hint">コンテスト内の全文検索（アイデア・チャット・添付）には、このコンテストへの参加が必要です。</p>
+          {myStatus === "requested"
+            ? <p className="muted text-sm" style={{ margin: 0 }}>⏳ 参加リクエストは承認待ちです。</p>
+            : contest.status === "open"
+              ? <div style={{ marginTop: "var(--space-3)" }}><Button variant="primary" onClick={join} disabled={busy}>参加する</Button></div>
+              : null}
+        </section>
+      )}
+
       {/* 全文検索（J・実接続＝GET /quests/{id}/search・PGroonga）＝SC-12 クエスト詳細と同一 UI。 */}
-      {showTabs && view === "search" && (
+      {showTabs && view === "search" && !flags.guardContent && (
         <section aria-label="全文検索">
           {/* ガイダンス ⓘ(ScreenPurpose) は data-sp-host の行幅いっぱいに展開＝全幅の .list-toolbar をホストにする（§4.13・共通仕様） */}
           <div className="list-toolbar" data-sp-host>
