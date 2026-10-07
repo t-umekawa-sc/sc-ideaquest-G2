@@ -6,7 +6,7 @@
 // 認可はサーバー権威（会社アカウント管理者/system_admin のみ・per-account EP で付与/剥奪）。
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Avatar, Button, DataTable, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Avatar, Button, DataTable, Modal, ModalBody, ModalFooter, Multiselect, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { grantCapability, listCapabilityHolders, listOwnAccounts, listOwnCompanyQuestGroups, revokeCapability } from "../api";
@@ -15,6 +15,7 @@ import { filterCapabilityCandidates } from "../capabilityCandidates";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css"; // admin-create/admin-toolbar（SC-93 の他セクションと同居）
 import "@/features/qgadmin/qgadmin.css"; // dir-list/dir-row/dir-more（メンバー追加ダイアログと同構成）
+import "@/features/info-input/info-input.css"; // pick-filters/pick-filter-row/pick-divider（「対象を選ぶ」と同レイアウト）
 
 const PER = 20; // 付与ダイアログの「もっと見る」1回の増分（クライアント側スライス）。
 
@@ -37,14 +38,17 @@ export function CapabilitiesSection() {
   const [cap, setCap] = useState<CapabilityKey>("info_curator"); // 選択中の能力
   const [holders, setHolders] = useState<CapabilityHolder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [everLoaded, setEverLoaded] = useState(false); // 初回ロード済みか（タブ切替のちらつき防止＝2回目以降はテーブルを差し替えない）
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false); // 付与ダイアログの開閉
   const [q, setQ] = useState(""); // 会社ディレクトリ検索
-  const [group, setGroup] = useState(""); // クエストグループ絞り込み（""=すべて）
+  const [groupIds, setGroupIds] = useState<string[]>([]); // クエストグループ絞り込み（空=すべて・複数選択=OR）
   const [groups, setGroups] = useState<{ group_id: string; name: string }[]>([]); // 自社クエストグループ候補
+  const [grantCaps, setGrantCaps] = useState<CapabilityKey[]>(["info_curator"]); // 付与ダイアログで同時付与する能力（複数可）
   const [shown, setShown] = useState(PER); // 「もっと見る」で増える表示件数
 
   const meta = useMemo(() => CAPS.find((c) => c.key === cap) ?? CAPS[0], [cap]);
+  const groupOptions = useMemo(() => groups.map((g) => ({ value: g.group_id, label: g.name })), [groups]);
 
   // 付与ダイアログのクエストグループ絞り込み候補＝自社のクエストグループ一覧（1回取得）。
   useEffect(() => {
@@ -57,32 +61,41 @@ export function CapabilitiesSection() {
     setLoading(true);
     try { const res = await listCapabilityHolders(key); setHolders(res?.data ?? []); }
     catch { setHolders([]); /* 403 等は空表示（画面自体は管理者のみ到達） */ }
-    finally { setLoading(false); }
+    finally { setLoading(false); setEverLoaded(true); }
   }, []);
   useEffect(() => { void reload(cap); }, [reload, cap]);
 
   const holderIds = useMemo(() => new Set(holders.map((c) => c.account_id)), [holders]);
   // 付与候補＝有効(active)かつ当該能力を未付与＋氏名/ログインID検索＋クエストグループ所属（純関数・T-TC-209）。
   const candidates = useMemo(
-    () => filterCapabilityCandidates(accounts, { holderIds, q, groupId: group }),
-    [accounts, holderIds, q, group],
+    () => filterCapabilityCandidates(accounts, { holderIds, q, groupIds }),
+    [accounts, holderIds, q, groupIds],
   );
   const visible = candidates.slice(0, shown);
   const hasNext = candidates.length > shown;
 
   // 検索/グループ変更・ダイアログ開閉・能力切替で表示件数をリセット（メンバー追加ダイアログの先頭ページ相当）。
-  useEffect(() => { setShown(PER); }, [q, group, open, cap]);
+  useEffect(() => { setShown(PER); }, [q, groupIds, open, cap]);
   // 能力を切り替えたら付与ダイアログは閉じる（対象能力の取り違え防止）。
   useEffect(() => { setOpen(false); }, [cap]);
+  // ダイアログを開くたび「付与する能力」を現在のタブ1つに初期化（既定＝今見ている能力）。
+  useEffect(() => { if (open) setGrantCaps([cap]); }, [open, cap]);
 
-  const grant = async (accountId: string) => {
+  const toggleGrantCap = (key: CapabilityKey) =>
+    setGrantCaps((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+
+  const grant = async (accountId: string, name: string) => {
+    if (grantCaps.length === 0) { snack({ type: "error", title: "付与する権限を1つ以上選んでください" }); return; }
     setBusy(true);
     try {
-      await grantCapability(accountId, cap);
-      snack({ type: "success", title: `${meta.noun}を付与しました` });
-      await reload(cap); // 付与応答は能力配列のみ＝保有者一覧を再取得（付与済みは候補から自動的に外れる）。
-    } catch (e) {
-      snack({ type: "error", title: "付与できませんでした", msg: e instanceof ApiError && e.status === 409 ? "既に付与済みです。" : "時間をおいて再度お試しください。" });
+      // 選択された能力を同時付与（複数可・各 per-account EP・既に保持は 409 を握り潰す＝冪等扱い）。
+      await Promise.all(grantCaps.map((c) =>
+        grantCapability(accountId, c).catch((e) => { if (!(e instanceof ApiError && e.status === 409)) throw e; })));
+      const names = grantCaps.map((k) => CAPS.find((c) => c.key === k)?.noun ?? k).join("・");
+      snack({ type: "success", title: `「${name}」に ${names} を付与しました` });
+      await reload(cap); // 保有者一覧を再取得（現タブの能力を付与していれば候補から外れる）。
+    } catch {
+      snack({ type: "error", title: "付与できませんでした", msg: "時間をおいて再度お試しください。" });
       void reload(cap);
     } finally { setBusy(false); }
   };
@@ -133,7 +146,8 @@ export function CapabilitiesSection() {
         <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>＋ 権限を付与する</button>
       </div>
 
-      {loading ? (
+      {/* 初回だけ「読み込み中…」を出し、タブ切替（2回目以降）は前のテーブルを残したまま差し替え＝ちらつき防止。 */}
+      {loading && !everLoaded ? (
         <p className="muted">読み込み中…</p>
       ) : (
         <DataTable<CapabilityHolder>
@@ -152,33 +166,68 @@ export function CapabilitiesSection() {
       )}
 
       {open && (
-        <Modal open={open} onClose={() => setOpen(false)} title={`${meta.noun}を付与`} size="md">
+        // レイアウトは「対象を選ぶ」(TargetPicker) に合わせる＝セクション見出し＋左ラベル行＋仕切り線（§受入）。
+        <Modal open={open} onClose={() => setOpen(false)} title="権限を付与" size="md">
           <ModalBody>
-            <div className="form-row dialog-section is-quiet">
-              <label htmlFor="cap_search">会社ディレクトリを検索</label>
-              <input id="cap_search" className="input" type="search" placeholder="氏名・ログインIDで検索" value={q} onChange={(e) => setQ(e.target.value)} />
-              {/* クエストグループでの絞り込み（ユーザー要望）＝所属メンバーだけに絞る（""=すべて）。 */}
-              <select id="cap_group" className="select" aria-label="クエストグループで絞り込み" value={group} onChange={(e) => setGroup(e.target.value)} style={{ marginTop: "var(--space-2)" }}>
-                <option value="">クエストグループ: すべて</option>
-                {groups.map((g) => <option key={g.group_id} value={g.group_id}>{g.name}</option>)}
-              </select>
-              <div className="hint">自社の有効アカウントから選択。既に{meta.label}権限を持つ人は表示されません。</div>
+            {/* 🔍 絞り込み＝検索＋クエストグループ（複数選択・候補のみ＝.multiselect）。 */}
+            <div className="pick-filters">
+              <div className="pick-filters__title">🔍 絞り込み</div>
+              <div className="pick-filter-row">
+                <span className="pick-filter-lbl">検索</span>
+                <div className="dt-search">
+                  <span className="dt-search__ic" aria-hidden="true">🔍</span>
+                  <input className="input" type="search" placeholder="氏名・ログインIDで検索…" aria-label="氏名・ログインID検索" value={q} onChange={(e) => setQ(e.target.value)} />
+                </div>
+              </div>
+              <div className="pick-filter-row">
+                <span className="pick-filter-lbl">グループ</span>
+                <Multiselect
+                  options={groupOptions}
+                  value={groupIds}
+                  onChange={setGroupIds}
+                  ariaLabel="クエストグループで絞り込み"
+                  placeholder="クエストグループで絞り込み（すべて）"
+                  emptyText="クエストグループがありません"
+                />
+              </div>
             </div>
+
+            <hr className="pick-divider" />
+            {/* 🏷️ 付与する権限＝複数同時に選べる（既定は現在のタブの能力・ユーザー要望）。 */}
+            <div className="pick-kindsel">
+              <div className="pick-kindsel__title">🏷️ 付与する権限</div>
+              <div className="pick-filter-row">
+                <span className="pick-filter-lbl">権限</span>
+                <div className="pick-checks">
+                  {CAPS.map((c) => (
+                    <label key={c.key} className="checkbox">
+                      <input type="checkbox" checked={grantCaps.includes(c.key)} onChange={() => toggleGrantCap(c.key)} /><span>{c.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <span className="hint">選んだ権限を、下で選んだユーザーに同時に付与します（既に{meta.label}権限を持つ人は候補に出ません）。</span>
+            </div>
+
+            <hr className="pick-divider" />
+            {/* 📋 対象者＝絞り込み結果（会社の有効アカウント・各行の「付与」で選択能力をまとめて付与）。 */}
+            <div className="pick-results-title">📋 対象者</div>
+            <div className="pick-count-row"><span className="pick-count">該当 {candidates.length} 名</span></div>
             <div className="dir-list">
               {visible.length === 0 ? (
-                <div className="dir-list__status">{q.trim() || group ? "条件に一致するユーザーがいません（検索・クエストグループ絞り込みを見直してください）。" : "候補がありません。未発行の場合はアカウントを発行してください。"}</div>
+                <div className="dir-list__status">{q.trim() || groupIds.length ? "条件に一致するユーザーがいません（検索・クエストグループ絞り込みを見直してください）。" : "候補がありません。未発行の場合はアカウントを発行してください。"}</div>
               ) : (
                 visible.map((a) => (
                   <div className="dir-row" key={a.account_id}>
                     <Avatar name={a.display_name} imageUrl={a.avatar_url ?? undefined} size="sm" />
                     <span className="dir-row__name">{a.display_name}（{a.login_id}）</span>
-                    <Button type="button" variant="primary" disabled={busy} onClick={() => void grant(a.account_id)}>付与</Button>
+                    <Button type="button" variant="primary" disabled={busy || grantCaps.length === 0} onClick={() => void grant(a.account_id, a.display_name)}>付与</Button>
                   </div>
                 ))
               )}
             </div>
             {hasNext ? (
-              <div className="dir-more">
+              <div className="pick-more-wrap">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShown((s) => s + PER)}>
                   もっと見る（残り {candidates.length - shown}）
                 </Button>

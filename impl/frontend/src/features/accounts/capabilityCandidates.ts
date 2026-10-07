@@ -10,14 +10,16 @@ export type CandidateAccount = {
 
 export function filterCapabilityCandidates<T extends CandidateAccount>(
   accounts: T[],
-  opts: { holderIds: Set<string>; q: string; groupId: string },
+  opts: { holderIds: Set<string>; q: string; groupIds: string[] },
 ): T[] {
   const needle = opts.q.trim().toLowerCase();
+  const groups = opts.groupIds;
   return accounts.filter(
     (a) =>
       a.status === "active" &&
       !opts.holderIds.has(a.account_id) &&
       (!needle || `${a.display_name} ${a.login_id}`.toLowerCase().includes(needle)) &&
-      (!opts.groupId || (a.memberships ?? []).some((m) => m.group_id === opts.groupId)),
+      // クエストグループ絞り込み＝未選択なら全件・選択ありは「いずれかに所属」(OR・複数選択=和集合)。
+      (groups.length === 0 || (a.memberships ?? []).some((m) => groups.includes(m.group_id))),
   );
 }
