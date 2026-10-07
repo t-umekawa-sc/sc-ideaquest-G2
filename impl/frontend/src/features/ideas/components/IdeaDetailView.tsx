@@ -503,6 +503,20 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。
                 ボタンは投稿者本人のみ表示（is_mine・サーバー権威／SC-22 §4.5・決定 2026-09-06）。
                 完了クエストは事前無効化＝入力後に「保存できません」を避ける（選定/投票と同じ凍結UXに統一・サーバー 409 も権威）。 */}
+            {/* クエストへ昇格（T.5・FR-47）＝コンテストの有望アイデアを種に業務クエストを起票。
+                表示は can_promote（サーバー権威＝コンテスト配下×非public×quest_create/管理者）のみ。
+                ⋮（削除danger）を最右に保つため編集/⋮ブロックより前に置く（操作統一§4.14）。 */}
+            {idea.can_promote && (
+              <button
+                className="btn btn-outline"
+                type="button"
+                disabled={promoteBusy}
+                title="このアイデアを種に新しいクエストを作成します"
+                onClick={() => void handlePromote()}
+              >
+                🚀 クエストへ昇格
+              </button>
+            )}
             {idea.is_mine && (
               <>
                 <button
@@ -514,22 +528,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                 >
                   編集
                 </button>
-                {/* 削除＝⋮の最下部（danger・操作統一§4.14）。削除は親クエスト依存をやめ詳細にも常設。 */}
+                {/* 削除＝⋮の最下部（danger・操作統一§4.14）。削除は親クエスト依存をやめ詳細にも常設。⋮は最右。 */}
                 <RowMenu items={[{ label: "アイデアを削除", danger: true, onClick: () => void onDeleteIdea() }]} />
               </>
-            )}
-            {/* クエストへ昇格（T.5・FR-47）＝コンテストの有望アイデアを種に業務クエストを起票。
-                表示は can_promote（サーバー権威＝コンテスト配下×非public×quest_create/管理者）のみ。 */}
-            {idea.can_promote && (
-              <button
-                className="btn btn-outline"
-                type="button"
-                disabled={promoteBusy}
-                title="このアイデアを種に新しいクエストを作成します"
-                onClick={() => void handlePromote()}
-              >
-                🚀 クエストへ昇格
-              </button>
             )}
           </div>
         </div>

@@ -17,7 +17,7 @@ import { QuestIcon } from "@/components/layout";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { getQuestActivities } from "@/features/feed/api";
 import { getQuestActivity, type QuestActivity } from "@/features/quests/api";
-import { followIdea, listIdeas, unfollowIdea, type IdeaCard } from "@/features/ideas/api";
+import { followIdea, IDEAS_CHANGED_EVENT, listIdeas, unfollowIdea, type IdeaCard } from "@/features/ideas/api";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 
@@ -240,6 +240,14 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
     void load(ac.signal);
     return () => ac.abort();
   }, [load, reload]);
+
+  // IDEAS_CHANGED_EVENT（跨ルート・window）を購読して再取得＝/quests/{id}/ideas/new で投稿後、
+  // コンテスト詳細のアイデア一覧へ即反映する（SC-12 QuestDetailView と同型・リロード不要化）。
+  useEffect(() => {
+    const onIdeasChanged = () => { void load(); };
+    window.addEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
+    return () => window.removeEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
+  }, [load]);
 
   // アイデアをタブ別に仕分け（contest_idea_flags＋is_selected から導出）。
   const { shelvedIds, hofIds } = useMemo(() => {
