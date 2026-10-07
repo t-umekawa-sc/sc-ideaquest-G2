@@ -1789,9 +1789,10 @@ a.quest-card:active { transform: translateY(1px); }
    自然に解除・複数一覧でも重ならない。戻るピル(.backlink--float)・タブ(.tabs)・文脈バナー(.ctx＝会社詳細の
    会社名フローティング)が上部固定中なら JS がその下端まで見出しを下げる（重なり回避）＝個別に --dt-head-top 上書き不要。 */
 .dt-scroll thead { position: relative; z-index: 3; will-change: transform; }
-/* フローティング中は戻るピル(§4.10・z:9)の「下」に固定する（JS が --dt-head-top にピル高を加算）ため
-   重ならない。z-index はピルより下（8）＝万一の接触時もピルを前面に保つ（app-header z:10 の下）。 */
-.dt-scroll thead.dt-head--floating { z-index: 8; box-shadow: 0 6px 10px -8px rgba(15, 23, 42, .35); }
+/* フローティング中の重なり順＝行(2)やヘッダ相対(3)より上・ただし上部固定バー（戻るピル§4.10 z:9／
+   app-header z:10／会社バナー .ctx z:5／タブ .tabs z:5）より「下」に潜らせる＝一覧領域の端で見出しが
+   バナー/タブの上に乗らず下に潜る（2026-10-07 受入指摘）。JS(belowStuckBar) が top も下げるので通常は非接触。 */
+.dt-scroll thead.dt-head--floating { z-index: 4; box-shadow: 0 6px 10px -8px rgba(15, 23, 42, .35); }
 
 /* --- 列幅手動調整（table-layout:fixed＋見出し右端ハンドル） --- */
 .table.dt-fixed { table-layout: fixed; }
