@@ -269,7 +269,7 @@ export function SignupForm() {
               {resendInfo && <div className="auth-confirm">{resendInfo}</div>}
               <form onSubmit={onSubmitCode} noValidate>
                 <Field id="code" label="認証コード（6桁）" required>
-                  <input id="code" className="input" inputMode="numeric" autoComplete="one-time-code"
+                  <input id="code" className="input otp-input" inputMode="numeric" autoComplete="one-time-code"
                     placeholder="000000" value={code}
                     onChange={(e) => setCode(e.target.value)} required />
                 </Field>
