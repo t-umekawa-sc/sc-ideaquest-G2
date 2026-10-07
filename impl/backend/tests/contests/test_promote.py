@@ -71,6 +71,28 @@ def test_t_tc_140_promote_idea_to_quest(client, factory):
         _purge_contest_idea(cid, iid)
 
 
+def test_t_tc_140d_promote_sets_source_url(client, factory):
+    """T-TC-140d: 昇格クエストの source_url＝由来アイデアへの内部リンク `/ideas/{id}`（可視リンク・FR-47）。"""
+    admin = _admin(client, factory)
+    r = client.post(BASE, json=_body(status="open"), headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    cid, qid = r.json()["id"], r.json()["quest_id"]
+    iid = _seed_published_idea(qid, _user_id(admin["id"]))
+    new_qid = None
+    try:
+        promoter = factory.make_seed_company_account(display_name=f"昇格者_{uuid.uuid4().hex[:6]}")
+        factory.grant_capability(promoter["id"], "quest_create")
+        _login(client, SEED_COMPANY_CODE, promoter["login_id"], promoter["password"])
+        rp = client.post(f"/api/v1/ideas/{iid}/promote-to-quest", headers=_csrf(client))
+        assert rp.status_code == 201, rp.text
+        new_qid = rp.json()["id"]
+        assert rp.json()["source_url"] == f"/ideas/{iid}"   # 由来アイデアへの内部リンクを自動設定。
+    finally:
+        if new_qid:
+            _cleanup_quest(new_qid)
+        _purge_contest_idea(cid, iid)
+
+
 def test_t_tc_140c_idea_detail_can_promote_flag(client, factory):
     """T-TC-140c: GET /ideas/{id}.can_promote＝コンテスト配下×`quest_create`/管理者に True・非保持は False（SC-22 出し分け・サーバー権威）。"""
     admin = _admin(client, factory)

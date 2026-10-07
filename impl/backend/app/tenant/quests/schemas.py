@@ -218,6 +218,8 @@ class QuestCreateRequest(BaseModel):
     categories: list[str] = []
     deadline: date | None = None
     purpose: str | None = None
+    # 出典URL（任意・FR-47／情報インプットの出典URLと同趣旨）。http/https の外部URL または `/` 始まりの内部パス。
+    source_url: str | None = None
     icon_image_path: str | None = None
     members: list[QuestMemberInput] = []
     # 作成＝下書き or 即公開。状態機械の前進は publish/transition のみ（recruiting 以降は不可）。
@@ -242,6 +244,8 @@ class QuestUpdateRequest(BaseModel):
     categories: list[str] | None = None
     deadline: date | None = None
     purpose: str | None = None
+    # 出典URL（任意・差分＝送信時のみ適用）。空文字で明示クリア可。
+    source_url: str | None = None
     icon_image_path: str | None = None
     members: list[QuestMemberInput] | None = None
     # 参加部署の「あるべき全体像」（フラット 0..N・すべて同格・FR-38 再設計）。送信時のみ差分適用。
@@ -263,6 +267,7 @@ class QuestPublishRequest(BaseModel):
     categories: list[str] | None = None
     deadline: date | None = None
     purpose: str | None = None
+    source_url: str | None = None
     icon_image_path: str | None = None
     members: list[QuestMemberInput] | None = None
 
@@ -294,6 +299,8 @@ class QuestDetailDTO(BaseModel):
     status: str
     deadline: date | None = None
     purpose: str | None = None
+    # 出典URL（任意・FR-47）。内部パス（/ideas/{id} 等）はフロントが <Link>・http(s) は新規タブで表示。
+    source_url: str | None = None
     member_count: int
     idea_count: int
     owner: QuestOwnerDTO

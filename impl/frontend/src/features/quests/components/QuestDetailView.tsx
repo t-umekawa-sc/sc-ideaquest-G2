@@ -604,6 +604,15 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                   ); })()}
                   <span>👥 パーティ {quest.member_count}人</span>
                   <span>💡 アイデア {quest.idea_count}件</span>
+                  {/* 出典URL（任意・FR-47）＝内部パス（/ideas/… 等）は <Link> でシームレス遷移、http(s) は新規タブ。
+                      参照資格の無いアイデアを指す内部リンクは遷移先が 404（存在秘匿）＝情報漏洩なし。 */}
+                  {quest.source_url && (
+                    quest.source_url.startsWith("/") ? (
+                      <Link className="poster" href={quest.source_url}>🔗 出典</Link>
+                    ) : (
+                      <a className="poster" href={quest.source_url} target="_blank" rel="noopener noreferrer">🔗 出典</a>
+                    )
+                  )}
                   <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span>
                   {(() => {
                     // 参加部署（複数部署横断・0..N・すべて同格・FR-38 再設計）。0 件なら「全社」。

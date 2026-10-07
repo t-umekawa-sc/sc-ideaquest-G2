@@ -72,7 +72,7 @@ const uiPermsToApi = (perms: Record<PermKey, boolean>): string[] =>
 
 // 編集の無変更判定用＝内容の正規化シグネチャ（順序非依存・デザイン標準 §14）。同値なら edit-save で API を呼ばない。
 function questContentSig(o: {
-  title: string; color: string; categories: string[]; deadline: string; purpose: string;
+  title: string; color: string; categories: string[]; deadline: string; purpose: string; sourceUrl: string;
   deptIds: string[]; strategyDocIds: string[]; discoverable: boolean; members: { user_id: string; permissions?: string[] | null }[];
 }): string {
   return JSON.stringify({
@@ -81,6 +81,7 @@ function questContentSig(o: {
     categories: [...o.categories].sort(),
     deadline: o.deadline || null,
     purpose: o.purpose.trim() || null,
+    sourceUrl: o.sourceUrl.trim() || null,
     deptIds: [...o.deptIds].sort(),
     strategyDocIds: [...o.strategyDocIds].sort(),
     discoverable: o.discoverable,
@@ -175,6 +176,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             color?: string;
             categories?: string[];
             purpose?: string;
+            source_url?: string;
             quest_group_ids?: string[];
             strategy_document_ids?: string[]; // 適用経営資料（R.1b）＝複製で引き継ぐ
             // 複製で引き継ぐパーティ（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
@@ -196,6 +198,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [catInput, setCatInput] = useState("");
   const [deadline, setDeadline] = useState(dup?.deadline ?? "");
   const [theme, setTheme] = useState(dup?.purpose ?? "");
+  // 出典URL（任意・FR-47／情報インプットの出典URL欄に合わせる）。昇格クエストは /ideas/{id} が入る。
+  const [sourceUrl, setSourceUrl] = useState(dup?.source_url ?? "");
 
   const [directory, setDirectory] = useState<QuestGroup[]>([]); // 会社内の全部署（参加部署の選択肢・FR-38）
   const [groupsLoaded, setGroupsLoaded] = useState(false);
@@ -293,6 +297,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         setCategories(d.categories ?? []);
         setDeadline(d.deadline ?? "");
         setTheme(d.purpose ?? "");
+        setSourceUrl(d.source_url ?? "");
         // 参加部署（フラット 0..N・すべて同格・FR-38 再設計）。
         const linked = d.quest_groups ?? [];
         setDeptIds(linked.map((g) => g.id));
@@ -324,7 +329,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         // 無変更判定の基準シグネチャ（buildMembers と同じ perms 正規化で不変を保証）。
         initialSigRef.current = questContentSig({
           title: d.title, color: d.color || DEFAULT_COLOR, categories: d.categories ?? [],
-          deadline: d.deadline ?? "", purpose: d.purpose ?? "", deptIds: linked.map((g) => g.id),
+          deadline: d.deadline ?? "", purpose: d.purpose ?? "", sourceUrl: d.source_url ?? "", deptIds: linked.map((g) => g.id),
           strategyDocIds: sdocs.map((s) => s.id),
           discoverable: d.discoverable ?? false,
           members: (d.members ?? []).filter((m) => !m.is_creator).map((m) => ({
@@ -540,6 +545,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       categories,
       deadline: deadline || null,
       purpose: theme.trim() || null,
+      source_url: sourceUrl.trim() || null,
       members: buildMembers(),
     };
   }
@@ -567,7 +573,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     // 編集の内容保存で無変更なら API を呼ばず info「変更はありません」（発行/公開/パーティは対象外・デザイン標準 §14）。
     if (kind === "edit-save") {
       const sig = questContentSig({
-        title: name, color, categories, deadline, purpose: theme, deptIds, strategyDocIds, discoverable, members: buildMembers(),
+        title: name, color, categories, deadline, purpose: theme, sourceUrl, deptIds, strategyDocIds, discoverable, members: buildMembers(),
       });
       const iconChanged = !!iconFile || iconRemoved;
       if (initialSigRef.current !== null && sig === initialSigRef.current && !iconChanged) {
@@ -733,6 +739,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
         <Field className="dialog-section is-quiet" id="q_theme" label="目的・テーマ" required error={fieldErrors.purpose}>
           <textarea id="q_theme" className="textarea" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか" value={theme} onChange={(e) => setTheme(e.target.value)} aria-invalid={fieldErrors.purpose ? true : undefined} disabled={frozen} />
+        </Field>
+
+        {/* 出典URL（任意・FR-47／情報インプットの登録ダイアログの出典URL欄に合わせる）。
+            アイデア→クエスト昇格時は由来アイデアへの内部リンク /ideas/{id} が自動で入る。 */}
+        <Field className="dialog-section is-quiet" id="q_source_url" label="出典URL" hint="出典を明記すると引用性・信頼性の裏付けになります。アイデアから昇格した場合は由来アイデアへのリンクが入ります。" error={fieldErrors.source_url}>
+          <input id="q_source_url" className="input" type="text" inputMode="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://…（http/https または /ideas/… の内部リンク）" aria-invalid={fieldErrors.source_url ? true : undefined} disabled={frozen} />
         </Field>
 
         {/* 参加部署（アクセス条件・フラット 0..N・すべて同格・FR-38 再設計。主グループは廃止）。 */}

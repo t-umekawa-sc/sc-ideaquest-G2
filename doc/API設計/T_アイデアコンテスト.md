@@ -81,6 +81,7 @@
 - **ゲート**＝`quest_create`（②会社レベル能力）または管理者（通常のクエスト作成 C.2 と同一＝`quests.application._can_create_quest`・一か所で一致）。能力なしは `403`（`capability_required`）。
 - **社内のみ（決定O/P'）**＝`/ideas` 配下は公開モード外周ガード（access_gate）を素通りするため、**`public` 会社では application で明示 `404`（存在秘匿）**（コンテスト専用テナントでは管理者も不可）。
 - **出し分け（SC-22・サーバー権威）**＝`GET /ideas/{id}` の `can_promote`＝コンテスト配下（`is_contest`）×非`public`×上記ゲートで `true`。frontend はこれで「🚀 クエストへ昇格」導線を表示（成功後は新クエストへ遷移）。
+- **出典URL の自動設定**＝昇格クエストの `quests.source_url` に由来アイデアへの内部リンク `/ideas/{origin_idea_id}` を設定（人間向けの可視リンク＝機械リンク `origin_idea_id` と併存・データモデル §5.6）。閲覧資格の無いユーザーがリンクを踏むと `GET /ideas/{id}` は **404（存在秘匿）**（通常のアイデア門番 `can_access_quest`＝`can_view_contest` と同じ）。
 
 ## T.6 既存規約準拠
 

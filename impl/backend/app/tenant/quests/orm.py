@@ -44,6 +44,9 @@ class Quest(CompanyBase):
     # アイデア→クエスト昇格（FR-47・決定H）の由来参照。コンテストの有望アイデアを独立業務クエストへ種継ぎした
     # 際に由来を保持（トレーサビリティ）。通常作成は NULL。コンテストの backing quest（contests.quest_id）とは別物。
     origin_idea_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ideas.id"), nullable=True)
+    # 出典URL（任意・FR-47）＝情報インプットの出典URLと同趣旨。昇格時は由来アイデアへの内部リンク /ideas/{id} を自動設定。
+    # 値は http/https の外部URL または `/` 始まりの内部パス（app 層 _validate_source_url で検証）。
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
     # 論理削除（トゥームストーン）。NULL＝有効。値あり＝削除済み（一覧/参照から除外・§5.6）。
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(

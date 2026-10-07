@@ -80,6 +80,7 @@
 | T-TC-140 | api | 昇格＝別実体の独立業務クエスト生成＋由来参照・要 `quest_create`・社内のみ | コンテストの有望アイデア・quest_create 保持 | `POST /ideas/{id}/promote-to-quest` | 新クエスト（内容コピー・`origin_idea_id` 保持・作成者=owner でパーティー投入）／能力なしは 403（`capability_required`） | T.5／§7／決定H |
 | T-TC-140b | api | 昇格は社内のみ＝`public`（コンテスト専用テナント）では業務機能として存在しない＝404（存在秘匿） | `public` 会社セッション・quest_create 保持 | `POST /ideas/{id}/promote-to-quest` | `404`（`not_found`）＝`/ideas` 配下は外周ガードを素通りするため application で明示 404（管理者でも不可） | 決定O／決定P'／§8.0／T.5 |
 | T-TC-140c | api | 昇格導線の出し分け＝`GET /ideas/{id}.can_promote`（SC-22・サーバー権威） | コンテスト配下アイデア（auto_approve で閲覧可） | `GET /ideas/{id}` | `can_promote`＝`quest_create`/管理者で `true`・非保持は `false`（ゲートは POST と同一＝`_can_create_quest`×非public） | T.5／§7／FR-47 |
+| T-TC-140d | api | 昇格クエストの出典URL＝由来アイデアへの内部リンク（可視リンク・機械リンク origin_idea_id と併存） | コンテスト配下アイデア・quest_create 保持 | `POST /ideas/{id}/promote-to-quest` | 応答 `source_url == /ideas/{origin_idea_id}`（情報インプットの出典URLと同趣旨・内部パス） | T.5／§7／FR-47 |
 
 ## 6. 公開/非公開モード 外周ガード（§8.0・A.11.1／e2e 含む）
 

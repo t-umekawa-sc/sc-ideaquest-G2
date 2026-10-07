@@ -9146,6 +9146,8 @@ export interface components {
             deadline?: string | null;
             /** Purpose */
             purpose?: string | null;
+            /** Source Url */
+            source_url?: string | null;
             /** Icon Image Path */
             icon_image_path?: string | null;
             /**
@@ -9229,6 +9231,8 @@ export interface components {
             deadline?: string | null;
             /** Purpose */
             purpose?: string | null;
+            /** Source Url */
+            source_url?: string | null;
             /** Member Count */
             member_count: number;
             /** Idea Count */
@@ -9630,6 +9634,8 @@ export interface components {
             deadline?: string | null;
             /** Purpose */
             purpose?: string | null;
+            /** Source Url */
+            source_url?: string | null;
             /** Icon Image Path */
             icon_image_path?: string | null;
             /** Members */
@@ -9928,6 +9934,8 @@ export interface components {
             deadline?: string | null;
             /** Purpose */
             purpose?: string | null;
+            /** Source Url */
+            source_url?: string | null;
             /** Icon Image Path */
             icon_image_path?: string | null;
             /** Members */

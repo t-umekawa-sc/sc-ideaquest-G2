@@ -610,3 +610,25 @@ def test_c_tc_254_recruiting_patch_strict_categories(client, env):
     r = client.patch(f"{QUESTS}/{qid}", json={"categories": []}, headers=_csrf(client))
     assert r.status_code == 422, r.text
     assert any(e["field"] == "categories" for e in r.json()["errors"])
+
+
+def test_c_tc_307_source_url_roundtrip_and_validation(client, env):
+    """C-TC-307: 出典URL（任意・FR-47）＝http/https と `/` 始まり内部パスは round-trip、不正は 422（field=source_url）。"""
+    _login_seed(client)
+    # http(s) 外部URL＝作成で round-trip（詳細 DTO に載る）。
+    r = client.post(QUESTS, json=_base_body(env, source_url="https://example.com/src"), headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]; env.track(uuid.UUID(qid))
+    assert r.json()["source_url"] == "https://example.com/src"
+    # PATCH で内部パスに更新（/ideas/.. ＝昇格の自動入力と同形）。
+    r2 = client.patch(f"{QUESTS}/{qid}", json={"source_url": "/ideas/abc"}, headers=_csrf(client))
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["source_url"] == "/ideas/abc"
+    # 空文字は None にクリア。
+    r3 = client.patch(f"{QUESTS}/{qid}", json={"source_url": ""}, headers=_csrf(client))
+    assert r3.status_code == 200 and r3.json()["source_url"] is None
+    # 不正（javascript:/ftp:/プロトコル相対 //）は 422（field=source_url）＝open-redirect/スキーム悪用を拒否。
+    for bad in ("javascript:alert(1)", "ftp://x/y", "//evil.com"):
+        rb = client.post(QUESTS, json=_base_body(env, source_url=bad), headers=_csrf(client))
+        assert rb.status_code == 422, (bad, rb.text)
+        assert any(e["field"] == "source_url" for e in rb.json()["errors"])

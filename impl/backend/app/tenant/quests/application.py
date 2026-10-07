@@ -461,6 +461,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     title = _validate_title(body.title)
     color = _validate_color(body.color)
     cats = _normalize_categories(body.categories)
+    source_url = _validate_source_url(body.source_url)
 
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
@@ -479,6 +480,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
             ts, owner_id=user.id, title=title, color=color,
             status=body.status, purpose=body.purpose, deadline=body.deadline,
             icon_image_path=body.icon_image_path, discoverable=body.discoverable,
+            source_url=source_url,
         )
         ts.flush()  # quest.id 確定（カテゴリ/パーティー/リンクの FK に使う）
         repo.replace_categories(ts, quest.id, cats)
@@ -547,9 +549,11 @@ def promote_idea_to_quest(account_id: uuid.UUID, company_id: uuid.UUID, idea_id:
         if idea is None or idea.deleted_at is not None:
             raise AppError(404, "not_found", detail="アイデアが見つかりません")
         title = _validate_title(idea.title)
+        # 出典URL＝由来アイデアへの内部リンク（可視リンク・FR-47）。機械リンク origin_idea_id と併存。
         quest = repo.create_quest(
             ts, owner_id=user.id, title=title, color=company.color or "#6366F1",
             status="draft", purpose=_compose_promote_purpose(idea), origin_idea_id=idea.id,
+            source_url=f"/ideas/{idea.id}",
         )
         ts.flush()  # quest.id 確定（パーティー/リビジョン/トークンの FK に使う）
         # 作成者は常にパーティー員＝owner（通常作成 C.0 と同型）。
@@ -1594,6 +1598,31 @@ def _validate_color(color: str) -> str:
     return color
 
 
+_MAX_SOURCE_URL = 2048
+
+
+def _validate_source_url(url: str | None) -> str | None:
+    """出典URL（任意・FR-47）＝http/https の外部URL、または `/` 始まりの内部パス（昇格の自動入力 /ideas/{id} 等）。
+
+    空/未指定は None（クリア）。`//`（プロトコル相対）は外部誘導になり得るため不可（内部パスは単一 `/` のみ）。
+    情報インプットの出典URL（http/https のみ）に対し、クエストは内部リンクも張れるよう緩和（UIは情報側に合わせる）。
+    """
+    if url is None:
+        return None
+    u = url.strip()
+    if not u:
+        return None
+    if len(u) > _MAX_SOURCE_URL:
+        raise AppError(422, "validation_error", detail="出典URLが長すぎます", errors=[{"field": "source_url"}])
+    if u.startswith("/") and not u.startswith("//"):
+        return u
+    if u.startswith("http://") or u.startswith("https://"):
+        return u
+    raise AppError(422, "validation_error",
+                   detail="http/https の URL か、/ から始まる内部パスを入力してください",
+                   errors=[{"field": "source_url"}])
+
+
 def _normalize_categories(labels) -> list[tuple[str, bool]]:
     """カテゴリを正規化（NFKC＝全半角統一＋トリム＋空白畳み）し、大文字小文字を無視して重複排除（§5.7）。
 
@@ -1634,6 +1663,8 @@ def _apply_content(ts, quest, body) -> None:
         quest.color = _validate_color(body.color)
     if "purpose" in provided:
         quest.purpose = body.purpose
+    if "source_url" in provided:
+        quest.source_url = _validate_source_url(body.source_url)
     if "deadline" in provided:
         quest.deadline = body.deadline
     if "icon_image_path" in provided:
@@ -1742,6 +1773,7 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         "status": quest.status,
         "deadline": quest.deadline,
         "purpose": quest.purpose,
+        "source_url": quest.source_url,  # 出典URL（任意・FR-47・昇格時は /ideas/{id} を自動設定）
         "member_count": len(members),
         # 公開アイデア数（C.1・下書き/削除は除外）。
         "idea_count": idea_count,
