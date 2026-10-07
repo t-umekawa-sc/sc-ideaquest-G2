@@ -47,14 +47,14 @@
 | T-TC-139 | api | backing quest は**クエストとして発見/参加/詳細不可**（器を内部に閉じる・サーバーガード） | contest（backing quest あり） | `GET /quests/{backing}`／`POST /quests/{backing}/join-request`／`POST /quests/{backing}/follow` | 詳細=404・参加リクエスト=404（存在秘匿・`can_discover_quest`）・フォロー=404／アイデア一覧 `GET /quests/{backing}/ideas` は従来どおり可（コンテスト内部経路は can_access_quest 経由で無影響） | §2.2／FR-46 |
 | T-TC-141 | api | 参加リクエスト承認の判断材料プロフィール＝運営のみ・コンテスト内活動＋ゲーム層・申請のない user は404 | 承認制 contest・requested 済み・運営/一般 | `GET /contests/{id}/participation/{uid}/profile` | 運営=200（posted_idea_count/vote_count/chat_message_count＋game〔モードON時〕）／一般（運営でない）=403／未申請 user=404（存在秘匿） | T.2／C.9.1／SC-01/SC-54 |
 
-## 2b. 公開モード外周アクセスゲート（FR-48 §8.0・決定O・2026-10-04）
+## 2b. 公開モード外周アクセスゲート（FR-48 §8.0・決定O・2026-10-04／存在秘匿 404 化 決定P'・2026-10-07）
 
-> `companies.access_mode='public'`（コンテスト専用テナント）＝役割別許可リスト外のEPをサーバーで 403（UI非依存・§1.6）。可視ゲート（§2.3）とは直交する2段目の外周ガード。実装＝`app/core/access_gate.py`（middleware・全/api/v1 一律）。
+> `companies.access_mode='public'`（コンテスト専用テナント）＝役割別許可リスト外のEPをサーバーで 404＝存在秘匿（`not_found`・決定P'・UI非依存・§1.6）。可視ゲート（§2.3）とは直交する2段目の外周ガード。実装＝`app/core/access_gate.py`（middleware・全/api/v1 一律）＋frontend 業務ルート群 `layout.tsx` の `requireNotPublicMode()`（`notFound()`）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | T-TC-204 | unit | 許可判定（純関数）＝コンテスト許可リストは全ロール可／管理許可リストは管理者のみ追加／業務EPは管理者でも不可（決定O） | `access_gate.is_path_allowed(sub, is_admin)`（実パスは /api/v1 以降・auth は /auth/*・管理系は /admin/*） | contest系（/contests・/ideas・/chat-messages・/attachments・/me・/notifications・/auth/session）／admin系（/admin/companies・/admin/accounts・/admin/quest-groups）／業務系（/quests・/quests/{id}/search・/concepts・/dashboard）を general/admin で判定 | contest系＝general/admin とも True／admin系＝admin のみ True・general False／業務系＝general/admin とも False（公開会社はコンテスト専用・コンテスト内検索は /quests 配下ゆえ当面不可） | §8.0／決定O |
-| T-TC-205 | int | public 会社は許可リスト外を 403・コンテスト系は素通し／private は不変（middleware 外周ガード） | シード会社を access_mode=public とみなす（`access_gate._resolve` を monkeypatch）・一般ログイン | `GET /quests`（業務）／`GET /contests`（コンテスト）を public で／private（非patch）で `GET /quests` | public×general＝`/quests` 403 `forbidden`・`/contests` は 403 以外（ゲート非該当）／private＝`/quests` は 403 にならない（従来どおり） | §8.0／§1.6 |
+| T-TC-205 | int | public 会社は許可リスト外を 404＝存在秘匿・コンテスト系は素通し／private は不変（middleware 外周ガード） | シード会社を access_mode=public とみなす（`access_gate._resolve` を monkeypatch）・一般ログイン | `GET /quests`（業務）／`GET /contests`（コンテスト）を public で／private（非patch）で `GET /quests` | public×general＝`/quests` 404 `not_found`・`/contests` は 404 以外（ゲート非該当）／private＝`/quests` は 404 にならない（従来どおり） | §8.0／§1.6／決定P' |
 
 ## 3. 評価（審査員）・②会社レベル能力（T.0/T.4・§5.2/§5.3・データモデル §5.63）
 
@@ -83,6 +83,6 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-TC-150 | api | public×general は非コンテストEPを 403（許可リスト外） | `access_mode=public`・role=general | 非コンテストEP（例 `GET /quests`）呼び出し | 403 `forbidden`／コンテスト系（T・配下 D/E/F）は 200 | §8.0／README §1.6 |
-| T-TC-151 | api | public でも管理者は管理系EP保持（決定O） | `access_mode=public`・company_account_admin | 管理系EP | 200（403 は role=general のみ） | §8.0／決定O |
+| T-TC-150 | api | public×general は非コンテストEPを 404＝存在秘匿（許可リスト外） | `access_mode=public`・role=general | 非コンテストEP（例 `GET /quests`）呼び出し | 404 `not_found`／コンテスト系（T・配下 D/E/F）は 200 | §8.0／README §1.6／決定P' |
+| T-TC-151 | api | public でも管理者は管理系EP保持（決定O・業務EPは管理者でも 404） | `access_mode=public`・company_account_admin | 管理系EP／業務EP | 管理系＝200／業務系＝404 `not_found`（決定O） | §8.0／決定O／決定P' |
 | T-TC-201 | e2e | public 会社はSC-53 着地・SC-01 を出さない・クエスト系リンク非表示（決定P） | public 会社ログイン | ログイン後の着地/ナビ確認 | SC-53 着地・SC-01 非描画・クエスト系 `<Link>` なし（UIと403の二重封鎖） | §8.0／決定P |

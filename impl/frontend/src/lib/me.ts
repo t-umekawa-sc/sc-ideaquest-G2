@@ -3,7 +3,7 @@
 import { cache } from "react";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import type { components } from "@/lib/api/schema";
 
@@ -27,6 +27,16 @@ export const getServerMe = cache(async (): Promise<Me | null> => {
 export async function requireGameEnabled(): Promise<Me | null> {
   const me = await getServerMe();
   if (!(me?.game_mode.effective ?? true)) redirect("/");
+  return me;
+}
+
+// 公開（コンテスト専用）会社では業務ルートを 404＝存在秘匿（FR-48 §8.0・決定P'）。
+// 業務ルート群の layout.tsx から呼ぶ＝配下の全ページ・ネストを漏れなくガードする（新規ページも自動で効く）。
+// backend access_gate も同じ業務EPを 404 で封鎖する二重防御（UI 非依存＝サーバー権威）。
+// me 取得不可（セッション消失）時はガードしない＝既存の各ページ側リダイレクトに委ねる。
+export async function requireNotPublicMode(): Promise<Me | null> {
+  const me = await getServerMe();
+  if (me?.company.access_mode === "public") notFound();
   return me;
 }
 

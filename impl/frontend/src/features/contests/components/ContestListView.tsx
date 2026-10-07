@@ -45,7 +45,8 @@ const joinModeLabel = (x: ContestRow): string => (x.autoApprove ? "誰でも参�
 
 type FormMode = "create" | "edit" | "duplicate";
 
-export function ContestListView() {
+// publicMode＝会社が公開（コンテスト専用）モード（FR-48 §8.0・決定P）。SSR で算出し prop で受ける。
+export function ContestListView({ publicMode = false }: { publicMode?: boolean }) {
   const router = useRouter();
   const snack = useSnackbar();
   const confirm = useConfirm();
@@ -163,10 +164,12 @@ export function ContestListView() {
 
   return (
     <section aria-label="アイデアコンテスト一覧">
-      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
+      {/* 公開モードはダッシュボードが無い（"/"→/contests へ戻されるだけ）ので backlink を出さない。 */}
+      {!publicMode && <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>}
       <div className="page-head">
         <h1>アイデアコンテスト</h1>
-        <Button variant="primary" onClick={openCreate}>＋ コンテストを作成</Button>
+        {/* 公開モードの一般ユーザーは作成不可（サーバー 403）＝導線も出さない。運営（canManage）には表示。 */}
+        {!(publicMode && !canManage) && <Button variant="primary" onClick={openCreate}>＋ コンテストを作成</Button>}
       </div>
       <p className="muted text-sm" style={{ marginBottom: "var(--space-4)" }}>
         クエストに縛られず、アイデア単体を公募・投票・評価し、会期で優秀アイデアを表彰します。
