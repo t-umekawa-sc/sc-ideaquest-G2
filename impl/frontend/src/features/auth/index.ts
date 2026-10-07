@@ -5,6 +5,7 @@ export { LogoutMenuItem } from "./components/LogoutMenuItem";
 export { LogoutAllMenuItem } from "./components/LogoutAllMenuItem";
 export { PasswordResetRequestForm } from "./components/PasswordResetRequestForm";
 export { PasswordSetupForm } from "./components/PasswordSetupForm";
+export { SignupForm } from "./components/SignupForm";
 export { MfaForm } from "./components/MfaForm";
 export { SessionNotice } from "./components/SessionNotice";
 export {

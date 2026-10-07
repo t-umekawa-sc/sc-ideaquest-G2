@@ -180,6 +180,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bootstrap
+         * @description デプロイ既定会社コードの有無等（会社コード欄の出し分け・A.11.2・決定L）。
+         */
+        get: operations["bootstrap_api_v1_public_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signup
+         * @description セルフサインアップ要求（A.11.3）＝一律 202・検証前に accounts を作らない（決定A・SEC A/B）。
+         */
+        post: operations["signup_api_v1_public_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/signup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signup Verify
+         * @description 認証コード検証 → アカウント確定（A.11.3・SEC E/I）。自動ログインしない（セッション発行なし）。
+         */
+        post: operations["signup_verify_api_v1_public_signup_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies": {
         parameters: {
             query?: never;
@@ -5242,6 +5302,16 @@ export interface components {
             /** File */
             file: string;
         };
+        /** BootstrapResponse */
+        BootstrapResponse: {
+            /** Default Company Code */
+            default_company_code?: string | null;
+            /**
+             * Self Signup Available
+             * @default false
+             */
+            self_signup_available: boolean;
+        };
         /** CapabilityGrantRequest */
         CapabilityGrantRequest: {
             /** Capability */
@@ -10009,6 +10079,54 @@ export interface components {
             /** Avatar Url */
             avatar_url?: string | null;
         };
+        /** SignupAcceptedResponse */
+        SignupAcceptedResponse: {
+            /**
+             * Status
+             * @default verification_sent
+             */
+            status: string;
+            /** Masked To */
+            masked_to: string;
+            /** Expires In */
+            expires_in: number;
+            /** Resend Available In */
+            resend_available_in: number;
+        };
+        /** SignupCreatedResponse */
+        SignupCreatedResponse: {
+            /**
+             * Status
+             * @default created
+             */
+            status: string;
+            /** Company Code */
+            company_code: string;
+            /** Login Id */
+            login_id: string;
+        };
+        /** SignupRequest */
+        SignupRequest: {
+            /** Company Code */
+            company_code?: string | null;
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /** Password */
+            password: string;
+        };
+        /** SignupVerifyRequest */
+        SignupVerifyRequest: {
+            /** Company Code */
+            company_code?: string | null;
+            /** Email */
+            email: string;
+            /** Code */
+            code: string;
+        };
         /** SpellCatalogResponse */
         SpellCatalogResponse: {
             /** Data */
@@ -10822,6 +10940,92 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    bootstrap_api_v1_public_bootstrap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapResponse"];
+                };
+            };
+        };
+    };
+    signup_api_v1_public_signup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_verify_api_v1_public_signup_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

@@ -1,6 +1,37 @@
 // auth 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/A_認証・セッション.md。
 import { apiFetch } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 import type { LoginResponse, MfaResendResponse, PasswordSetupVerifyResponse } from "./types";
+
+// セルフサインアップ（FR-48②・公開/未認証・A.11.2-A.11.3）。型は OpenAPI 生成（drift 防止）。
+export type BootstrapResponse = components["schemas"]["BootstrapResponse"];
+export type SignupAcceptedResponse = components["schemas"]["SignupAcceptedResponse"];
+export type SignupCreatedResponse = components["schemas"]["SignupCreatedResponse"];
+
+// A.11.2＝デプロイ既定会社コードの有無（会社コード欄の出し分け）。未認証 GET。
+export function getBootstrap(): Promise<BootstrapResponse | null> {
+  return apiFetch<BootstrapResponse>("/public/bootstrap");
+}
+
+// A.11.3＝サインアップ要求。列挙耐性のため成否に関わらず一律 202（呼び出し側は成否を区別しない）。
+export function signup(input: {
+  company_code?: string; login_id: string; email: string; display_name: string; password: string;
+}): Promise<SignupAcceptedResponse | null> {
+  return apiFetch<SignupAcceptedResponse>("/public/signup", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// A.11.3＝認証コード検証→アカウント確定。成功で 200（自動ログインしない＝確定後はログインへ誘導）。
+export function signupVerify(input: {
+  company_code?: string; email: string; code: string;
+}): Promise<SignupCreatedResponse | null> {
+  return apiFetch<SignupCreatedResponse>("/public/signup/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
 
 export function login(companyCode: string, loginId: string, password: string): Promise<LoginResponse | null> {
   return apiFetch<LoginResponse>("/auth/login", {

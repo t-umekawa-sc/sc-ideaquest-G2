@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { login } from "../api";
+import { getBootstrap, login } from "../api";
 import type { MfaChallenge } from "../types";
 import { MfaForm } from "./MfaForm";
 import "../auth.css";
@@ -39,11 +39,35 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [mfa, setMfa] = useState<MfaChallenge | null>(null);
+  // 既定会社コード（public デプロイ）があれば会社コード欄を隠す（§8.1）。セルフサインアップ導線の出し分けにも使う。
+  const [defaultCode, setDefaultCode] = useState<string | null>(null);
+  const [signupAvailable, setSignupAvailable] = useState(false);
 
   // 会社コードは端末記憶（前回値）でプリフィル。SSR ハイドレーション不整合を避けるためマウント後に復元。
+  // セルフサインアップ確定後の誘導（?company_code=&login_id=）があれば優先してプリフィル（FR-48②）。
   useEffect(() => {
-    const remembered = localStorage.getItem("ideaquest_company_code");
-    if (remembered) setCompanyCode(remembered);
+    const params = new URLSearchParams(window.location.search);
+    const qCompany = params.get("company_code");
+    const qLogin = params.get("login_id");
+    if (qCompany) setCompanyCode(qCompany.toUpperCase());
+    else {
+      const remembered = localStorage.getItem("ideaquest_company_code");
+      if (remembered) setCompanyCode(remembered);
+    }
+    if (qLogin) setLoginId(qLogin);
+  }, []);
+
+  // 公開ブートストラップ＝既定会社コードの有無で会社コード欄とサインアップ導線を出し分け（FR-48②・§8.1）。
+  useEffect(() => {
+    getBootstrap()
+      .then((b) => {
+        if (b?.default_company_code) {
+          setDefaultCode(b.default_company_code);
+          setCompanyCode((cur) => cur || b.default_company_code!);
+        }
+        setSignupAvailable(Boolean(b?.self_signup_available));
+      })
+      .catch(() => {});
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -96,18 +120,21 @@ export function LoginForm() {
         {error && <div className="form-error" role="alert">{error}</div>}
 
         <form onSubmit={onSubmit} noValidate>
-          <Field id="company_code" label="会社コード" required>
-            <input
-              id="company_code"
-              className="input"
-              autoComplete="organization"
-              placeholder="例: systemcon"
-              style={{ textTransform: "uppercase" }}
-              value={companyCode}
-              onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
-              required
-            />
-          </Field>
+          {/* public デプロイで既定会社コードがある場合は会社コード欄を隠して自動セット（§8.1）。 */}
+          {!defaultCode && (
+            <Field id="company_code" label="会社コード" required>
+              <input
+                id="company_code"
+                className="input"
+                autoComplete="organization"
+                placeholder="例: systemcon"
+                style={{ textTransform: "uppercase" }}
+                value={companyCode}
+                onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
+                required
+              />
+            </Field>
+          )}
           <Field id="login_id" label="ログインID" required>
             <input
               id="login_id"
@@ -149,14 +176,25 @@ export function LoginForm() {
 
         <div className="login-links">
           <Link href="/password-reset">パスワードをお忘れですか？</Link>
+          {/* セルフサインアップ有効（公開デプロイ）の時だけ「アカウント作成」導線を出す（FR-48②・§8.1）。 */}
+          {signupAvailable && <Link href="/signup">アカウントを作成</Link>}
         </div>
 
         <p className="login-note">
-          アカウントは管理者が発行します（自己新規登録はできません）。
-          <br />
-          <strong>初回ログインの方</strong>は、管理者発行後にメールで届く
-          <strong>初回パスワード設定リンク</strong>（72時間有効）からパスワードを設定してからログインしてください。
-          <br />
+          {signupAvailable ? (
+            <>
+              <strong>はじめての方</strong>は「アカウントを作成」から登録できます（メール認証）。
+              <br />
+            </>
+          ) : (
+            <>
+              アカウントは管理者が発行します。
+              <br />
+              <strong>初回ログインの方</strong>は、管理者発行後にメールで届く
+              <strong>初回パスワード設定リンク</strong>（72時間有効）からパスワードを設定してからログインしてください。
+              <br />
+            </>
+          )}
           ログインできない場合は、所属組織の管理者にお問い合わせください。
         </p>
       </div>
