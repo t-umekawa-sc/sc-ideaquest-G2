@@ -766,3 +766,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（else の info トーストを無効化した時の actual）→ green |
 | --- | --- |
 | B-TC-179 | 無変更保存で info を出さない（無音）に戻すと、`getByText('変更はありません')` が **element(s) not found**（line 101・toBeVisible 5s timeout）で失敗＝旧「無音」を再現。else 分岐の `snack(info)` を復元・再ビルドで **1 passed（6.2s）**。 |
+
+## info_curators → user_capabilities 統合（クリーン移行・N 各TC・2026-10-07・FR-47）
+
+> ②会社レベル能力を `user_capabilities` に集約（info_curator 統合・旧 `info_curators` は migration 0056 で移行→DROP）。
+> `info/repository` のキュレータ4関数を caps 経由へ差し替えた refactor（挙動保存）。後追いのため §5.1 スタブ手技で
+> behavior-red を目視（`is_curator` を `return False` にスタブ化→キュレーション系 N テストが権限拒否で落ちる）。
+
+| TC-ID | 観測 red（`is_curator` を `return False` にスタブ化した時の actual）→ green |
+| --- | --- |
+| N curator ゲート群（代表 N-TC-011 他・計7件） | `is_curator` を常に False に壊すと、キュレータ付与済みでも属性付与/triage/一覧等の curator 能力判定が全拒否＝**7 failed, 73 passed**（curator 依存テストのみ赤）。`caps_repo.has_capability(..., 'info_curator')` を復元で **tests/info+capabilities 82 passed**（回帰ゼロ）。 |

@@ -143,6 +143,8 @@
 
 **アイデア→クエスト昇格＝完了（2026-10-07・FR-47・T.5・決定H）**＝コンテストの有望アイデアを**別実体の独立業務クエスト**へ種継ぎ（タイトル／本文＋狙う価値をコピー・作成者を owner でパーティー投入・初版リビジョン・`quests.origin_idea_id` で由来参照）＝コンセプト創造・検証（FR-42）以降へ接続。EP＝`POST /ideas/{id}/promote-to-quest`（`quests/router`＋`quests.application.promote_idea_to_quest`／`repository.create_quest` に `origin_idea_id` 引数追加）。ゲート＝`quest_create`（②能力）または管理者＝通常のクエスト作成と同一（`_can_create_quest`・一か所で一致）・能力なしは403。**社内のみ**＝`/ideas` 配下は公開モード外周ガードを素通りするため `public` 会社では application で明示404（存在秘匿・決定O/P'）。出し分け＝`GET /ideas/{id}.can_promote`（コンテスト配下×非public×権限・サーバー権威）＝frontend は SC-22（`IdeaDetailView`）に「🚀 クエストへ昇格」導線（確認→POST→新クエストへ遷移）。テスト＝`tests/contests/test_promote.py` 3 passed（T-TC-140/140b/140c・red〔501/False スタブ〕→green）・contests+quests 176・ideas 84 green・frontend build green。正＝[T_アイデアコンテスト §T.5](../doc/API設計/T_アイデアコンテスト.md)。
 
+**info_curators → user_capabilities 統合＝完了（2026-10-07・FR-47・決定D・クリーン移行）**＝情報判定権限（curator）を②会社レベル能力レジストリ `user_capabilities`（`capability='info_curator'`）へ集約（1能力1テーブルの増殖を止め付与/剥奪/管理UI/監査を1本化・DRY）。migration 0056＝既存 `info_curators` 行を `user_capabilities` へデータ移行→旧テーブル DROP（クリーンカットオーバー）。`info/repository` のキュレータ4関数（`is_curator`/`list_curators`/`grant_curator`/`revoke_curator`）を caps repository 経由へ差し替え＋`InfoCurator` ORM 撤去。管理EP `GET/POST /info-curators`（N.5・account_id ベース）は**内部実装のみ差し替えて応答互換を維持**（frontend 無改修）。テスト＝`tests/info`+`tests/capabilities` 82 passed（N-TC-011 他をユーザ能力ベースへ更新・red確認は台帳）。正＝データモデル §5.37/§5.63。
+
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。

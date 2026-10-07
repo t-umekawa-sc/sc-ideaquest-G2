@@ -26,10 +26,10 @@ def _seed_member_account_id() -> str:
 
 
 def _purge_curators(db_identifier):
-    """info_curators を全削除（テスト間の権限漏れ防止）。"""
-    from app.tenant.info.orm import InfoCurator
+    """info_curator 能力を全削除（テスト間の権限漏れ防止）＝user_capabilities へ統合済み（FR-47）。"""
+    from app.tenant.capabilities.orm import UserCapability
     with get_tenant_session(db_identifier) as ts:
-        ts.execute(InfoCurator.__table__.delete()); ts.commit()
+        ts.execute(UserCapability.__table__.delete().where(UserCapability.capability == "info_curator")); ts.commit()
 
 
 def _seed_quest_idea_vote(db_identifier):
@@ -221,15 +221,16 @@ def test_n_tc_107_status_facets(client, info_env):
 
 
 def _grant_curator(db_identifier, user_id):
-    from app.tenant.info.orm import InfoCurator
+    from app.tenant.capabilities.orm import UserCapability
     with get_tenant_session(db_identifier) as ts:
-        ts.add(InfoCurator(user_id=user_id)); ts.commit()
+        ts.add(UserCapability(user_id=user_id, capability="info_curator")); ts.commit()
 
 
 def _revoke_curators(db_identifier, user_id):
-    from app.tenant.info.orm import InfoCurator
+    from app.tenant.capabilities.orm import UserCapability
     with get_tenant_session(db_identifier) as ts:
-        ts.execute(InfoCurator.__table__.delete().where(InfoCurator.user_id == user_id)); ts.commit()
+        ts.execute(UserCapability.__table__.delete().where(
+            UserCapability.user_id == user_id, UserCapability.capability == "info_curator")); ts.commit()
 
 
 def _seed_other_item(db_identifier):

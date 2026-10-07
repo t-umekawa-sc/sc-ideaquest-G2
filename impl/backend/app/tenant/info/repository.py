@@ -16,7 +16,13 @@ from sqlalchemy import bindparam, delete, func, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from app.core import list_query as lq
-from app.tenant.info.orm import InfoAttachment, InfoCurator, InfoItem, InfoLink
+from app.tenant.capabilities import repository as caps_repo
+from app.tenant.capabilities.orm import UserCapability
+from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink
+
+# 情報判定権限（情報インプットの curator）は②会社レベル能力レジストリ `user_capabilities` に統合（FR-47・決定D）。
+# 旧 `info_curators` テーブルは migration 0056 で user_capabilities へ移行のうえ DROP（1能力1テーブルの増殖を止める・DRY）。
+_INFO_CURATOR = "info_curator"
 from app.tenant.profile.orm import User
 from app.tenant.tokens import repository as tokens_repo
 from app.tenant.tokens.orm import EntityToken
@@ -639,21 +645,22 @@ def tokens_top(session: Session, info_id: uuid.UUID, *, limit: int) -> list[dict
 
 
 def is_curator(session: Session, user_id: uuid.UUID) -> bool:
-    """情報判定権限（info_curator・未剥奪）を持つか（§5.37）。"""
-    return session.execute(
-        select(InfoCurator.id).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None)).limit(1)
-    ).first() is not None
+    """情報判定権限（info_curator・未剥奪）を持つか（§5.37・`user_capabilities` へ統合）。"""
+    return caps_repo.has_capability(session, user_id, _INFO_CURATOR)
 
 
 def list_curators(session: Session) -> list[dict]:
-    """情報判定権限の一覧（未剥奪のみ・N.5）＝付与ユーザー＋付与者名＋付与日時。account_id で識別（管理面）。"""
+    """情報判定権限の一覧（未剥奪のみ・N.5）＝付与ユーザー＋付与者名＋付与日時。account_id で識別（管理面）。
+
+    `user_capabilities`（`capability='info_curator'`）を User に解決（旧 `info_curators` と同形の応答を維持）。
+    """
     grantor = aliased(User)
     rows = session.execute(
-        select(User.account_id, User.display_name, grantor.display_name, InfoCurator.granted_at)
-        .join(User, User.id == InfoCurator.user_id)
-        .join(grantor, grantor.id == InfoCurator.granted_by_id, isouter=True)
-        .where(InfoCurator.revoked_at.is_(None))
-        .order_by(InfoCurator.granted_at.desc())
+        select(User.account_id, User.display_name, grantor.display_name, UserCapability.granted_at)
+        .join(User, User.id == UserCapability.user_id)
+        .join(grantor, grantor.id == UserCapability.granted_by_id, isouter=True)
+        .where(UserCapability.capability == _INFO_CURATOR, UserCapability.revoked_at.is_(None))
+        .order_by(UserCapability.granted_at.desc())
     ).all()
     return [
         {"account_id": str(acc_id), "display_name": name, "granted_by": gname, "granted_at": granted_at}
@@ -662,17 +669,13 @@ def list_curators(session: Session) -> list[dict]:
 
 
 def grant_curator(session: Session, user_id: uuid.UUID, granted_by_id: uuid.UUID) -> None:
-    """情報判定権限を付与（N.5）＝未剥奪の重複は呼び出し側が 409 判定（is_curator）。行を追加。"""
-    session.add(InfoCurator(user_id=user_id, granted_by_id=granted_by_id))
+    """情報判定権限を付与（N.5）＝未剥奪の重複は呼び出し側が 409 判定（is_curator）。`user_capabilities` に付与。"""
+    caps_repo.grant(session, user_id, _INFO_CURATOR, granted_by_id=granted_by_id)
 
 
 def revoke_curator(session: Session, user_id: uuid.UUID) -> bool:
     """情報判定権限を剥奪（N.5・論理＝revoked_at セット・行は残す）。剥奪した行があれば True。"""
-    result = session.execute(
-        update(InfoCurator).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None))
-        .values(revoked_at=func.now())
-    )
-    return result.rowcount > 0
+    return caps_repo.revoke(session, user_id, _INFO_CURATOR) > 0
 
 
 # ---- 参考資料（info_attachments・N.2・§5.33）----

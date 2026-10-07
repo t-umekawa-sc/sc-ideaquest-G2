@@ -237,23 +237,24 @@ def test_n_tc_010_detail_aggregates(info_env):
 
 
 def test_n_tc_011_is_curator(info_env):
-    """N-TC-011: is_curator＝付与=true／未付与・剥奪(revoked)=false。"""
+    """N-TC-011: is_curator＝付与=true／未付与・剥奪(revoked)=false（user_capabilities へ統合・FR-47）。"""
     from datetime import datetime, timezone
 
-    from app.tenant.info.orm import InfoCurator
+    from app.tenant.capabilities.orm import UserCapability
     with get_tenant_session(info_env.db_identifier) as ts:
         assert repo.is_curator(ts, info_env.user_id) is False  # 未付与
-        grant = InfoCurator(user_id=info_env.user_id)
+        grant = UserCapability(user_id=info_env.user_id, capability="info_curator")
         ts.add(grant); ts.commit()
     try:
         with get_tenant_session(info_env.db_identifier) as ts:
             assert repo.is_curator(ts, info_env.user_id) is True  # 付与
-            row = ts.get(InfoCurator, grant.id); row.revoked_at = datetime(2026, 9, 20, tzinfo=timezone.utc); ts.commit()
+            row = ts.get(UserCapability, grant.id); row.revoked_at = datetime(2026, 9, 20, tzinfo=timezone.utc); ts.commit()
         with get_tenant_session(info_env.db_identifier) as ts:
             assert repo.is_curator(ts, info_env.user_id) is False  # 剥奪
     finally:
         with get_tenant_session(info_env.db_identifier) as ts:
-            ts.execute(InfoCurator.__table__.delete().where(InfoCurator.user_id == info_env.user_id)); ts.commit()
+            ts.execute(UserCapability.__table__.delete().where(
+                UserCapability.user_id == info_env.user_id, UserCapability.capability == "info_curator")); ts.commit()
 
 
 def test_n_tc_008_word_cloud(info_env):
