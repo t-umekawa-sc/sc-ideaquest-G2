@@ -219,3 +219,32 @@ def test_u_tc_109_pick_dashboard_pure():
     # 全件ピン無し＆既読なら空。
     allread = [R("x", False, True), R("y", False, True)]
     assert pick(allread, limit=3) == []
+
+
+# ---- 画像再ホスト（U-8） ----
+IMAGES = f"{ADMIN}/images"
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 有効な PNG シグネチャ（validate_image_upload はシグネチャ検証）
+
+
+def test_u_tc_110_rehost_image(client, factory):
+    """U-TC-110: 本文画像を自社ホスト（MinIO）へ再ホスト＝管理者 201・自社署名URL／一般は 403。"""
+    _admin(client, factory)
+    r = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    url = r.json()["url"]
+    assert url and "announcement-images/" in url  # 自社ホスト（prefix=announcement-images）へ保存された署名URL
+    # 一般（非管理者）は投稿権限が無いので 403。
+    part = factory.make_seed_company_account(display_name=f"一般_{uuid.uuid4().hex[:6]}")
+    _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
+    r2 = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
+    assert r2.status_code == 403, r2.text
+
+
+def test_u_tc_111_rehost_image_signature_mismatch(client, factory):
+    """U-TC-111: 申告 image/png だが中身が非画像→422 validation_error（field=file・MIME 偽装拒否）。"""
+    _admin(client, factory)
+    r = client.post(IMAGES, files={"file": ("p.png", b"not really a png", "image/png")}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    body = r.json()
+    assert body["code"] == "validation_error"
+    assert any(e.get("field") == "file" for e in body.get("errors", []))

@@ -4477,6 +4477,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/announcements/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rehost Announcement Image
+         * @description 本文貼付画像の再ホスト（U-8・§1.10）＝multipart・管理者のみ。自社ホスト署名URL を返す。
+         *
+         *     静的パス（`/admin/announcements/images`）＝動的 `/admin/announcements/{id}` より前に定義（優先ルーティング）。
+         */
+        post: operations["rehost_announcement_image_api_v1_admin_announcements_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/announcements/{announcement_id}": {
         parameters: {
             query?: never;
@@ -5051,6 +5073,17 @@ export interface components {
              */
             is_read: boolean;
         };
+        /**
+         * AnnouncementImageUploadResponse
+         * @description 本文貼付画像の再ホスト結果（POST /admin/announcements/images・U-8）＝自社ホスト（MinIO）署名URL。
+         *
+         *     エディタの挿入/paste/ドロップハンドラが blob を送り、返った `url` で `img src` を置換する
+         *     （外部参照・`data:` を持ち込まない。`sanitize_html` は http/https のみ許可＝`data:` は保存時に落ちる）。
+         */
+        AnnouncementImageUploadResponse: {
+            /** Url */
+            url: string;
+        };
         /** AnnouncementListItem */
         AnnouncementListItem: {
             /** Id */
@@ -5294,6 +5327,11 @@ export interface components {
         };
         /** Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put */
         Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_rehost_announcement_image_api_v1_admin_announcements_images_post */
+        Body_rehost_announcement_image_api_v1_admin_announcements_images_post: {
             /** File */
             file: string;
         };
@@ -19842,6 +19880,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rehost_announcement_image_api_v1_admin_announcements_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_rehost_announcement_image_api_v1_admin_announcements_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementImageUploadResponse"];
                 };
             };
             /** @description Validation Error */

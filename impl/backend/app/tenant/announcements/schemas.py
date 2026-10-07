@@ -82,3 +82,12 @@ class AnnouncementUpdateRequest(BaseModel):
     pinned: bool | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+
+
+class AnnouncementImageUploadResponse(BaseModel):
+    """本文貼付画像の再ホスト結果（POST /admin/announcements/images・U-8）＝自社ホスト（MinIO）署名URL。
+
+    エディタの挿入/paste/ドロップハンドラが blob を送り、返った `url` で `img src` を置換する
+    （外部参照・`data:` を持ち込まない。`sanitize_html` は http/https のみ許可＝`data:` は保存時に落ちる）。
+    """
+    url: str

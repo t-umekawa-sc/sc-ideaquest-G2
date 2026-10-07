@@ -69,7 +69,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 2. **公開デプロイ既定会社コードの供給検証**＝env `IQ_DEFAULT_COMPANY_CODE=DEMO` を公開デプロイで設定した際に SC-00 の会社コード欄が隠れ「アカウント作成」導線が出ることを実機確認（dev 共有スタックには設定しない＝ACME ログインUXを壊すため）。
 3. **アイデアコンテストの他 未実装**＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md` の正式反映残／Phase2（妥当性解析 §6.4 等）。着手前にコードで現況裏取り（memory「未実装記述は done が多い」）。
 4. **SC-01 設計書 §3〜9 を5ゾーンに整合**（持ち越し・`doc/画面設計/screens/SC-01_ダッシュボード.md` 本文は再設計前のまま）。
-5. **お知らせ follow-up ③ 本文画像の再ホスト**（持ち越し・共有 `RichTextEditor` 画像対応＋backend お知らせ画像アップEP）。
+5. **【完了 2026-10-07】お知らせ本文画像の再ホスト（U-8）**＝共有 `RichTextEditor` に任意 `uploadImage` 注入prop を追加（渡された時だけ「🖼 画像」挿入＋paste/ドロップ・未指定なら従来どおり＝info 側は無改修で DRY）。backend `POST /admin/announcements/images`（管理者のみ・`application.rehost_image`＝`validate_image_upload`→MinIO put〔prefix=`announcement-images`〕→署名URL・情報 N.2 と同パターン・router は `/{id}` より前に静的定義）。frontend `uploadAnnouncementImageApi`＋SC-96 配線。`sanitize_html` は http/https のみ許可（`data:` は保存時に落ちる）ため自社ホスト署名URL に置換。設計反映＝API設計 U-8／テスト U-TC-110/111/112／設計ドラフト §4.2／SC-96。検証＝pytest `tests/announcements` 11 green（U-TC-110/111 red→green）・vitest（U-TC-112）green・build green・TCトレーサビリティ ✅ 1010・Playwright で管理→挿入→公開→閲覧側に画像残存を目視（検証データは掃除済）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。

@@ -45,3 +45,12 @@ export function updateAnnouncement(id: string, input: AnnouncementUpdateInput): 
 export function deleteAnnouncement(id: string): Promise<null> {
   return apiFetch<null>(`/admin/announcements/${id}`, { method: "DELETE" });
 }
+
+// 本文貼付画像の再ホスト（POST /admin/announcements/images・U-8）＝multipart・管理者のみ。
+// エディタの挿入/paste/ドロップが blob を送り、返った自社ホスト署名 URL で img src を置換する（外部参照・data: を持ち込まない）。
+export async function uploadAnnouncementImageApi(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch<{ url: string }>("/admin/announcements/images", { method: "POST", body: form });
+  return (res as { url: string }).url;
+}

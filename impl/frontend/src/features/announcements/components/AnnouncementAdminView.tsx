@@ -10,7 +10,7 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { RichTextEditor } from "@/components/richtext/RichTextEditor";
 import {
   createAnnouncement, deleteAnnouncement, getAnnouncement, listAdminAnnouncements,
-  updateAnnouncement, type AdminAnnouncementItem,
+  updateAnnouncement, uploadAnnouncementImageApi, type AdminAnnouncementItem,
 } from "../api";
 
 const STATUS_LABEL: Record<string, string> = { draft: "下書き", published: "公開中", archived: "アーカイブ" };
@@ -174,7 +174,7 @@ export function AnnouncementAdminView() {
               <input className="input" id="an-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）年末アイデアソン開催のお知らせ" />
             </Field>
             <Field id="an-body" label="本文">
-              <RichTextEditor value={bodyHtml} onChange={setBodyHtml} placeholder="お知らせ本文（見出し・強調・箇条書き・リンク）…" ariaLabel="お知らせ本文" />
+              <RichTextEditor value={bodyHtml} onChange={setBodyHtml} uploadImage={uploadAnnouncementImageApi} placeholder="お知らせ本文（見出し・強調・箇条書き・リンク・画像）…" ariaLabel="お知らせ本文" />
             </Field>
             <div className="row-2">
               <Field id="an-status" label="状態">

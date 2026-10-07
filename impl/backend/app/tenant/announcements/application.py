@@ -156,6 +156,28 @@ def list_admin(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         return {"data": data, "can_manage": True}
 
 
+def rehost_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """本文貼付画像を自社ホスト（MinIO）へ再ホスト（U-8・§1.10）＝**管理者のみ**（起稿権限と同じ）。
+
+    マジックバイト検証（validate_image_upload 共用）→ 保存 → 短TTL 署名URL を返す。`sanitize_html` は
+    http/https のみ許可＝`data:` 画像は保存時に落ちるため、エディタは返却 URL に置換してから保存する
+    （外部 img src を持ち込まない＝トラッキング/referer 漏れ防止・情報インプット N.2 の再ホストと同パターン）。
+    """
+    from app.infra.storage import get_storage, validate_image_upload
+
+    _require_admin(account_id)
+    validate_image_upload(content_type, data)  # MIME allowlist＋サイズ＋シグネチャ（申告を信用しない）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        if profile_repo.get_user_by_account(ts, account_id) is None:
+            raise AppError(401, "unauthenticated")  # 会社内 active ユーザーのみ
+    storage = get_storage()
+    key = storage.put(data, content_type, prefix="announcement-images")
+    return {"url": storage.presigned_get(key)}
+
+
 def create_announcement(account_id: uuid.UUID, company_id: uuid.UUID, *, title: str, body_html: str,
                         status: str, pinned: bool, starts_at, ends_at) -> dict:
     _require_admin(account_id)

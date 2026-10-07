@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
@@ -16,6 +16,7 @@ from app.tenant.announcements.schemas import (
     AdminAnnouncementListResponse,
     AnnouncementCreateRequest,
     AnnouncementDetail,
+    AnnouncementImageUploadResponse,
     AnnouncementListResponse,
     AnnouncementUpdateRequest,
     ReadResponse,
@@ -61,6 +62,25 @@ def create_announcement(body: AnnouncementCreateRequest, request: Request, sessi
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         title=body.title, body_html=body.body_html, status=body.status, pinned=body.pinned,
         starts_at=body.starts_at, ends_at=body.ends_at)
+
+
+@router.post("/admin/announcements/images", response_model=AnnouncementImageUploadResponse, status_code=201,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+async def rehost_announcement_image(
+    request: Request,
+    file: UploadFile = File(...),
+    session: dict = Depends(require_me),
+) -> AnnouncementImageUploadResponse:
+    """本文貼付画像の再ホスト（U-8・§1.10）＝multipart・管理者のみ。自社ホスト署名URL を返す。
+
+    静的パス（`/admin/announcements/images`）＝動的 `/admin/announcements/{id}` より前に定義（優先ルーティング）。
+    """
+    data = await file.read()
+    result = service.rehost_image(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        data=data, content_type=file.content_type or "",
+    )
+    return AnnouncementImageUploadResponse(**result)
 
 
 @router.patch("/admin/announcements/{announcement_id}", response_model=dict,

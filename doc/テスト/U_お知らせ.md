@@ -20,6 +20,8 @@
 | U-TC-105 | api | 作成/編集/削除は管理者のみ・一般は403 | 管理者/一般 | 一般 `POST/PATCH/DELETE /admin/announcements` ／管理者 `POST` | 一般=403（全操作）／管理者=201/200/204 | U.2／§1.6 |
 | U-TC-106 | api | body_html サニタイズ（XSS 無害化）＋body_text 派生＋published_at 設定 | 管理者 | `POST /admin/announcements`（`body_html` に `<script>`/`onerror`/`javascript:` を含む・status=published） | 保存後の `body_html` から script/on*/javascript: が除去（許可タグのみ）／`body_text` は平文／`published_at` が設定される | U.2／U.4／N.7 |
 | U-TC-107 | api | ピン留めトグル＋論理削除 | published 複数 | `PATCH /admin/announcements/{id}`（pinned 切替）／`DELETE` | pinned=true が一覧先頭／削除後は `GET /announcements`・`GET /announcements/{id}` から消える（論理削除・read 404） | U.2 |
+| U-TC-110 | api | 本文画像の再ホスト（自社 MinIO・署名URL／管理者のみ） | 管理者＋PNG バイト／一般 | 管理者 `POST /admin/announcements/images`（multipart `file`）／一般も同 | 管理者=201・`{url}`＝自社ホスト署名URL（外部参照を持ち込まない）／一般=403 | U-8／U.4／§1.10 |
+| U-TC-111 | api | 画像検証（非画像/シグネチャ不一致は 422） | 管理者＋非画像バイト | `POST /admin/announcements/images`（`file`＝text） | 422 `validation_error`（`errors[].field="file"`） | U-8／§1.10／N.7 |
 
 ## 3. ダッシュボード選別（§4.3a・U.3）
 
@@ -27,3 +29,9 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | U-TC-108 | int | ダッシュボードパネル選別＝ピン最優先→未読で埋める→既読かつ非ピンは出さない（最大3） | ピン2・未読非ピン2・既読非ピン1 | `dashboard/application.get_dashboard`（`announcements`） | ピン2件が先頭→未読非ピンで3件目まで埋める／既読かつ非ピンは出ない／`announcements_unread_count` 同梱／全件が「ピン無し＆既読」のときは空 | I.3／§4.3a |
 | U-TC-109 | unit | お知らせ3件選別の純ロジック（ピン優先→未読→既読非ピン除外） | `pickDashboardAnnouncements(items, limit=3)`（純関数） | ピン/未読/既読の混在配列を与える | ピン（published_at 降順）→未読（同降順）の順で最大 limit／既読かつ非ピンは除外／ピン超過は公開日時で上位 limit | §4.3a |
+
+## 4. フロント（画像再ホスト・U-8）
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| U-TC-112 | unit | 貼付画像の再ホスト API クライアント（multipart 送信） | 画像 File | `uploadAnnouncementImageApi(file)` | `POST /admin/announcements/images` に FormData を送り（Content-Type は自動）`url` を返す | U-8 |

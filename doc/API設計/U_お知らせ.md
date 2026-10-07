@@ -26,6 +26,9 @@
 | U-5 | `POST /admin/announcements` | 作成 | 管理者 | body＝`{title,body_html,status,pinned,starts_at?,ends_at?}`（`body_html` はサーバーで sanitize・`body_text` 派生・`status=published` 時に `published_at=now`） |
 | U-6 | `PATCH /admin/announcements/{id}` | 編集（ピン留めトグル含む・部分更新） | 管理者 | body＝任意の `{title?,body_html?,status?,pinned?,starts_at?,ends_at?}`。`draft→published` で `published_at` 設定（未設定時）。無変更は API 抑制（§4.147 標準） |
 | U-7 | `DELETE /admin/announcements/{id}` | 削除（論理） | 管理者 | 204。`deleted_at`/`deleted_by_id` 設定（一覧/詳細から消える） |
+| U-8 | `POST /admin/announcements/images` | 本文貼付画像の再ホスト（自社 MinIO・署名URL） | 管理者 | multipart `file`。応答＝`{url}`＝自社ホスト署名URL。検証＝`validate_image_upload`（MIME allowlist＋サイズ＋シグネチャ・§1.10）。エディタが返却 URL で `img src` を置換（外部参照・`data:` を持ち込まない）。静的パス＝`/admin/announcements/{id}` より前に定義 |
+
+> 画像再ホストの理由＝`sanitize_html` の許可スキームは http/https のみ（`data:` 画像は保存時に除去）。貼付/ドロップ画像は本EPで自社ホストへ再ホストし、`<img src="署名URL">` として本文に残す（`img` は許可タグ・N.7/U.4 と同一基準）。認可は投稿権限と同じ**管理者のみ**（情報インプット N.2 の再ホストは全ユーザーだが、お知らせは管理者のみが起稿するため）。
 
 ## U.3 ダッシュボード合成（I.3）
 
