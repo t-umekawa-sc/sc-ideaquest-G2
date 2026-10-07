@@ -60,8 +60,11 @@ export async function exportStrategyMarkdown(id: string, signal?: AbortSignal): 
 }
 
 // Phase2 in-app 生成（iso_generate・FR-44 Phase2）＝AIジョブ基盤へ投入（202）。結果は fetchStrategyGeneration で参照。
-export function generateStrategyIso(id: string): Promise<{ id: string; status: string } | null> {
-  return apiFetch<{ id: string; status: string }>(`/strategy-documents/${id}/generate`, { method: "POST" });
+// model＝クライアント側で選んだ論理モデルキー（省略時 task_type 既定・設計§3.4/§9.2）。不正/会社OFF は backend 422。
+export function generateStrategyIso(id: string, model?: string | null): Promise<{ id: string; status: string } | null> {
+  return apiFetch<{ id: string; status: string }>(`/strategy-documents/${id}/generate`, {
+    method: "POST", body: JSON.stringify({ model: model ?? null }),
+  });
 }
 
 // この経営資料の最新生成ジョブの状態＋ドラフト（無ければ null）。

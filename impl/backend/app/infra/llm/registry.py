@@ -24,6 +24,8 @@ class ModelSpec:
     external: bool         # True=外部クラウド送信（opt-in ゲート・設計 §10）
     billing: str           # 'free'（自社ホスト）/'paid'（外部従量）
     enabled: bool          # registry 既定の有効性（会社 ON/OFF は別レイヤ §5.58）
+    label: str = ""        # ピッカー表示名（key を出さず表示名で選ばせる・設計§9.2）
+    description: str = ""  # 用途説明（ピッカー副文・設計§9.2）
     params: dict = field(default_factory=dict)  # 温度/最大トークン等の既定
 
 
@@ -47,11 +49,15 @@ def _catalog() -> dict[str, ModelSpec]:
         "qwen3-light": ModelSpec(
             key="qwen3-light", provider="openai_compat", model=s.llm_model_light,
             external=False, billing="free", enabled=True,
+            label="高速（軽量）",
+            description="要約・短文整形・分類など軽めの処理に向く。",
             params={"temperature": 0.3},
         ),
         "qwen3-swallow": ModelSpec(
             key="qwen3-swallow", provider="openai_compat", model=s.llm_model_swallow,
             external=False, billing="free", enabled=True,
+            label="高品質（日本語）",
+            description="アイデア整形・説明文生成・長めの要約に向く。",
             params={"temperature": 0.4},
         ),
     }
@@ -60,6 +66,12 @@ def _catalog() -> dict[str, ModelSpec]:
 def catalog_billing() -> dict[str, str]:
     """論理キー→billing（free/paid）。会社の実効有効集合を app 層が組むのに使う（§4.2）。"""
     return {k: s.billing for k, s in _catalog().items()}
+
+
+def catalog_meta() -> dict[str, dict]:
+    """論理キー→表示メタ（billing/label/description）。管理一覧（admin）が表示名を付すのに使う（DRY・§9.2）。"""
+    return {k: {"billing": s.billing, "label": s.label, "description": s.description}
+            for k, s in _catalog().items()}
 
 
 def get(key: str) -> ModelSpec:
@@ -106,6 +118,8 @@ def list_models(task_type: str | None = None, *, enabled_keys: set[str] | None =
             "provider": spec.provider,
             "external": spec.external,
             "billing": spec.billing,
+            "label": spec.label,
+            "description": spec.description,
             "is_default": key == default_key,
         })
     return out

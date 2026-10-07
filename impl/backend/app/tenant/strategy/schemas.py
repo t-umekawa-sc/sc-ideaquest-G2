@@ -147,6 +147,12 @@ class QuestLinkAddRequest(BaseModel):
 
 
 # Phase2 in-app 生成（iso_generate・FR-44 Phase2・設計 §8）。
+class GenerationEnqueueRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # 論理モデルキー（省略時 task_type 既定・クライアント側モデル選択・設計§3.4/§9.2）。不正/会社OFF は 422（基盤ガード）。
+    model: str | None = None
+
+
 class GenerationEnqueueResponse(BaseModel):
     id: str
     status: str

@@ -64,3 +64,38 @@ def test_r_tc_121_generate_requires_admin(client, factory):
         assert r.status_code == 403, r.text
     finally:
         _cleanup(did)
+
+
+def _job_requested_models(did: uuid.UUID) -> list[str | None]:
+    with get_tenant_session(_seed_db()) as ts:
+        return [r[0] for r in ts.execute(
+            select(AiJob.requested_model).where(AiJob.ref_strategy_document_id == did)).all()]
+
+
+def test_r_tc_124_generate_with_model(client, factory):
+    """R-TC-124: 生成のモデル指定＝model=有効キーで投入ジョブの requested_model に反映（省略時は null）。"""
+    _admin(client, factory)
+    did = uuid.UUID(client.post(BASE, json=_body(f"モデル_{uuid.uuid4().hex[:6]}"), headers=_csrf(client)).json()["id"])
+    try:
+        # 明示モデル指定＝requested_model に載る。
+        r = client.post(f"{BASE}/{did}/generate", json={"model": "qwen3-light"}, headers=_csrf(client))
+        assert r.status_code == 202, r.text
+        assert "qwen3-light" in _job_requested_models(did)
+        # 省略＝requested_model は null（task_type 既定へ委譲）。
+        r2 = client.post(f"{BASE}/{did}/generate", headers=_csrf(client))
+        assert r2.status_code == 202, r2.text
+        assert None in _job_requested_models(did)
+    finally:
+        _cleanup(did)
+
+
+def test_r_tc_125_generate_invalid_model_422(client, factory):
+    """R-TC-125: 生成の不正モデルは 422（ジョブは作られない）。"""
+    _admin(client, factory)
+    did = uuid.UUID(client.post(BASE, json=_body(f"不正_{uuid.uuid4().hex[:6]}"), headers=_csrf(client)).json()["id"])
+    try:
+        r = client.post(f"{BASE}/{did}/generate", json={"model": "bogus-model"}, headers=_csrf(client))
+        assert r.status_code == 422, r.text
+        assert _job_requested_models(did) == []  # ジョブ未作成
+    finally:
+        _cleanup(did)

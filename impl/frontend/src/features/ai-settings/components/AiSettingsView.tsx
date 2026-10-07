@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useConfirm, useSnackbar } from "@/components/ui";
 
 import { fetchAdminModels, fetchAiUsage, patchAdminModel } from "../api";
-import { modelMeta } from "../types";
+import { modelFeature } from "../types";
 import type { AdminModelItem, AiUsageRow } from "../types";
 import "../ai-settings.css";
 
@@ -89,6 +89,8 @@ export function AiSettingsView() {
   if (!models) return <p className="hint">読み込み中…</p>;
 
   const hasPaid = models.some((m) => m.billing === "paid");
+  // 利用明細の表示名＝モデル一覧の label（backend 由来）。履歴に残る未知キーはキーをそのまま出す。
+  const labelByKey: Record<string, string> = Object.fromEntries(models.map((m) => [m.key, m.label]));
 
   return (
     <section aria-label="会社のLLM設定">
@@ -112,7 +114,6 @@ export function AiSettingsView() {
       <div className="section-head"><h2>モデル</h2></div>
       <section className="card settings-card" aria-label="モデル一覧">
         {models.map((m) => {
-          const meta = modelMeta(m.key);
           const paid = m.billing === "paid";
           const cm = m.current_month;
           const budgetPct = paid && m.monthly_budget_micros ? Math.round((cm.cost_micros / m.monthly_budget_micros) * 100) : null;
@@ -120,15 +121,15 @@ export function AiSettingsView() {
             <div key={m.key} className={`setting-row${m.enabled ? "" : " is-disabled"}`}>
               <div className="setting-row__info">
                 <div className="setting-row__name">
-                  {meta.name}
+                  {m.label}
                   <span className={`badge ${paid ? "badge-danger" : "badge-muted"}`} style={{ marginLeft: "var(--space-2)" }}>
                     {paid ? "有料（外部・従量）" : "無料（自社ホスト）"}
                   </span>
                 </div>
                 <div className="setting-row__desc">
-                  {meta.feature}
+                  {modelFeature(m.key)}
                   <br />
-                  用途：{meta.use}
+                  用途：{m.description}
                 </div>
                 <div className="ai-settings__usage">
                   当月：{cm.tokens.toLocaleString()} トークン ／ {yen(cm.cost_micros)}
@@ -156,7 +157,7 @@ export function AiSettingsView() {
                 )}
               </div>
               <label className="switch">
-                <input type="checkbox" aria-label={`${meta.name} を有効にする`} checked={m.enabled} onChange={(e) => setEnabled(m, e.target.checked)} />
+                <input type="checkbox" aria-label={`${m.label} を有効にする`} checked={m.enabled} onChange={(e) => setEnabled(m, e.target.checked)} />
                 <span className="switch__track"><span className="switch__thumb" /></span>
                 <span className="switch__state">{m.enabled ? "ON" : "OFF"}</span>
               </label>
@@ -179,7 +180,7 @@ export function AiSettingsView() {
               {usage.map((u, i) => (
                 <tr key={i}>
                   <td>{periodLabel(u.period_ym)}</td>
-                  <td>{modelMeta(u.model_key).name}</td>
+                  <td>{labelByKey[u.model_key] ?? u.model_key}</td>
                   <td>{u.input_tokens.toLocaleString()} / {u.output_tokens.toLocaleString()}</td>
                   <td>{yen(u.cost_micros)}</td>
                   <td>{u.count.toLocaleString()} 件</td>

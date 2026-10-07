@@ -5,7 +5,7 @@
 // （詳細ヘッダーの操作統一＝デザイン標準 §4.14）。業務計算はしない（§4.1・create/updateContest を呼ぶだけ）。
 import { useEffect, useState } from "react";
 
-import { Button, Field, Modal, useSnackbar } from "@/components/ui";
+import { Button, Combobox, Field, Modal, useSnackbar } from "@/components/ui";
 import { createContest, getContest, updateContest } from "../api";
 import { CONTEST_MODE_LABEL } from "../types";
 
@@ -110,10 +110,8 @@ export function ContestFormModal({
         </Field>
         {mode !== "edit" && (
           <Field id="ct-mode" label="種別">
-            <select className="select" id="ct-mode" value={cmode} onChange={(e) => setCmode(e.target.value)}>
-              <option value="bounded">{CONTEST_MODE_LABEL.bounded}</option>
-              <option value="rolling">{CONTEST_MODE_LABEL.rolling}</option>
-            </select>
+            <Combobox id="ct-mode" ariaLabel="種別" value={cmode} onChange={setCmode}
+              options={[{ value: "bounded", label: CONTEST_MODE_LABEL.bounded }, { value: "rolling", label: CONTEST_MODE_LABEL.rolling }]} />
           </Field>
         )}
         {cmode === "rolling" ? (
@@ -133,10 +131,8 @@ export function ContestFormModal({
         )}
         {mode !== "edit" && (
           <Field id="ct-status" label="公開">
-            <select className="select" id="ct-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="draft">準備中（下書き）</option>
-              <option value="open">すぐ公募を開始</option>
-            </select>
+            <Combobox id="ct-status" ariaLabel="公開" value={status} onChange={setStatus}
+              options={[{ value: "draft", label: "準備中（下書き）" }, { value: "open", label: "すぐ公募を開始" }]} />
           </Field>
         )}
         <Field id="ct-approve" label="参加の受付">

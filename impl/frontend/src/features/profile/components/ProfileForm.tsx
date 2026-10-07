@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-import { Button, Field, useSnackbar } from "@/components/ui";
+import { Button, Combobox, Field, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { deleteAvatarImage, deleteIdeaIconImage, getMe, setAvatarImage, setIdeaIconImage, updateMe } from "../api";
 import type { MeProfile } from "../types";
@@ -304,10 +304,8 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
             <input id="p_name" className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (nameErr) setNameErr(null); }} required />
           </Field>
           <Field id="p_locale" label="言語">
-            <select id="p_locale" className="select" value={locale} onChange={(e) => setLocale(e.target.value as "ja" | "en")}>
-              <option value="ja">日本語</option>
-              <option value="en">English</option>
-            </select>
+            <Combobox id="p_locale" ariaLabel="言語" value={locale} onChange={(v) => setLocale(v as "ja" | "en")}
+              options={[{ value: "ja", label: "日本語" }, { value: "en", label: "English" }]} />
           </Field>
           {/* アニメーション演出の抑制（accounts.reduce_motion・デザイン標準 §4.9）。checked=動きを減らす。 */}
           <Field id="p_anim" label="アニメーション演出">

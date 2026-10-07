@@ -91,6 +91,18 @@ def test_s_tc_115_list_models(client):
     assert keys["qwen3-light"]["is_default"] is True and keys["qwen3-light"]["billing"] == "free"
 
 
+def test_s_tc_134_list_models_label_description(client):
+    """S-TC-134(api): GET /ai-models＝各モデルに label（表示名）/description（用途説明）を返す（ピッカー供給源）。"""
+    _make(client)
+    r = client.get("/api/v1/ai-models", params={"task_type": "iso_generate"})
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data  # 候補 ≥1
+    for m in data:
+        assert m.get("label"), m        # 表示名（非空）
+        assert m.get("description"), m  # 用途説明（非空）
+
+
 def test_s_tc_108_other_and_missing_job_404(client):
     """S-TC-108(api): 存在しない/他人のジョブは 404（依頼者スコープ・存在秘匿）。"""
     _make(client)

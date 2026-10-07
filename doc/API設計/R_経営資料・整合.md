@@ -97,10 +97,10 @@
 
 > **位置づけ**＝R.5 の Markdown を**自社ホスト LLM（オンプレ無料・既定 `qwen3-swallow`）で要約生成**し、意図/重点領域のたたき台を**読み取り専用ドラフト**として返す。生成は**横断 LLM ゲートウェイ＋AIジョブ基盤（S ドメイン）**に委譲＝物理モデルは基盤側に閉じ、経営資料は**外部へ出さない**（データ主権）。たたき台は**人が最終確定**（自動反映しない）。
 
-| メソッド/パス | 概要 | 返却 |
-|---|---|---|
-| `POST /strategy-documents/{id}/generate`（管理者スコープ） | ISO56001 §6（意図/方針/重点領域）のたたき台生成を**非同期投入**＝R.5 の Markdown を context として `iso_generate` ジョブを enqueue（`ref_strategy_document_id={id}`） | 202＋`{id, status:"queued"}`（ジョブID・§S.1） |
-| `GET /strategy-documents/{id}/generation`（管理者スコープ） | 当該資料の**最新**生成ジョブの状態＝SC-81 がポーリング | `{job_id, status, result_text?（succeeded 時のドラフト本文）, error?, finished_at?}` |
+| メソッド/パス | 概要 | リクエスト | 返却 |
+|---|---|---|---|
+| `POST /strategy-documents/{id}/generate`（管理者スコープ） | ISO56001 §6（意図/方針/重点領域）のたたき台生成を**非同期投入**＝R.5 の Markdown を context として `iso_generate` ジョブを enqueue（`ref_strategy_document_id={id}`） | `{model?}`（任意・論理モデルキー＝SC-81 ピッカーで選択・省略時 task_type 既定・不正/会社OFF は 422＝§S.2） | 202＋`{id, status:"queued"}`（ジョブID・§S.1） |
+| `GET /strategy-documents/{id}/generation`（管理者スコープ） | 当該資料の**最新**生成ジョブの状態＝SC-81 がポーリング | — | `{job_id, status, result_text?（succeeded 時のドラフト本文）, error?, finished_at?}` |
 
 - **task_type＝`iso_generate`**（S ドメイン・既定キー `qwen3-swallow`）。context は enqueue 時に `export.build_markdown` で確定＝ジョブ入力 `input.context_md` に焼く（実行時に資料を再読込しない＝決定性/機微の露出面を絞る）。
 - **会社別の生成トークン上限**（`company_ai_model_settings.max_output_tokens`・§S.5）を実行時に `max_tokens` として適用＝無料ティアの暴走抑止。NULL=無制限。

@@ -226,10 +226,12 @@ def export_markdown(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -
         return export_mod.build_markdown(ts, doc, company, related)
 
 
-def generate_iso(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
+def generate_iso(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str,
+                 requested_model: str | None = None) -> dict:
     """Phase2 in-app 生成（FR-44 Phase2・設計 §8）＝経営資料＋関連の構造化 Markdown を文脈に
     AIジョブ基盤（FR-45）へ `iso_generate` を投入。文脈は本層（strategy）で用意し input に載せる
-    （worker は strategy 非依存のまま・LLM 物理は基盤に閉じる＝データ主権）。202＝{id, status}。"""
+    （worker は strategy 非依存のまま・LLM 物理は基盤に閉じる＝データ主権）。202＝{id, status}。
+    requested_model＝クライアント側で選んだ論理キー（省略=task_type 既定・不正/会社OFF は enqueue が 422）。"""
     from app.tenant.ai_jobs import application as ai_jobs
     from app.tenant.strategy import export as export_mod
 
@@ -245,6 +247,7 @@ def generate_iso(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> d
         context_md = export_mod.build_markdown(ts, doc, company, related)
     return ai_jobs.enqueue(account_id, company_id, task_type="iso_generate",
                            input={"context_md": context_md, "strategy_document_id": str(did)},
+                           requested_model=requested_model,
                            ref_strategy_document_id=did)
 
 

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
-import { ActivitySpark, Avatar, Button, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Button, Combobox, DataTable, Modal, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeContestFromList } from "@/lib/nav";
@@ -729,12 +729,13 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <div className="list-toolbar" data-sp-host>
             <div className="filters">
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
-              <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
-                <option value="">対象: すべて</option>
-                <option value="idea">アイデア</option>
-                <option value="chat">チャット</option>
-                <option value="attachment">添付ファイル名</option>
-              </select>
+              <Combobox ariaLabel="検索対象" style={{ minWidth: 170 }} value={ftScope} onChange={setFtScope}
+                options={[
+                  { value: "", label: "対象: すべて" },
+                  { value: "idea", label: "アイデア" },
+                  { value: "chat", label: "チャット" },
+                  { value: "attachment", label: "添付ファイル名" },
+                ]} />
               <ScreenPurpose
                 summary="対象ごとの検索項目：アイデア＝タイトル・本文・価値・補足／チャット＝メッセージ本文／添付ファイル名＝ファイル名。「すべて」は3種を横断。"
                 dialogTitle="全文検索の対象について"

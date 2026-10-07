@@ -1,5 +1,6 @@
 // AIジョブ（ドメイン S・FR-45・SC-04）の型。backend schema（S.1）と対応。
 // 物理（provider/base_url）は API に出ない＝画面が扱うのは論理キーと状態だけ。
+import type { components } from "@/lib/api/schema";
 
 export type AiJobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
 
@@ -33,6 +34,16 @@ export interface AiJobSummary {
 // SC-04 上部＝他ユーザ含む会社内 running の進捗率のみ（匿名・S.1a）。依頼者/入力/種別は持たない。
 export interface RunningJobItem {
   ratio: number | null;
+}
+
+// GET /ai-models（S.2）＝機能内モデルピッカーの供給源（会社で有効な論理キーのみ・設計§9.2）。
+// label/description は backend 由来（表示名の単一ソース）＝key は画面に出さず表示名で選ばせる。
+export type AiModelItem = components["schemas"]["AiModelItem"];
+
+// ピッカーの初期選択キー＝is_default のキー・無ければ先頭（候補1でも成立・設計§9.2）。
+export function defaultModelKey(models: AiModelItem[]): string | null {
+  if (!models.length) return null;
+  return (models.find((m) => m.is_default) ?? models[0]).key;
 }
 
 export interface AiJobDetail {

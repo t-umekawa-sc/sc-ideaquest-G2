@@ -261,18 +261,19 @@ def admin_list_models(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
-    billing = registry.catalog_billing()
+    meta = registry.catalog_meta()  # key→{billing,label,description}（ピッカーと同一ソース・§9.2）
     with get_tenant_session(company.db_identifier) as ts:
         explicit = repo.model_settings(ts)
-        settings_rows = {r.model_key: r for r in [repo.get_model_setting(ts, k) for k in billing] if r}
+        settings_rows = {r.model_key: r for r in [repo.get_model_setting(ts, k) for k in meta] if r}
         effective = _effective_enabled_keys(ts)
         usage = repo.month_cost_by_model(ts, _period_ym())
         data = []
-        for key, bill in billing.items():
+        for key, m in meta.items():
             row = settings_rows.get(key)
             u = usage.get(key, {"input_tokens": 0, "output_tokens": 0, "cost_micros": 0})
             data.append({
-                "key": key, "billing": bill, "enabled": key in effective,
+                "key": key, "billing": m["billing"], "label": m["label"], "description": m["description"],
+                "enabled": key in effective,
                 "monthly_budget_micros": row.monthly_budget_micros if row else None,
                 "max_output_tokens": row.max_output_tokens if row else None,
                 "current_month": {"tokens": u["input_tokens"] + u["output_tokens"], "cost_micros": u["cost_micros"]},

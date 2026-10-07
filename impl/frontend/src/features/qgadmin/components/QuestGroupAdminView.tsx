@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Avatar, Combobox, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { GROUP_MEMBERS_CHANGED_EVENT, listGroupMembers, listMyGroups, removeMember, type Member, type QuestGroup } from "../api";
@@ -165,16 +165,13 @@ export function QuestGroupAdminView() {
 
       <div className="group-bar">
         <span className="group-bar__label">管理グループ:</span>
-        <select
-          className="select"
-          style={{ width: "auto" }}
+        <Combobox
+          ariaLabel="管理グループ"
+          style={{ minWidth: 240 }}
           value={selectedId ?? ""}
-          onChange={(e) => setSelectedId(e.target.value)}
-        >
-          {groups.map((g) => (
-            <option key={g.group_id} value={g.group_id}>{g.name}（{g.member_count}）</option>
-          ))}
-        </select>
+          onChange={setSelectedId}
+          options={groups.map((g) => ({ value: g.group_id, label: `${g.name}（${g.member_count}）` }))}
+        />
       </div>
 
       <div className="section-head">

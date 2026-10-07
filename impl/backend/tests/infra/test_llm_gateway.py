@@ -73,3 +73,14 @@ def test_s_tc_206_list_models_enabled_set():
     # enabled_keys=None なら registry 既定 enabled 全部（light+swallow）。
     all_keys = {m["key"] for m in registry.list_models("info_summarize")}
     assert {"qwen3-light", "qwen3-swallow"} <= all_keys
+
+
+def test_s_tc_212_registry_label_description():
+    """S-TC-212: 各論理キーが label/description を持ち、list_models がそれを返す（ピッカー表示名の単一ソース）。"""
+    for key in ("qwen3-light", "qwen3-swallow"):
+        spec = registry.get(key)
+        assert spec.label and isinstance(spec.label, str)          # 表示名（非空）
+        assert spec.description and isinstance(spec.description, str)  # 用途説明（非空）
+    # list_models の各 dict にも label/description が載る（API 供給源）。
+    for m in registry.list_models("iso_generate", enabled_keys={"qwen3-light", "qwen3-swallow"}):
+        assert m["label"] and m["description"]

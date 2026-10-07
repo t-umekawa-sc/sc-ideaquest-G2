@@ -60,7 +60,7 @@
 
 | メソッド / パス | 説明 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /admin/ai-models` | カタログ＋自社設定一覧 | — | registry 全キー＋`{enabled, billing, monthly_budget_micros, max_output_tokens, current_month:{tokens, cost_micros}}` |
+| `GET /admin/ai-models` | カタログ＋自社設定一覧 | — | registry 全キー＋`{label, description, enabled, billing, monthly_budget_micros, max_output_tokens, current_month:{tokens, cost_micros}}`（`label`/`description` は registry 由来＝`GET /ai-models` ピッカーと同一ソース・§9.2） |
 | `PATCH /admin/ai-models/{key}` | ON/OFF・予算・**生成トークン上限**変更 | `{enabled?, monthly_budget_micros?, max_output_tokens?}` | 200。**`paid` を ON＝課金合意**（確認ダイアログ・§S.7）。`enabled_by`/`enabled_at` を記録。`max_output_tokens`＝**会社別の生成上限**（NULL=無制限・負値は 422・実行時に `max_tokens` として適用＝無料ティア抑制） |
 | `GET /admin/ai-usage` | 会社の利用量/コスト | `?period_ym=`/`?model_key=`（任意） | 会社×モデル×月の集計（`ai_usage_events` の read 集計・§5.59）＋予算消化率 |
 

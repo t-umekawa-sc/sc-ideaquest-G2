@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
-import { ActivitySpark, Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Combobox, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { QuestDecisionLogView, QuestRevisionHistory } from "./QuestHistory";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
@@ -896,12 +896,13 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <div className="list-toolbar" data-sp-host>
             <div className="filters">
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
-              <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
-                <option value="">対象: すべて</option>
-                <option value="idea">アイデア</option>
-                <option value="chat">チャット</option>
-                <option value="attachment">添付ファイル名</option>
-              </select>
+              <Combobox ariaLabel="検索対象" style={{ minWidth: 170 }} value={ftScope} onChange={setFtScope}
+                options={[
+                  { value: "", label: "対象: すべて" },
+                  { value: "idea", label: "アイデア" },
+                  { value: "chat", label: "チャット" },
+                  { value: "attachment", label: "添付ファイル名" },
+                ]} />
               {/* 対象ごとに検索する項目（列名）を ⓘ で明示（デザイン標準 §4.13・ユーザー要望）。列は backend search（PGroonga・J）と一致。 */}
               <ScreenPurpose
                 summary="対象ごとの検索項目：アイデア＝タイトル・本文・価値・補足／チャット＝メッセージ本文／添付ファイル名＝ファイル名。「すべて」は3種を横断。"

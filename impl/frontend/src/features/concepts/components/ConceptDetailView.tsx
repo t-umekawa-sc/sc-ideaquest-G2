@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { ActivitySpark, Avatar, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, RowMenu, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Combobox, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, RowMenu, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -587,18 +587,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 <>
                   <div className="field dialog-section is-quiet">
                     <label htmlFor="link_assumption">前提を選択</label>
-                    <select id="link_assumption" className="select" value={linkSel} onChange={(e) => setLinkSel(e.target.value)}>
-                      <option value="">— 選択してください —</option>
-                      {candidates.map((a) => <option key={a.id} value={a.id}>{a.statement}</option>)}
-                    </select>
+                    <Combobox id="link_assumption" ariaLabel="前提を選択" placeholder="— 選択してください —" value={linkSel} onChange={setLinkSel}
+                      options={[{ value: "", label: "— 選択してください —" }, ...candidates.map((a) => ({ value: a.id, label: a.statement }))]} />
                   </div>
                   <div className="field dialog-section is-quiet">
                     <label htmlFor="link_criticality">重要度</label>
-                    <select id="link_criticality" className="select" value={linkCrit} onChange={(e) => setLinkCrit(e.target.value as "critical" | "major" | "minor")}>
-                      <option value="critical">致命的</option>
-                      <option value="major">重要</option>
-                      <option value="minor">補助</option>
-                    </select>
+                    <Combobox id="link_criticality" ariaLabel="重要度" value={linkCrit} onChange={(v) => setLinkCrit(v as "critical" | "major" | "minor")}
+                      options={[{ value: "critical", label: "致命的" }, { value: "major", label: "重要" }, { value: "minor", label: "補助" }]} />
                   </div>
                 </>
               );
@@ -621,11 +616,9 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               <input id="val_method" className="input" value={valDialog.method} onChange={(e) => { setValDialog((d) => (d ? { ...d, method: e.target.value } : d)); setValErrors((x) => ({ ...x, method: "" })); }} placeholder="例: 想定顧客20名にインタビュー" />
             </Field>
             <Field className="dialog-section is-quiet" id="val_verdict" label="判定" required>
-              <select id="val_verdict" className="select" value={valDialog.verdict} onChange={(e) => setValDialog((d) => (d ? { ...d, verdict: e.target.value as "supported" | "refuted" | "inconclusive" } : d))}>
-                <option value="supported">支持</option>
-                <option value="refuted">反証</option>
-                <option value="inconclusive">保留</option>
-              </select>
+              <Combobox id="val_verdict" ariaLabel="判定" value={valDialog.verdict}
+                onChange={(v) => setValDialog((d) => (d ? { ...d, verdict: v as "supported" | "refuted" | "inconclusive" } : d))}
+                options={[{ value: "supported", label: "支持" }, { value: "refuted", label: "反証" }, { value: "inconclusive", label: "保留" }]} />
             </Field>
             <Field className="dialog-section is-quiet" id="val_date" label="検証実施日" required error={valErrors.validatedOn}>
               <input id="val_date" type="date" className="input" value={valDialog.validatedOn} onChange={(e) => { setValDialog((d) => (d ? { ...d, validatedOn: e.target.value } : d)); setValErrors((x) => ({ ...x, validatedOn: "" })); }} />

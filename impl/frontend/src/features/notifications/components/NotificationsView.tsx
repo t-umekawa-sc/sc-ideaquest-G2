@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { EmptyState } from "@/components/ui";
+import { Combobox, EmptyState } from "@/components/ui";
 import { realtime } from "@/lib/realtime";
 import { useScrollRestore } from "@/lib/scrollRestore";
 
@@ -194,20 +194,14 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
         <div className="filters">
           <label>
             状態
-            <select className="select" value={fState} onChange={(e) => setFState(e.target.value as "" | "unread")}>
-              <option value="">すべて</option>
-              <option value="unread">未読のみ</option>
-            </select>
+            <Combobox ariaLabel="状態" style={{ minWidth: 130 }} value={fState} onChange={(v) => setFState(v as "" | "unread")}
+              options={[{ value: "", label: "すべて" }, { value: "unread", label: "未読のみ" }]} />
           </label>
           <label>
             種別
-            <select className="select" value={fCat} onChange={(e) => setFCat(e.target.value)}>
-              <option value="">すべて</option>
-              {/* ゲームモード OFF（§4.11）＝ゲーム層カテゴリ（実績/魔法）は選択肢から外す。 */}
-              {CATEGORY.filter(([k]) => gameEnabled || !GAME_CATS.has(k)).map(([k, label]) => (
-                <option key={k} value={k}>{label}</option>
-              ))}
-            </select>
+            {/* ゲームモード OFF（§4.11）＝ゲーム層カテゴリ（実績/魔法）は選択肢から外す。 */}
+            <Combobox ariaLabel="種別" style={{ minWidth: 150 }} value={fCat} onChange={setFCat}
+              options={[{ value: "", label: "すべて" }, ...CATEGORY.filter(([k]) => gameEnabled || !GAME_CATS.has(k)).map(([k, label]) => ({ value: k, label }))]} />
           </label>
         </div>
         <div className="tools">

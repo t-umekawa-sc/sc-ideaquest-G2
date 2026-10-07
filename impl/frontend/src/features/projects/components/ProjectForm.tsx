@@ -5,7 +5,7 @@
 // 作成: conceptId 有り POST /concepts/{id}/project／無し POST /projects。編集: projectId で詳細＋メンバーを取得し PATCH。
 import { useEffect, useMemo, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { MultiselectOption } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { ApiError } from "@/lib/api/client";
@@ -157,9 +157,8 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
         </Field>
         {isEdit && (
           <Field className="dialog-section is-quiet" id="p_status" label="状態">
-            <select id="p_status" className="select" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
-              {(Object.keys(STATUS_LABEL) as ProjectStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-            </select>
+            <Combobox id="p_status" ariaLabel="状態" value={status} onChange={(v) => setStatus(v as ProjectStatus)}
+              options={(Object.keys(STATUS_LABEL) as ProjectStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))} />
           </Field>
         )}
         <Field className="dialog-section is-quiet" id="p_launch" label="ローンチ状態（任意）">

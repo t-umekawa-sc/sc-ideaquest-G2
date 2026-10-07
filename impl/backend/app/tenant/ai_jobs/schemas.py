@@ -98,6 +98,8 @@ class AiModelItem(BaseModel):
     provider: str
     external: bool
     billing: str
+    label: str          # ピッカー表示名（key を出さず表示名で選ばせる・設計§9.2）
+    description: str     # 用途説明（ピッカー副文・設計§9.2）
     is_default: bool
 
 
@@ -115,6 +117,8 @@ class AdminModelCurrentMonth(BaseModel):
 class AdminModelItem(BaseModel):
     key: str
     billing: str
+    label: str          # 表示名（registry 由来・ピッカーと同一ソース・設計§9.2）
+    description: str     # 用途説明（registry 由来）
     enabled: bool
     monthly_budget_micros: int | None = None
     max_output_tokens: int | None = None   # 会社別の生成トークン上限（NULL=無制限・S.5）

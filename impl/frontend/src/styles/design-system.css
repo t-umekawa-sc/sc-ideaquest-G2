@@ -965,6 +965,24 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
 .combobox__option[aria-selected="true"] { font-weight: 600; color: var(--color-primary-active); }
 .combobox__option[aria-selected="true"]::after { content: "✓"; float: right; }
 
+/* --- AI生成コントロール（モデル選択＋生成ボタンの一体型・分割ボタン・案A採用 2026-10-07） ---
+   主ボタン「✨ AI で生成する」＋右端 ▾（使用モデル候補）。候補リストは .combobox__list を再利用。
+   見本＝style-guide.html「4e」。候補は GET /ai-models 駆動（候補1でも常設・§9.2）。 */
+.aigen { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.aigen-split { position: relative; display: inline-flex; }
+/* .btn の border-radius を確実に上書き（Next は CSS をチャンク分割するため、
+   同スコア .btn が後勝ちしないよう子孫結合子で特異度を上げる＝分割ボタンの継ぎ目を角丸ゼロで密着）。 */
+.aigen-split .aigen-split__main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.aigen-split .aigen-split__caret {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  padding-left: 12px; padding-right: 12px; border-left: 1px solid rgba(255, 255, 255, .4);
+}
+.aigen-menu { position: absolute; z-index: 30; left: 0; top: calc(100% + 4px); min-width: 280px; margin: 0; }
+.aigen-menu .combobox__option { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.aigen-menu .combobox__option[aria-selected="true"]::after { content: none; } /* ✓ は付けず 既定バッジ等で表現 */
+.aigen-sub { font-size: var(--text-sm); color: var(--color-text-muted); }
+.aigen-badge { font-size: var(--text-xs); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: 999px; padding: 0 6px; }
+
 /* --- 複数選択コンボボックス（オートコンプリート絞り込み＋選択チップ＋任意で自由入力） ---
    選択済みは control 内にチップ表示（×で解除）。入力でオプションを絞り込み、↑↓/Enterで確定。
    data-free="true" のときは候補に無い手入力文字列も Enter で追加（タグ作成）できる。

@@ -4,7 +4,7 @@
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, useFormErrorNotice } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, useFormErrorNotice } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import {
@@ -324,11 +324,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
         <details className="disclosure field dialog-section is-quiet">
           <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定{curated ? "" : ""}</summary>
           <div className="disclosure__body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-            <Field className="dialog-section is-quiet" id="im-priority" label="優先度"><select className="select" id="im-priority" value={priority} onChange={(e) => setPriority(e.target.value)}><option value="">—</option>{OPT(PRIORITY_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-source" label="情報ソース"><select className="select" id="im-source" value={source} onChange={(e) => setSource(e.target.value)}><option value="">—</option>{OPT(SOURCE_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-class" label="情報分類"><select className="select" id="im-class" value={classification} onChange={(e) => setClassification(e.target.value)}><option value="">—</option>{OPT(CLASSIFICATION_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-scope" label="大分類"><select className="select" id="im-scope" value={scope} onChange={(e) => setScope(e.target.value)}><option value="">—</option>{OPT(SCOPE_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-biz" label="対象事業"><select className="select" id="im-biz" value={business} onChange={(e) => setBusiness(e.target.value)}><option value="">—</option>{OPT(BUSINESS_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
+            <Field className="dialog-section is-quiet" id="im-priority" label="優先度"><Combobox id="im-priority" ariaLabel="優先度" value={priority} onChange={setPriority} options={[{ value: "", label: "—" }, ...OPT(PRIORITY_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-source" label="情報ソース"><Combobox id="im-source" ariaLabel="情報ソース" value={source} onChange={setSource} options={[{ value: "", label: "—" }, ...OPT(SOURCE_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-class" label="情報分類"><Combobox id="im-class" ariaLabel="情報分類" value={classification} onChange={setClassification} options={[{ value: "", label: "—" }, ...OPT(CLASSIFICATION_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-scope" label="大分類"><Combobox id="im-scope" ariaLabel="大分類" value={scope} onChange={setScope} options={[{ value: "", label: "—" }, ...OPT(SCOPE_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-biz" label="対象事業"><Combobox id="im-biz" ariaLabel="対象事業" value={business} onChange={setBusiness} options={[{ value: "", label: "—" }, ...OPT(BUSINESS_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <div className="field dialog-section is-quiet">
               <div className="dialog-label">情報カテゴリ（複数可）</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -337,12 +337,12 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
                 ))}
               </div>
             </div>
-            <Field className="dialog-section is-quiet" id="im-impact" label="影響度"><select className="select" id="im-impact" value={impact} onChange={(e) => setImpact(e.target.value)}><option value="">—</option>{OPT(IMPACT_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-impactclass" label="影響分類"><select className="select" id="im-impactclass" value={impactClass} onChange={(e) => setImpactClass(e.target.value)}><option value="">—</option>{OPT(Object.fromEntries(Object.entries(IMPACT_CLASS_LABEL).map(([v, l]) => [v, l[0]]))).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <Field className="dialog-section is-quiet" id="im-timing" label="影響発生時期"><select className="select" id="im-timing" value={timing} onChange={(e) => setTiming(e.target.value)}><option value="">—</option>{OPT(TIMING_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
+            <Field className="dialog-section is-quiet" id="im-impact" label="影響度"><Combobox id="im-impact" ariaLabel="影響度" value={impact} onChange={setImpact} options={[{ value: "", label: "—" }, ...OPT(IMPACT_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-impactclass" label="影響分類"><Combobox id="im-impactclass" ariaLabel="影響分類" value={impactClass} onChange={setImpactClass} options={[{ value: "", label: "—" }, ...OPT(Object.fromEntries(Object.entries(IMPACT_CLASS_LABEL).map(([v, l]) => [v, l[0]]))).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
+            <Field className="dialog-section is-quiet" id="im-timing" label="影響発生時期"><Combobox id="im-timing" ariaLabel="影響発生時期" value={timing} onChange={setTiming} options={[{ value: "", label: "—" }, ...OPT(TIMING_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-due" label="期限日（対応/有効期限）"><input className="input" id="im-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
             <Field className="dialog-section is-quiet" id="im-triageon" label="情報判定日"><input className="input" id="im-triageon" type="date" value={triagedOn} onChange={(e) => setTriagedOn(e.target.value)} /></Field>
-            <Field className="dialog-section is-quiet" id="im-triage" label="情報判定"><select className="select" id="im-triage" value={triage} onChange={(e) => setTriage(e.target.value)}><option value="">—</option>{OPT(TRIAGE_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
+            <Field className="dialog-section is-quiet" id="im-triage" label="情報判定"><Combobox id="im-triage" ariaLabel="情報判定" value={triage} onChange={setTriage} options={[{ value: "", label: "—" }, ...OPT(TRIAGE_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-reason" label="判定理由"><textarea className="input" id="im-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="この判定に至った理由（任意・改行可）" /></Field>
           </div>
         </details>

@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Button, DataTable, Field, Modal, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Button, Combobox, DataTable, Field, Modal, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { RichTextEditor } from "@/components/richtext/RichTextEditor";
 import {
@@ -178,11 +178,12 @@ export function AnnouncementAdminView() {
             </Field>
             <div className="row-2">
               <Field id="an-status" label="状態">
-                <select className="select" id="an-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  <option value="draft">下書き（非公開）</option>
-                  <option value="published">公開する</option>
-                  {editingId && <option value="archived">アーカイブ</option>}
-                </select>
+                <Combobox id="an-status" ariaLabel="状態" value={status} onChange={setStatus}
+                  options={[
+                    { value: "draft", label: "下書き（非公開）" },
+                    { value: "published", label: "公開する" },
+                    ...(editingId ? [{ value: "archived", label: "アーカイブ" }] : []),
+                  ]} />
               </Field>
               <Field id="an-pin" label="ピン留め">
                 <label className="checkbox">

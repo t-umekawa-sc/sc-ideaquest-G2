@@ -353,6 +353,9 @@ canceled
 - LLM を使う各機能（初版は `info_summarize` の画面）に**モデル選択ピッカーを最初から常設**する。候補は `GET /ai-models?task_type=`（会社で有効なキー・§4.2）で供給し、既定キーを初期選択。
 - **候補が1つ（無料ローカルのみ有効）なら1件だけ表示**され、会社が有料モデルを ON にすると候補が増える。有料キーは「有料」バッジ（`billing=paid`）を表示。
 - **なぜ初版から**＝会社 ON/OFF で候補数が動的に変わる前提のため、`GET /ai-models` 駆動のピッカーを最初から置く（候補1でも同じ部品）＝後付けの手戻りを避ける（§3.4）。デザイン標準に沿った標準セレクトで実装。
+- **表示名/説明＝backend 由来（単一ソース）**＝`GET /ai-models` が `label`（表示名）/`description`（用途）を返す（registry `ModelSpec`）。ピッカーは key を出さず表示名で選ばせ、管理画面 `GET /admin/ai-models` も同じ label/description を使う（frontend にラベルを二重定義しない・DRY）。
+- **実装先（2026-10-07）**＝初版の常設ピッカーは**経営資料 ISO 生成（SC-81・`iso_generate`）**に導入済み（`POST /strategy-documents/{id}/generate` の `model` を導通・既定 `qwen3-swallow` を初期選択）。`info_summarize` は現状フロントが**クライアント抽出型の要約**で LLM ジョブ未結線のため、ピッカーは LLM 起動が結線される時に同じ部品で載せる。
+- **UI 形態＝モデル選択と生成ボタンの一体型「分割ボタン」（案A・2026-10-07 決定）**＝主ボタン「✨ AI で生成する」＋右端 ▾（使用モデル候補）。選択中モデル＋用途を直下に小さく表示。React 共通部品 `features/ai-jobs/AiGenerateControl`（候補＝`GET /ai-models?task_type=` 駆動・候補1でも常設）・CSS `.aigen*`（shared.css / design-system.css）・見本＝style-guide.html「4e」。③アイデア LLM 評価など他の LLM 起動 UI でも再利用する。不採用＝案B（セグメント一体バー）／案C（ボタン＋インラインモデル）。
 
 ### 9.3 管理画面「会社のLLM設定」（新規・`company_account_admin`・§4.2）
 

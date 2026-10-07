@@ -4,10 +4,11 @@
 // 冒頭に ⓘ ガイダンス（ScreenPurpose・§4.13）／ISO 要求項目はラベル横 icon-only ⓘ で入力解説。重点領域は自由入力ありの複数選択。
 import { useCallback, useEffect, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { emitAiJobsChanged } from "@/features/ai-jobs";
+import { AiGenerateControl, defaultModelKey, emitAiJobsChanged, fetchAiModels } from "@/features/ai-jobs";
+import type { AiModelItem } from "@/features/ai-jobs";
 import { cloudTokens } from "@/features/info-input/wordcloud";
 
 import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, fetchStrategyGeneration, fetchStrategyWordCloud, generateStrategyIso, getStrategyDoc, updateStrategyDoc } from "../api";
@@ -87,6 +88,8 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [exporting, setExporting] = useState(false); // AI 用 Markdown エクスポート中（R.5）
   const [generation, setGeneration] = useState<StrategyGeneration | null>(null); // Phase2 in-app 生成（最新ジョブ・R.6）
   const [generating, setGenerating] = useState(false);
+  const [models, setModels] = useState<AiModelItem[]>([]); // 生成に使えるモデル候補（会社で有効・設計§9.2）
+  const [modelKey, setModelKey] = useState<string | null>(null); // 選択中の論理モデルキー（初期=既定）
   const { summaryRef, notify } = useFormErrorNotice();
   const snack = useSnackbar();
 
@@ -95,7 +98,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
     if (!docId) return;
     setGenerating(true);
     try {
-      await generateStrategyIso(docId);
+      await generateStrategyIso(docId, modelKey);
       emitAiJobsChanged(); // ヘッダーの AIジョブ件数バッジを更新
       setGeneration({ job_id: "", status: "queued", result_text: null, error: null, finished_at: null });
       snack({ type: "success", title: "生成を開始しました", msg: "完了まで少し待ちます（AI処理状況でも確認できます）。" });
@@ -105,6 +108,17 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
       setGenerating(false);
     }
   };
+
+  // 生成に使えるモデル候補を取得（編集時のみ・会社で有効なキー＝候補1でも常設・設計§9.2）。既定キーを初期選択。
+  useEffect(() => {
+    if (!docId) return;
+    const ac = new AbortController();
+    fetchAiModels("iso_generate", ac.signal).then((ms) => {
+      setModels(ms);
+      setModelKey((cur) => cur ?? defaultModelKey(ms));
+    }).catch(() => {});
+    return () => ac.abort();
+  }, [docId]);
 
   // 生成中（queued/running）は結果が出るまで軽くポーリングして状態を更新する。
   useEffect(() => {
@@ -231,9 +245,8 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
           <input className="input" id="sd-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）2027-2029 中期経営計画" />
         </Field>
         <Field className="dialog-section is-quiet" id="sd-kind" label="種別">
-          <select className="select" id="sd-kind" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
-            {KIND_OPTS.map(({ v, l }) => <option key={v} value={v}>{l}</option>)}
-          </select>
+          <Combobox id="sd-kind" ariaLabel="種別" value={docKind} onChange={setDocKind}
+            options={KIND_OPTS.map(({ v, l }) => ({ value: v, label: l }))} />
         </Field>
         {/* 対象期間の開始/終了は同じ行に並べる（ユーザー指摘 2026-09-29）。 */}
         <div className="form-grid-2">
@@ -354,9 +367,14 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
           <div className="dialog-section gen-iso">
             <div className="dialog-label">🤖 AI で下書きを生成（ISO56001 §6）</div>
             <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連を基に、意図/戦略/方針のたたき台を<strong>アプリ内の自社ホスト LLM</strong>で生成します（外部送信しません）。生成されたら内容を確認し、各項目へ反映してください。</p>
-            <button type="button" className="btn btn-outline btn-sm" disabled={generating || generation?.status === "queued" || generation?.status === "running"} onClick={runGenerate}>
-              {generation?.status === "queued" || generation?.status === "running" ? "生成中…" : "✨ AI で生成する"}
-            </button>
+            {/* モデル選択＋生成を一体化（分割ボタン・案A・設計§9.2）。候補1でも常設・初期=既定。 */}
+            <AiGenerateControl
+              models={models}
+              modelKey={modelKey}
+              onModelChange={setModelKey}
+              onGenerate={runGenerate}
+              busy={generating || generation?.status === "queued" || generation?.status === "running"}
+            />
             {(generation?.status === "queued" || generation?.status === "running") && (
               <p className="hint" style={{ marginBottom: 0 }}>生成中です。完了するとここに下書きが表示されます（AI処理状況でも確認できます）。</p>
             )}

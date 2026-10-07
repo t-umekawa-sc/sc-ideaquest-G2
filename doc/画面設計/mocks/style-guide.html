@@ -947,6 +947,103 @@
     </script>
   </div>
 
+  <!-- AI生成コントロール（モデル選択一体型・検討中） -->
+  <div class="section" id="aigenDemo">
+    <h2>4e. AI生成コントロール（モデル選択＋生成ボタンの一体型）<span class="badge">案A採用</span></h2>
+    <p class="hint" style="margin-bottom:16px">「使用モデルの選択」と「✨ AI で生成する」を1つの部品に統合。<strong>案A（分割ボタン）を採用（2026-10-07）＝ shared.css の <code>.aigen*</code> へ移植済み・React は <code>features/ai-jobs/AiGenerateControl</code></strong>。候補は <code>GET /ai-models</code> 駆動（候補1でも常設・§9.2）。案B/C は不採用（参考・下のスコープ style のみ）。</p>
+    <style>
+      /* 案A の .aigen* は shared.css に移植済み（ここでは再定義しない）。案B/C は見本専用スコープ（不採用・参考）。 */
+
+      /* 案B＝セグメント一体バー（モデル部＋生成部を1枠に・不採用） */
+      #aigenDemo .aigen-seg { position:relative; display:inline-flex; align-self:flex-start; border:1px solid var(--color-border-strong); border-radius:var(--radius); }
+      #aigenDemo .aigen-seg__model { display:inline-flex; align-items:center; gap:8px; background:var(--color-surface); color:var(--color-text); border:none; font-size:var(--text-base); padding:var(--space-2) var(--space-3); cursor:pointer; border-radius:var(--radius) 0 0 var(--radius); }
+      #aigenDemo .aigen-seg__model:hover { background:var(--color-surface-alt); }
+      #aigenDemo .aigen-seg__arrow { color:var(--color-text-muted); }
+      #aigenDemo .aigen-seg__go { border:none; border-left:1px solid var(--color-primary-active); border-radius:0 var(--radius) var(--radius) 0; }
+
+      /* 案C＝ボタン＋インラインのモデル切替 */
+      #aigenDemo .aigen-inline__row { position:relative; display:inline-flex; align-items:center; gap:14px; align-self:flex-start; }
+      #aigenDemo .aigen-inline__model { background:transparent; border:none; color:var(--color-primary-active); font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:var(--text-sm); }
+      #aigenDemo .aigen-inline__model:hover { text-decoration:underline; }
+    </style>
+
+    <div class="demo-grid" style="grid-template-columns:1fr; gap:4px; max-width:620px">
+      <!-- 案A -->
+      <div class="field">
+        <label>案A：分割ボタン（主ボタン＋右端 ▾ で候補）</label>
+        <div class="aigen">
+          <div class="aigen-split" data-aigen-pop>
+            <button type="button" class="btn btn-primary aigen-split__main">✨ AI で生成する</button>
+            <button type="button" class="btn btn-primary aigen-split__caret" data-aigen-trigger aria-haspopup="listbox" aria-expanded="false" aria-label="使用モデルを選ぶ">▾</button>
+            <ul class="aigen-menu combobox__list" role="listbox" hidden>
+              <li class="combobox__option" role="option" data-aigen-opt data-label="高速（軽量）">高速（軽量）</li>
+              <li class="combobox__option" role="option" aria-selected="true" data-aigen-opt data-label="高品質（日本語）">高品質（日本語）<span class="aigen-badge">既定</span></li>
+            </ul>
+          </div>
+          <div class="aigen-sub">モデル：<span data-aigen-value data-prefix="">高品質（日本語）</span> ・ アイデア整形・長めの要約に向く</div>
+        </div>
+      </div>
+
+      <!-- 案B -->
+      <div class="field">
+        <label>案B：セグメント一体バー（モデル部＋生成部を1枠に）</label>
+        <div class="aigen">
+          <div class="aigen-seg" data-aigen-pop>
+            <button type="button" class="aigen-seg__model" data-aigen-trigger aria-haspopup="listbox" aria-expanded="false">
+              <span>⚙ <span data-aigen-value>高品質（日本語）</span></span><span class="aigen-seg__arrow">▾</span>
+            </button>
+            <button type="button" class="btn btn-primary aigen-seg__go">✨ AI で生成する</button>
+            <ul class="aigen-menu combobox__list" role="listbox" hidden>
+              <li class="combobox__option" role="option" data-aigen-opt data-label="高速（軽量）">高速（軽量）</li>
+              <li class="combobox__option" role="option" aria-selected="true" data-aigen-opt data-label="高品質（日本語）">高品質（日本語）<span class="aigen-badge">既定</span></li>
+            </ul>
+          </div>
+          <div class="aigen-sub">アイデア整形・長めの要約に向く</div>
+        </div>
+      </div>
+
+      <!-- 案C -->
+      <div class="field">
+        <label>案C：ボタン＋インラインのモデル切替</label>
+        <div class="aigen">
+          <div class="aigen-inline__row" data-aigen-pop>
+            <button type="button" class="btn btn-primary">✨ AI で生成する</button>
+            <button type="button" class="aigen-inline__model" data-aigen-trigger aria-haspopup="listbox" aria-expanded="false">モデル：<span data-aigen-value>高品質（日本語）</span> ▾</button>
+            <ul class="aigen-menu combobox__list" role="listbox" hidden style="left:auto; right:0">
+              <li class="combobox__option" role="option" data-aigen-opt data-label="高速（軽量）">高速（軽量）</li>
+              <li class="combobox__option" role="option" aria-selected="true" data-aigen-opt data-label="高品質（日本語）">高品質（日本語）<span class="aigen-badge">既定</span></li>
+            </ul>
+          </div>
+          <div class="aigen-sub">アイデア整形・長めの要約に向く</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        document.querySelectorAll('#aigenDemo [data-aigen-pop]').forEach(function (pop) {
+          var trigger = pop.querySelector('[data-aigen-trigger]');
+          var menu = pop.querySelector('.aigen-menu');
+          var opts = Array.prototype.slice.call(menu.querySelectorAll('[data-aigen-opt]'));
+          var valueEls = pop.parentElement.querySelectorAll('[data-aigen-value]');
+          function open() { menu.hidden = false; trigger.setAttribute('aria-expanded', 'true'); }
+          function close() { menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
+          trigger.addEventListener('click', function (e) { e.stopPropagation(); menu.hidden ? open() : close(); });
+          opts.forEach(function (o) {
+            o.addEventListener('click', function () {
+              opts.forEach(function (x) { x.setAttribute('aria-selected', 'false'); });
+              o.setAttribute('aria-selected', 'true');
+              var label = o.getAttribute('data-label') || o.textContent.trim();
+              valueEls.forEach(function (v) { v.textContent = label; });
+              close();
+            });
+          });
+          document.addEventListener('click', function (e) { if (!pop.contains(e.target)) close(); });
+        });
+      })();
+    </script>
+  </div>
+
   <!-- カード / バッジ -->
   <div class="section">
     <h2>5. カード / バッジ（アイデア一覧の見本）</h2>

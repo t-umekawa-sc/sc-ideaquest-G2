@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { QuestIcon } from "@/components/layout/QuestIcon";
-import { useConfirm, useSnackbar } from "@/components/ui";
+import { Combobox, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
@@ -44,10 +44,8 @@ function AttrSelect({ label, k, map, attrs, onSet }: {
   return (
     <div>
       <label className="dialog-label" htmlFor={`dm-${k}`}>{label}</label>
-      <select className="select" id={`dm-${k}`} value={attrs[k] ?? ""} onChange={(e) => onSet(k, e.target.value)}>
-        <option value="">—</option>
-        {Object.entries(map).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
+      <Combobox id={`dm-${k}`} ariaLabel={label} value={attrs[k] ?? ""} onChange={(val) => onSet(k, val)}
+        options={[{ value: "", label: "—" }, ...Object.entries(map).map(([v, l]) => ({ value: v, label: String(l) }))]} />
     </div>
   );
 }

@@ -67,3 +67,5 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | R-TC-120 | int | 生成縦1本＝資料→`iso_generate` 投入→worker(FakeChat)→succeeded→生成取得 | company_account_admin・資料1件 | `POST /{id}/generate`→`process_ai_jobs_once`→`GET /{id}/generation` | generate=202・queued／生成前は generation.status=queued・result_text=null／worker後 succeeded≥1／generation.status=succeeded・result_text 非空 | R.6／FR-45／設計§8 |
 | R-TC-121 | api | 生成は管理者のみ（一般は 403） | 資料1件・一般ユーザー | 一般で `POST /{id}/generate` | 403（require_company_account_admin） | R.6／R.0 |
+| R-TC-124 | int | 生成のモデル指定＝`POST /{id}/generate`（`model`=有効キー）で投入ジョブの `requested_model` に反映（クライアント側モデル選択の導通） | admin・資料1件 | `POST /{id}/generate`（model=qwen3-light）→投入された iso_generate ジョブを確認 | 202／投入ジョブの requested_model=qwen3-light（明示優先・§3.4）／model 省略時は requested_model=null（既定=task_type 既定） | R.6／FR-45／設計§3.4・§9.2 |
+| R-TC-125 | api | 生成の不正モデルは 422＝registry 無効/会社 OFF のキーは弾く | admin・資料1件 | `POST /{id}/generate`（model=bogus） | 422（field=model・ジョブは作られない） | R.6／S.2／設計§3.4 |

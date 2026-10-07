@@ -37,6 +37,7 @@
 | S-TC-113 | api | 会社 OFF のキーは選択不可（422） | paid キーが会社 OFF | `POST /ai-jobs`（model=OFFキー） | 422（会社無効） | S.2／§4.2 |
 | S-TC-114 | api | external ポリシー違反＝機微 task で外部キーは 422 | external=true キー・task ポリシー禁止 | `POST /ai-jobs`（機微 task＋external キー） | 422（データ主権・§10） | S.2／S.7 |
 | S-TC-115 | api | GET /ai-models＝会社で有効なキーのみ返す（候補1もあり得る） | 無料ローカルのみ ON | `GET /ai-models?task_type=info_summarize` | data に有効キーのみ・既定フラグ・billing 付き・OFF/未許可は出ない | S.2／§4.2 |
+| S-TC-134 | api | GET /ai-models＝各モデルに `label`（表示名）/`description`（用途説明）を返す（ピッカー供給源＝key を出さず表示名で選ばせる） | 無料ローカル ON | `GET /ai-models?task_type=iso_generate` | data 各要素に `label` 非空・`description` 非空＋既存の key/billing/external/is_default | S.2／設計§9.2・§7(GET /ai-models) |
 
 ## 3. 進捗・協調キャンセル（S.4・§5.5/§5.6）
 
@@ -89,3 +90,5 @@
 | S-TC-204 | unit | FakeChat＝決定的な要約テキスト＋usage（tokens）を返す（外部未接続） | FakeChat 注入 | `gateway.complete('info_summarize', messages)` | text 非空・input_tokens/output_tokens>0・provider/model が解決結果と一致・finish_reason='stop' | 設計 §3.1／§5.57 |
 | S-TC-205 | unit | 実プロバイダ到達不能は LLMUnavailable（呼び出し側でリトライ/failed へ） | OpenAICompatibleChat（未接続 base_url） | `client.complete(...)` | LLMUnavailable（例外型で分岐可能） | 設計 §5.4／embeddings 同流儀 |
 | S-TC-206 | unit | list_models＝会社の有効集合で論理キーを返す（task_type 絞り・既定フラグ） | 全 free ON | `registry.list_models(task_type='info_summarize', enabled_keys=...)` | qwen3-light を含む・is_default 正・billing/external 付き・OFF/未許可は出ない | S.2／設計 §3.4 |
+| S-TC-212 | unit | registry のメタ＝各論理キーが `label`/`description` を持ち list_models が返す（ピッカー表示名の単一ソース） | 既定 config | `registry.get('qwen3-light')`／`registry.list_models(task_type='iso_generate', enabled_keys=...)` | ModelSpec.label/description 非空／list_models の各 dict に label・description を含む | 設計§9.2・§4.1 |
+| S-TC-213 | unit | ピッカー初期選択＝`defaultModelKey` は is_default のキー・無ければ先頭・空なら null（候補1でも成立） | モデル配列（既定フラグ各種／空） | `defaultModelKey(models)`（frontend 純関数） | is_default のキーを返す／既定フラグ無しは先頭 key／空配列は null | 設計§9.2 |

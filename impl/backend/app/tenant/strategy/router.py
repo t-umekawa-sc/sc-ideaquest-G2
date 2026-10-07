@@ -16,6 +16,7 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.strategy import application as service
 from app.tenant.strategy.schemas import (
+    GenerationEnqueueRequest,
     GenerationEnqueueResponse,
     GenerationStatusResponse,
     QuestLinkAddRequest,
@@ -89,9 +90,12 @@ def export_strategy_document_markdown(doc_id: str, request: Request,
 @router.post("/strategy-documents/{doc_id}/generate", response_model=GenerationEnqueueResponse, status_code=202,
              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
 def generate_strategy_iso(doc_id: str, request: Request,
+                          body: GenerationEnqueueRequest | None = None,
                           session: dict = Depends(require_company_account_admin)):
     # Phase2 in-app 生成（iso_generate・FR-44 Phase2）＝AIジョブ基盤へ投入。結果は GET /generation で参照。
-    return service.generate_iso(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+    # model＝クライアント側で選んだ論理キー（省略時 task_type 既定・設計§3.4/§9.2）。不正/会社OFF は基盤で 422。
+    return service.generate_iso(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id,
+                               requested_model=body.model if body else None)
 
 
 @router.get("/strategy-documents/{doc_id}/generation", response_model=GenerationStatusResponse | None)

@@ -5,7 +5,7 @@
 // mode: create（+parentId で子追加 / +dupId で複製プリフィル）/ edit（taskId）。§4.7 検証（§2.1b）。
 import { useEffect, useMemo, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 
 import { createTask, listProjectMembers, listProjectTasks, patchTask } from "../api";
@@ -119,26 +119,20 @@ export function TaskForm({ projectId, taskId, parentId: parentIdProp, dupId, onD
           <input id="t_title" className="input" value={title} onChange={(e) => { setTitle(e.target.value); setErrors((x) => ({ ...x, title: "" })); }} placeholder="例: 打刻画面 実装" />
         </Field>
         <Field className="dialog-section is-quiet" id="t_kind" label="粒度">
-          <select id="t_kind" className="select" value={kind} onChange={(e) => setKind(e.target.value as TaskKind)}>
-            {(Object.keys(KIND_LABEL) as TaskKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-          </select>
+          <Combobox id="t_kind" ariaLabel="粒度" value={kind} onChange={(v) => setKind(v as TaskKind)}
+            options={(Object.keys(KIND_LABEL) as TaskKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))} />
         </Field>
         <Field className="dialog-section is-quiet" id="t_parent" label="親タスク" hint="未選択＝プロジェクト直下。同一プロジェクト内のみ。">
-          <select id="t_parent" className="select" value={parentId} onChange={(e) => setParentId(e.target.value)}>
-            <option value="">（プロジェクト直下）</option>
-            {parentOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+          <Combobox id="t_parent" ariaLabel="親タスク" value={parentId} onChange={setParentId}
+            options={[{ value: "", label: "（プロジェクト直下）" }, ...parentOptions.map((o) => ({ value: o.id, label: o.label }))]} />
         </Field>
         <Field className="dialog-section is-quiet" id="t_assignee" label="担当者" hint={noMembers ? "先に開発メンバーを追加してください（担当は開発メンバーに限ります）。" : "開発メンバーから選択（単一）。"}>
-          <select id="t_assignee" className="select" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={noMembers}>
-            <option value="">（未割当）</option>
-            {members.filter((m) => m.user).map((m) => <option key={m.user!.user_id} value={m.user!.user_id}>{m.user!.display_name}（{m.role === "lead" ? "リード" : "担当"}）</option>)}
-          </select>
+          <Combobox id="t_assignee" ariaLabel="担当者" value={assignee} onChange={setAssignee} disabled={noMembers}
+            options={[{ value: "", label: "（未割当）" }, ...members.filter((m) => m.user).map((m) => ({ value: m.user!.user_id, label: `${m.user!.display_name}（${m.role === "lead" ? "リード" : "担当"}）` }))]} />
         </Field>
         <Field className="dialog-section is-quiet" id="t_status" label="状態">
-          <select id="t_status" className="select" value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
-            {(Object.keys(STATUS_LABEL) as TaskStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-          </select>
+          <Combobox id="t_status" ariaLabel="状態" value={status} onChange={(v) => setStatus(v as TaskStatus)}
+            options={(Object.keys(STATUS_LABEL) as TaskStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))} />
         </Field>
         <Field className="dialog-section is-quiet" id="t_due" label="期日">
           <input id="t_due" type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />

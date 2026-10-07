@@ -4890,6 +4890,10 @@ export interface components {
             key: string;
             /** Billing */
             billing: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
             /** Enabled */
             enabled: boolean;
             /** Monthly Budget Micros */
@@ -5049,6 +5053,10 @@ export interface components {
             external: boolean;
             /** Billing */
             billing: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
             /** Is Default */
             is_default: boolean;
         };
@@ -7107,6 +7115,11 @@ export interface components {
         FollowResponse: {
             /** Following */
             following: boolean;
+        };
+        /** GenerationEnqueueRequest */
+        GenerationEnqueueRequest: {
+            /** Model */
+            model?: string | null;
         };
         /** GenerationEnqueueResponse */
         GenerationEnqueueResponse: {
@@ -18678,7 +18691,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GenerationEnqueueRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {

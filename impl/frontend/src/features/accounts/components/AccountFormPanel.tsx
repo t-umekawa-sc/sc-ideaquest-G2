@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Combobox, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
@@ -285,11 +285,12 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         </Field>
         {showRole && (
           <Field className="dialog-section is-quiet" id={`${idPrefix}_role`} label="システムロール">
-            <select id={`${idPrefix}_role`} className="select" value={systemRole} onChange={(e) => setSystemRole(e.target.value as SystemRole)}>
-              <option value="general">一般</option>
-              <option value="company_account_admin">会社アカウント管理者</option>
-              <option value="system_admin">システム管理者</option>
-            </select>
+            <Combobox id={`${idPrefix}_role`} ariaLabel="システムロール" value={systemRole} onChange={(v) => setSystemRole(v as SystemRole)}
+              options={[
+                { value: "general", label: "一般" },
+                { value: "company_account_admin", label: "会社アカウント管理者" },
+                { value: "system_admin", label: "システム管理者" },
+              ]} />
           </Field>
         )}
         {mode === "edit" && (
