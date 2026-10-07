@@ -47,6 +47,13 @@
 }
 /* 一覧ツールバー（.list-toolbar）・ページャ（.pagination）は design-system.css（＝mock shared.css）が正。ここでは定義しない。 */
 
+/* ②能力の汎用付与UI（CapabilitiesSection・SC-93）＝能力タブ＋タブ内に付与ボタン。
+   グローバル .tabs は quests.css で position:sticky のため、管理セクション内では static に上書き（info-page と同趣旨）。 */
+.caps-section .tabs { position: static; z-index: auto; box-shadow: none; padding-top: 0; background: transparent; margin: 0 0 var(--space-3); }
+.caps-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-3); }
+.caps-toolbar .hint { flex: 1 1 auto; }
+.caps-toolbar .btn { flex: 0 0 auto; }
+
 /* DataTable: 操作不可行（sys_admin＝SC-93）はクリック割当なし＝指カーソル/ホバー背景を出さない（§4.5⑪ クリック標準）。
    ※ shared.css §9y には未収録（SC-93 mock の inline 由来）＝feature スコープで補う。 */
 .table tr.dt-row--link.is-rowlocked { cursor: default; }

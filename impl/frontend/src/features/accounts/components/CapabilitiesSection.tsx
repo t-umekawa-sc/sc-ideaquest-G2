@@ -9,8 +9,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar, Button, DataTable, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { grantCapability, listCapabilityHolders, listOwnAccounts, revokeCapability } from "../api";
+import { grantCapability, listCapabilityHolders, listOwnAccounts, listOwnCompanyQuestGroups, revokeCapability } from "../api";
 import type { CapabilityHolder, CapabilityKey } from "../api";
+import { filterCapabilityCandidates } from "../capabilityCandidates";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css"; // admin-create/admin-toolbar（SC-93 の他セクションと同居）
 import "@/features/qgadmin/qgadmin.css"; // dir-list/dir-row/dir-more（メンバー追加ダイアログと同構成）
@@ -39,9 +40,18 @@ export function CapabilitiesSection() {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false); // 付与ダイアログの開閉
   const [q, setQ] = useState(""); // 会社ディレクトリ検索
+  const [group, setGroup] = useState(""); // クエストグループ絞り込み（""=すべて）
+  const [groups, setGroups] = useState<{ group_id: string; name: string }[]>([]); // 自社クエストグループ候補
   const [shown, setShown] = useState(PER); // 「もっと見る」で増える表示件数
 
   const meta = useMemo(() => CAPS.find((c) => c.key === cap) ?? CAPS[0], [cap]);
+
+  // 付与ダイアログのクエストグループ絞り込み候補＝自社のクエストグループ一覧（1回取得）。
+  useEffect(() => {
+    void listOwnCompanyQuestGroups()
+      .then((res) => setGroups((res?.data ?? []).map((g) => ({ group_id: g.group_id, name: g.name }))))
+      .catch(() => setGroups([]));
+  }, []);
 
   const reload = useCallback(async (key: CapabilityKey) => {
     setLoading(true);
@@ -52,18 +62,16 @@ export function CapabilitiesSection() {
   useEffect(() => { void reload(cap); }, [reload, cap]);
 
   const holderIds = useMemo(() => new Set(holders.map((c) => c.account_id)), [holders]);
-  // 付与候補＝有効（active）かつ当該能力を未付与のアカウント。検索は氏名/ログインID の部分一致（クライアント側・管理系は小規模）。
-  const candidates = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return accounts
-      .filter((a) => a.status === "active" && !holderIds.has(a.account_id))
-      .filter((a) => !needle || `${a.display_name} ${a.login_id}`.toLowerCase().includes(needle));
-  }, [accounts, holderIds, q]);
+  // 付与候補＝有効(active)かつ当該能力を未付与＋氏名/ログインID検索＋クエストグループ所属（純関数・T-TC-209）。
+  const candidates = useMemo(
+    () => filterCapabilityCandidates(accounts, { holderIds, q, groupId: group }),
+    [accounts, holderIds, q, group],
+  );
   const visible = candidates.slice(0, shown);
   const hasNext = candidates.length > shown;
 
-  // 検索変更・ダイアログ開閉・能力切替で表示件数をリセット（メンバー追加ダイアログの先頭ページ相当）。
-  useEffect(() => { setShown(PER); }, [q, open, cap]);
+  // 検索/グループ変更・ダイアログ開閉・能力切替で表示件数をリセット（メンバー追加ダイアログの先頭ページ相当）。
+  useEffect(() => { setShown(PER); }, [q, group, open, cap]);
   // 能力を切り替えたら付与ダイアログは閉じる（対象能力の取り違え防止）。
   useEffect(() => { setOpen(false); }, [cap]);
 
@@ -106,21 +114,24 @@ export function CapabilitiesSection() {
   ];
 
   return (
-    <section className="card admin-create admin-create--table" aria-label="②会社レベル能力の管理" style={{ marginTop: "var(--space-4)" }}>
+    <section className="card admin-create admin-create--table caps-section" aria-label="②会社レベル能力の管理" style={{ marginTop: "var(--space-4)" }}>
       <div className="admin-toolbar">
         <h2>権限（能力）の付与</h2>
-        <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>＋ 権限を付与する</button>
       </div>
-      {/* 能力セレクタ＝対象の能力を切り替える（選択能力の保有者一覧＋付与/剥奪を回す）。 */}
-      <div className="segmented" role="radiogroup" aria-label="能力の種類" style={{ marginBottom: "var(--space-2)" }}>
+      {/* 能力タブ＝対象の能力を切り替える（選択能力の保有者一覧＋付与/剥奪を回す）。 */}
+      <div className="tabs" role="tablist" aria-label="能力の種類">
         {CAPS.map((c) => (
-          <label key={c.key}>
-            <input type="radio" name="capability-kind" checked={cap === c.key} onChange={() => setCap(c.key)} />
+          <button key={c.key} type="button" role="tab" aria-selected={cap === c.key}
+                  className={`tab${cap === c.key ? " is-active" : ""}`} onClick={() => setCap(c.key)}>
             {c.label}
-          </label>
+          </button>
         ))}
       </div>
-      <p className="hint" style={{ marginTop: 0 }}>{meta.hint}</p>
+      {/* 付与ボタンはタブ内（選択中の能力に対して付与・ユーザー要望）。説明と同じ行に右寄せ。 */}
+      <div className="caps-toolbar">
+        <p className="hint" style={{ margin: 0 }}>{meta.hint}</p>
+        <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>＋ 権限を付与する</button>
+      </div>
 
       {loading ? (
         <p className="muted">読み込み中…</p>
@@ -146,11 +157,16 @@ export function CapabilitiesSection() {
             <div className="form-row dialog-section is-quiet">
               <label htmlFor="cap_search">会社ディレクトリを検索</label>
               <input id="cap_search" className="input" type="search" placeholder="氏名・ログインIDで検索" value={q} onChange={(e) => setQ(e.target.value)} />
+              {/* クエストグループでの絞り込み（ユーザー要望）＝所属メンバーだけに絞る（""=すべて）。 */}
+              <select id="cap_group" className="select" aria-label="クエストグループで絞り込み" value={group} onChange={(e) => setGroup(e.target.value)} style={{ marginTop: "var(--space-2)" }}>
+                <option value="">クエストグループ: すべて</option>
+                {groups.map((g) => <option key={g.group_id} value={g.group_id}>{g.name}</option>)}
+              </select>
               <div className="hint">自社の有効アカウントから選択。既に{meta.label}権限を持つ人は表示されません。</div>
             </div>
             <div className="dir-list">
               {visible.length === 0 ? (
-                <div className="dir-list__status">候補がありません。未発行の場合はアカウントを発行してください。</div>
+                <div className="dir-list__status">{q.trim() || group ? "条件に一致するユーザーがいません（検索・クエストグループ絞り込みを見直してください）。" : "候補がありません。未発行の場合はアカウントを発行してください。"}</div>
               ) : (
                 visible.map((a) => (
                   <div className="dir-row" key={a.account_id}>
