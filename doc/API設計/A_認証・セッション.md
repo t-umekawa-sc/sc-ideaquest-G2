@@ -231,7 +231,7 @@ stateDiagram-v2
   - 監査（SEC J）＝`signup.request`/`signup.verify`（成否）を request_id/tenant 付きで記録・PW/コードは出力しない。
 
 - **確定後の遷移（決定）**＝**ログイン画面へプリフィル誘導**（自動ログインしない）。SC-05 → 成功 → SC-00 状態A（会社コード/ログインID 充填・PW 入力）。
-- **外部依存 SEC は follow-up（決定 2026-10-07）**＝CAPTCHA（SEC G）・漏洩PW拒否〔HIBP〕（SEC D）・使い捨てメールドメイン判定（SEC G）は外部サービス依存のため MVP 対象外（設計に残置）。MVP は A/B/C/E/F/I/J＋レート制限（既存再利用）＋Origin 検証（既存再利用）＋PW 最低文字数。
+- **外部依存 SEC も実装済み（env-gated・2026-10-07）**＝CAPTCHA〔Turnstile・SEC G〕／漏洩PW拒否〔HIBP・SEC D〕／使い捨てメール判定〔ローカル blocklist・SEC G〕／管理者通知ダイジェスト〔SEC H〕。既定は安全側（OFF・本番で有効化）。`POST /public/signup` は `captcha_token`（CAPTCHA 有効時のみ必須）を受け、`GET /public/bootstrap` は `turnstile_site_key` を返す。詳細＝[設計ドラフト FR-48 SEC強化](../設計ドラフト/FR-48_セルフサインアップSEC強化.md)。
 
 ### A.11.4 セキュリティ必須要件（SEC A〜J・FR-48 実装の受入条件）
 
@@ -248,4 +248,4 @@ stateDiagram-v2
 | **I** | セッション | 自動ログインするなら新規セッション発行（固定化対策）。`email_verify` トークンで既存アカウントのセッションを取得できないよう purpose を厳格分離 |
 | **J** | ログ・監査・PII | PW/コードをログに出さない・試行を request_id/tenant 付きで監査・public はデータ保持/削除方針（デモ後クリーンアップ）・PII最小化（表示名以外を要求しない） |
 
-- **MVP 実装境界（決定 2026-10-07）**＝**実装**＝A（検証前に作らない・`signup_challenges`）／B（一律 202・out-of-band）／C（OTP 短命・単回・試行ロック・再送レート制限）／E（権限固定）／F（会社コード再検証）／I（自動ログインしない＝確定後ログイン誘導）／J（監査/PII 最小化）＋レート制限（既存再利用）＋Origin/Sec-Fetch（既存再利用）＋PW 最低文字数。**follow-up（外部サービス依存）**＝**D の漏洩PW拒否〔HIBP〕**・**G の CAPTCHA**・**G の使い捨てメールドメイン判定**（いずれも外部サービス/外部呼び出しのため後続・設計には残置）。
+- **実装状況（2026-10-07・全 SEC 実装済み）**＝A（検証前に作らない・`signup_challenges`）／B（一律 202・out-of-band）／C（OTP 短命・単回・試行ロック・再送レート制限）／E（権限固定）／F（会社コード再検証）／I（自動ログインしない＝確定後ログイン誘導）／J（監査/PII 最小化）＋レート制限＋Origin/Sec-Fetch＋PW 最低文字数。**外部依存の4点も env-gated で実装済み**＝**D 漏洩PW拒否〔HIBP range API・k-匿名性・`HIBP_ENABLED`〕**／**G CAPTCHA〔Cloudflare Turnstile・`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY`〕**／**G 使い捨てメール判定〔ローカル同梱 blocklist・`SIGNUP_DISPOSABLE_EMAIL_BLOCK`〕**／**H 管理者通知ダイジェスト〔`signup_registered`・クールダウンでまとめ・`SIGNUP_ADMIN_NOTIFY_ENABLED`〕**。既定は安全側（外部依存/副作用は OFF・本番で有効化）。詳細＝[設計ドラフト FR-48 SEC強化](../設計ドラフト/FR-48_セルフサインアップSEC強化.md)。

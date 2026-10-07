@@ -4,9 +4,9 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-07（セッション末）
+- 更新: 2026-10-07（セッション末・FR-48② SEC強化4点まで完了）
 - ブランチ: `main`（main 直 push が慣習・本セッションも都度 push 済）
-- 最新コミット: `b1da82d3 feat(signup): セルフサインアップ frontend（SC-05＋SC-00 更新＋/public/* 結線）FR-48②`
+- 最新コミット: `b3930606 feat(signup): セルフサインアップ SEC強化4点（CAPTCHA/漏洩PW/使い捨てメール/管理者通知）FR-48②`
 - working tree: **clean**（全コミット＆push 済み・この handoff コミットを除く）。
 - alembic heads（ファイル基準）: control=`0020_signup_challenges`（**本セッションで追加**）／company=`0054_announcements`。
 - 本セッションのコミット（古→新）: `768b2ea5`（info テスト冪等化）/`e43b3489`（公開モード業務ルート404存在秘匿＋SC-50導線）/`a9ec44e3`+`676294a3`（お知らせ公開閲覧可）/`f111d4d2`（FR-48②設計反映）/`b0ddb6fc`（FR-48② backend）/`b1da82d3`（FR-48② frontend）。
@@ -56,7 +56,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **SEC-MVP＝外部依存は follow-up**＝CAPTCHA・漏洩PW拒否HIBP・使い捨てメール判定は外部サービス依存のため後続（設計には残置）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-1. **FR-48② follow-up（外部依存SEC）**＝(a) CAPTCHA（Turnstile 等・無料だが外部サービス・`POST /public/signup` 前段）／(b) 漏洩PW拒否（HIBP k-anonymity・`public/application.signup` の PW 検証に追加）／(c) 使い捨てメールドメイン判定（ローカルblocklist 可）／(d) 管理者への新規登録通知ダイジェスト（SEC H・`signup verify` 後）。正＝API設計A §A.11.4・設計§8.4。
+1. **【完了 2026-10-07】FR-48② SEC強化4点**＝CAPTCHA〔Turnstile・`core/captcha.py`〕／漏洩PW〔HIBP・`core/pwned.py`〕／使い捨てメール〔`core/disposable_email.py`＋`disposable_domains.txt`〕／管理者通知ダイジェスト〔`signup_registered`・verify post-commit〕。すべて env-gated（`b3930606`・設計 `doc/設計ドラフト/FR-48_セルフサインアップSEC強化.md`）。**本番で要作業＝CAPTCHA の Cloudflare アカウント＋Site/Secret key を env に設定、`HIBP_ENABLED=true`・`SIGNUP_ADMIN_NOTIFY_ENABLED=true` を本番で ON**。他は不要。
 2. **公開デプロイ既定会社コードの供給検証**＝env `IQ_DEFAULT_COMPANY_CODE=DEMO` を公開デプロイで設定した際に SC-00 の会社コード欄が隠れ「アカウント作成」導線が出ることを実機確認（dev 共有スタックには設定しない＝ACME ログインUXを壊すため）。
 3. **アイデアコンテストの他 未実装**＝`doc/設計ドラフト/アイデアコンテスト機能_設計.md` の正式反映残／Phase2（妥当性解析 §6.4 等）。着手前にコードで現況裏取り（memory「未実装記述は done が多い」）。
 4. **SC-01 設計書 §3〜9 を5ゾーンに整合**（持ち越し・`doc/画面設計/screens/SC-01_ダッシュボード.md` 本文は再設計前のまま）。
