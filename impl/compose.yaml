@@ -96,6 +96,13 @@ services:
       OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-30}
       PREAUTH_TTL_SECONDS: ${PREAUTH_TTL_SECONDS:-600}
       TRUSTED_DEVICE_TTL_SECONDS: ${TRUSTED_DEVICE_TTL_SECONDS:-2592000}
+      # セルフサインアップ（FR-48②）。既定は安全側（空/false）＝未設定なら現行挙動のまま。本番/検証で設定。
+      IQ_DEFAULT_COMPANY_CODE: ${IQ_DEFAULT_COMPANY_CODE:-}                   # 既定会社コード（public デプロイのみ・会社コード欄を隠す・§8.1）
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}                            # CAPTCHA site key（公開・空で無効）
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}                        # CAPTCHA secret（秘匿・空で無効）
+      HIBP_ENABLED: ${HIBP_ENABLED:-false}                                  # 漏洩PW拒否 HIBP（prod で true・外部 range API）
+      SIGNUP_DISPOSABLE_EMAIL_BLOCK: ${SIGNUP_DISPOSABLE_EMAIL_BLOCK:-true}  # 使い捨てメール拒否（ローカル blocklist・既定 ON）
+      SIGNUP_ADMIN_NOTIFY_ENABLED: ${SIGNUP_ADMIN_NOTIFY_ENABLED:-false}     # 新規登録の管理者通知（prod で true）
       # ログイン試行レート制限（ADR-0005・IP+login_id/窓）。dev/e2e は直列で同一 OPS 管理者へ多数ログインするため既定 10 では自己スロットルする→ヘッドルームを確保（prod は別 env で不変）。
       LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-50}
       LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
