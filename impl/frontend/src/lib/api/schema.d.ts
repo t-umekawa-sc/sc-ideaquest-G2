@@ -1383,6 +1383,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/promote-to-quest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Idea To Quest
+         * @description アイデア→クエスト昇格（T.5・FR-47・§7・決定H）＝別実体の独立業務クエストへ種継ぎ。要 `quest_create`。
+         */
+        post: operations["promote_idea_to_quest_api_v1_ideas__idea_id__promote_to_quest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/publish": {
         parameters: {
             query?: never;
@@ -7212,6 +7232,11 @@ export interface components {
              * @default false
              */
             is_contest: boolean;
+            /**
+             * Can Promote
+             * @default false
+             */
+            can_promote: boolean;
             /** Current Revision */
             current_revision: number;
             author: components["schemas"]["IdeaAuthorDTO"];
@@ -13351,6 +13376,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestCandidatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_idea_to_quest_api_v1_ideas__idea_id__promote_to_quest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
                 };
             };
             /** @description Validation Error */

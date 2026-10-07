@@ -127,7 +127,13 @@ def get_idea_detail(account_id, company_id, idea_id) -> dict:
             raise AppError(404, "not_found")  # 下書きは本人のみ
         if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
             raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
-        return _build_detail(ts, idea, user.id)
+        detail = _build_detail(ts, idea, user.id)
+        # 昇格導線の出し分け（SC-22・T.5・FR-47・サーバー権威）＝コンテスト配下×非public×`quest_create`/管理者。
+        # ゲートは POST /ideas/{id}/promote-to-quest と同一（`quests.application._can_create_quest`）＝一か所で一致。
+        if detail.get("is_contest") and company.access_mode != "public":
+            from app.tenant.quests import application as quests_app
+            detail["can_promote"] = quests_app._can_create_quest(account_id, ts, user.id)
+        return detail
 
 
 def _can_dispose_idea(ts, idea, user) -> bool:

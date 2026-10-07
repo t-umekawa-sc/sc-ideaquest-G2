@@ -511,6 +511,56 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     return detail
 
 
+def _compose_promote_purpose(idea) -> str | None:
+    """昇格クエストの目的＝由来アイデアの本文＋狙う価値を種にする（T.5・§7）。空なら None。"""
+    parts = [idea.body or ""]
+    if idea.value:
+        parts.append(f"【狙う価値】{idea.value}")
+    text = "\n\n".join(p for p in parts if p).strip()
+    return text or None
+
+
+def promote_idea_to_quest(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str) -> dict:
+    """アイデア→クエスト昇格（FR-47・T.5・§7・決定H）＝由来アイデアを種に**別実体の独立業務クエスト**を起票。
+
+    内容（タイトル/本文/狙う価値）をコピーし、`quests.origin_idea_id` で由来参照を保持（トレーサビリティ）。
+    器クエスト（contest backing quest）とは混ぜない（決定H）。要 `quest_create`（②会社レベル能力・社内のみ）。
+    public（コンテスト専用テナント）では業務機能の昇格は「存在しない」＝404 存在秘匿（決定O/P'・§8.0）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    # 社内のみ（決定H）＝public 会社は業務EPを塞ぐ。/ideas 配下は外周ガード（access_gate）を素通りするため、
+    # 昇格は業務機能として明示的に 404（存在秘匿・決定P'）にする（コンテスト専用テナントでは管理者も不可・決定O）。
+    if company.access_mode == "public":
+        raise AppError(404, "not_found", detail="お探しのリソースは見つかりません。")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        # クエスト作成権限ゲート（②会社レベル能力 `quest_create`・FR-47・決定K）＝管理者は常時可。
+        if not _can_create_quest(account_id, ts, user.id):
+            raise AppError(403, "forbidden", detail="クエストを作成する権限がありません",
+                           extra={"errors": [{"code": "capability_required", "capability": "quest_create"}]})
+        idea = ideas_repo.get_idea(ts, iid)
+        if idea is None or idea.deleted_at is not None:
+            raise AppError(404, "not_found", detail="アイデアが見つかりません")
+        title = _validate_title(idea.title)
+        quest = repo.create_quest(
+            ts, owner_id=user.id, title=title, color=company.color or "#6366F1",
+            status="draft", purpose=_compose_promote_purpose(idea), origin_idea_id=idea.id,
+        )
+        ts.flush()  # quest.id 確定（パーティー/リビジョン/トークンの FK に使う）
+        # 作成者は常にパーティー員＝owner（通常作成 C.0 と同型）。
+        repo.add_member(ts, quest.id, user.id, permissions=_ALL_PERMISSIONS, granted_by_id=user.id)
+        _record_quest_revision_if_changed(ts, quest, user.id)  # 初版（定義スナップ・§3.1）
+        _persist_quest_tokens(ts, quest)  # 前向き自動関連付けの永続トークン（§5.36b）
+        detail = _build_detail(ts, quest, user.id)
+        ts.commit()
+    return detail
+
+
 def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, body) -> dict:
     """クエストを編集（C.2・SC-11「下書き保存」/全体編集）。差分＝送られたフィールドのみ適用。
 

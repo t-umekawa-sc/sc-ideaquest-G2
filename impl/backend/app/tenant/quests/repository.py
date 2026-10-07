@@ -54,10 +54,12 @@ def create_quest(
     icon_image_path: str | None = None,
     discoverable: bool = False,
     quest_id: uuid.UUID | None = None,
+    origin_idea_id: uuid.UUID | None = None,
 ) -> Quest:
     """クエストを1件作成（カテゴリ/パーティー/参加部署は別プリミティブ）。作成者を owner_id に保存。
 
     参加部署（クエストグループ）は `quest_group_links` に保持＝本体は単一グループ FK を持たない（§5.6b・FR-38）。
+    `origin_idea_id`＝アイデア→クエスト昇格（FR-47・T.5・決定H）の由来参照（通常作成は None）。
     """
     quest = Quest(
         id=quest_id or uuid.uuid4(),
@@ -69,6 +71,7 @@ def create_quest(
         deadline=deadline,
         icon_image_path=icon_image_path,
         discoverable=discoverable,
+        origin_idea_id=origin_idea_id,
     )
     session.add(quest)
     return quest

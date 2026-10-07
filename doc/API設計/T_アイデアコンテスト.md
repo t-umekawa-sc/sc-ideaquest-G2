@@ -76,7 +76,11 @@
 
 | メソッド / パス | 概要 | 補足 |
 |---|---|---|
-| `POST /ideas/{id}/promote-to-quest`（要 `quest_create`） | **別実体の独立業務クエストへ種継ぎ**（内容コピー＋`quests.origin_idea_id` で由来参照） | 決定H＝器クエストと業務クエストを混ぜない。コンセプト創造・検証（FR-42）以降へ接続。社内のみ（`public`/公開参加者には出さない） |
+| `POST /ideas/{id}/promote-to-quest`（要 `quest_create`） | **別実体の独立業務クエストへ種継ぎ**（内容コピー＝タイトル／本文＋狙う価値を `purpose` へ・作成者を owner でパーティー投入・初版リビジョン／`quests.origin_idea_id` で由来参照） | 決定H＝器クエストと業務クエストを混ぜない。コンセプト創造・検証（FR-42）以降へ接続。社内のみ（`public`/公開参加者には出さない） |
+
+- **ゲート**＝`quest_create`（②会社レベル能力）または管理者（通常のクエスト作成 C.2 と同一＝`quests.application._can_create_quest`・一か所で一致）。能力なしは `403`（`capability_required`）。
+- **社内のみ（決定O/P'）**＝`/ideas` 配下は公開モード外周ガード（access_gate）を素通りするため、**`public` 会社では application で明示 `404`（存在秘匿）**（コンテスト専用テナントでは管理者も不可）。
+- **出し分け（SC-22・サーバー権威）**＝`GET /ideas/{id}` の `can_promote`＝コンテスト配下（`is_contest`）×非`public`×上記ゲートで `true`。frontend はこれで「🚀 クエストへ昇格」導線を表示（成功後は新クエストへ遷移）。
 
 ## T.6 既存規約準拠
 

@@ -23,7 +23,7 @@ import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@
 import { decideIdeaParticipation, getIdeaParticipation, requestIdeaParticipation, type IdeaParticipationContext } from "@/features/contests/api";
 import { RelatedInfoPanel } from "@/features/info-input";
 
-import { deleteIdea, followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
+import { deleteIdea, followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, promoteIdeaToQuest, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { isVotingClosed, todayISODate, votePercents } from "../voting";
 import { IdeaForm } from "./IdeaForm";
 import { RevisionHistory } from "./RevisionHistory";
@@ -114,6 +114,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [following, setFollowing] = useState(false);
   const [voteBusy, setVoteBusy] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [promoteBusy, setPromoteBusy] = useState(false);
   // 評価結果（F.1 集計）＋選定状態（楽観更新）。
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [selected, setSelected] = useState(false);
@@ -311,6 +312,30 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     }
   }, [idea, confirm, snack, router]);
 
+  // アイデア→クエスト昇格（T.5・FR-47・社内のみ・要 quest_create）。コンテストの有望アイデアを種に
+  // 別実体の独立業務クエストを起票（内容コピー＋由来参照）＝コンセプト創造・検証以降へ接続。
+  // ボタンは can_promote（サーバー権威＝コンテスト配下×非public×権限）でのみ表示。成功後は新クエストへ遷移。
+  const handlePromote = useCallback(async () => {
+    if (!idea) return;
+    const ok = await confirm({
+      title: "クエストへ昇格",
+      msg: `「${idea.title}」を種に新しいクエストを作成します。内容（本文・狙う価値）がコピーされ、由来としてこのアイデアが参照されます。`,
+    });
+    if (!ok) return;
+    setPromoteBusy(true);
+    try {
+      const q = await promoteIdeaToQuest(idea.id);
+      if (q) {
+        snack({ type: "success", title: "クエストを作成しました", msg: "由来アイデアを種に業務クエストを起票しました。" });
+        router.push(`/quests/${q.id}`);
+      }
+    } catch (e) {
+      snack({ type: "error", title: "昇格できませんでした", msg: e instanceof ApiError ? e.message : "権限が必要な場合があります。時間をおいて再度お試しください。" });
+    } finally {
+      setPromoteBusy(false);
+    }
+  }, [idea, confirm, snack, router]);
+
   // 選定/選定解除（F.3・owner/quest_admin）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
   const handleSelect = useCallback(async () => {
     if (selectBusy) return;
@@ -492,6 +517,19 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                 {/* 削除＝⋮の最下部（danger・操作統一§4.14）。削除は親クエスト依存をやめ詳細にも常設。 */}
                 <RowMenu items={[{ label: "アイデアを削除", danger: true, onClick: () => void onDeleteIdea() }]} />
               </>
+            )}
+            {/* クエストへ昇格（T.5・FR-47）＝コンテストの有望アイデアを種に業務クエストを起票。
+                表示は can_promote（サーバー権威＝コンテスト配下×非public×quest_create/管理者）のみ。 */}
+            {idea.can_promote && (
+              <button
+                className="btn btn-outline"
+                type="button"
+                disabled={promoteBusy}
+                title="このアイデアを種に新しいクエストを作成します"
+                onClick={() => void handlePromote()}
+              >
+                🚀 クエストへ昇格
+              </button>
             )}
           </div>
         </div>

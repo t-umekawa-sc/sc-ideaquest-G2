@@ -19,6 +19,7 @@ export type IdeaRevisionListResponse = components["schemas"]["IdeaRevisionListRe
 export type IdeaRevisionDiff = components["schemas"]["IdeaRevisionDiffResponse"];
 export type IdeaDiffField = components["schemas"]["IdeaDiffField"];
 export type IdeaDiffSegment = components["schemas"]["IdeaDiffSegment"];
+export type PromotedQuest = components["schemas"]["QuestDetailDTO"];
 
 // アイデアの変更（作成/公開/編集/削除）通知イベント名。URL モーダル（別ルート）からの成功時に window へ発火し、
 // クエスト詳細のアイデアタブ（QuestDetailView）が購読して再取得する（跨ルートの疎結合ブリッジ・QUESTS_CHANGED と同方式）。
@@ -86,6 +87,11 @@ export function removeVote(ideaId: string): Promise<null> {
 // アイデアをフォロー（SC-22・D.6・冪等・パーティ所属）。completed 後の新規は 409。
 export function followIdea(ideaId: string): Promise<null> {
   return apiFetch<null>(`/ideas/${ideaId}/follow`, { method: "POST" }) as Promise<null>;
+}
+
+// アイデア→クエスト昇格（T.5・FR-47・社内のみ・要 quest_create）＝別実体の独立業務クエストを起票して返す。
+export function promoteIdeaToQuest(ideaId: string): Promise<PromotedQuest | null> {
+  return apiFetch<PromotedQuest>(`/ideas/${ideaId}/promote-to-quest`, { method: "POST" });
 }
 
 // フォロー解除（D.6・冪等・completed 後も可）。

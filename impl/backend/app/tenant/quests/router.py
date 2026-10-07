@@ -341,6 +341,21 @@ def create_quest(
     return QuestDetailDTO(**result)
 
 
+@router.post("/ideas/{idea_id}/promote-to-quest", response_model=QuestDetailDTO, status_code=201)
+def promote_idea_to_quest(
+    idea_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestDetailDTO:
+    """アイデア→クエスト昇格（T.5・FR-47・§7・決定H）＝別実体の独立業務クエストへ種継ぎ。要 `quest_create`。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.promote_idea_to_quest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+    return QuestDetailDTO(**result)
+
+
 @router.patch("/quests/{quest_id}", response_model=QuestDetailDTO)
 def update_quest(
     quest_id: str,

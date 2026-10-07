@@ -235,6 +235,7 @@ class IdeaDetailDTO(BaseModel):
     status: str
     is_selected: bool
     is_contest: bool = False            # コンテスト配下のアイデアか（SC-22 で関連情報パネルを非表示・FR-46）
+    can_promote: bool = False           # クエストへ昇格できるか＝コンテスト配下×非public×`quest_create`/管理者（T.5・FR-47・サーバー権威）
     current_revision: int
     author: IdeaAuthorDTO
     icon_image_url: str | None = None  # 表示用に解決したアイデアアイコン（個別→作成者既定→null）。
