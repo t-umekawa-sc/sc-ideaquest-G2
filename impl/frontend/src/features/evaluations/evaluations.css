@@ -38,14 +38,7 @@
 .eval-summary__avg { font-size: var(--text-2xl); font-weight: 800; color: var(--color-primary); }
 .eval-summary__note { font-size: var(--text-xs); color: var(--color-text-muted); flex: 1; min-width: 180px; }
 
-/* 公開範囲 */
-.visibility { display: flex; flex-direction: column; gap: var(--space-2); }
-.vis-opt { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); cursor: pointer; }
-.vis-opt:hover { background: var(--color-surface-alt); }
-.vis-opt input { margin-top: 3px; accent-color: var(--color-primary); cursor: pointer; }
-.vis-opt.is-sel { border-color: var(--color-primary); background: var(--color-primary-soft); }
-.vis-opt__title { font-weight: 600; }
-.vis-opt__desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+/* 公開範囲＝共有の縦ラジオ `.radio-list`/`.radio-opt`（design-system.css）へ統合（DRY・旧 .visibility/.vis-opt は撤去）。 */
 
 /* ── ゲーム感 #22: 評価の星採点の手触り（SC-25・純CSS）───────────────────────────────
    ホバーした星の拡大＋点灯星のグロー、確定時に星がフィルスイープでポップ（data-pop）。reduce-motion 尊重。 */

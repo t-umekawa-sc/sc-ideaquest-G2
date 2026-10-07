@@ -64,6 +64,26 @@ test("B-TC-180 public-mode row: state word single-line + desc says 404", { tag: 
   expect(stateH, "状態語が折り返さず単一行").toBeLessThan(28);
 });
 
+// B-TC-181（受入指摘）「経営資料との整合の測り方」が縦ラジオ（共有 .radio-list）＝旧 select から変更。
+test("B-TC-181 alignment-method setting renders as vertical radio list", { tag: "@serial" }, async ({ page }) => {
+  await formLogin(page, OPS);
+  const list = await (await page.request.get(`/api/v1/admin/companies?q=ACME-01&per_page=100`)).json();
+  const co = (list.data ?? []).find((c: { company_code: string }) => c.company_code === "ACME-01");
+  expect(co, "ACME-01 が一覧APIに現れる").toBeTruthy();
+  await page.goto(`/admin/companies/${co.company_id}`);
+
+  const row = page.locator(".setting-row", { hasText: "経営資料との整合の測り方" });
+  await expect(row).toBeVisible();
+  // 縦ラジオ＝3肢・select ではない。
+  await expect(row.locator(".radio-list .radio-opt")).toHaveCount(3);
+  await expect(row.locator("select")).toHaveCount(0);
+  // 既定「キーワード」が選択（.is-sel＋radio checked）。
+  const selected = row.locator(".radio-opt.is-sel");
+  await expect(selected).toHaveCount(1);
+  await expect(selected.locator(".radio-opt__title")).toContainText("キーワード");
+  await expect(selected.locator("input[type=radio]")).toBeChecked();
+});
+
 // B-TC-121: 一般ユーザーは SC-92 会社詳細に入れない（サーバーガード＝/ へリダイレクト）。
 // ※ガードは system_role!=="system_admin" で一律 redirect＝company_account_admin も同じ分岐（backend SoD は B-TC-095）。
 test("B-TC-121 general user cannot access SC-92 detail", { tag: "@serial" }, async ({ page }) => {

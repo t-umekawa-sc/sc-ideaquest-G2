@@ -468,19 +468,19 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         {/* 公開範囲＝上に薄い仕切り線で採点/集計と区切る（§4.1 ダイアログ内コンテンツ標準）。 */}
         <div className="field dialog-section is-quiet">
           <label>評価結果の公開範囲</label>
-          <div className="visibility">
-            <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
+          <div className="radio-list">
+            <label className={"radio-opt" + (visibility === "party" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="party" checked={visibility === "party"} onChange={() => setVisibility("party")} />
               <span>
-                <span className="vis-opt__title">🔓 パーティ全員に公開（既定）</span>
-                <span className="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・観点別コメントを閲覧できます。フィードバックを全員で共有。</span>
+                <span className="radio-opt__title">🔓 パーティ全員に公開（既定）</span>
+                <span className="radio-opt__desc">当該クエストの参加メンバー全員が、スコア・観点別コメントを閲覧できます。フィードバックを全員で共有。</span>
               </span>
             </label>
-            <label className={"vis-opt" + (visibility === "limited" ? " is-sel" : "")}>
+            <label className={"radio-opt" + (visibility === "limited" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="limited" checked={visibility === "limited"} onChange={() => setVisibility("limited")} />
               <span>
-                <span className="vis-opt__title">🔒 限定公開</span>
-                <span className="vis-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーには集計にも含めず完全非表示。</span>
+                <span className="radio-opt__title">🔒 限定公開</span>
+                <span className="radio-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーには集計にも含めず完全非表示。</span>
               </span>
             </label>
           </div>

@@ -294,6 +294,7 @@
 | B-TC-113 | e2e | 会社設定トグルのサーバー永続 | OPS system_admin | SC-91 で会社作成→会社名リンクで詳細へ→設定トグル（MFA）→リロード | 詳細に会社名/コード/状態＋設定が表示され、トグルした値が**リロード後も保持**（サーバー保存） | SC-92／B.1 |
 | B-TC-121 | e2e | 非 system_admin 一律リダイレクトの担保 | 一般ユーザー（general） | `/admin/companies/{id}`（SC-92 詳細）を開く | `/` へリダイレクト＝サーバーガード。**`system_role!=="system_admin"` は一律 redirect＝company_account_admin も同分岐**（frontend で company_account_admin を別途検証しない理由。SoD の越権不可は backend B-TC-095 が担保）。SC-93 は system_admin を上位互換で許可＝リダイレクトしない（B-TC-117） | B.0.1 P6／§8-⑯ |
 | B-TC-180 | e2e | 公開（コンテスト専用）モード行の表示崩れ/文言（受入指摘の回帰・§5.3） | OPS system_admin・会社詳細（ACME-01 を一覧APIで解決し直接遷移） | 会社設定の「公開（コンテスト専用）モード」行を検証 | ①状態語「非公開」が**1行に収まる**（`.switch__state` 高さが単一行＝修正前は折り返して2行高に膨らむ・共有 `.switch__state{white-space:nowrap}`）／②補足文が**「404＝存在秘匿」**を含み「403」を含まない（業務EPは外周ガードで404＝存在秘匿） | FR-48 §8.0・決定P'（業務EP=404存在秘匿）／デザイン標準（.switch 状態語）／SC-92 |
+| B-TC-181 | e2e | 「経営資料との整合の測り方」が縦ラジオ（受入指摘・select→.radio-list） | OPS system_admin・会社詳細（ACME-01 直接遷移） | 「経営資料との整合の測り方」行を検証 | 共有 `.radio-list`（縦ラジオ）で**3肢**（キーワード/意味/ハイブリッド）が出る・`<select>` ではない・既定「キーワード」が `.is-sel`＋`input:checked` | デザイン標準（§4 縦ラジオ .radio-list）／FR-44 A-2／SC-92 |
 
 ## 10. frontend e2e（SC-92B アカウント管理・B.2/B.5）
 

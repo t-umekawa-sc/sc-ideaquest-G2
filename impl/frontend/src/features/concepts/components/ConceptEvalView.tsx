@@ -218,22 +218,22 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
           </div>
         </Field>
 
-        {/* 公開範囲＝アイデア評価(SC-25)と同じ .visibility/.vis-opt ラジオを再利用。 */}
+        {/* 公開範囲＝アイデア評価(SC-25)と同じ共有 .radio-list/.radio-opt ラジオを再利用。 */}
         <div className="field dialog-section is-quiet">
           <label>評価結果の公開範囲</label>
-          <div className="visibility">
-            <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
+          <div className="radio-list">
+            <label className={"radio-opt" + (visibility === "party" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="party" checked={visibility === "party"} onChange={() => setVisibility("party")} />
               <span>
-                <span className="vis-opt__title">🔓 パーティ全員に公開（既定）</span>
-                <span className="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・推奨・総評を閲覧できます。</span>
+                <span className="radio-opt__title">🔓 パーティ全員に公開（既定）</span>
+                <span className="radio-opt__desc">当該クエストの参加メンバー全員が、スコア・推奨・総評を閲覧できます。</span>
               </span>
             </label>
-            <label className={"vis-opt" + (visibility === "limited" ? " is-sel" : "")}>
+            <label className={"radio-opt" + (visibility === "limited" ? " is-sel" : "")}>
               <input type="radio" name="vis" value="limited" checked={visibility === "limited"} onChange={() => setVisibility("limited")} />
               <span>
-                <span className="vis-opt__title">🔒 限定公開</span>
-                <span className="vis-opt__desc">作成者＋評価者＋所有者/クエスト管理のみが閲覧できます（範囲外は非表示・集計にも含めません）。</span>
+                <span className="radio-opt__title">🔒 限定公開</span>
+                <span className="radio-opt__desc">作成者＋評価者＋所有者/クエスト管理のみが閲覧できます（範囲外は非表示・集計にも含めません）。</span>
               </span>
             </label>
           </div>

@@ -427,22 +427,30 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
           </div>
         </div>
 
-        {/* 経営資料整合の類似度方式（FR-44・A-2）＝アイデアと経営資料の「整合率」の測り方。 */}
-        <div className="setting-row">
+        {/* 経営資料整合の類似度方式（FR-44・A-2）＝アイデアと経営資料の「整合率」の測り方。縦ラジオ（共有 .radio-list・ユーザー要望）。 */}
+        <div className="setting-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
           <div className="setting-row__info">
             <div className="setting-row__name">経営資料との整合の測り方</div>
-            <div className="setting-row__desc">アイデアと経営資料の「整合率」の算出方式。キーワード＝語の一致（速く決定的）／意味＝言い回しが違っても意味が近ければ高い（埋め込み）／ハイブリッド＝両者の組み合わせ。変更すると既存アイデアの整合率が再計算されます。既定キーワード。</div>
+            <div className="setting-row__desc">アイデアと経営資料の「整合率」の算出方式。変更すると既存アイデアの整合率が再計算されます。既定＝キーワード。</div>
           </div>
-          <select
-            className="select"
-            aria-label="経営資料との整合の測り方"
-            value={company.alignment_method ?? "keyword"}
-            onChange={(e) => void saveAlignmentMethod(e.target.value)}
-          >
-            <option value="keyword">キーワード（語の一致）</option>
-            <option value="embedding">意味（埋め込み）</option>
-            <option value="hybrid">ハイブリッド（両方）</option>
-          </select>
+          <div className="radio-list" role="radiogroup" aria-label="経営資料との整合の測り方" style={{ marginTop: "var(--space-2)" }}>
+            {([
+              ["keyword", "キーワード（語の一致）", "語の一致で測る。速く決定的（同じ語が多いほど整合率が高い）。"],
+              ["embedding", "意味（埋め込み）", "言い回しが違っても意味が近ければ高い（埋め込みベクトルの類似度）。"],
+              ["hybrid", "ハイブリッド（両方）", "キーワードと意味の両方を組み合わせて測る。"],
+            ] as const).map(([val, title, desc]) => {
+              const sel = (company.alignment_method ?? "keyword") === val;
+              return (
+                <label key={val} className={"radio-opt" + (sel ? " is-sel" : "")}>
+                  <input type="radio" name="alignment_method" value={val} checked={sel} onChange={() => void saveAlignmentMethod(val)} />
+                  <span>
+                    <span className="radio-opt__title">{title}</span>
+                    <span className="radio-opt__desc">{desc}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         <div className="provision-note">

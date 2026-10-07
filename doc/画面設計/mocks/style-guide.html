@@ -482,6 +482,35 @@
         <div class="segmented-note">会社設定に従う（現在：ON）</div>
         <div class="hint">トグル（ON/OFF の2値）で足りない<strong>3選以上の単一選択</strong>設定向け。例＝<strong>ゲームモード</strong>（会社設定に従う／ON／OFF＝デザイン標準 §4.11・SC-03）。ネイティブ radio を装飾（<code>role=radiogroup</code>・矢印/Space 操作）。選択の下に<strong>現在の実効値の補足</strong>（<code>.segmented-note</code>）を添えられる。</div>
       </div>
+
+      <!-- 4e. 縦ラジオ（選択肢リスト・.radio-list）＝各肢にタイトル＋説明が要る単一選択 -->
+      <div class="field">
+        <label>縦ラジオ（.radio-list・選択肢ごとに説明が要る単一選択）</label>
+        <div class="radio-list" role="radiogroup" aria-label="経営資料との整合の測り方">
+          <label class="radio-opt is-sel">
+            <input type="radio" name="align-demo" checked>
+            <span>
+              <span class="radio-opt__title">キーワード（語の一致）</span>
+              <span class="radio-opt__desc">語の一致で測る。速く決定的（同じ語が多いほど整合率が高い）。</span>
+            </span>
+          </label>
+          <label class="radio-opt">
+            <input type="radio" name="align-demo">
+            <span>
+              <span class="radio-opt__title">意味（埋め込み）</span>
+              <span class="radio-opt__desc">言い回しが違っても意味が近ければ高い（埋め込みベクトルの類似度）。</span>
+            </span>
+          </label>
+          <label class="radio-opt">
+            <input type="radio" name="align-demo">
+            <span>
+              <span class="radio-opt__title">ハイブリッド（両方）</span>
+              <span class="radio-opt__desc">キーワードと意味の両方を組み合わせて測る。</span>
+            </span>
+          </label>
+        </div>
+        <div class="hint"><strong>横の .segmented より選択肢が長い／各肢に説明が要る</strong>単一選択向け（縦並び・タイトル＋説明・選択肢は <code>.is-sel</code> で強調）。ネイティブ radio を装飾（<code>role=radiogroup</code>・矢印/Space 操作）。初出＝<strong>SC-92 整合の測り方</strong>・評価の公開範囲（旧 <code>.vis-opt</code> を統合）。</div>
+      </div>
     </div>
   </div>
 
