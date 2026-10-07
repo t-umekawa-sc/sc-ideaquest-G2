@@ -204,7 +204,7 @@ stateDiagram-v2
 
 | メソッド / パス | 概要 | 補足 |
 |---|---|---|
-| `POST /public/signup`（**未認証**） | アカウント作成リクエスト（`{company_code, login_id, email, password}`） | 対象会社が `self_signup_enabled=true` か検証（否は一様reject）。**アカウントは作らず** pending（署名トークン/`otp_challenges.purpose=email_verify` に束ね）で保持・PW は即 Argon2id。**一律 `202`**（列挙耐性）＝メールへ認証コード送信。既存メールには out-of-band で「既にアカウントがあります」通知 |
+| `POST /public/signup`（**未認証**） | アカウント作成リクエスト（`{company_code?, login_id, email, display_name, password, captcha_token?}`） | 対象会社が `self_signup_enabled=true` か検証（否は一様reject）。**アカウントは作らず** pending（専用 `signup_challenges`・§4.4a）で保持・PW は即 Argon2id。**一律 `202`**（列挙耐性）＝メールへ認証コード送信。既存メールには out-of-band で「既にアカウントがあります」通知。CAPTCHA 有効時は `captcha_token` 必須（SEC G） |
 | `POST /public/signup/verify`（**未認証**） | 認証コード検証 → アカウント確定 | **検証成功で初めて `accounts` INSERT**（一意性は commit 時）＝`role=general`・`company_id`=解決値・`status=active`（決定N・即 active）・`email_verified_at=now`・`password_set=true`。outbox で会社DBミラー＋Tier1 自動 `approved`（決定G）＋管理者へ新規登録通知（レート制限/ダイジェスト） |
 
 - 既存の **email_verify OTP＋MFA画面（SC-00 状態C）を再利用**（UIを増やさない）。PW は登録時入力のため `password_setup` リンク不要。
@@ -215,11 +215,13 @@ stateDiagram-v2
 **pending 保持＝新規テーブル `signup_challenges`**（データモデル §4.4a）。`otp_challenges` は `account_id NOT NULL` ＋ pending 入力列が無く**流用不可**のため新設（決定A・構造）。
 
 - **`GET /public/bootstrap`**（未認証）
-  - out `200`: `{ "default_company_code": string | null, "self_signup_available": boolean }`。`default_company_code`＝env `IQ_DEFAULT_COMPANY_CODE`（あれば SC-00 の会社コード欄を非表示＋自動セット）。`self_signup_available`＝既定会社がありその `self_signup_enabled=true` の時 true（会社コードを隠す public デプロイ向けのUI出し分け用。既定会社が無い通常デプロイは `false`＝SC-00 の「アカウント作成」リンク表示判断は会社コード入力後の `/signup` 一律202に委ねる＝会社の存在は明かさない・SEC B）。
+  - out `200`: `{ "default_company_code": string | null, "self_signup_available": boolean, "turnstile_site_key": string | null }`。`default_company_code`＝env `IQ_DEFAULT_COMPANY_CODE`（あれば SC-00 の会社コード欄を非表示＋自動セット）。`self_signup_available`＝既定会社がありその `self_signup_enabled=true` の時 true（会社コードを隠す public デプロイ向けのUI出し分け用。既定会社が無い通常デプロイは `false`＝SC-00 の「アカウント作成」リンク表示判断は会社コード入力後の `/signup` 一律202に委ねる＝会社の存在は明かさない・SEC B）。`turnstile_site_key`＝CAPTCHA（Turnstile）site key（公開・env `TURNSTILE_SITE_KEY`）。設定時のみフロントがウィジェットを出す。未設定は null（CAPTCHA 無効）。
 
 - **`POST /public/signup`**（未認証・Origin/Sec-Fetch 検証・IP/メール レート制限）
-  - in: `{ "company_code": string, "login_id": string, "email": string, "display_name": string, "password": string }`（public デプロイで既定会社コードがある場合 `company_code` 省略可＝サーバーが env 値で補完）。
-  - **422（形式不正のみ）**＝必須欠落・email 形式・password 最低文字数（§4.7 準拠・field エラー）。※**会社の存在/`self_signup_enabled`/login_id・email の重複は 422 にしない**（列挙耐性・SEC B）。
+  - in: `{ "company_code"?: string, "login_id": string, "email": string, "display_name": string, "password": string, "captcha_token"?: string }`（public デプロイで既定会社コードがある場合 `company_code` 省略可＝サーバーが env 値で補完。`captcha_token`＝CAPTCHA 有効時のみ必須・Turnstile ウィジェット発行）。
+  - **422（形式不正・PW品質・メール種別）**＝必須欠落・email 形式・password 最低文字数（SEC D）・**漏洩PW〔HIBP〕(field=password)**・**使い捨てメールドメイン(field=email)**（§4.7 準拠・field エラー）。※**会社の存在/`self_signup_enabled`/login_id・email の重複は 422 にしない**（列挙耐性・SEC B）。
+  - **400 `captcha_failed`**＝CAPTCHA 有効時にトークン無/不正/検証不能（SEC G・fail-closed）。
+  - **SEC（env-gated）**＝先頭で CAPTCHA 検証（Turnstile siteverify）→ 使い捨てメール判定（ローカル blocklist・422）→ 漏洩PW判定（HIBP range API・k-匿名性・422）。既定は安全側（外部依存/副作用は OFF・本番で有効化）。詳細＝[設計ドラフト FR-48 SEC強化](../設計ドラフト/FR-48_セルフサインアップSEC強化.md)。
   - out **一律 `202`**: `{ "status": "verification_sent", "masked_to": string, "expires_in": 600, "resend_available_in": number }`（`masked_to`＝入力メールのマスク表示＝状態C 用。内部条件を満たさない場合も**同一の 202**を返し、行作成・メール送信はしない／既存アカウントには out-of-band 通知）。
   - 内部: 会社コード→会社解決→`self_signup_enabled=true` 再検証（SEC F）→ email が既存 `accounts` に無いか確認（有れば out-of-band「既にアカウントがあります」メール・SEC B）→ PW 即 Argon2id（SEC D）→ `signup_challenges` に 1 行（10分・単回・`attempts=0`）＋ 6桁OTP をメール送信。
   - **再送**＝同入力で `POST /public/signup` を再呼び（直近 pending を置換＝最新のみ有効・`resend_available_in` 内は 429 相当だが応答は一律 202 を保ちつつ送信抑制・SEC C）。
