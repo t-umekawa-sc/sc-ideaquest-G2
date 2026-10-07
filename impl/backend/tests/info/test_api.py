@@ -785,12 +785,13 @@ def test_n_tc_106_word_cloud(client, info_env):
 
 
 def test_n_tc_125_rehost_image(client, info_env):
-    """N-TC-125: 貼付画像を自社ホスト（MinIO）へ再ホスト＝201・自社署名URL（外部参照を持ち込まない）。"""
+    """N-TC-125: 貼付画像を自社ホスト（MinIO）へ再ホスト＝201・**安定配信パス**（F8・外部参照を持ち込まない）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     r = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     url = r.json()["url"]
-    assert url and "info-images/" in url  # 自社ホスト（prefix=info-images）へ保存された署名URL
+    # F8＝短TTL署名URLではなく安定配信プロキシパス（body_html に埋めても失効しない）。
+    assert url.startswith("/api/v1/media/info-images/"), url
 
 
 def test_n_tc_126_rehost_image_signature_mismatch(client, info_env):

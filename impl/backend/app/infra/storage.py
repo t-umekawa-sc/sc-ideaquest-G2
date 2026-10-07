@@ -128,6 +128,25 @@ def hashed_key(data: bytes, content_type: str, *, prefix: str) -> str:
     return f"{prefix}/{digest}-{uuid.uuid4().hex[:8]}.{ext}"
 
 
+# リッチ本文に直接埋め込む「インライン画像」の prefix（安定配信プロキシ `GET /media/{key}` が serve する対象）。
+# 添付（*-attachments）/アバター等は専用の認可付き DL 経路を持つため proxy では serve しない（prefix allowlist で限定）。
+INLINE_IMAGE_PREFIXES = ("announcement-images", "info-images")
+
+
+def media_proxy_path(key: str) -> str:
+    """インライン画像の安定配信パス（F8）＝`/api/v1/media/<key>`。
+
+    本文（body_html）には短TTL署名URLではなくこの安定パスを埋め込み、閲覧時にプロキシEPが都度再署名して
+    302 する＝保存から時間が経っても画像が失効しない（env 非依存＝ホスト名を焼かない相対パス）。
+    """
+    return f"/api/v1/media/{key}"
+
+
+def is_inline_image_key(key: str) -> bool:
+    """proxy が serve してよいキーか＝インライン画像 prefix のみ（添付/アバター等は対象外）。"""
+    return any(key.startswith(p + "/") for p in INLINE_IMAGE_PREFIXES)
+
+
 class ObjectStorage(Protocol):
     def put(self, data: bytes, content_type: str, *, prefix: str) -> str: ...
     def presigned_get(self, key: str) -> str: ...

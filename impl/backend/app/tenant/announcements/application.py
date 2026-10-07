@@ -173,9 +173,12 @@ def rehost_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, c
     with get_tenant_session(company.db_identifier) as ts:
         if profile_repo.get_user_by_account(ts, account_id) is None:
             raise AppError(401, "unauthenticated")  # 会社内 active ユーザーのみ
+    from app.infra.storage import media_proxy_path
+
     storage = get_storage()
     key = storage.put(data, content_type, prefix="announcement-images")
-    return {"url": storage.presigned_get(key)}
+    # F8＝短TTL署名URLではなく安定配信パスを返す（body_html に埋めても失効しない・閲覧時に /media が再署名302）。
+    return {"url": media_proxy_path(key)}
 
 
 def create_announcement(account_id: uuid.UUID, company_id: uuid.UUID, *, title: str, body_html: str,

@@ -38,6 +38,7 @@ from app.tenant.ai_jobs.router import router as ai_jobs_router
 from app.tenant.capabilities.router import router as capabilities_router
 from app.tenant.contests.router import router as contests_router
 from app.tenant.announcements.router import router as announcements_router
+from app.tenant.media.router import router as media_router
 from app.core.access_gate import access_mode_gate
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
@@ -117,6 +118,7 @@ app.include_router(ai_jobs_router)  # テナントプレーン（ドメイン S�
 app.include_router(capabilities_router)  # テナントプレーン（②会社レベル能力 user_capabilities・FR-47・T.4）
 app.include_router(contests_router)  # テナントプレーン（ドメイン T・アイデアコンテスト SC-53/54・FR-46）
 app.include_router(announcements_router)  # テナントプレーン（ドメイン U・お知らせ SC-95/96・FR-49）
+app.include_router(media_router)  # インライン画像の安定配信プロキシ（F8・GET /media/{key}）
 
 
 # 冪等キー（§1.9）＝add_request_id の内側（request_id 設定後）に置く。header 無し POST は素通し。

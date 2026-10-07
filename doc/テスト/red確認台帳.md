@@ -801,3 +801,16 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（修正差戻し時の actual）→ green |
 | --- | --- |
 | C-TC-308 | 実測＝**修正前**は展開 pop 幅 **140px**（floor・内容幅/狭い `.filters` で停止）でホスト右端から大きく離れる（`.filters` を基準にすると -139px はみ出し）＝「残り幅いっぱい」不成立。**修正後**は pop 幅 **649px**（ホスト `.list-toolbar` 幅 1077px）・右端との余白 **17px**＝残り幅を埋める → e2e `6≤gap≤48` で green（**C-TC-308 1 passed**）。 |
+
+## F8 インライン画像の安定配信プロキシ（U-TC-113/114/115＋110・N-TC-125・2026-10-07・test-first）
+
+> 新規EP `GET /api/v1/media/{key}`＝インライン画像を都度再署名して 302（body_html に安定パスを保存＝失効しない）。
+> §5.1 に従い**501 スタブを先に置いて** behavior-red を目視（ルート未定義404に頼らない）→ 本実装で green。
+> rehost（U-TC-110／N-TC-125）は署名URL→安定パスへ期待値変更＝スタブ段階で presigned≠proxy の red を併せて目視。
+
+| TC-ID | 観測 red（スタブ/変更前 actual）→ green |
+| --- | --- |
+| U-TC-110／N-TC-125（rehost） | 本実装前は rehost が `presigned_get(key)`（`http://…minio…?X-Amz-…`）を返し `url.startswith("/api/v1/media/…")` が **False** で失敗＝安定パス未適用。`media_proxy_path(key)` へ差し替えて green。 |
+| U-TC-113（302） | 501 スタブ（ルートは定義済・本実装前）では GET /media/{key} が **302 を返さない**（スタブは 501／`_problem` 引数不足で 500）＝`assert 302` 失敗で red。本実装（prefix 検証→再署名→RedirectResponse 302）で green・`Location` にキーを含む署名URL。 |
+| U-TC-114（401） | 認可 dep（`require_me`）は本実装前から実在＝未認証は 401（スタブ段階でも成立・認可を先に通す設計の確認）。 |
+| U-TC-115（404） | スタブ段階は認証後スタブ本体に到達し **302/404 以外**（501/500）＝`assert 404` 失敗で red。本実装（`is_inline_image_key` 外は 404 存在秘匿）で green。 |

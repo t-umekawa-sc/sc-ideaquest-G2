@@ -20,8 +20,11 @@
 | U-TC-105 | api | 作成/編集/削除は管理者のみ・一般は403 | 管理者/一般 | 一般 `POST/PATCH/DELETE /admin/announcements` ／管理者 `POST` | 一般=403（全操作）／管理者=201/200/204 | U.2／§1.6 |
 | U-TC-106 | api | body_html サニタイズ（XSS 無害化）＋body_text 派生＋published_at 設定 | 管理者 | `POST /admin/announcements`（`body_html` に `<script>`/`onerror`/`javascript:` を含む・status=published） | 保存後の `body_html` から script/on*/javascript: が除去（許可タグのみ）／`body_text` は平文／`published_at` が設定される | U.2／U.4／N.7 |
 | U-TC-107 | api | ピン留めトグル＋論理削除 | published 複数 | `PATCH /admin/announcements/{id}`（pinned 切替）／`DELETE` | pinned=true が一覧先頭／削除後は `GET /announcements`・`GET /announcements/{id}` から消える（論理削除・read 404） | U.2 |
-| U-TC-110 | api | 本文画像の再ホスト（自社 MinIO・署名URL／管理者のみ） | 管理者＋PNG バイト／一般 | 管理者 `POST /admin/announcements/images`（multipart `file`）／一般も同 | 管理者=201・`{url}`＝自社ホスト署名URL（外部参照を持ち込まない）／一般=403 | U-8／U.4／§1.10 |
+| U-TC-110 | api | 本文画像の再ホスト（自社 MinIO・**安定配信パス**／管理者のみ） | 管理者＋PNG バイト／一般 | 管理者 `POST /admin/announcements/images`（multipart `file`）／一般も同 | 管理者=201・`{url}`＝**`/api/v1/media/announcement-images/…`**（短TTL署名URLでなく安定パス＝F8・外部参照を持ち込まない）／一般=403 | U-8／U.4／§1.10／F8 |
 | U-TC-111 | api | 画像検証（非画像/シグネチャ不一致は 422） | 管理者＋非画像バイト | `POST /admin/announcements/images`（`file`＝text） | 422 `validation_error`（`errors[].field="file"`） | U-8／§1.10／N.7 |
+| U-TC-113 | api | インライン画像の安定配信プロキシ＝都度再署名302（F8） | 認証ユーザー＋再ホスト済キー | `GET /api/v1/media/{key}`（follow_redirects=false） | 302・`Location` が署名URL（キーを含む）＝閲覧時に都度再署名（body_html の安定パスは失効しない） | F8／§1.10 |
+| U-TC-114 | api | プロキシは認証必須（認可が先） | 未認証 | `GET /api/v1/media/announcement-images/x.png` | 401（キー存在に依存せず認可で弾く） | F8／§1.6 |
+| U-TC-115 | api | プロキシ対象はインライン画像 prefix のみ（踏み台防止） | 認証ユーザー | `GET /api/v1/media/info-attachments/secret.pdf`（対象外 prefix） | 404（存在秘匿＝添付/アバター等は serve しない） | F8／§1.10 |
 
 ## 3. ダッシュボード選別（§4.3a・U.3）
 

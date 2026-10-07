@@ -227,12 +227,13 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 有効な PNG シグネチャ（valida
 
 
 def test_u_tc_110_rehost_image(client, factory):
-    """U-TC-110: 本文画像を自社ホスト（MinIO）へ再ホスト＝管理者 201・自社署名URL／一般は 403。"""
+    """U-TC-110: 本文画像を自社ホスト（MinIO）へ再ホスト＝管理者 201・**安定配信パス**（F8）／一般は 403。"""
     _admin(client, factory)
     r = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     url = r.json()["url"]
-    assert url and "announcement-images/" in url  # 自社ホスト（prefix=announcement-images）へ保存された署名URL
+    # F8＝短TTL署名URLではなく安定配信プロキシパスを返す（body_html に埋めても失効しない）。
+    assert url.startswith("/api/v1/media/announcement-images/"), url
     # 一般（非管理者）は投稿権限が無いので 403。
     part = factory.make_seed_company_account(display_name=f"一般_{uuid.uuid4().hex[:6]}")
     _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
@@ -248,3 +249,32 @@ def test_u_tc_111_rehost_image_signature_mismatch(client, factory):
     body = r.json()
     assert body["code"] == "validation_error"
     assert any(e.get("field") == "file" for e in body.get("errors", []))
+
+
+# ---- F8 安定配信プロキシ GET /api/v1/media/{key}（インライン画像の再署名302） ----
+MEDIA = "/api/v1/media"
+
+
+def test_u_tc_113_media_proxy_redirects_signed(client, factory):
+    """U-TC-113: 認証ユーザーが安定パスにアクセス→都度再署名して 302（Location は署名URL）。"""
+    _admin(client, factory)
+    up = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
+    assert up.status_code == 201, up.text
+    key = up.json()["url"].removeprefix("/api/v1/media/")  # announcement-images/<hash>-<rand>.png
+    r = client.get(f"{MEDIA}/{key}", follow_redirects=False)
+    assert r.status_code == 302, r.text
+    loc = r.headers.get("location", "")
+    assert loc and key in loc  # 署名URL へ 302（キーを含む・都度署名）
+
+
+def test_u_tc_114_media_proxy_requires_auth(client):
+    """U-TC-114: 未認証は 401（認可が先＝キー存在に依存しない）。"""
+    r = client.get(f"{MEDIA}/announcement-images/whatever.png", follow_redirects=False)
+    assert r.status_code == 401, r.text
+
+
+def test_u_tc_115_media_proxy_rejects_non_inline_prefix(client, factory):
+    """U-TC-115: インライン画像 prefix 以外（添付等）は 404＝任意オブジェクトの踏み台にしない（存在秘匿）。"""
+    _admin(client, factory)
+    r = client.get(f"{MEDIA}/info-attachments/secret.pdf", follow_redirects=False)
+    assert r.status_code == 404, r.text

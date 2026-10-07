@@ -140,6 +140,7 @@
 - **ダウンロード**: `GET /attachments/{id}/download` が**権限検証（パーティー内）後に署名付き GET URL へ 302**（or URL を JSON で返す）。
   - **非公開バケット＋発行時サーバー認可＋短 TTL 署名 URL を用い、恒久公開 URL は作らない（なぜ）**: バケットは非公開でオブジェクトは直リンク不可（物理名もハッシュで推測・列挙不可）。ダウンロードのたびにサーバーが認可を確認してから、**数十〜数百秒だけ有効な署名 URL**（改ざん不可の HMAC 署名＋失効時刻付き）を発行する。TTL を短くする狙いは、**署名 URL がブラウザ履歴・アクセスログ・`Referer`・共有などで漏れても、被害の窓を数十〜数百秒に限定して自然失効させる（直リンク流出耐性）**こと。恒久公開 URL は一度漏れると永久アクセスになるため禁止。実装は §3.4 `infra/storage.py`（署名鍵はサーバー専任・コーディング規約 §2.2）。
 - **画像/アバター/背景/クエストアイコン/会社アイコン**も同様に MinIO（それぞれ `users.background_image_path`・`quests.icon_image_path`・`companies.icon_image_path`）。
+- **リッチ本文のインライン画像＝安定配信プロキシ `GET /api/v1/media/{key}`（F8）**: お知らせ U-8／情報 N.2 の本文（`body_html`）に直接埋め込むインライン画像は、**短TTL署名URLを直埋めすると保存から TTL 経過で失効し画像が壊れる**（latent）。対策＝再ホスト（`POST .../images`）は署名URLでなく**安定パス `/api/v1/media/<object_key>`**（env 非依存の相対パス）を返し `body_html` に保存する。閲覧時に本EPが**認可（`require_me`）→都度再署名→302**（`Cache-Control: no-store`）。serve 対象は**インライン画像 prefix のみ**（`announcement-images`/`info-images`・添付/アバター等は専用DL経路で認可＝任意オブジェクトの踏み台にしない・対象外は 404 存在秘匿）。公開会社の general も閲覧可（外周ガード許可リストに `/media` を追加＝お知らせのインライン画像表示）。`sanitize_html` は相対URLを通過させる（nh3・スキーム無しは素通し）。
 
 ### 1.11 全文検索（PGroonga）
 

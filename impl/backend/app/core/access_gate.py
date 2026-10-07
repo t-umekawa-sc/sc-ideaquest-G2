@@ -36,6 +36,7 @@ _API = "/api/v1"
 _CONTEST_ALLOW = (
     "/contests", "/ideas", "/chat-messages", "/attachments",
     "/me", "/notifications", "/announcements", "/realtime", "/auth",
+    "/media",  # お知らせ本文のインライン画像（安定配信プロキシ・F8）＝公開会社の general も閲覧可
 )
 # 管理許可リスト（system_admin / company_account_admin のみ追加）。会社/アカウント/所属/能力の管理は全て /admin/* に集約（32本）。
 _ADMIN_ALLOW = ("/admin",)
