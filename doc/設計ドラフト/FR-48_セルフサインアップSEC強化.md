@@ -74,10 +74,14 @@
 公開の `disposable-email-domains` リスト（GitHub・数千ドメイン）を**リポジトリに同梱**し、email の @以降ドメインを照合。外部APIは使わない（有料/キー要の外部判定サービスは不採用）。
 
 ### 実装仕様
-- **backend**: `data/disposable_domains.txt`（同梱）＋`core/disposable_email.py` の `is_disposable(email)`（起動時ロード・キャッシュ）。`signup()` の email 検証で呼ぶ → 使い捨ては **422 field=email**。
+- **backend**: `app/core/disposable_domains.txt`（同梱・自動生成）＋`core/disposable_email.py` の `is_disposable(email)`（起動時ロード・キャッシュ）。`signup()` の email 検証で呼ぶ → 使い捨ては **422 field=email**。
 - **env**: `SIGNUP_DISPOSABLE_EMAIL_BLOCK`（既定 **true**・ローカルで安全）。
-- **更新**: 手動 or 小スクリプトで GitHub から取得して差し替え（頻度低くて可）。
-- **テスト**: 既知 disposable→拒否／通常→許可。
+- **更新の自動化（案A・採用 2026-10-07）**＝実行時は外部を叩かず、**CI（GitHub Actions）週次で生成物を更新し差分を PR**。
+  - `scripts/update_disposable_domains.py`＝公開リスト（disposable-email-domains）を取得→正規化（小文字/重複排除/ソート）→**誤爆防止（主要プロバイダ allowlist・`*.example` 除外・件数サニティ＝下限500/急減ガード）**→`disposable_domains.txt` 書き出し。異常時は非ゼロ終了で中止。手動実行も可（`--input`/`--check-only`）。
+  - `.github/workflows/update-disposable-domains.yml`＝`schedule`（週次・月曜）＋`workflow_dispatch`。スクリプト実行→差分があれば `peter-evans/create-pull-request` で PR 作成（**人がレビューしてマージ＝誤爆の最終防波堤**）。無差分なら何もしない。
+  - 初期同梱＝上流から 9205 件を取り込み済（2026-10-07）。
+  - **あなたの操作**＝週1で来る PR の差分を確認してマージするだけ。※GitHub リポジトリ設定で **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" を ON**（Actions が PR を作れるようにする）。
+- **テスト**: 既知 disposable→拒否／通常→許可（A-TC-132）。
 
 ### あなたの操作
 **ほぼ不要**。採用リスト（定番 `disposable-email-domains`）と更新頻度を運用で決める程度。

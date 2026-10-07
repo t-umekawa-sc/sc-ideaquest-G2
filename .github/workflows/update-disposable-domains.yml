@@ -1,0 +1,48 @@
+name: update-disposable-domains
+
+# 使い捨てメールドメイン blocklist（FR-48② SEC G・案A）を週次で更新し、差分があれば PR を作る。
+# 実行時は外部を叩かない方針＝CI で生成物（impl/backend/app/core/disposable_domains.txt）を更新して同梱。
+# 誤爆防止（主要プロバイダ allowlist・件数サニティ）は scripts/update_disposable_domains.py 側で担保。
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"   # 毎週月曜 03:17 UTC（JST 12:17 頃）
+  workflow_dispatch: {}     # 手動実行も可
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 公開リストを取得→正規化→サニティ→書き出し（異常時は非ゼロ終了で後続を止める）。
+      - name: Update blocklist
+        run: python scripts/update_disposable_domains.py
+
+      # 差分があれば PR を作成（人がレビューしてマージ＝誤爆の最終防波堤）。無差分なら何もしない。
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: impl/backend/app/core/disposable_domains.txt
+          branch: auto/disposable-domains
+          delete-branch: true
+          commit-message: "chore(signup): update disposable email blocklist (auto)"
+          title: "chore(signup): update disposable email blocklist (auto)"
+          body: |
+            使い捨てメールドメイン blocklist の自動更新（FR-48② SEC G・案A）。
+
+            - 出典＝disposable-email-domains（公開リスト）を `scripts/update_disposable_domains.py` で
+              正規化（小文字/重複排除/ソート）・主要プロバイダ allowlist と `*.example` を除外。
+            - サニティ（件数下限/急減ガード）を通過したもののみ。
+            - **マージ前に差分を確認**（正規ドメインの誤混入が無いか）。
+          labels: |
+            dependencies
+            automated
