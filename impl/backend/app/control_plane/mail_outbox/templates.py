@@ -19,6 +19,8 @@ CATEGORY_NEW_DEVICE = "new_device"                        # 新端末ログイ�
 CATEGORY_PASSWORD_CHANGED = "password_changed"            # パスワード変更完了通知（本人宛・A.9-⑧(b)）
 CATEGORY_JOIN_REQUEST_RECEIVED = "join_request_received"  # 参加リクエスト受信（作成者/quest_admin 宛・FR-40・業務通知）
 CATEGORY_JOIN_REQUEST_DECIDED = "join_request_decided"    # 参加リクエスト結果（申請者宛・FR-40・業務通知）
+CATEGORY_SIGNUP_VERIFY = "signup_verify"                  # セルフサインアップ認証コード（6桁OTP・FR-48②・SEC C）
+CATEGORY_SIGNUP_EXISTING = "signup_existing_account"      # 既存アカウント通知（列挙耐性 out-of-band・SEC B）
 
 
 def render(
@@ -46,6 +48,37 @@ def render(
                 f"認証コード: {secret}\n"
                 f"（有効期限 {minutes} 分・1回限り）\n\n"
                 "このメールに心当たりがない場合は破棄してください。")
+
+    if category == CATEGORY_SIGNUP_VERIFY:
+        minutes = s.otp_ttl_seconds // 60
+        if en:
+            return ("[ideaquest] Account sign-up verification code",
+                    "Your ideaquest sign-up verification code.\n\n"
+                    f"Code: {secret}\n"
+                    f"(valid for {minutes} minutes, single use)\n\n"
+                    "Enter this code to finish creating your account.\n"
+                    "If you did not request this, please ignore this email.")
+        return ("【ideaquest】アカウント作成の認証コード",
+                "ideaquest のアカウント作成の認証コードです。\n\n"
+                f"認証コード: {secret}\n"
+                f"（有効期限 {minutes} 分・1回限り）\n\n"
+                "この認証コードを入力するとアカウント作成が完了します。\n"
+                "このメールに心当たりがない場合は破棄してください。")
+
+    if category == CATEGORY_SIGNUP_EXISTING:
+        # 列挙耐性（SEC B）＝サインアップ試行時、既にアカウントがある旨は in-band で返さず本メールで out-of-band 通知。
+        link = f"{s.app_base_url}/login"
+        if en:
+            return ("[ideaquest] Account sign-up attempt",
+                    "Someone tried to sign up with this email, but an account already exists.\n\n"
+                    f"If this was you, please sign in instead: {link}\n"
+                    "If you forgot your password, use the password reset on the sign-in page.\n\n"
+                    "If this was not you, you can safely ignore this email.")
+        return ("【ideaquest】アカウント作成のお試しについて",
+                "このメールアドレスでアカウント作成が試みられましたが、既にアカウントが存在します。\n\n"
+                f"お心当たりがある場合はログインしてください：{link}\n"
+                "パスワードをお忘れの場合はログイン画面から再設定できます。\n\n"
+                "お心当たりがない場合は本メールを破棄してください。")
 
     if category == CATEGORY_PASSWORD_SETUP:
         link = f"{s.app_base_url}/password-setup?token={secret}"

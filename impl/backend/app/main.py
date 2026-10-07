@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from app.control_plane.admin.router import router as admin_router
 from app.control_plane.auth.router import router as auth_router
+from app.control_plane.public.router import router as public_router
 from app.control_plane.me.router import router as me_router
 from app.tenant.quests.router import router as quests_router
 from app.tenant.ideas.router import router as ideas_router
@@ -94,6 +95,7 @@ app = FastAPI(
 app.add_middleware(AuditContextMiddleware)  # 監査ログの実行者/IP/UA を contextvar に載せる（B.6・§4.5）
 install_error_handlers(app)
 app.include_router(auth_router)
+app.include_router(public_router)  # 公開（未認証）＝セルフサインアップ/ブートストラップ（FR-48②）
 app.include_router(admin_router)
 app.include_router(me_router)
 app.include_router(quests_router)  # テナントプレーン（ドメイン C・SC-10 読み取り）

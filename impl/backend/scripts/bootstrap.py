@@ -53,6 +53,28 @@ SEED_MFA_ACCOUNT = {
     "system_role": "general",
     "status": "active",
 }
+# デモ公開会社（FR-48②・設計 §8.3）＝access_mode=public＋self_signup_enabled=true。
+# ホームページ→セルフサインアップ→コンテストのみ操作可 のデモ導線用（公開＝コンテスト専用テナント）。
+# 会社コードは §8.1 のデプロイ設定（env IQ_DEFAULT_COMPANY_CODE=DEMO）で自動供給する前提。
+SEED_DEMO_COMPANY = {
+    "company_code": "DEMO",
+    "name": "IdeaQuest Demo",
+    "db_identifier": "ideaquest_company_demo",
+    "status": "active",
+    "mfa_required": False,
+    "access_mode": "public",
+    "self_signup_enabled": True,
+}
+# デモ会社の運営アカウント（コンテスト作成/運営・company_account_admin）。一般参加者はセルフサインアップで作る。
+SEED_DEMO_ADMIN = {
+    "login_id": "admin@demo.example",
+    "email": "admin@demo.example",
+    "display_name": "DEMO 運営",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "company_account_admin",
+    "status": "active",
+}
 
 # セッション破棄系 e2e（全端末ログアウト A-TC-022）専用の隔離アカウント。共有の user@acme を
 # 使うと logout_all が並列ワーカ全員のセッションを巻き込み session_expired が多発する（e2e フレーク）。
@@ -121,6 +143,7 @@ _SEEDS = [
     (SEED_COMPANY, SEED_DEMO_USER3),
     (SEED_COMPANY, SEED_DEMO_KANRI),
     (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT),
+    (SEED_DEMO_COMPANY, SEED_DEMO_ADMIN),  # FR-48② デモ公開会社（public＋self_signup・§8.3）
 ]
 
 # e2e 並列隔離用のワーカ会社（ACME-W0..W{N-1}）。Playwright の各ワーカに専用会社DBを割り当て、

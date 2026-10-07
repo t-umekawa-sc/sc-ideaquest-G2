@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "dev"
+
+    # セルフサインアップ（FR-48②・§8.1・決定L）＝デプロイ既定会社コード。デモ用デプロイのみ env 設定。
+    # 設定があれば SC-00 の会社コード欄を隠して自動セット（`DEMO` をコードに焼かない＝設定値を読むだけ）。
+    # env 名は IQ_DEFAULT_COMPANY_CODE（決定L）。未設定（空）＝通常デプロイ＝会社コード欄を出す。
+    default_company_code: str = Field(default="", validation_alias="IQ_DEFAULT_COMPANY_CODE")
 
     # e2e 並列隔離（ワーカ別DB）＝Playwright の各ワーカに専用会社DBを割り当てて並列競合を断つため、
     # bootstrap が ACME-01 に加えて N 社（ACME-W0..W{N-1}／ideaquest_company_acme_w{i}）を seed する。
@@ -71,6 +77,11 @@ class Settings(BaseSettings):
     # request（自己サービス再設定要求）のレート制限（ADR-0002 §2.3・超過時も 202 維持）
     pw_request_rate_limit_max: int = 5
     pw_request_rate_limit_window_seconds: int = 600
+
+    # セルフサインアップ（FR-48②・SEC C/G）のレート制限（超過時も 202 維持＝送信スキップ・列挙耐性）。
+    # IP／(会社,メール) 単位で作成・再送を抑制（メール爆撃・自動化対策）。
+    signup_request_rate_limit_max: int = 5
+    signup_request_rate_limit_window_seconds: int = 600
 
     # メール変更のダブルオプトイン（ADR-0008）。確認リンクトークン TTL（24時間・単回・otp_challenges purpose=email_change）
     email_change_ttl_seconds: int = 86400

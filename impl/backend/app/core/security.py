@@ -253,3 +253,17 @@ def within_pw_request_rate_limit(r: redis.Redis, ip: str, company_code: str, log
     if count == 1:
         r.expire(key, s.pw_request_rate_limit_window_seconds)
     return count <= s.pw_request_rate_limit_max
+
+
+def within_signup_rate_limit(r: redis.Redis, ip: str, company_code: str, email: str) -> bool:
+    """セルフサインアップ要求のレート制限（FR-48②・SEC C/G）。超過なら False（例外は投げない）。
+
+    列挙耐性のため超過しても応答は 202 のまま（呼び出し側が作成/送信をスキップする）。
+    IP＋(会社,メール) 単位でメール爆撃・自動化を抑制する。
+    """
+    s = get_settings()
+    key = f"signup_req:{ip}:{company_code}:{email}"
+    count = r.incr(key)
+    if count == 1:
+        r.expire(key, s.signup_request_rate_limit_window_seconds)
+    return count <= s.signup_request_rate_limit_max

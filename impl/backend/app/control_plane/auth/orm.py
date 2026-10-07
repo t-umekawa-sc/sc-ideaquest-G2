@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -113,6 +113,39 @@ class OtpChallenge(ControlBase):
     purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup | email_change | email_verify
     # email_verify（ADR-0009）が束ねる送信時の email スナップショット。confirm で現 email と照合し不一致は 409 stale。
     target_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SignupChallenge(ControlBase):
+    """セルフサインアップの検証前 pending（データモデル §4.4a・FR-48②・SEC A）。
+
+    決定A＝メール認証成功まで `accounts` を作らない。`otp_challenges` は account_id NOT NULL ＋
+    pending 入力列が無く流用不可のため専用テーブル。検証前の入力（会社/希望ログインID/メール/表示名/
+    PWハッシュ）と 6桁OTP を**アカウント不在のまま**束ねて保持する。
+    - `password_hash`＝Argon2id 済み（平文/ログ出力禁止・SEC D）。`code_hash`＝6桁OTP の SHA-256（SEC C）。
+    - `attempts`＝上限で失効（OTP ブルートフォース対策・SEC C）。`expires_at`＝10 分。
+    - `used_at`＝確定成功で打刻し単回（再利用は 410・SEC A/C）。
+    - 一意制約は置かない（一意性は確定時の `accounts` INSERT が権威＝スクワッティング防止・決定A）。
+    """
+
+    __tablename__ = "signup_challenges"
+    __table_args__ = (
+        Index("ix_signup_challenges_company_email", "company_id", "email"),
+        Index("ix_signup_challenges_expires_at", "expires_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+    )
+    login_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)  # Argon2id（平文保持しない）
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)  # 6桁OTP の SHA-256 hex
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
