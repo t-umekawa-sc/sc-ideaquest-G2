@@ -86,6 +86,43 @@ def test_t_tc_208_capability_holders_list(client, factory):
         ts.commit()
 
 
+def test_t_tc_211_capability_regrant_idempotent(client, factory):
+    """T-TC-211: 既に保持する能力の再付与は 200 の no-op（二重付与なし・granted_at 不変）。
+
+    複数権限同時付与UI（CapabilitiesSection）で、既保持の能力が混ざってもエラーにならない根拠。
+    """
+    from sqlalchemy import text as _text
+
+    target = factory.make_seed_company_account(display_name=f"冪等_{uuid.uuid4().hex[:6]}")
+    _admin(client, factory)
+    url = f"/api/v1/admin/accounts/{target['id']}/capabilities"
+    # 1回目＝新規付与（200）。
+    r1 = client.post(url, json={"capability": "info_curator"}, headers=_csrf(client))
+    assert r1.status_code == 200 and r1.json()["capabilities"].count("info_curator") == 1, r1.text
+    # 付与直後の granted_at を保有者一覧から控える。
+    holders1 = client.get("/api/v1/admin/capabilities/info_curator/holders").json()["data"]
+    granted_at_1 = next(h["granted_at"] for h in holders1 if h["account_id"] == str(target["id"]))
+    # 2回目＝既に保持＝200 の no-op（エラーにならない・重複追加しない）。
+    r2 = client.post(url, json={"capability": "info_curator"}, headers=_csrf(client))
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["capabilities"].count("info_curator") == 1  # 1回だけ（二重付与なし）
+    # 有効行（revoked_at NULL）は1行のまま・granted_at は初回のまま（上書きしない）。
+    with get_tenant_session(_seed_db()) as ts:
+        active = ts.execute(_text(
+            "SELECT count(*) FROM user_capabilities uc JOIN users u ON u.id = uc.user_id "
+            "WHERE u.account_id = :a AND uc.capability = 'info_curator' AND uc.revoked_at IS NULL"
+        ), {"a": target["id"]}).scalar()
+        assert active == 1, f"有効行は1行のはず: {active}"
+    holders2 = client.get("/api/v1/admin/capabilities/info_curator/holders").json()["data"]
+    mine2 = [h for h in holders2 if h["account_id"] == str(target["id"])]
+    assert len(mine2) == 1 and mine2[0]["granted_at"] == granted_at_1  # 付与日時は不変
+    # 後始末（共有 dev DB を汚さない）。
+    with get_tenant_session(_seed_db()) as ts:
+        ts.execute(_text("DELETE FROM user_capabilities WHERE user_id IN "
+                         "(SELECT id FROM users WHERE account_id = :a)"), {"a": target["id"]})
+        ts.commit()
+
+
 def test_t_tc_123_quest_create_capability_gate(client, factory):
     """T-TC-123: クエスト作成は quest_create 保持者のみ（決定K）＝非保持の一般は 403・付与後は 201・管理者は常時可。"""
     from sqlalchemy import text as _text
