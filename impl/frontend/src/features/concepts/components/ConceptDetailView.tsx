@@ -19,9 +19,10 @@ import { backToListOr } from "@/lib/nav";
 
 import {
   addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, deleteConcept, deleteValidation, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
-  patchValidation, selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
+  patchValidation, regenerateAiEvaluation, selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
   type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate, type Validation,
 } from "../api";
+import { EvaluationComments } from "@/features/evaluations/components/EvaluationComments";
 import { AssumptionCard } from "./AssumptionCard";
 import { validateValidationInput } from "../validation";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
@@ -105,6 +106,29 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
 
   // 評価結果は SC-22 と同じく集計 EP から別途取得（観点別平均・評価者ごとの総評/コメント・複数名対応）。
   const loadEval = useCallback(() => { void getEvaluationAggregate(conceptId).then(setEvalAgg).catch(() => {}); }, [conceptId]);
+
+  // AI 評価の生成/再生成（P.5a・評価者権限のみ・手動のみ＝サーバー権威）。完了/権限/モデル無効はサーバーが 409/403/422。
+  const [regeneratingAi, setRegeneratingAi] = useState(false);
+  const handleRegenerateAi = useCallback(async () => {
+    if (regeneratingAi) return;
+    setRegeneratingAi(true);
+    try {
+      await regenerateAiEvaluation(conceptId);
+      snack({ type: "success", title: "AI 評価の生成を開始しました", msg: "完了すると評価結果に反映されます（AI処理状況で進捗を確認できます）。" });
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg:
+          status === 409 ? "完了したクエストでは生成できません。"
+          : status === 403 ? "AI 評価を生成する権限がありません（評価者権限が必要です）。"
+          : status === 422 ? "この会社では AI 評価のモデルが有効化されていません。"
+          : "生成の開始に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setRegeneratingAi(false);
+    }
+  }, [conceptId, regeneratingAi, snack]);
   // 議論チャットのルーム一覧（総合＝常在／グループ・前提＝あれば）＝動線の遷移先解決に使う（P.6）。
   const loadScopes = useCallback(() => { void listChatScopes(conceptId).then((r) => setScopes(r?.items ?? [])).catch(() => {}); }, [conceptId]);
 
@@ -487,27 +511,75 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                     </div>
                   );
                 })}
-                {(evalAgg?.evaluators ?? []).some((e) => e.overall_comment) && (
-                  <>
-                    <div className="eval-section-label">総評</div>
-                    <div className="eval-overall">
-                      {(evalAgg?.evaluators ?? []).filter((e) => e.overall_comment).map((e) => (
-                        <div className="eval-overall__item" key={e.evaluator_id}>
-                          <div className="eval-comment__head">
-                            <Avatar name={e.evaluator?.display_name || "?"} imageUrl={e.evaluator?.avatar_image_url ?? undefined} size="sm" />
-                            <span className="chat-msg__name">{e.evaluator?.display_name || "?"}</span>
-                            {e.recommendation && <span className="badge badge-muted">{DECISION_LABEL[e.recommendation]?.[0] ?? e.recommendation}</span>}
-                          </div>
-                          <p className="eval-comment__text">{e.overall_comment}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                {/* コメント＝観点ごと代表1件（タブ=高評価/合意/懸念）＋総評代表＋他N件→#13 評価詳細（F.1.1/F.1.2 同型） */}
+                {evalAgg && (
+                  <EvaluationComments
+                    evaluators={evalAgg.evaluators ?? []}
+                    aspectLabels={ASPECT_LABELS}
+                    aiEvaluation={evalAgg.ai_evaluation}
+                    title={concept.title}
+                  />
                 )}
               </>
             )}
             {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-primary" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
           </section>
+
+          {/* AI 評価（独立した評価者・FR-50・P.5a）＝別枠カード。8観点＋Go/Pivot/Kill 推奨。手動のみ（生成/再生成）。 */}
+          {evalAgg?.ai_evaluation && (
+            <section className="card ai-eval" aria-label="AI評価">
+              <div className="eval-head">
+                <span className="ai-badge">🤖 AI評価</span>
+                {evalAgg.ai_evaluation.recommendation && (
+                  <span className="badge badge-muted">推奨: {DECISION_LABEL[evalAgg.ai_evaluation.recommendation]?.[0] ?? evalAgg.ai_evaluation.recommendation}</span>
+                )}
+                {evalAgg.ai_evaluation.model && <span className="badge badge-muted">{evalAgg.ai_evaluation.model}</span>}
+              </div>
+              {evalAgg.ai_evaluation.generated_at && (
+                <p className="ai-meta">{new Date(evalAgg.ai_evaluation.generated_at).toLocaleString("ja-JP")} 生成 ・ 独立した評価者として採点（集計に算入）</p>
+              )}
+              {ASPECT_LABELS.map(([key, label]) => {
+                const v = evalAgg.ai_evaluation?.scores?.[key];
+                const cmt = evalAgg.ai_evaluation?.comments?.[key];
+                return (
+                  <div key={key}>
+                    <div className="score-row">
+                      <span className="score-row__label">{label}</span>
+                      <span className="score-bar"><i style={{ width: `${v ? (v / 5) * 100 : 0}%` }} /></span>
+                      <span className="score-row__val">{v ? v.toFixed(1) : "–"}</span>
+                    </div>
+                    {cmt && <p className="eval-comment__text eval-comment__text--indent">{cmt}</p>}
+                  </div>
+                );
+              })}
+              {evalAgg.ai_evaluation.overall_comment && (
+                <>
+                  <div className="eval-section-label">総評</div>
+                  <div className="eval-overall__item"><p className="eval-comment__text">{evalAgg.ai_evaluation.overall_comment}</p></div>
+                </>
+              )}
+              {perms.includes("evaluate") && (
+                <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
+                  <button className="btn btn-outline" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
+                    {regeneratingAi ? "生成中…" : "AI評価を生成 / 再生成"}
+                  </button>
+                </div>
+              )}
+              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>▲ 生成/再生成は<strong>評価者権限</strong>を持つ人のみ（手動のみ）。</p>
+            </section>
+          )}
+          {/* AI 未生成でも評価者は生成ボタンを出す（手動のみ＝自動起動しない・P.5a） */}
+          {!evalAgg?.ai_evaluation && perms.includes("evaluate") && (
+            <section className="card" aria-label="AI評価">
+              <div className="eval-head"><span className="ai-badge">🤖 AI評価</span></div>
+              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>AI による評価（8観点＋Go/Pivot/Kill）はまだありません。生成すると独立した評価者として集計に加わります。</p>
+              <div className="modal__foot" style={{ marginTop: "var(--space-3)" }}>
+                <button className="btn btn-outline" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
+                  {regeneratingAi ? "生成中…" : "AI評価を生成"}
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}
           <section className="card" aria-label="総合判定">

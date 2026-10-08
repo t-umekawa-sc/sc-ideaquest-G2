@@ -2551,6 +2551,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/concepts/{concept_id}/ai-evaluation/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate Ai Evaluation
+         * @description AI 評価を生成/再生成（P.5a・**評価者権限保持者のみ**・手動のみ）。完了は 409・会社モデル無効は 422。
+         */
+        post: operations["regenerate_ai_evaluation_api_v1_concepts__concept_id__ai_evaluation_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/vote": {
         parameters: {
             query?: never;
@@ -5835,6 +5855,49 @@ export interface components {
             /** Access Mode */
             access_mode?: string | null;
         };
+        /**
+         * ConceptAiEvaluationDTO
+         * @description コンセプト AI 評価の別枠ブロック（FR-50・P.5a）＝8観点＋Go/Pivot/Kill 推奨。
+         */
+        ConceptAiEvaluationDTO: {
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /** Recommendation */
+            recommendation?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Generated At */
+            generated_at?: string | null;
+            /** Job Id */
+            job_id?: string | null;
+        };
+        /**
+         * ConceptAiEvaluationJobResponse
+         * @description コンセプト AI 評価の生成/再生成 enqueue 応答（202 相当・P.5a）。
+         */
+        ConceptAiEvaluationJobResponse: {
+            /** Job Id */
+            job_id: string;
+            /**
+             * Status
+             * @default queued
+             */
+            status: string;
+        };
         /** ConceptAssumptionDTO */
         ConceptAssumptionDTO: {
             /** Assumption Id */
@@ -6192,6 +6255,7 @@ export interface components {
              * @default []
              */
             evaluators: components["schemas"]["ConceptEvaluatorDTO"][];
+            ai_evaluation?: components["schemas"]["ConceptAiEvaluationDTO"] | null;
             my_evaluation?: components["schemas"]["ConceptEvaluationMeDTO"] | null;
             /**
              * Stale
@@ -6293,6 +6357,10 @@ export interface components {
             comments: {
                 [key: string]: string;
             };
+            /** Visibility */
+            visibility?: string | null;
+            /** Submitted At */
+            submitted_at?: string | null;
         };
         /** ConceptGroupScopeCreateRequest */
         ConceptGroupScopeCreateRequest: {
@@ -16012,6 +16080,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptEvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_ai_evaluation_api_v1_concepts__concept_id__ai_evaluation_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptAiEvaluationJobResponse"];
                 };
             };
             /** @description Validation Error */

@@ -8,7 +8,22 @@ import { useState } from "react";
 
 import { Avatar, Modal, ModalBody } from "@/components/ui";
 
-import type { AiEvaluation, EvaluationEvaluator } from "../api";
+// アイデア評価(EvaluationEvaluatorDTO)・コンセプト評価(ConceptEvaluatorDTO)の両方が構造的に満たす最小型で受ける
+// （観点数・recommendation の有無はアイデア/コンセプトで異なるが、本コンポーネントは共通部＝スコア/コメント/総評のみ扱う）。
+type RepEvaluator = {
+  evaluator?: { user_id?: string | null; display_name?: string | null; avatar_image_url?: string | null } | null;
+  scores?: Record<string, number> | null;
+  comments?: Record<string, string> | null;
+  overall_comment?: string | null;
+  visibility?: string | null;
+  submitted_at?: string | null;
+};
+type RepAi = {
+  scores?: Record<string, number> | null;
+  comments?: Record<string, string> | null;
+  overall_comment?: string | null;
+  model?: string | null;
+} | null;
 
 type Tab = "high" | "avg" | "low";
 const TABS: { key: Tab; label: string }[] = [
@@ -35,12 +50,12 @@ function pickRep<T extends Scored>(items: T[], tab: Tab): T | null {
   return [...items].sort((a, b) => Math.abs(a.score - mean) - Math.abs(b.score - mean) || earliest(a, b))[0];
 }
 
-type EvalLike = EvaluationEvaluator & Scored;
+type EvalLike = RepEvaluator & Scored;
 
 export function EvaluationComments({ evaluators, aspectLabels, aiEvaluation, title }: {
-  evaluators: EvaluationEvaluator[];
+  evaluators: RepEvaluator[];
   aspectLabels: [string, string][];
-  aiEvaluation?: AiEvaluation | null;
+  aiEvaluation?: RepAi;
   title: string;
 }) {
   const [tab, setTab] = useState<Tab>("avg");
@@ -79,8 +94,8 @@ export function EvaluationComments({ evaluators, aspectLabels, aiEvaluation, tit
           <div className="eval-overall">
             <div className="eval-overall__item">
               <div className="eval-comment__head">
-                <Avatar name={repOverall.evaluator.display_name || "?"} imageUrl={repOverall.evaluator.avatar_image_url ?? undefined} size="sm" />
-                <span className="chat-msg__name">{repOverall.evaluator.display_name || "?"}</span>
+                <Avatar name={repOverall.evaluator?.display_name || "?"} imageUrl={repOverall.evaluator?.avatar_image_url ?? undefined} size="sm" />
+                <span className="chat-msg__name">{repOverall.evaluator?.display_name || "?"}</span>
                 {overallCands.length > 1 && (
                   <button type="button" className="eval-comment__more" onClick={() => setDetail(true)}>他{overallCands.length - 1}件 →</button>
                 )}
@@ -103,8 +118,8 @@ export function EvaluationComments({ evaluators, aspectLabels, aiEvaluation, tit
                 <div className="eval-comment" key={k}>
                   <div className="eval-comment__head">
                     <span className="badge badge-muted eval-comment__aspect--lead">{label}</span>
-                    <Avatar name={rep.evaluator.display_name || "?"} imageUrl={rep.evaluator.avatar_image_url ?? undefined} size="sm" />
-                    <span className="chat-msg__name">{rep.evaluator.display_name || "?"}</span>
+                    <Avatar name={rep.evaluator?.display_name || "?"} imageUrl={rep.evaluator?.avatar_image_url ?? undefined} size="sm" />
+                    <span className="chat-msg__name">{rep.evaluator?.display_name || "?"}</span>
                     {cands.length > 1 && (
                       <button type="button" className="eval-comment__more" onClick={() => setDetail(true)}>他{cands.length - 1}件 →</button>
                     )}
@@ -121,9 +136,9 @@ export function EvaluationComments({ evaluators, aspectLabels, aiEvaluation, tit
         <Modal open onClose={() => setDetail(false)} title="評価詳細" size="lg">
           <ModalBody>
             <p className="ai-meta">公開範囲（パーティ全員／限定／非公開）に応じて、あなたに公開されている評価のみ表示します。</p>
-            {evaluators.map((e) => (
-              <ScoreCard key={e.evaluator.user_id}
-                name={e.evaluator.display_name || "?"} avatar={e.evaluator.avatar_image_url ?? undefined}
+            {evaluators.map((e, i) => (
+              <ScoreCard key={e.evaluator?.user_id ?? i}
+                name={e.evaluator?.display_name || "?"} avatar={e.evaluator?.avatar_image_url ?? undefined}
                 scores={e.scores} comments={e.comments} overall={e.overall_comment} aspectLabels={aspectLabels} />
             ))}
             {aiEvaluation && (

@@ -180,6 +180,15 @@ export function putEvaluation(conceptId: string, body: EvaluationPutInput): Prom
   return apiFetch<EvaluationMe>(`/concepts/${conceptId}/evaluation`, { method: "PUT", body: JSON.stringify(body) });
 }
 
+// コンセプト AI 評価の別枠ブロック（FR-50・P.5a）＝8観点＋Go/Pivot/Kill 推奨。
+export type ConceptAiEvaluation = components["schemas"]["ConceptAiEvaluationDTO"];
+export type ConceptAiEvaluationJob = components["schemas"]["ConceptAiEvaluationJobResponse"];
+
+// AI 評価を生成/再生成（P.5a・評価者権限保持者のみ・手動のみ・202）。完了は 409・会社モデル無効は 422（サーバー権威）。
+export function regenerateAiEvaluation(conceptId: string): Promise<ConceptAiEvaluationJob | null> {
+  return apiFetch<ConceptAiEvaluationJob>(`/concepts/${conceptId}/ai-evaluation/regenerate`, { method: "POST" });
+}
+
 // ---- 議論チャット（P.6・scope＝総合/グループ/前提スレッド） ----
 
 export type ConceptChatScopeItem = components["schemas"]["ConceptChatScopeItemDTO"];
