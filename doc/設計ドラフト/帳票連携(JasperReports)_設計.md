@@ -1,0 +1,197 @@
+# 帳票連携（JasperReports）機能 — 設計ドラフト（疎結合な帳票出力基盤）
+
+> 状態: **レビュー完了・方針確定（2026-10-08）＝(1) データ・プッシュ(JSON)／(2) MVP は同期ストリーム／(3) `fallback`(純 Python) を用意、の 3 点を合意（§5 決定事項）**。実装未着手。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠（文書間参照は文書名接頭辞）。
+> 関連正本＝[コーディング規約](../規約/コーディング規約.md)（§2 セキュリティ・§2.3 DRY・§3.4 バックエンド4層）・[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)・[API設計 README](../API設計/README.md)（§1.x 横断規約）・[データモデル](../データモデル.md)・[本番デプロイ要件](../本番デプロイ要件.md)。
+> 実体化先＝[API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)・[テスト V_帳票](../テスト/V_帳票.md)。初回の縦1本＝**会社詳細（[SC-92](../画面設計/screens/SC-92_会社詳細.md)）から使用料請求書 PDF をダウンロード**。
+> 提供参考資料＝JasperReports × Python 連携サンプル（`pyreportjasper` + FastAPI・`v_pythonjasper`・2026-05-13 納品）。本書はその統合設計。
+
+## 0. 位置づけ・狙い
+
+- **フロント →（自前バックエンド経由）→ JasperReports で帳票を出力し、ブラウザに PDF がダウンロードされる**一連の仕組みを、**疎結合**（JasperReports が無くてもアプリが動く）に構築する。
+- 帳票ロジック（＝何を印字するかのデータ組み立て）を**レンダリング・エンジン（Jasper）から切り離す**。Jasper は差し替え可能な 1 レンダラに過ぎない設計にする。
+- **なぜ疎結合か**＝(a) Jasper は Java 製の重い外部依存（JVM・jrxml テンプレ）で、開発/テスト/小規模デプロイでは不在のことがある。(b) 帳票は将来エンジンが変わり得る（Jasper→別エンジン）。データ組み立てをエンジンに密結合させると移行で業務ロジックごと壊れる。
+
+## 1. 提供サンプルのレビュー（現状分析と課題）
+
+`v_pythonjasper` は**独立した FastAPI サービス**（`:8000`）で、`GET /generate?report_id&format&group` を受け、`reports/{group}/{report_id}.jrxml` を `pyreportjasper` で実行し `FileResponse` で返す。付属 `sample.ts` はフロントから `window.open('http://localhost:8000/generate?...')` で**直接**叩く構成。Jasper は `config.ini` の DB 資格情報で DB へ JDBC 接続し、jrxml 内の SQL（`SELECT ... FROM accounts`）でデータを取得する（DB 直結型）。
+
+そのまま本番統合すると以下が問題になる（本設計で解消する）。
+
+| # | サンプルの実装 | 課題 | 本設計での対処 |
+|---|---|---|---|
+| R1 | フロントが Jasper(`:8000`) を直接叩く（`window.open`） | 認証・テナント境界を素通り。Jasper がブラウザに露出 | **自前バックエンドを唯一の窓口**にし、Jasper は内部ネットワーク限定（§3） |
+| R2 | `CORSMiddleware(allow_origins=["*"])` | 本番で危険 | ブラウザから直接呼ばない設計ゆえ CORS 不要（内部 S2S・§11） |
+| R3 | `# ここに認証ロジックを組み込む`（未実装） | 無認証 | バックエンド側で認可（会社管理者のみ）＋ S2S は共有シークレット（§11） |
+| R4 | `config.ini` に DB 資格情報・jrxml 内に `SELECT ... FROM accounts`（JDBC 直結） | Jasper が**我々の DB スキーマ・テナント分割・資格情報に密結合** | **データ・プッシュ型**（JSON データソース）へ切替。Jasper から DB 資格情報を排除（§4） |
+| R5 | `reports/{group}/{report_id}.jrxml` を query から直接組み立て | **パストラバーサル**（`report_id=../../etc`） | `report_key` を**ホワイトリスト**（レジストリ）で解決（§11） |
+| R6 | `/tmp/{report_id}.{fmt}` に出力し削除しない | 一時ファイル・リーク／多テナントで衝突 | バイト列でストリームし即破棄、重い帳票は MinIO 短 TTL（§8） |
+| R7 | 同期 `window.open` 固定 | 重い帳票で UX 劣化 | MVP は同期ストリーム、重い帳票は AI ジョブ基盤パターンで非同期化（§9） |
+
+> つまりサンプルは「Jasper 単体の動作確認用」としては有効。統合点はバックエンドに寄せ、**Jasper を純粋なレンダリング・エンジンに限定**するのが本設計の肝。
+
+## 2. 設計方針（疎結合の 3 原則）
+
+1. **バックエンドが唯一の窓口**。フロントは自前 API だけを叩く。Jasper はブラウザから見えない内部サービス。
+2. **帳票ロジックとレンダリングの分離**。「何を印字するか（データ組み立て）」は自前ドメインの純粋ロジック、「どう描画するか（PDF 化）」は差し替え可能な**レンダラ port**。Jasper は後者の 1 実装。
+3. **env ゲートで着脱**。`REPORT_RENDERER=jasper|fallback|none` で切替。Jasper 未デプロイでもアプリは落ちない。
+   - **なぜ**＝[S_AIジョブ・LLM連携](../API設計/S_AIジョブ・LLM連携.md) の LLM ゲートウェイ（`infra/llm`・env 可変・Fake 注入でテスト）と同作法に揃える＝既存知見の再利用（DRY・コーディング規約 §2.3）。
+
+## 3. アーキテクチャ全体像
+
+```
+ ブラウザ(SC-92)
+    │  ① GET /api/v1/admin/companies/{id}/billing/invoice?period=YYYY-MM  (同一オリジン, Cookie認証)
+    ▼
+┌──────────────────────────── 自前 Backend (FastAPI) ─────────────────────────────┐
+│  router(認可: 会社管理者)                                                          │
+│     └─ application                                                               │
+│          ├─ ② domain: 請求書データ組み立て(純粋) → InvoiceReportData (JSON可)      │
+│          └─ ③ infra/reports: ReportRenderer port で描画                          │
+│                 ├─ JasperHttpRenderer ──④ POST /render (JSON body, S2S秘密) ──┐  │
+│                 └─ FallbackPdfRenderer (純Python, Jasper不要)                 │  │
+└──────────────────────────────────────────────────────────────────────────────┼──┘
+    ▲  ⑥ 200 OK: PDFバイト列 (Content-Disposition: attachment)                    │
+    │                                                                            ▼
+    │                                        ┌──── Jasper Service (内部のみ) ────┐
+    └────────────── ⑥ ブラウザへストリーム ──┤  /render: JSONデータ+テンプレIDで  │
+                                             │  jrxml実行 → PDFバイト列を返す ⑤  │
+                                             └──────────────────────────────────┘
+```
+
+**「誰がファイルを持つか」の結論**＝**バックエンドが取りに行き、バックエンドが返す**。Jasper → バックエンド（S2S・バイト列）→ ブラウザへストリーム。フロントは既存 CSV エクスポートと同じ seam（同一オリジンの GET ナビゲーション）でダウンロードするだけで、Jasper の URL はフロントに一切出さない。
+- **なぜ**＝認可・テナント解決・CSRF/Cookie の作法を**既存バックエンドに集約**でき、Jasper を露出しないため（R1〜R3 を構造的に封じる）。
+
+## 4. データ連携モデル＝データ・プッシュ（JSON）【決定】
+
+Jasper へのデータ供給は 2 通り。**(B) データ・プッシュを本線に採用**（§5 決定）。
+
+| | (A) DB 直結（サンプル方式） | (B) データ・プッシュ（JSON データソース）★採用 |
+|---|---|---|
+| 仕組み | jrxml に SQL、Jasper が DB へ JDBC 接続 | バックエンドが JSON を組み立て Jasper に渡す。jrxml は JSON データアダプタ |
+| 結合度 | Jasper が我々のスキーマ・テナント分割・DB 資格情報に**密結合** | Jasper は**スキーマを知らない**純粋レンダラ |
+| マルチテナント | 会社別 DB ルーティングを Jasper 側で再実装が必要（破綻しやすい） | バックエンドが解決済みのデータを渡すだけ |
+| セキュリティ | Jasper に DB 資格情報（R4） | Jasper から DB 資格情報を**排除** |
+| サンプルからの変更 | ほぼ無改修 | Jasper 側を「JSON を受けて描画」に小改修 |
+
+- **採用理由**＝疎結合・マルチテナント・セキュリティ（特に R4）を満たすのは (B) のみ。「帳票ロジック切り離し」の主要件とも整合する。
+- **(A) 不採用理由**＝サンプル無改修は魅力だが、会社別 DB（[API設計 README §0](../API設計/README.md) の 2 層 DB・動的ルーティング）を Jasper 側に再実装させる必要があり、資格情報も分散する。初回スパイク検証に限り (A) を許容するが、本線には載せない。
+- **Jasper 側の必要改修（最小 2 点）**＝(a) jrxml を JSON データアダプタ化（SQL を除去）、(b) `/render` を JSON body 受けに変更。これで `config.ini` の `[DATABASE]` 節は丸ごと不要になる。
+
+## 5. 決定事項（2026-10-08 レビューで確定）
+
+| 決定点 | 確定 | なぜ |
+|---|---|---|
+| データ連携（§4） | **データ・プッシュ（JSON）** | Jasper から DB 資格情報・スキーマ依存を排除（R4 解消）・純レンダラ化で疎結合／マルチテナント対応 |
+| 出力方式（§9） | **MVP は同期ストリーム** | 既存 CSV エクスポートと同形。請求書は軽量で受入基準（落ちれば OK）に十分・実装最小 |
+| 切り離し（§12） | **`fallback`（純 Python）を用意** | `REPORT_RENDERER=jasper/fallback/none`。Jasper 無しでも PDF が落ちる＝主要件を完全充足 |
+
+## 6. バックエンド設計（4 層＋レンダラ port）
+
+[コーディング規約 §3.4](../規約/コーディング規約.md) の 4 層に準拠。帳票**基盤**は `infra`（LLM の `infra/llm` と同じ立ち位置）、請求書**機能**はコントロールプレーン（SC-92 は admin 画面）に置く。
+
+```
+app/infra/reports/            ← 帳票基盤
+  ├─ port.py                  ReportRenderer(Protocol): render(report_key, data, fmt) -> bytes
+  ├─ jasper_http.py           JasperHttpRenderer   (HTTP で Jasper を呼ぶ)
+  ├─ fallback_pdf.py          FallbackPdfRenderer  (純 Python: reportlab 等で PDF/HTML/CSV)
+  ├─ registry.py              report_key のホワイトリスト解決(R5) + レンダラ選択(env)
+  └─ errors.py                ReportUnavailable / ReportConfigError
+
+app/control_plane/billing/    ← 請求書「機能」(4層)
+  ├─ router.py                GET .../invoice  (認可→application→Response でストリーム)
+  ├─ schemas.py               期間パラメータ等の DTO
+  ├─ application.py           ②データ組み立て呼び出し→③レンダラ選択→bytes 返却
+  └─ domain/
+       └─ invoice.py          InvoiceReportData 構築(純粋・レンダラ非依存＝これが「帳票ロジック」)
+```
+
+**切り離しの核心**＝`domain/invoice.py`（何を印字するか）はレンダラを知らない。`infra/reports/port.py` の `ReportRenderer` を介してのみ描画し、`JasperHttpRenderer` / `FallbackPdfRenderer` を env で差し替える。テストは `FakeRenderer` を注入（既存 `set_chat_client(FakeChat)` と同作法・[テスト S_AIジョブ](../テスト/S_AIジョブ.md) の Fake ゲートウェイ方針に揃える）。
+
+## 7. API 設計（新ドメイン V）
+
+詳細は [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)。MVP は同期・既存 CSV エクスポート（`GET /admin/companies?format=csv`）と同形。
+
+| メソッド | パス | 認可 | 返却 |
+|---|---|---|---|
+| GET | `/api/v1/admin/companies/{id}/billing/invoice?period=YYYY-MM&format=pdf` | 会社管理者（既存 SC-92 認可を再利用） | `200` PDF バイト列 + `Content-Disposition: attachment; filename="invoice-{company}-{period}.pdf"` |
+
+- `format` は `pdf` 既定（将来 `xlsx`/`csv` は Jasper の `output_formats` で拡張）。`period` は `^\d{4}-\d{2}$` 検証。`report_key` は内部ホワイトリスト固定（外部から任意テンプレ指定をさせない＝R5）。
+- Jasper 停止時＝`fallback` なら純 Python 生成、`jasper` でダウン時は `502`（再試行可メッセージ）、`none` は `503`／ボタン非活性。
+
+## 8. 一時ファイルの扱い（R6）
+
+- **MVP（同期）**＝Jasper からバイト列で受領→そのまま `Response` でストリーム→保持しない。サンプルの `/tmp` 書き捨ては不採用。Jasper サービス側で一時生成する場合は生成直後に削除（finally）。
+- **非同期（将来）**＝MinIO に短 TTL（既存 `minio_url_ttl_seconds` 既定 300s）で置き、署名 URL を返す（既存添付ダウンロードと同じ seam・[D_アイデア・添付・版・投票・フォロー](../API設計/D_アイデア・添付・版・投票・フォロー.md)）。
+
+## 9. 同期 / 非同期【MVP=同期】
+
+- **MVP は同期ストリーム**（§5 決定）。Jasper 呼び出しに `JASPER_TIMEOUT_SECONDS`（既定 30s 程度）を設定。
+- 重い帳票や一括出力が出てきたら [S_AIジョブ・LLM連携](../API設計/S_AIジョブ・LLM連携.md) のジョブ基盤と同型で非同期化（202＋job_id→WS/ポーリング→署名 URL）。**最初から両対応を作り込まない**（過剰設計回避）。
+
+## 10. 設定・デプロイ
+
+`impl/compose.yaml` に Jasper を内部サービスとして追加（公開ポートを張らない）。backend から `http://jasper:8000` で到達。
+
+| env | 既定 | 用途 |
+|---|---|---|
+| `REPORT_RENDERER` | `none` | `jasper`/`fallback`/`none`（着脱スイッチ） |
+| `JASPER_BASE_URL` | `http://jasper:8000` | 内部エンドポイント |
+| `JASPER_TIMEOUT_SECONDS` | `30` | タイムアウト |
+| `JASPER_SHARED_SECRET` | （空） | S2S 認証ヘッダ |
+
+- jrxml テンプレートは Jasper サービスのイメージ内（`reports/{group}/{id}.jrxml`）にバージョン管理。
+- 本番要件（ネットワーク分離・ヘルスチェック・JVM headless）は [本番デプロイ要件](../本番デプロイ要件.md) に追記。
+
+## 11. セキュリティ（[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md) 突合）
+
+- **Jasper 非公開**（内部ネットワークのみ・ブラウザ露出なし）。CORS `*` は不採用（R1/R2）。
+- **認可**＝自前エンドポイントで会社管理者のみ（既存 SC-92 認可再利用）。他社請求書は存在秘匿で 404（[API設計 README §1.5](../API設計/README.md)・テナント分離）。
+- **S2S 認証**＝`JASPER_SHARED_SECRET` ヘッダ（将来 mTLS 可）。サンプルの TODO（R3）を埋める。
+- **パストラバーサル対策**（R5）＝`report_key` はレジストリのホワイトリスト解決。query から直接パスを組み立てない。
+- **DB 資格情報の排除**（R4）＝データ・プッシュ採用で Jasper 側 `config.ini` の DB 接続を廃止。
+- **入力検証**＝`period`/`format` を [デザイン標準 §4.7](../画面設計/デザイン標準.md) 相当で検証。CSRF は GET ダウンロードのため不要（状態変更なし・[API設計 README §1.4](../API設計/README.md)）。
+
+## 12. 切り離し可能性（Jasper 無しで動く）＝主要件の担保【fallback 採用】
+
+| `REPORT_RENDERER` | 挙動 |
+|---|---|
+| `jasper` | Jasper で高品質 PDF |
+| `fallback` | 純 Python（reportlab 等）で PDF/HTML/CSV を生成。**Jasper 不要で全機能稼働** |
+| `none` | 帳票機能オフ（ボタン非活性）。アプリ本体は無影響 |
+
+帳票ロジック（`domain/invoice.py`）はレンダラ非依存なので、Jasper 撤去＝`jasper_http.py` を使わないだけ。ドメイン・API・フロントは無改修。
+
+## 13. フロントエンド設計（SC-92 への追加）
+
+- [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に「請求書」アクション（期間ピッカー＋ダウンロードボタン）を追加。
+- ダウンロードは**既存 CSV エクスポートと同じ seam**＝同一オリジンの GET ナビゲーション（Cookie 認証・CSRF 不要）。`features/companies/api.ts` の `companiesCsvUrl()` に倣い `invoiceUrl(companyId, period)` を追加。
+- サンプルの `window.open('http://localhost:8000/...')` は不採用（Jasper 露出）。
+- `REPORT_RENDERER=none` 時はボタン非活性＋ツールチップ（「押せない方が親切」＝完了クエスト凍結 UI と同原則）。
+- フロント実装は [フロントエンド実装フロー規約](../規約/フロントエンド実装フロー規約.md)（モック先行→接続）に従い、SC-92 既存ダウンロード導線を踏襲（新規 UI を作らない）。
+
+## 14. テスト方針（[テスト規約](../規約/テスト規約.md)）
+
+詳細 TC は [テスト V_帳票](../テスト/V_帳票.md)。TC-ID は `V-TC-1xx`（api/int）・`V-TC-2xx`（e2e/unit）。実装前に md へ TC 行（`根拠` 列付き）を追加してからコードを書く（CLAUDE.md）。
+
+- unit＝`domain/invoice.py` のデータ組み立て／`registry` のホワイトリスト（`../` 拒否＝R5 回帰）。
+- int＝`FakeRenderer` 注入で application がバイト列を返す／`none` で 503／`jasper` ダウンで 502。
+- api＝エンドポイントの認可（他社 404）・`Content-Disposition`・`period` 検証。
+- 受入＝SC-92 で実際に PDF が落ちること（目視検証）。
+
+## 15. 段階的実装計画（MVP）
+
+1. `infra/reports` port＋`FallbackPdfRenderer`＋registry（**Jasper 無しで PDF が落ちる**所まで）。
+2. `control_plane/billing` ドメイン＋ API（同期ストリーム）。
+3. SC-92 にボタン＋`invoiceUrl()`。→ ここで受入（落ちれば OK）。
+4. Jasper サービスを `/render`（JSON body）対応に小改修＋jrxml を JSON データソース化。compose に追加。`REPORT_RENDERER=jasper` へ切替。
+5. S2S 秘密・ネットワーク分離・本番要件追記。
+
+> この順なら **1〜3 の時点で「帳票ダウンロード」が Jasper 無しで成立**し、4 で Jasper を“挿すだけ”＝疎結合が実証できる。
+
+## 16. 正式反映の TODO（本ドラフト合意後）
+
+- [ ] FR 採番（[要件定義 README](../要件定義/README.md) に「帳票出力基盤」を追加）。
+- [ ] [データモデル](../データモデル.md) に（非同期化時のみ）`report_jobs` 等を追加検討（MVP の同期では DB 追加なし）。
+- [ ] [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md) の詳細確定（本書と同時起票済・ドラフト）。
+- [ ] [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に請求書アクションの節を追記。
+- [ ] [本番デプロイ要件](../本番デプロイ要件.md) に Jasper コンテナ（内部ネットワーク・ヘルスチェック）を追記。
