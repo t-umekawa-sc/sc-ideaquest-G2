@@ -93,6 +93,36 @@
 .eval-comment__aspect { margin-left: auto; }
 .eval-comment__text { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: 1.7; }
 
+/* ⑥ AI 評価（FR-50）＝人間と別枠カード。紫アクセント＋🤖バッジで区別。正＝mocks/_AI評価パネル_検討.html */
+.eval-sep { border: 0; border-top: 1px solid var(--color-border); margin: var(--space-4) 0 0; }
+.ai-eval { border-left: 4px solid var(--ai-accent, #7c5cff); }
+.ai-eval .score-bar > i { background: var(--ai-accent, #7c5cff); }
+.ai-eval .eval-overall__item { border-left-color: var(--ai-accent-border, #d6ccff); background: var(--ai-accent-soft, #efeaff); }
+.ai-eval .avatar__img.placeholder { background: var(--ai-accent, #7c5cff); color: #fff; }
+.ai-badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 700;
+  color: var(--ai-accent, #7c5cff); background: var(--ai-accent-soft, #efeaff); border: 1px solid var(--ai-accent-border, #d6ccff);
+  border-radius: var(--radius-full); padding: 2px 10px; }
+.ai-meta { color: var(--color-text-muted); font-size: var(--text-xs); margin: var(--space-1) 0 var(--space-2); }
+
+/* 代表コメント＝タブ（ダッシュボード .dash-tabs と同一見た目・SC-22/61 右レール内で再利用） */
+.eval-cmt-tabs { display: flex; align-items: flex-end; gap: var(--space-1); flex-wrap: wrap; border-bottom: 2px solid var(--color-border); margin-bottom: var(--space-3); }
+.eval-cmt-tab { appearance: none; background: none; border: 0; font: inherit; font-weight: 500; color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-3); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  border-radius: var(--radius) var(--radius) 0 0; white-space: nowrap; transition: background .12s, color .12s; }
+.eval-cmt-tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.eval-cmt-tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
+/* 観点別コメント＝観点バッジを行頭に／コメントは評価者名の下に字下げ・他N件は右寄せ */
+.eval-comment__aspect--lead { margin-left: 0; margin-right: var(--space-1); }
+.eval-comment__more { margin-left: auto; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: var(--text-xs); color: var(--color-primary); white-space: nowrap; }
+.eval-comment__more:hover { text-decoration: underline; }
+.eval-comment__text--indent { padding-left: 30px; }
+.eval-cmt-empty { color: var(--color-text-muted); font-style: italic; opacity: .55; }
+/* #13 評価詳細モーダル＝評価者ごとスコアカード */
+.sc-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-3); }
+.sc-card.ai-eval { border-color: var(--ai-accent-border, #d6ccff); }
+.sc-card__head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.sc-card__meta { margin-left: auto; color: var(--color-text-muted); font-size: var(--text-xs); }
+
 /* 情報リスト（定義リスト） */
 .info-list { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); margin: 0; font-size: var(--text-sm); }
 .info-list dt { color: var(--color-text-muted); }

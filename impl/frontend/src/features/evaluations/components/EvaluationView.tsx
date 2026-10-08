@@ -483,6 +483,13 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
                 <span className="radio-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーには集計にも含めず完全非表示。</span>
               </span>
             </label>
+            <label className={"radio-opt" + (visibility === "private" ? " is-sel" : "")}>
+              <input type="radio" name="vis" value="private" checked={visibility === "private"} onChange={() => setVisibility("private")} />
+              <span>
+                <span className="radio-opt__title">🔕 非公開</span>
+                <span className="radio-opt__desc">投稿者＋あなた（評価者）のみ閲覧可。所有者/クエスト管理権限者にも非表示（限定公開より1段狭い）。集計の平均・コインには反映されます。</span>
+              </span>
+            </label>
           </div>
         </div>
 

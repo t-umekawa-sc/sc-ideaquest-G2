@@ -7,6 +7,7 @@ import type { components } from "@/lib/api/schema";
 export type EvaluationMe = components["schemas"]["EvaluationMeDTO"];
 export type EvaluationAggregate = components["schemas"]["EvaluationAggregateDTO"];
 export type EvaluationEvaluator = components["schemas"]["EvaluationEvaluatorDTO"];
+export type AiEvaluation = components["schemas"]["AiEvaluationDTO"];  // AI 評価の別枠ブロック（FR-50・F.7.4）
 export type EvaluationCoin = components["schemas"]["EvaluationCoinDTO"];
 export type EvaluationPutInput = components["schemas"]["EvaluationPutRequest"];
 export type EvaluationVisibility = EvaluationPutInput["visibility"];
@@ -46,4 +47,10 @@ export function selectIdea(ideaId: string): Promise<IdeaSelectResult | null> {
 // 選定を解除（F.3・owner/quest_admin）。XP は剥奪しない。完了は 409。
 export function unselectIdea(ideaId: string): Promise<IdeaSelectResult | null> {
   return apiFetch<IdeaSelectResult>(`/ideas/${ideaId}/select`, { method: "DELETE" });
+}
+
+// AI 評価を再生成（F.7.3・評価者権限保持者のみ・202）。完了は 409・会社モデル無効は 422（サーバー権威）。
+export type AiEvaluationJob = components["schemas"]["AiEvaluationJobResponse"];
+export function regenerateAiEvaluation(ideaId: string): Promise<AiEvaluationJob | null> {
+  return apiFetch<AiEvaluationJob>(`/ideas/${ideaId}/ai-evaluation/regenerate`, { method: "POST" });
 }

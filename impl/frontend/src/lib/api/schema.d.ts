@@ -2023,6 +2023,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/ai-evaluation/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate Ai Evaluation
+         * @description AI 評価を再生成（F.7.3・**評価者権限保持者のみ**）。完了クエストは 409・会社モデル無効は 422。
+         */
+        post: operations["regenerate_ai_evaluation_api_v1_ideas__idea_id__ai_evaluation_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/select": {
         parameters: {
             query?: never;
@@ -4916,6 +4936,47 @@ export interface components {
             /** Max Output Tokens */
             max_output_tokens?: number | null;
         };
+        /**
+         * AiEvaluationDTO
+         * @description AI 評価の別枠ブロック（FR-50・F.7.4）。人間の evaluators[] とは分離して返す。
+         */
+        AiEvaluationDTO: {
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Generated At */
+            generated_at?: string | null;
+            /** Job Id */
+            job_id?: string | null;
+        };
+        /**
+         * AiEvaluationJobResponse
+         * @description AI 評価の生成/再生成 enqueue 応答（202 相当・F.7.3）。
+         */
+        AiEvaluationJobResponse: {
+            /** Job Id */
+            job_id: string;
+            /**
+             * Status
+             * @default queued
+             */
+            status: string;
+        };
         /** AiJobDetail */
         AiJobDetail: {
             /** Id */
@@ -6170,7 +6231,7 @@ export interface components {
              * @default party
              * @enum {string}
              */
-            visibility: "party" | "limited";
+            visibility: "party" | "limited" | "private";
             /** Submitted At */
             submitted_at?: string | null;
             /**
@@ -6201,7 +6262,7 @@ export interface components {
              * @default party
              * @enum {string}
              */
-            visibility: "party" | "limited";
+            visibility: "party" | "limited" | "private";
             /**
              * Status
              * @default draft
@@ -6883,6 +6944,7 @@ export interface components {
              * @default []
              */
             evaluators: components["schemas"]["EvaluationEvaluatorDTO"][];
+            ai_evaluation?: components["schemas"]["AiEvaluationDTO"] | null;
             /** @default {
              *       "projected": 0
              *     } */
@@ -6946,7 +7008,7 @@ export interface components {
         };
         /**
          * EvaluationEvaluatorDTO
-         * @description 集計に含める1評価者の内訳（SC-22 §4.6・可視な評価のみ）。
+         * @description 集計に含める1評価者の内訳（SC-22 §4.6・可視な評価のみ・人間のみ）。
          */
         EvaluationEvaluatorDTO: {
             evaluator: components["schemas"]["EvaluationAuthorDTO"];
@@ -6966,6 +7028,10 @@ export interface components {
             };
             /** Overall Comment */
             overall_comment?: string | null;
+            /** Visibility */
+            visibility?: string | null;
+            /** Submitted At */
+            submitted_at?: string | null;
         };
         /**
          * EvaluationMeDTO
@@ -6999,7 +7065,7 @@ export interface components {
              * @default party
              * @enum {string}
              */
-            visibility: "party" | "limited";
+            visibility: "party" | "limited" | "private";
             /** Submitted At */
             submitted_at?: string | null;
             /**
@@ -7033,7 +7099,7 @@ export interface components {
              * @default party
              * @enum {string}
              */
-            visibility: "party" | "limited";
+            visibility: "party" | "limited" | "private";
             /**
              * Status
              * @default draft
@@ -14771,6 +14837,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_ai_evaluation_api_v1_ideas__idea_id__ai_evaluation_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEvaluationJobResponse"];
                 };
             };
             /** @description Validation Error */
