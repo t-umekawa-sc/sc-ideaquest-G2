@@ -136,7 +136,7 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
       unfollow: { label: "★ フォロー解除", onClick: () => void toggleFollow(r) },
       withdraw: { label: "申請を取り消す", onClick: () => void withdraw(r) },
       request: { label: "参加をリクエスト", onClick: () => void request(r) },
-      recommend: { label: r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定", onClick: () => void toggleRecommended(r) },
+      recommend: { label: r.recommended ? "☆ おすすめ解除" : "⭐ おすすめに設定", onClick: () => void toggleRecommended(r) },
     };
     return catalogRowMenuKeys(r, isAdmin).map((k) => build[k]);
   };
@@ -163,7 +163,7 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
         {/* 管理者のみ＝おすすめ（Zone D 選出のブースト）を設定/解除。my_state に関わらず出す（カタログ掲載＝発見可能＝候補）。 */}
         {isAdmin && (
           <button type="button" className="btn btn-outline btn-sm" onClick={() => void toggleRecommended(r)}>
-            {r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定"}
+            {r.recommended ? "☆ おすすめ解除" : "⭐ おすすめに設定"}
           </button>
         )}
         {(st === "none" || st === "following") && (
@@ -351,7 +351,7 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
         {/* 管理者のみ＝おすすめ（Zone D 選出ブースト）の設定/解除。閉じる（左）の隣に配置。 */}
         {isAdmin && (
           <button type="button" className="btn btn-outline" onClick={() => onToggleRecommended(row)}>
-            {row.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定"}
+            {row.recommended ? "☆ おすすめ解除" : "⭐ おすすめに設定"}
           </button>
         )}
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
