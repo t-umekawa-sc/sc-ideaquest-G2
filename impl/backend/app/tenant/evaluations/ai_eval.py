@@ -55,6 +55,14 @@ def build_messages(ts: Session, idea_id: uuid.UUID) -> list[dict]:
     parts = [f"# アイデア\nタイトル: {idea.title}\n価値: {idea.value}\n本文: {idea.body}"]
     if quest is not None:
         parts.append(f"# 由来クエスト\nタイトル: {quest.title}\n目的・テーマ: {quest.purpose or '—'}")
+    # RAG＝関連情報（FR-41）＋経営資料（FR-44・fit 観点の根拠）。要約主体・graceful（§3）。
+    from app.tenant._shared import eval_rag
+    info_lines = eval_rag.related_info_lines(ts, "ideas", idea_id)
+    if info_lines:
+        parts.append("# 関連情報（外部情報の知識レイヤ・反証を優先提示）\n" + "\n".join(info_lines))
+    strat_lines = eval_rag.strategy_doc_lines(ts, idea.quest_id)
+    if strat_lines:
+        parts.append("# 経営資料（方針との整合＝fit 観点の根拠）\n" + "\n".join(strat_lines))
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": "\n\n".join(parts)},

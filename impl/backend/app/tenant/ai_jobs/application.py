@@ -8,6 +8,7 @@ llm_worker.py がループで呼ぶ（テストは本関数を直接呼ぶ＝常
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -421,7 +422,28 @@ def _notify_completion(session, job: AiJob, *, ok: bool) -> None:
     params = {"task_type": job.task_type}
     if not ok and job.error:
         params["error"] = job.error
-    notify_svc.notify(session, [notify_svc.entry(job.requested_by_id, ntype, refs=refs, params=params)])
+    recipients = [job.requested_by_id]
+    # 評価ジョブの**失敗**は依頼者に加えて評価者権限保持者（owner 含む）へも通知（FR-50・F.7/P.5a・§6-5）＝
+    # 自動起動は system/author 起点で依頼者だけだと気づけないため。graceful（解決失敗でも依頼者通知は出す）。
+    if not ok and job.task_type in ("idea_evaluate", "concept_evaluate"):
+        try:
+            from app.tenant.evaluations import application as eval_app
+            inp = job.input or {}
+            quest = None
+            if job.task_type == "idea_evaluate" and (job.ref_idea_id or inp.get("idea_id")):
+                from app.tenant.ideas import repository as ideas_repo
+                from app.tenant.quests import repository as quests_repo
+                idea = ideas_repo.get_idea(session, job.ref_idea_id or uuid.UUID(str(inp.get("idea_id"))))
+                quest = quests_repo.get_quest(session, idea.quest_id) if idea is not None else None
+            elif job.task_type == "concept_evaluate" and job.ref_quest_id:
+                from app.tenant.quests import repository as quests_repo
+                quest = quests_repo.get_quest(session, job.ref_quest_id)
+            for uid in eval_app.eval_failure_recipient_ids(session, quest):
+                if uid not in recipients:
+                    recipients.append(uid)
+        except Exception:  # noqa: BLE001 — 宛先解決の失敗で通知全体を止めない
+            logging.getLogger("app").warning("eval failure recipients resolve failed for job=%s", job.id, exc_info=True)
+    notify_svc.notify(session, [notify_svc.entry(r, ntype, refs=refs, params=params) for r in recipients])
 
 
 def process_ai_jobs_once(db_identifier: str) -> dict:

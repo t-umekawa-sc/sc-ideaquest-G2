@@ -76,6 +76,14 @@ def build_messages(ts: Session, concept_id: uuid.UUID) -> list[dict]:
             arows.append(f"- {a.statement}（検証結果: {a.current_verdict}）")
     if arows:
         parts.append("# 前提と検証\n" + "\n".join(arows))
+    # RAG＝関連情報（FR-41）＋経営資料（FR-44・viability/差別化の根拠）。要約主体・graceful（§11）。
+    from app.tenant._shared import eval_rag
+    info_lines = eval_rag.related_info_lines(ts, "concepts", concept_id)
+    if info_lines:
+        parts.append("# 関連情報（外部情報の知識レイヤ・反証を優先提示）\n" + "\n".join(info_lines))
+    strat_lines = eval_rag.strategy_doc_lines(ts, c.quest_id)
+    if strat_lines:
+        parts.append("# 経営資料（方針との整合の根拠）\n" + "\n".join(strat_lines))
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": "\n".join(parts)},

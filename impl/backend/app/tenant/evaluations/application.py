@@ -310,6 +310,11 @@ def _my_permissions(ts, quest, user) -> list[str]:
     return perms
 
 
+def eval_failure_recipient_ids(ts, quest) -> set[uuid.UUID]:
+    """AI 評価ジョブ失敗の通知宛先＝当該クエストの評価者権限保持者（owner 含む・F.7/P.5a・§6-5）＝手動再生成を促す。"""
+    return _evaluator_user_ids(ts, quest)
+
+
 def _evaluator_user_ids(ts, quest) -> set[uuid.UUID]:
     """当該クエストの evaluator 権限保持者（有効所属）の user_id 集合（owner を含む）。"""
     ids: set[uuid.UUID] = set()

@@ -104,6 +104,37 @@ def test_f_tc_215_idea_evaluate_worker_creates_ai_evaluation():
         _cleanup(db, uid, qid, iid, [jid] if jid else [])
 
 
+def test_f_tc_220_build_messages_includes_rag_context():
+    """F-TC-220: build_messages に関連情報（FR-41・反証優先）と経営資料（FR-44）が RAG として注入される（設計 §3）。"""
+    from app.tenant.evaluations import ai_eval
+    from app.tenant.info.orm import InfoItem, InfoLink
+    from app.tenant.strategy.orm import QuestStrategyDocument, StrategyDocument
+    db = _seed_db()
+    uid, qid, iid = _seed_idea(db)
+    info_id, doc_id = uuid.uuid4(), uuid.uuid4()
+    try:
+        with get_tenant_session(db) as ts:
+            ts.add(InfoItem(id=info_id, title="競合値下げ情報", status="curated", created_by_id=uid, summary="A社が10%値下げ", impact_class="threat"))
+            ts.add(StrategyDocument(id=doc_id, title="中期物流戦略", doc_kind="strategy", status="active", created_by_id=uid, intent="物流効率化を推進", focus_areas=["物流", "コスト"]))
+            ts.flush()
+            ts.add(InfoLink(id=uuid.uuid4(), info_item_id=info_id, target_type="ideas", target_id=iid, kind="refuting", origin="manual", disposition="pending"))
+            ts.add(QuestStrategyDocument(id=uuid.uuid4(), quest_id=qid, strategy_document_id=doc_id))
+            ts.commit()
+        with get_tenant_session(db) as ts:
+            msgs = ai_eval.build_messages(ts, iid)
+            user = next(m["content"] for m in msgs if m["role"] == "user")
+            assert "競合値下げ情報" in user and "反証" in user          # 関連情報（反証ラベル優先）
+            assert "中期物流戦略" in user and "物流効率化を推進" in user  # 経営資料（意図）
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == info_id))
+            ts.execute(InfoItem.__table__.delete().where(InfoItem.id == info_id))
+            ts.execute(QuestStrategyDocument.__table__.delete().where(QuestStrategyDocument.strategy_document_id == doc_id))
+            ts.execute(StrategyDocument.__table__.delete().where(StrategyDocument.id == doc_id))
+            ts.commit()
+        _cleanup(db, uid, qid, iid, [])
+
+
 def test_f_tc_217_publish_auto_enqueues_idea_evaluate(monkeypatch):
     """F-TC-217: 公開経路のヘルパーが idea_evaluate ジョブを自動投入する（F.7.1・opt-in フラグ ON 時・graceful）。"""
     from app.core.config import get_settings
@@ -122,6 +153,41 @@ def test_f_tc_217_publish_auto_enqueues_idea_evaluate(monkeypatch):
             assert (jobs[0].input or {}).get("idea_id") == str(iid)
     finally:
         _cleanup(db, uid, qid, iid, job_ids)
+
+
+def test_f_tc_221_failure_notifies_evaluator_holders():
+    """F-TC-221: idea_evaluate 失敗は依頼者に加え評価者権限保持者へも ai_task_failed 通知（FR-50・§6-5）。"""
+    from app.tenant.notifications.orm import Notification
+    from app.tenant.quests import repository as quests_repo
+    from app.tenant.quests.orm import QuestMember, QuestMemberPermission
+    db = _seed_db()
+    uid, qid, iid = _seed_idea(db)
+    evaluator = uuid.uuid4()
+    jid = None
+    try:
+        with get_tenant_session(db) as ts:
+            ts.add(User(id=evaluator, account_id=uuid.uuid4(), display_name="ev", locale="ja", status="active"))
+            ts.flush()
+            quests_repo.add_member(ts, qid, uid, permissions=["owner"])
+            quests_repo.add_member(ts, qid, evaluator, permissions=["evaluator"])
+            ts.commit()
+        gw.set_chat_client(_FakeJson("not json at all"))
+        jid = ai_app.enqueue_ai_job(db, task_type="idea_evaluate", requested_by_id=uid, input={"idea_id": str(iid)}, ref_idea_id=iid)
+        assert ai_app.process_ai_jobs_once(db)["failed"] == 1
+        with get_tenant_session(db) as ts:
+            n = ts.query(Notification).filter(Notification.recipient_id == evaluator, Notification.type == "ai_task_failed").count()
+            assert n == 1  # 評価者権限保持者（非依頼者）にも失敗通知
+    finally:
+        gw.set_chat_client(gw.FakeChat())
+        with get_tenant_session(db) as ts:
+            mids = [m.id for m in ts.query(QuestMember).filter(QuestMember.quest_id == qid).all()]
+            if mids:
+                ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
+                ts.execute(QuestMember.__table__.delete().where(QuestMember.id.in_(mids)))
+            ts.execute(Notification.__table__.delete().where(Notification.recipient_id.in_([evaluator, uid])))
+            ts.execute(User.__table__.delete().where(User.id == evaluator))
+            ts.commit()
+        _cleanup(db, uid, qid, iid, [jid] if jid else [])
 
 
 def test_f_tc_216_idea_evaluate_invalid_output_fails_job_no_evaluation():

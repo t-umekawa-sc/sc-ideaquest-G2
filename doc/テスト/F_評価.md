@@ -41,6 +41,8 @@
 | F-TC-215 | int | **idea_evaluate ワーカー成功で AI 評価が入る**（enqueue→worker→gateway(JSON)→evaluations 保存） | published アイデア＋fake chat が構造化JSON を返す | `enqueue_ai_job(idea_evaluate)`→`process_ai_jobs_once` | job=succeeded・`evaluations` に `kind='ai'`/`evaluator_id=NULL`/`submitted`/`party`/`ai_job_id`/`model`＋5観点スコア＋版1（editor_id=NULL＝自動） | F.7.2／FR-50 |
 | F-TC-216 | int | **出力不正は job=failed・AI 評価は作らない**（人間評価のみで進行＝graceful） | fake chat が非JSON を返す | 同上 | job=failed（`error.code='invalid_output'`）・AI 評価0件 | F.7.2／§6-5 |
 | F-TC-217 | int | **公開で idea_evaluate を自動投入**（F.7.1・graceful） | published アイデア | `_enqueue_idea_ai_evaluation(db, idea_id, user_id)` | `ai_jobs` に `task_type='idea_evaluate'`・`ref_idea_id`・`input.idea_id` の queued ジョブ1件 | F.7.1／FR-50 |
+| F-TC-220 | int | **RAG 文脈注入**＝build_messages に関連情報（FR-41・反証優先）＋経営資料（FR-44）が入る | アイデア＋info_link(反証)＋quest選択の経営資料 | `ai_eval.build_messages(ts, idea_id)` | user メッセージに関連情報タイトル/「反証」＋経営資料タイトル/意図が含まれる（graceful＝無ければ省略） | 設計§3／FR-41/FR-44 |
+| F-TC-221 | int | **失敗通知は評価者権限保持者にも届く**（依頼者＋評価者権限者・§6-5） | owner＋evaluator メンバー・fake 非JSON | idea_evaluate を process（failed） | evaluator（非依頼者）に `ai_task_failed` 通知1件 | F.7／§6-5／FR-50 |
 | F-TC-218 | api | **再生成は評価者権限保持者が可**（202＋queued・regenerated_by 入り） | ACME-01=evaluator メンバー・published アイデア | `POST /ideas/{id}/ai-evaluation/regenerate` | 202・`{job_id, status:'queued'}`・`ai_jobs` に idea_evaluate（`input.regenerated_by`＝実行者） | F.7.3／FR-50 |
 | F-TC-219 | api | **評価者権限が無い再生成は 403**（owner/quest_admin でも評価者権限無ければ不可） | ACME-01=vote のみのパーティー員 | 同上 | 403 | F.7.3／F.0 |
 
