@@ -31,6 +31,7 @@ FULL = {"novelty": 4, "impact": 4, "feasibility": 4, "fit": 4, "cost": 4}
 EVAL_ME = lambda i: f"/api/v1/ideas/{i}/evaluation/me"  # noqa: E731
 EVAL = lambda i: f"/api/v1/ideas/{i}/evaluation"  # noqa: E731
 SELECT = lambda i: f"/api/v1/ideas/{i}/select"  # noqa: E731
+REGEN = lambda i: f"/api/v1/ideas/{i}/ai-evaluation/regenerate"  # noqa: E731
 
 
 def _csrf(client) -> dict:
@@ -192,6 +193,36 @@ def test_f_tc_213_private_hidden_even_from_manager(client, env):
     assert body["evaluator_count"] == 1          # party の1件のみ（private は manager にも出さない）
     assert body["aspects"]["novelty"] == 2.0     # private を分母に入れない
     assert body["coin"]["projected"] == 30       # visibility 無視＝(2+4)/2=3 → 30
+
+
+def test_f_tc_218_regenerate_ai_evaluation_evaluator_enqueues(client, env):
+    """F-TC-218: 評価者権限保持者は AI 評価を再生成できる＝202＋queued idea_evaluate（regenerated_by 入り・F.7.3）。"""
+    from app.tenant.ai_jobs.orm import AiJob
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_perms=["evaluator"])  # ACME-01 = 評価者メンバー
+    idea = env.make_idea(quest_id=qid)  # published（既定）
+    try:
+        r = client.post(REGEN(idea), headers=_csrf(client))
+        assert r.status_code == 202, r.text
+        body = r.json()
+        assert body["status"] == "queued" and body["job_id"]
+        with get_tenant_session(env.db_identifier) as ts:
+            job = ts.query(AiJob).filter(AiJob.id == uuid.UUID(body["job_id"])).one()
+            assert job.task_type == "idea_evaluate" and str(job.ref_idea_id) == str(idea)
+            assert (job.input or {}).get("regenerated_by") == str(env.user_id)
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(AiJob.__table__.delete().where(AiJob.ref_idea_id == uuid.UUID(str(idea))))
+            ts.commit()
+
+
+def test_f_tc_219_regenerate_ai_evaluation_requires_evaluator(client, env):
+    """F-TC-219: 評価者権限が無いパーティー員の再生成は 403（owner/quest_admin でも評価者権限無ければ不可）。"""
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote"])  # ACME-01 = vote のみ（非評価者）
+    idea = env.make_idea(quest_id=qid, author=env.other_id)
+    r = client.post(REGEN(idea), headers=_csrf(client))
+    assert r.status_code == 403, r.text
 
 
 # ---- F.2 登録/更新 ----

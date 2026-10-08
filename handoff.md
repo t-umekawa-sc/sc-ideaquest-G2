@@ -58,9 +58,8 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 7. 次にやること（優先順・⑥ AI 評価本体の実装）
 > 設計は全確定・基盤(private/スキーマ)は実装済。残りは AI 評価パイプライン＋評価パネルUI。**TC md 先行→red-green**（テスト規約§5）。画面は**モック先行済→backend 結線**（§フロント実装フロー）。実装レイアウトを正（モックは一致済だが最終はコンポーネント）。
 
-> **済（3-3）**＝idea_evaluate worker・自動起動(flag gate)・F.1 集計分離(ai_evaluation別枠＋evaluators人間のみ＋submitted_at/visibility)。以下が残り。
+> **済（3-3）**＝idea_evaluate worker・自動起動(flag gate)・F.1 集計分離(ai_evaluation別枠＋evaluators人間のみ＋submitted_at/visibility)。**済（3-4・3回目commit）＝再生成EP** `POST /ideas/{id}/ai-evaluation/regenerate`（評価者権限のみ・202・`input.regenerated_by`＝版editor・完了409）＝`evaluations/application.py regenerate_ai_evaluation`＋router＋schemas(AiEvaluationJobResponse)。**EvaluationAggregateDTO に `ai_evaluation`(AiEvaluationDTO)＋evaluators に submitted_at/visibility を追加**（response_model が落とさないように）。TC=F-TC-218/219(api)。以下が残り。
 
-1. **backend：再生成EP** `POST /ideas/{id}/ai-evaluation/regenerate`（F.7.3）＝**評価者権限(FR-27)保持者のみ**（owner/quest_admin でも評価者権限無ければ 403）・`enqueue_ai_job(idea_evaluate, input={idea_id, regenerated_by: user_id})`（`regenerated_by` を入れると版 editor に記録される＝ai_eval.apply_result 対応済）・完了凍結409・会社モデル無効422。router(F) に追加。TC=F-TC-21x。
 2. **backend：コンセプト** `task_type=concept_evaluate`（8観点＋recommendation・**手動のみ** `POST /concepts/{id}/ai-evaluation/regenerate`・P.5a）＝ai_eval と同型の `concepts/ai_eval.py`（recommendation 必須・RAG に前提/検証 assumptions/validations 含む）＋concepts repo に upsert_ai_evaluation＋concepts `_aggregate` を AI 分離（recommendations も人間のみ数える等）。worker 分岐追加。
 3. **backend：RAG 強化**（任意・品質）＝ai_eval.build_messages に関連情報(info_links top)＋経営資料(entity_embeddings cosine top-k・A-2)を足す（現状はアイデア＋クエストのみ）。
 4. **backend：失敗通知の宛先**＝現状 `_notify_completion` は requester のみ。F.7/§6-5 の「評価者権限保持者＋owner/quest_admin」へ拡張（idea_evaluate 失敗時）。

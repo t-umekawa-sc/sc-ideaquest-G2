@@ -131,6 +131,30 @@ def put_evaluation(account_id, company_id, idea_id, *, body) -> dict:
     return detail
 
 
+def regenerate_ai_evaluation(account_id, company_id, idea_id) -> dict:
+    """AI 評価を再生成（enqueue・F.7.3）。**評価者権限（FR-27）保持者のみ**（owner/quest_admin でも評価者権限が
+    無ければ 403）。完了クエストは 409。`regenerated_by` を入力に載せると版の editor に実行者が記録される。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, quest = _resolve_evaluable_idea(ts, iid, user)
+        _require_evaluator(ts, quest, user)  # 評価者権限のみ（403）＝自動起動と違い明示操作（コスト制御）
+        _guard_not_completed(quest)
+        uid = user.id
+    # enqueue は自前セッション（202 相当・結果は待たない）。入力は参照のみ＋再生成実行者（版 editor 用・F.7.2/F.7.3）。
+    from app.tenant.ai_jobs import application as ai_app
+    job_id = ai_app.enqueue_ai_job(
+        company.db_identifier, task_type="idea_evaluate", requested_by_id=uid,
+        input={"idea_id": str(iid), "regenerated_by": str(uid)}, ref_idea_id=iid,
+    )
+    return {"job_id": str(job_id), "status": "queued"}
+
+
 def get_evaluation_revision_diff(account_id, company_id, idea_id, revision, *, from_revision=None) -> dict:
     """自分のアイデア評価の確定版差分（§3.6）。既定＝前版比較。範囲外 404/422。"""
     company = _resolve_company(company_id)

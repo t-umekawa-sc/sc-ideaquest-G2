@@ -13,6 +13,7 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.evaluations import application as eval_service
 from app.tenant.evaluations.schemas import (
+    AiEvaluationJobResponse,
     EvaluationAggregateDTO,
     EvaluationMeDTO,
     EvaluationPutRequest,
@@ -76,6 +77,21 @@ def put_evaluation(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, body=body,
     )
     return EvaluationMeDTO(**result)
+
+
+@router.post("/ideas/{idea_id}/ai-evaluation/regenerate", response_model=AiEvaluationJobResponse, status_code=202)
+def regenerate_ai_evaluation(
+    idea_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> AiEvaluationJobResponse:
+    """AI 評価を再生成（F.7.3・**評価者権限保持者のみ**）。完了クエストは 409・会社モデル無効は 422。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = eval_service.regenerate_ai_evaluation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+    return AiEvaluationJobResponse(**result)
 
 
 @router.post("/ideas/{idea_id}/select", response_model=IdeaSelectResponse)

@@ -5,6 +5,7 @@ request は extra=forbid（Mass Assignment 防止・§2.2）。evaluator_id/subm
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Literal
 
@@ -86,12 +87,32 @@ class EvaluationRevisionDiffResponse(BaseModel):
 
 
 class EvaluationEvaluatorDTO(BaseModel):
-    """集計に含める1評価者の内訳（SC-22 §4.6・可視な評価のみ）。"""
+    """集計に含める1評価者の内訳（SC-22 §4.6・可視な評価のみ・人間のみ）。"""
 
     evaluator: EvaluationAuthorDTO
     scores: dict[str, int] = {}
     comments: dict[str, str] = {}
     overall_comment: str | None = None
+    visibility: str | None = None       # party/limited/private（代表コメント母集団・#13・F.1.1）
+    submitted_at: datetime | None = None  # 同点タイブレーク「先に確定」用（F.1.1）
+
+
+class AiEvaluationDTO(BaseModel):
+    """AI 評価の別枠ブロック（FR-50・F.7.4）。人間の evaluators[] とは分離して返す。"""
+
+    scores: dict[str, int] = {}
+    comments: dict[str, str] = {}
+    overall_comment: str | None = None
+    model: str | None = None
+    generated_at: datetime | None = None
+    job_id: uuid.UUID | None = None
+
+
+class AiEvaluationJobResponse(BaseModel):
+    """AI 評価の生成/再生成 enqueue 応答（202 相当・F.7.3）。"""
+
+    job_id: str
+    status: str = "queued"
 
 
 class EvaluationCoinDTO(BaseModel):
@@ -107,8 +128,9 @@ class EvaluationAggregateDTO(BaseModel):
 
     aspects: dict[str, float] = {}  # 観点別平均
     overall_avg: float | None = None
-    evaluator_count: int = 0
-    evaluators: list[EvaluationEvaluatorDTO] = []
+    evaluator_count: int = 0          # 人間の提出済み人数（AI は数えない・F.1）
+    evaluators: list[EvaluationEvaluatorDTO] = []  # 人間の評価者のみ
+    ai_evaluation: AiEvaluationDTO | None = None   # AI 評価の別枠ブロック（FR-50・F.7.4）
     coin: EvaluationCoinDTO = EvaluationCoinDTO()
     my_evaluation: EvaluationMeDTO | None = None
     my_permissions: list[str] = []  # UX 出し分け（evaluate/select）
