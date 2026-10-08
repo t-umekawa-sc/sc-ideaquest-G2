@@ -6,8 +6,8 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-08（セッション末）。
 - ブランチ: `main`（main 直 push が慣習）。
-- **未コミットの作業あり**（本セッションは commit していない）。`git status` で確認し、必要に応じてまとめてコミット（red-green 証跡はコミットメッセージへ＝テスト規約 §5.1）。
-- working tree: 変更多数（下記 §3）。コンテナは起動済み（db/redis/minio/mailhog/backend/frontend）＝セッション末は `docker compose ps` で確認。
+- **本セッションは4コミット push 済み**（⑥: ①設計+private可視範囲 ②idea_evaluate worker+自動起動+F.1分離 ③再生成EP ④frontend評価パネル〔AI block/代表タブ/#13/private radio〕）。正確なハッシュは `git log --oneline -5`。working tree clean 想定（`git status` で確認）。
+- コンテナは起動済み（db/redis/minio/mailhog/backend/frontend・backend/frontend は本セッションで HEAD に再ビルド済み）＝`docker compose ps` で確認。
 - alembic heads: control=`0020_signup_challenges`／company=**`0057_ai_evaluation`**（本セッションで新規・**適用済み**）。
 
 ## 2. プロジェクトのゴール
@@ -63,7 +63,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 2. **backend：コンセプト** `task_type=concept_evaluate`（8観点＋recommendation・**手動のみ** `POST /concepts/{id}/ai-evaluation/regenerate`・P.5a）＝ai_eval と同型の `concepts/ai_eval.py`（recommendation 必須・RAG に前提/検証 assumptions/validations 含む）＋concepts repo に upsert_ai_evaluation＋concepts `_aggregate` を AI 分離（recommendations も人間のみ数える等）。worker 分岐追加。
 3. **backend：RAG 強化**（任意・品質）＝ai_eval.build_messages に関連情報(info_links top)＋経営資料(entity_embeddings cosine top-k・A-2)を足す（現状はアイデア＋クエストのみ）。
 4. **backend：失敗通知の宛先**＝現状 `_notify_completion` は requester のみ。F.7/§6-5 の「評価者権限保持者＋owner/quest_admin」へ拡張（idea_evaluate 失敗時）。
-5. **frontend：評価パネル**＝`IdeaDetailView`/`ConceptDetailView` を代表1件(タブ=`.dash-tabs`・高評価/合意既定/懸念)＋他N件＋仕切り線＋「コメント」card-title＋**AI評価ブロック別枠**(`ai_evaluation` を表示)＋**#13 評価詳細モーダル**(URL付きモーダル・全評価者スコアカード)。SC-25/SC-62 に **private radio** 追加。型再生成後 `evaluators[].scores/comments/submitted_at`・`ai_evaluation` を使う。モック3枚(`doc/画面設計/mocks/_*検討.html`)が実装の正。代表選定はクライアント側で可。
+5. **frontend：評価パネル**＝**アイデア側(SC-22)は実装済み(4回目commit)**＝`EvaluationComments`(代表1件タブ=高評価/合意/懸念・他N件→#13評価詳細モーダル・評価者ごとスコアカード)＋`IdeaDetailView` に AI評価カード(別枠・再生成ボタン=regenerateAiEvaluation)＋`EvaluationView`(SC-25)に private radio＋`api.ts regenerateAiEvaluation`/`ideas.css`。目視+e2e済。**残＝concept側**＝`ConceptDetailView`/SC-62 に同型適用（concept_evaluate backend〔残2〕の後）＋ConceptEvalModal(SC-62)に private radio。EvaluationComments は8観点/recommendation を受けられるよう要拡張（または concept 版を作る）。モック3枚が正。
 6. 仕上げ＝型再生成(`npm run codegen`)・`npm run build`・vitest・targeted pytest・TCトレーサビリティ・**UI実ブラウザ目視**（verify-ui-visually-before-done）。自動起動を dev で試すなら `impl/.env` に `LLM_AUTO_EVALUATE_ON_PUBLISH=true`＋`--profile ai` llm-worker 起動。
 
 ### 前セッションからの持ち越し（未着手）
