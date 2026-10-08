@@ -240,3 +240,51 @@ def test_i_tc_164_165_166_zone_d_e_panels(client, factory):
                 ts.execute(_sqltext("DELETE FROM quests WHERE id=:q"), {"q": str(qid)})
             ts.execute(_sqltext("DELETE FROM users WHERE id=:o"), {"o": str(other)})
             ts.commit()
+
+
+def test_i_tc_170_recommended_quests_scored_order(client, factory):
+    """I-TC-170(int): Zone D おすすめ＝加重和スコア順（④結線）。管理者お勧め `recommended=true` の
+    ブースト（admin 成分0.20）で、整合率/活動が同じ（ともに0）の未参加 none クエストより上位に並ぶ。
+
+    集約 `get_dashboard` の `recommended_quests` が発見カタログ既定順（created_at desc＝新着）ではなく
+    `get_recommended_quests` のスコア降順を使うことを検証（共有 seed のノイズを避け自分の2 id の相対順序）。
+    q_boost を先・q_plain を後に作成＝catalog 既定順なら新着 q_plain が先（＝未結線なら逆順で落ちる red）。
+    """
+    from sqlalchemy import text as _sqltext
+
+    from app.tenant.dashboard import application as dash_app
+
+    acc, uid = _login_dash(client, factory)  # fresh アカウント（何も参加/フォローしていない）
+    with control_session() as s:
+        company_id = str(s.query(Company).filter_by(company_code=SEED_COMPANY_CODE).one().id)
+    db = _db()
+
+    other = uuid.uuid4()
+    q_boost, q_plain = uuid.uuid4(), uuid.uuid4()  # どちらも discoverable・未参加(none)・活動0
+    with get_tenant_session(db) as ts:
+        ts.add(User(id=other, account_id=uuid.uuid4(), display_name="主催者170", locale="ja", status="active"))
+        # q_boost を先に作成（recommended=true）→ q_plain を後に作成（recommended=false・新着）。
+        qb = quests_repo.create_quest(ts, quest_id=q_boost, owner_id=other, title="おすすめ★", color="#3B82F6", status="recruiting")
+        qb.discoverable = True
+        qb.recommended = True
+        ts.flush()
+        qp = quests_repo.create_quest(ts, quest_id=q_plain, owner_id=other, title="おすすめ○", color="#3B82F6", status="recruiting")
+        qp.discoverable = True
+        qp.recommended = False
+        ts.commit()
+    try:
+        result = dash_app.get_dashboard({"account_id": str(acc["id"]), "company_id": company_id})
+        rec_ids = [q["id"] for q in result["recommended_quests"]]
+        assert str(q_boost) in rec_ids, "管理者お勧めクエストがおすすめに含まれない（top-N クランプ/候補母集団を確認）"
+        assert str(q_plain) in rec_ids, "素の未参加クエストがおすすめに含まれない（top-N クランプを確認）"
+        # 相対順序（subsequence）＝管理者お勧め(admin 0.20)が素のクエスト(score 0)より前。
+        assert rec_ids.index(str(q_boost)) < rec_ids.index(str(q_plain)), \
+            "おすすめがスコア順でない（カタログ既定順のまま＝④未結線）"
+    finally:
+        with get_tenant_session(db) as ts:
+            for qid in (q_boost, q_plain):
+                ts.execute(_sqltext("DELETE FROM quest_members WHERE quest_id=:q"), {"q": str(qid)})
+                ts.execute(_sqltext("DELETE FROM quest_revisions WHERE quest_id=:q"), {"q": str(qid)})
+                ts.execute(_sqltext("DELETE FROM quests WHERE id=:q"), {"q": str(qid)})
+            ts.execute(_sqltext("DELETE FROM users WHERE id=:o"), {"o": str(other)})
+            ts.commit()

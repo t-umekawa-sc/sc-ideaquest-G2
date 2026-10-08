@@ -357,8 +357,14 @@ def get_dashboard(session: dict) -> dict:
         account_id, company_id, per_page=_CATALOG_LIMIT)["data"], default=[])
     followed_quests = [c for c in _catalog if c.get("my_state") == "following"]
     join_requests = [c for c in _catalog if c.get("my_state") in ("pending", "rejected")]
-    # Zone D おすすめのクエスト（再設計§3.1 D）＝発見カタログで未参加・未フォロー・未申請（my_state=none）のみ。参加/フォロー済みはおすすめに出さない。
-    recommended_quests = [c for c in _catalog if c.get("my_state") == "none"][:_RECOMMENDED_LIMIT]
+    # Zone D おすすめのクエスト（再設計§8a・C.9.1・④結線）＝加重和スコアリング（整合率＋直近活発＋管理者お勧め）で選抜。
+    # 旧・発見カタログ素朴版（my_state=none の先頭 N・新着順）から get_recommended_quests のスコア降順に結線する。
+    # 候補母集団は「未参加∩非pending」で following/rejected を含み得るが、パネルは「これから発見して参加する」動線＝
+    # フォロー中/却下はここに出さず Zone E（フォロー中/参加リクエスト中）へ集約するため my_state=none に絞る（I-TC-166/170）。
+    from app.core.config import get_settings as _get_settings
+    _rec = _safe(lambda: quests_app.get_recommended_quests(
+        account_id, company_id, limit=_get_settings().recommend_max_limit)["data"], default=[])
+    recommended_quests = [c for c in _rec if c.get("my_state") == "none"][:_RECOMMENDED_LIMIT]
     # Zone D/E コンテスト（再設計§3.1・FR-46）＝既存 contests application を再利用（I.3 殻）。
     #   D 募集中＝open かつ未参加(none)＝ダッシュボードから応募できる機会／E 参加中＝approved＝よく行く先。
     from app.tenant.contests import application as contests_app
