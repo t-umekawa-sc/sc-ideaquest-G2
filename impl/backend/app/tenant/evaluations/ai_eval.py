@@ -60,7 +60,7 @@ def build_messages(ts: Session, idea_id: uuid.UUID) -> list[dict]:
     info_lines = eval_rag.related_info_lines(ts, "ideas", idea_id)
     if info_lines:
         parts.append("# 関連情報（外部情報の知識レイヤ・反証を優先提示）\n" + "\n".join(info_lines))
-    strat_lines = eval_rag.strategy_doc_lines(ts, idea.quest_id)
+    strat_lines = eval_rag.strategy_doc_lines(ts, idea.quest_id, target_type="idea", target_id=idea_id)
     if strat_lines:
         parts.append("# 経営資料（方針との整合＝fit 観点の根拠）\n" + "\n".join(strat_lines))
     return [

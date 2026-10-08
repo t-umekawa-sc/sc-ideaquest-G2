@@ -374,6 +374,7 @@ def _enqueue_idea_ai_evaluation(db_identifier: str, idea_id, user_id) -> None:
         ai_app.enqueue_ai_job(
             db_identifier, task_type="idea_evaluate", requested_by_id=user_id,
             input={"idea_id": str(idea_id)}, ref_idea_id=idea_id,
+            system=True, created_program="auto_evaluate",  # システム起票＝SC-04 個人一覧に出さない（§6・§2.1）
         )
     except Exception:  # noqa: BLE001 — AI 評価の失敗で公開を止めない（graceful・§6-4）
         logging.getLogger("app").warning("idea_evaluate auto-enqueue skipped for idea=%s", idea_id, exc_info=True)

@@ -73,6 +73,21 @@ def embedding_for(session: Session, owner_type: str, owner_id: uuid.UUID, *, mod
     return [float(x) for x in row[0]]
 
 
+def embeddings_by_type(
+    session: Session, owner_type: str, *, model: str
+) -> dict[uuid.UUID, list[float]]:
+    """当該 owner_type の保存済み埋め込みを一括取得（要求 model 一致のみ）。top-k 候補の母集団。
+
+    モデル不一致/未生成の行は除外（cosine 比較は同一モデル空間でのみ意味を持つ）。owner 数がテナント規模で
+    有界（経営資料は数十程度）な前提で全件読む＝ベクトル JSONB なので列は絞らず owner_id/vector のみ取る。
+    """
+    rows = session.execute(
+        select(EntityEmbedding.owner_id, EntityEmbedding.vector).where(
+            EntityEmbedding.owner_type == owner_type, EntityEmbedding.model == model)
+    ).all()
+    return {owner_id: [float(x) for x in vec] for owner_id, vec in rows}
+
+
 def tokens_for_owners(
     session: Session, owner_type: str, owner_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, list[tuple[str, int]]]:

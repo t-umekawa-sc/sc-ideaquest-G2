@@ -98,6 +98,7 @@
 | P-TC-461 | int | **出力不正（推奨欠落/中核不足）は job=failed・AI 評価は作らない**（graceful） | fake chat が不正JSON | 同上 | job=failed（`error.code='invalid_output'`）・AI 評価0件 | P.5a／§6-5 |
 | P-TC-462 | api | **再生成は評価者権限保持者が可**（202＋queued・regenerated_by 入り・手動のみ） | ACME-01=owner（評価者）・active コンセプト | `POST /concepts/{id}/ai-evaluation/regenerate` | 202・`{job_id,status:'queued'}`・`ai_jobs` に concept_evaluate（`input.concept_id`/`regenerated_by`） | P.5a／FR-50 |
 | P-TC-463 | api | **評価者権限が無い再生成は 403** | ACME-01=vote のみのパーティー員 | 同上 | 403 | P.5a／P.0 |
+| P-TC-464 | int | **RAG 経営資料の top-k 追補（concept はその場 embed）**＝本文に意味的に近い非選択資料が入る（A-2） | コンセプト（保存埋め込み無）＋意味的に近い非選択の経営資料（fake 埋め込み） | `ai_eval.build_messages(ts, concept_id)` | user に意味的に近い非選択資料のタイトルが入る（concept 本文を評価時 embed→cosine top-k・graceful） | P.5a／設計§11／FR-44／A-2 |
 
 ## 6. コンセプト投票 API（P.5b・SC-61 §4.5）
 

@@ -8,7 +8,8 @@
 - ブランチ: `main`（main 直 push が慣習）。
 - 最新コミット: **`ad6d7bf4`**（docs: handoff 更新）。本セッションは ⑥ 関連で **10 コミット push 済み**（`e333914d`→`ad6d7bf4`）。
 - working tree: **clean**（`git status` 確認済み）。`origin/main` 同期済み。
-- alembic heads: control=`0020_signup_challenges`／company=**`0057_ai_evaluation`（適用済み・本機能のスキーマ）**。
+- alembic heads: control=`0020_signup_challenges`／company=**`0058_ai_jobs_created_by`（適用済み・SC-04 起票主体フィルタ用の監査列）**。
+- **本セッション追加作業（⑥ 磨き込み・2026-10-08）**＝(a) **RAG 経営資料 top-k 追補**（選択分優先＋意味的 top-k・アイデア=保存埋め込み/コンセプト=その場 embed・graceful）／(b) **SC-04 非表示を created_by_id で実装**（ai_jobs に監査列 `created_by_id`/`created_program` 追加＝migration 0058・自動評価は system 起票 NULL で個人一覧から除外・既存行はバックフィル）。いずれも red-green 済み・未コミット（working tree に変更あり）。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘消化＋仕様確定済み未実装機能を順次処理。
@@ -63,10 +64,11 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 7. 次にやること（優先順）
 > ⑥ は実質クローズ。以下は「持ち越し討議」か「⑥ の任意の磨き込み」。着手前にコードで裏取り（memory `handoff-notes-often-stale`）。
 
-1. **④【討議】おすすめクエスト選出アルゴリズム**（ユーザー案＝参加可×経営資料整合率高×直近活発×管理者お勧め→得点上位をパネル最大件数）＝意見→合意後に実装。残るもう1つの討議案件。
-2. **（⑥ 磨き込み・任意）RAG に経営資料の embedding top-k を追加**＝現状 `eval_rag.strategy_doc_lines` はクエスト選択分のみ。`app/tenant/strategy/similarity.py`＋`entity_embeddings` を使い、アイデア/コンセプトに意味的に近い経営資料を top-k で引く案（A-2 基盤）。
-3. **（⑥ 磨き込み・任意）SC-04 への `created_by` 反映の裏取り**＝設計上「自動起動ジョブは system 所有(created_by=NULL)」としたが、`ai_jobs` に created_by 列と SC-04 フィルタが実在するか未確認。実在しなければ追加 or 設計注記。
+1. **④【討議】おすすめクエスト選出アルゴリズム**（ユーザー案＝参加可×経営資料整合率高×直近活発×管理者お勧め→得点上位をパネル最大件数）＝意見→合意後に実装。**残る討議案件（次の着手対象）**。
+2. ~~RAG に経営資料の embedding top-k~~ ＝**完了（2026-10-08）**。`eval_rag.strategy_doc_lines` を選択分優先＋top-k 追補化（config `eval_rag_strategy_topk/total/min_cosine`・`tokens/repository.py embeddings_by_type`・F-TC-222/P-TC-464）。
+3. ~~SC-04 `created_by` 裏取り~~ ＝**完了（2026-10-08）**。裏取り結果＝`ai_jobs` に `created_by` 列は無かった（`requested_by_id` のみ）。**ai_jobs だけ監査列 `created_by_id`/`created_program` を追加**（migration 0058・自動評価は system 起票 NULL・SC-04 は created_by_id フィルタ・S-TC-214/F-TC-217）。
 4. **（⑥ 磨き込み・任意）コンセプト #13 の recommendation 表示**＝EvaluationComments の #13 ScoreCard は recommendation を出さない（アイデア共通化のため）。コンセプトで各評価者の Go/Pivot/Kill を #13 に出すなら拡張。現状は SC-61 の推奨分布＋AIブロックで表示済み。
+5. **【バックログ・要討議】データモデル §2.1 共通監査6カラムの広範な未準拠**＝規約は全テーブルに `created_at`/`created_by_id`/`created_program`＋更新3点を必須とするが、実装は**大多数のテーブルが監査列ゼロ**（ideas/evaluations/quests/concepts/notifications/chat_messages/entity_embeddings＝無し・info_items/strategy_documents＝created_by_id のみ・2026-10-08 DB実査）。今回 ai_jobs だけ created_by_id/created_program を追加。「全テーブルにバックフィル」か「§2.1 を実装実態に合わせて緩める」かを別途決める（memory `spec-is-source-of-truth`）。
 
 ### 前セッションからの持ち越し（未着手）
 - Turnstile `size:flexible` 幅の実ブラウザ目視。SC-01 設計書 §3〜9 を5ゾーン再設計に整合。アイデアコンテスト Phase2。

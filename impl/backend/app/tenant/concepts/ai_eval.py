@@ -81,7 +81,11 @@ def build_messages(ts: Session, concept_id: uuid.UUID) -> list[dict]:
     info_lines = eval_rag.related_info_lines(ts, "concepts", concept_id)
     if info_lines:
         parts.append("# 関連情報（外部情報の知識レイヤ・反証を優先提示）\n" + "\n".join(info_lines))
-    strat_lines = eval_rag.strategy_doc_lines(ts, c.quest_id)
+    # concept は保存埋め込みを持たないため、本文（主要項目）を top-k クエリ用テキストとして渡す（その場 embed）。
+    concept_text = " ".join(x for x in (c.title, c.problem, c.value_proposition,
+                                        c.target, c.differentiation, c.solution_form) if x)
+    strat_lines = eval_rag.strategy_doc_lines(ts, c.quest_id, target_type="concept",
+                                              target_id=concept_id, target_text=concept_text)
     if strat_lines:
         parts.append("# 経営資料（方針との整合の根拠）\n" + "\n".join(strat_lines))
     return [

@@ -60,6 +60,31 @@ def test_s_tc_101_enqueue_and_list(client):
         _cleanup(ids)
 
 
+def test_s_tc_214_system_created_job_hidden_from_personal_list(client):
+    """S-TC-214(api): システム起票ジョブ（created_by_id=NULL・自動評価）は SC-04 個人一覧に出ない（requested_by は保持）。"""
+    from app.tenant.ai_jobs import repository as repo
+    _make(client)
+    ids = []
+    try:
+        # ユーザー起票（出る）。requested_by_id を DB から取ってシステム起票ジョブを同一依頼者で作る。
+        user_jid = _enqueue(client).json()["id"]
+        ids.append(user_jid)
+        with get_tenant_session(_db()) as ts:
+            uid = ts.get(AiJob, uuid.UUID(user_jid)).requested_by_id
+            sysjob = repo.create_job(ts, task_type="idea_evaluate", requested_by_id=uid,
+                                     input={"idea_id": str(uuid.uuid4())},
+                                     created_by_id=None, created_program="auto_evaluate")
+            sys_jid = str(sysjob.id)
+            ids.append(sys_jid)
+            ts.commit()
+        rows = client.get(BASE).json()["data"]
+        got = [r["id"] for r in rows]
+        assert user_jid in got          # ユーザー起票＝個人一覧に出る
+        assert sys_jid not in got        # システム起票（created_by_id=NULL）＝個人一覧に出ない
+    finally:
+        _cleanup(ids)
+
+
 def test_s_tc_110_default_model_ok(client):
     """S-TC-110(api): model 省略で 202（task_type 既定）。"""
     _make(client)

@@ -126,6 +126,7 @@ def enqueue(account_id: uuid.UUID, company_id: uuid.UUID, *, task_type: str, inp
                     raise AppError(422, "validation_error", detail="月次予算の上限に達しています",
                                    errors=[{"field": "model", "code": "budget_exceeded"}])
         job = repo.create_job(ts, task_type=task_type, requested_by_id=user.id, input=input,
+                              created_by_id=user.id, created_program="user",  # ユーザー起票＝SC-04 個人一覧に出す（§2.1）
                               requested_model=requested_model, ref_idea_id=ref_idea_id,
                               ref_quest_id=ref_quest_id, ref_strategy_document_id=ref_strategy_document_id,
                               ref_info_item_id=ref_info_item_id)
@@ -323,6 +324,8 @@ def enqueue_ai_job(
     requested_by_id: uuid.UUID,
     input: dict,
     requested_model: str | None = None,
+    system: bool = False,                 # True＝システム起票（created_by_id=NULL＝SC-04 個人一覧に出さない・§2.1）
+    created_program: str | None = None,   # 起票処理の識別。既定は user/system 判定で補完（下記）
     ref_idea_id: uuid.UUID | None = None,
     ref_quest_id: uuid.UUID | None = None,
     ref_strategy_document_id: uuid.UUID | None = None,
@@ -331,15 +334,21 @@ def enqueue_ai_job(
     """ジョブを queued で投入し、ジョブID を返す（202 相当・結果は待たない）。
 
     モデル指定（requested_model）は registry で検証＝不正/無効は LLMConfigError（呼び出し側で 422）。
+    起票主体＝`system=False`（既定）はユーザー起票（created_by_id=requested_by_id＝本人の SC-04 に出す）／
+    `system=True` はシステム起票（created_by_id=NULL・created_program で識別＝SC-04 個人一覧から除外）。
     """
     if requested_model is not None:
         registry.resolve_key(task_type, requested_model)  # 検証（副作用で例外）
+    created_by_id = None if system else requested_by_id
+    program = created_program or ("system" if system else "user")
     with get_tenant_session(db_identifier) as session:
         job = repo.create_job(
             session,
             task_type=task_type,
             requested_by_id=requested_by_id,
             input=input,
+            created_by_id=created_by_id,
+            created_program=program,
             requested_model=requested_model,
             ref_idea_id=ref_idea_id,
             ref_quest_id=ref_quest_id,

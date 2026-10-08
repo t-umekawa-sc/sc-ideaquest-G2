@@ -28,6 +28,10 @@ class AiJob(CompanyBase):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="queued", server_default="queued")  # queued/running/succeeded/failed/canceled
     execution: Mapped[str] = mapped_column(Text, nullable=False, default="queued", server_default="queued")  # queued(worker)/immediate（§5.2）
     requested_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # 監査列（§2.1）＝起票主体。ユーザー起票は created_by_id=本人／システム起票（自動評価など）は NULL＋created_program で識別。
+    # SC-04 個人一覧は created_by_id でフィルタ＝システム起票ジョブは本人の一覧に出さない（requested_by_id は通知先として別途保持）。
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_program: Mapped[str | None] = mapped_column(Text, nullable=True)
     input: Mapped[dict] = mapped_column(JSONB, nullable=False)                   # プロンプト材料（機微は参照ID・§10）
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)            # 構造化結果（成功時）
     error: Mapped[dict | None] = mapped_column(JSONB, nullable=True)             # {code, detail}

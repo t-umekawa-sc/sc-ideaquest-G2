@@ -160,6 +160,14 @@ class Settings(BaseSettings):
     alignment_embed_score_floor: float = 0.42
     alignment_embed_score_ceil: float = 0.62
 
+    # AI評価 RAG の経営資料 top-k 追補（FR-50・設計 §3/§11・A-2 基盤）＝クエストが明示選択した経営資料に加え、
+    # 成果物（アイデア/コンセプト）に意味的に近い経営資料を entity_embeddings の cosine で top-k 追補する。
+    # selected（admin の明示意図＝権威）を優先し、空き枠を top-k で補充（合計 total 上限でトークン抑制）。
+    # 埋め込み不可（サーバ不達・モデル不一致・ベクトル欠損）は現行動作（選択分のみ）へ graceful 縮退。
+    eval_rag_strategy_topk: int = 3              # 意味的に近い経営資料の追補候補数（cosine 上位）
+    eval_rag_strategy_total: int = 5             # selected＋top-k の合計上限（プロンプト肥大を抑える）
+    eval_rag_strategy_min_cosine: float = 0.45  # この生 cosine 未満の資料は追補しない（無関係文書の混入防止）
+
     # LLMゲートウェイ（生成・チャット補完・FR-45）＝OpenAI 互換 `/chat/completions` を叩く自前の薄い層
     # （infra/llm/gateway.py）。埋め込み（上）と同じ「物理は基盤側・キーは論理」方針。base_url は宛先
     # （dev=Ollama／prod=vLLM／将来クラウド）＝env で差し替え。物理モデル名は論理キー→config で解決し、

@@ -32,6 +32,8 @@ def create_job(
     input: dict,
     requested_model: str | None = None,
     execution: str = "queued",
+    created_by_id: uuid.UUID | None = None,   # 起票主体（§2.1）＝ユーザー起票は本人／システム起票は NULL
+    created_program: str | None = None,        # 起票処理の識別（システム起票の判別・'user'/'auto_evaluate' 等）
     ref_idea_id: uuid.UUID | None = None,
     ref_quest_id: uuid.UUID | None = None,
     ref_strategy_document_id: uuid.UUID | None = None,
@@ -40,6 +42,8 @@ def create_job(
     job = AiJob(
         task_type=task_type,
         requested_by_id=requested_by_id,
+        created_by_id=created_by_id,
+        created_program=created_program,
         input=input,
         requested_model=requested_model,
         execution=execution,
@@ -158,10 +162,14 @@ def list_jobs(
     session: Session, *, requester_id: uuid.UUID, status: str | None, task_type: str | None,
     sort: str | None, page: int, per_page: int,
 ) -> tuple[list[AiJob], int]:
-    """依頼者スコープの一覧（サーバー委譲・S.1）＝(rows, total)。sort/status はホワイトリスト（未知は 422）。"""
+    """起票者スコープの一覧（サーバー委譲・S.1）＝(rows, total)。sort/status はホワイトリスト（未知は 422）。
+
+    SC-04 個人一覧は **created_by_id（起票主体）** で絞る＝システム起票ジョブ（自動評価など・created_by_id=NULL）は
+    本人の一覧に出さない（§6・§2.1）。ユーザー起票は created_by_id=requested_by_id なので従来表示と一致。
+    """
     from app.core.errors import AppError
 
-    conds = [AiJob.requested_by_id == requester_id, AiJob.deleted_at.is_(None)]
+    conds = [AiJob.created_by_id == requester_id, AiJob.deleted_at.is_(None)]
     if status is not None:
         if status not in _STATUSES:
             raise AppError(422, "validation_error", detail="不正な status", errors=[{"field": "status", "code": "invalid_enum"}])
@@ -179,8 +187,8 @@ def list_jobs(
 
 
 def summary(session: Session, requester_id: uuid.UUID, *, recent_days: int = 7) -> dict:
-    """待ち/実行中/直近完了・失敗の件数（ヘッダーバッジ用・S.1）。"""
-    base = [AiJob.requested_by_id == requester_id, AiJob.deleted_at.is_(None)]
+    """待ち/実行中/直近完了・失敗の件数（ヘッダーバッジ用・S.1）。SC-04 と同じく created_by_id（起票主体）で絞る。"""
+    base = [AiJob.created_by_id == requester_id, AiJob.deleted_at.is_(None)]
 
     def _count(*extra):
         return int(session.execute(select(func.count()).select_from(AiJob).where(*base, *extra)).scalar_one())

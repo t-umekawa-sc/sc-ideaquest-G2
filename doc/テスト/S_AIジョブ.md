@@ -11,6 +11,7 @@
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | S-TC-101 | api | enqueue＝202＋ジョブ生成（queued）・自分のジョブに出る | 認証済み | `POST /ai-jobs`（task_type=info_summarize, input）＋Idempotency-Key | 202・`{id,status:"queued"}`／`GET /ai-jobs` の data に出る（requested_by=自分） | S.1／§5.57 |
+| S-TC-214 | api | **システム起票ジョブは SC-04 個人一覧に出ない**（created_by_id=NULL＝自動評価など・requested_by は通知先として保持） | ユーザー起票1件＋システム起票1件（created_by_id=NULL・created_program='auto_evaluate'・requested_by=自分） | `GET /ai-jobs` | data にユーザー起票は出る／システム起票（created_by_id=NULL）は出ない | S.1／データモデル§2.1／FR-50 |
 | S-TC-102 | api | 冪等＝同一 Idempotency-Key の二重投入で1件のみ | 認証済み | 同一キーで `POST /ai-jobs` ×2 | 2回目は同じ id を返す・ジョブは1件（重複作成しない） | S.1／§1.9 |
 | S-TC-103 | int | ワーカー取り出し＝queued を1件だけ running・Fake gateway で succeeded＋result 保存 | queued ジョブ1件・Fake gateway | worker dispatch 1 サイクル | status=succeeded・result 非null・started_at/finished_at 記録・input_tokens/output_tokens 記録 | §5.3／§5.57 |
 | S-TC-104 | int | 同時実行 N=1＝2件 queued でも1件ずつ running（SKIP LOCKED で二重取得しない） | queued 2件・多重ワーカー模擬 | 並行 dispatch | 同時 running は最大1・両方最終 succeeded（順次） | §5.3 |

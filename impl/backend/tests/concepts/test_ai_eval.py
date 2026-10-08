@@ -104,6 +104,40 @@ def test_p_tc_460_concept_evaluate_worker_creates_ai_evaluation():
         _cleanup(db, uid, qid, cid, [jid] if jid else [])
 
 
+def test_p_tc_464_strategy_topk_augments_via_onthefly_embed():
+    """P-TC-464: コンセプト（保存埋め込み無）でも本文を評価時 embed→意味的に近い非選択経営資料が top-k 追補（A-2・設計§11）。"""
+    from app.infra.llm.embeddings import get_embeddings_client
+    from app.tenant.concepts import ai_eval
+    from app.tenant.strategy.orm import StrategyDocument
+    from app.tenant.tokens import repository as tokens_repo
+    from app.tenant.tokens.orm import EntityEmbedding
+    db = _seed_db()
+    uid, qid, cid = _seed_concept(db)
+    close_id = uuid.uuid4()
+    try:
+        client = get_embeddings_client()  # conftest autouse の FakeEmbeddings
+        with get_tenant_session(db) as ts:
+            c = ts.get(Concept, cid)
+            c.problem = "太陽光 パネル 再エネ 脱炭素"  # 本文を再生可能エネルギークラスタに寄せる（その場 embed で近接）
+            # クエスト未選択の経営資料＝top-k でのみ拾える。保存埋め込みは直接 upsert（concept は query を評価時に embed）。
+            ts.add(StrategyDocument(id=close_id, title="再エネ推進計画", doc_kind="strategy", status="active",
+                                    created_by_id=uid, intent="脱炭素を推進する"))
+            ts.flush()
+            tokens_repo.upsert_embedding(ts, "strategy_doc", close_id, model=client.model,
+                                         vector=client.embed(["再エネ 脱炭素"])[0])
+            ts.commit()
+        with get_tenant_session(db) as ts:
+            msgs = ai_eval.build_messages(ts, cid)
+            user = next(m["content"] for m in msgs if m["role"] == "user")
+            assert "再エネ推進計画" in user  # concept 本文を評価時 embed→cosine top-k で非選択資料を追補
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(EntityEmbedding.__table__.delete().where(EntityEmbedding.owner_id == close_id))
+            ts.execute(StrategyDocument.__table__.delete().where(StrategyDocument.id == close_id))
+            ts.commit()
+        _cleanup(db, uid, qid, cid, [])
+
+
 def test_p_tc_461_concept_evaluate_invalid_output_fails():
     """P-TC-461: 推奨欠落など不正出力は job=failed・AI 評価は作られない（graceful）。"""
     db = _seed_db()

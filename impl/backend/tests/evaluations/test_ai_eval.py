@@ -135,6 +135,45 @@ def test_f_tc_220_build_messages_includes_rag_context():
         _cleanup(db, uid, qid, iid, [])
 
 
+def test_f_tc_222_strategy_topk_augments_unselected_docs():
+    """F-TC-222: クエスト未選択でも成果物に意味的に近い経営資料が top-k 追補され、無関係資料は入らない（A-2・設計§3）。"""
+    from app.infra.llm.embeddings import get_embeddings_client
+    from app.tenant.evaluations import ai_eval
+    from app.tenant.strategy.orm import StrategyDocument
+    from app.tenant.tokens import repository as tokens_repo
+    from app.tenant.tokens.orm import EntityEmbedding
+    db = _seed_db()
+    uid, qid, iid = _seed_idea(db)
+    close_id, far_id = uuid.uuid4(), uuid.uuid4()
+    try:
+        client = get_embeddings_client()  # conftest autouse の FakeEmbeddings（同義クラスタで意味近接を決定的に再現）
+        model = client.model
+        with get_tenant_session(db) as ts:
+            # どちらもクエスト未選択（QuestStrategyDocument なし）＝top-k でのみ拾える。
+            ts.add(StrategyDocument(id=close_id, title="再エネ推進計画", doc_kind="strategy", status="active",
+                                    created_by_id=uid, intent="脱炭素を推進する"))
+            ts.add(StrategyDocument(id=far_id, title="人材育成方針", doc_kind="strategy", status="active",
+                                    created_by_id=uid, intent="組織の人材育成"))
+            ts.flush()
+            # idea クエリベクトル＝再生可能エネルギークラスタ／close=同クラスタ(cosine 1.0)・far=別クラスタ(cosine 0.0)。
+            tokens_repo.upsert_embedding(ts, "idea", iid, model=model, vector=client.embed(["太陽光 パネル"])[0])
+            tokens_repo.upsert_embedding(ts, "strategy_doc", close_id, model=model, vector=client.embed(["再エネ 脱炭素"])[0])
+            tokens_repo.upsert_embedding(ts, "strategy_doc", far_id, model=model, vector=client.embed(["人材 育成 研修"])[0])
+            ts.commit()
+        with get_tenant_session(db) as ts:
+            msgs = ai_eval.build_messages(ts, iid)
+            user = next(m["content"] for m in msgs if m["role"] == "user")
+            assert "再エネ推進計画" in user          # 意味的に近い非選択資料＝top-k 追補される
+            assert "人材育成方針" not in user        # min_cosine 未満＝追補されない
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(EntityEmbedding.__table__.delete().where(
+                EntityEmbedding.owner_id.in_([iid, close_id, far_id])))
+            ts.execute(StrategyDocument.__table__.delete().where(StrategyDocument.id.in_([close_id, far_id])))
+            ts.commit()
+        _cleanup(db, uid, qid, iid, [])
+
+
 def test_f_tc_217_publish_auto_enqueues_idea_evaluate(monkeypatch):
     """F-TC-217: 公開経路のヘルパーが idea_evaluate ジョブを自動投入する（F.7.1・opt-in フラグ ON 時・graceful）。"""
     from app.core.config import get_settings
@@ -151,6 +190,8 @@ def test_f_tc_217_publish_auto_enqueues_idea_evaluate(monkeypatch):
             job_ids = [j.id for j in jobs]
             assert len(jobs) == 1 and jobs[0].status == "queued"
             assert (jobs[0].input or {}).get("idea_id") == str(iid)
+            # システム起票＝SC-04 個人一覧に出さない（created_by_id=NULL・created_program で識別・§6/§2.1）。
+            assert jobs[0].created_by_id is None and jobs[0].created_program == "auto_evaluate"
     finally:
         _cleanup(db, uid, qid, iid, job_ids)
 
