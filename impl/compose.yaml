@@ -148,6 +148,33 @@ services:
       ALIGNMENT_EMBED_BASE_URL: ${ALIGNMENT_EMBED_BASE_URL:-http://ollama:11434/v1}
       ALIGNMENT_EMBED_MODEL: ${ALIGNMENT_EMBED_MODEL:-bge-m3}
       ALIGNMENT_EMBED_API_KEY: ${ALIGNMENT_EMBED_API_KEY:-}
+      ALIGNMENT_EMBED_TIMEOUT_SECONDS: ${ALIGNMENT_EMBED_TIMEOUT_SECONDS:-15.0}
+      # LLM ゲートウェイ（生成・AIジョブ基盤・FR-45）＝OpenAI 互換 chat。既定は compose 内 Ollama（profile `ai`）。
+      # 未起動なら AIジョブは LLMUnavailable→リトライ/failed（業務は止めない）。prod は自社 vLLM 等に差し替え。
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-120.0}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-0}                 # 生成トークンのグローバル上限（0=無制限・会社別上限 S.5 の技術ガード）
+      LLM_MODEL_LIGHT: ${LLM_MODEL_LIGHT:-qwen3:4b}        # 論理キー qwen3-light の物理（軽量・info_summarize 既定）
+      LLM_MODEL_SWALLOW: ${LLM_MODEL_SWALLOW:-hf.co/tokyotech-llm/Llama-3.1-Swallow-8B}  # 高品質日本語・iso_generate
+      LLM_WORKER_CONCURRENCY: ${LLM_WORKER_CONCURRENCY:-1}            # 同時実行 N（最小スペック＝1件ずつ）
+      LLM_WORKER_POLL_INTERVAL_SECONDS: ${LLM_WORKER_POLL_INTERVAL_SECONDS:-2.0}
+      LLM_JOB_MAX_ATTEMPTS: ${LLM_JOB_MAX_ATTEMPTS:-3}               # 失敗リトライ上限（超で failed）
+      LLM_JOB_RUNNING_RECLAIM_SECONDS: ${LLM_JOB_RUNNING_RECLAIM_SECONDS:-300}  # running 無更新の孤児回収閾値
+      # アイデア公開時の AI 自動評価（FR-50・⑥）。既定 OFF＝LLM 基盤が無い環境では投入しない。
+      # true かつ `--profile ai llm-worker` 起動＋会社でモデル ON のとき、published で idea_evaluate を自動投入。
+      LLM_AUTO_EVALUATE_ON_PUBLISH: ${LLM_AUTO_EVALUATE_ON_PUBLISH:-false}
+      # AI 評価の RAG（経営資料の意味的追補・⑥）。top-k 件数・selected+topk の合計上限・採用する最小 cosine。
+      EVAL_RAG_STRATEGY_TOPK: ${EVAL_RAG_STRATEGY_TOPK:-3}
+      EVAL_RAG_STRATEGY_TOTAL: ${EVAL_RAG_STRATEGY_TOTAL:-5}
+      EVAL_RAG_STRATEGY_MIN_COSINE: ${EVAL_RAG_STRATEGY_MIN_COSINE:-0.45}
+      # おすすめクエスト選出（④・SC-01 Zone D）の加重和の重み・直近活発の集計窓・件数上限（env で調整可）。
+      RECOMMEND_WEIGHT_ALIGN: ${RECOMMEND_WEIGHT_ALIGN:-0.45}
+      RECOMMEND_WEIGHT_ACTIVE: ${RECOMMEND_WEIGHT_ACTIVE:-0.35}
+      RECOMMEND_WEIGHT_ADMIN: ${RECOMMEND_WEIGHT_ADMIN:-0.20}
+      RECOMMEND_ACTIVE_WINDOW_DAYS: ${RECOMMEND_ACTIVE_WINDOW_DAYS:-30}
+      RECOMMEND_DEFAULT_LIMIT: ${RECOMMEND_DEFAULT_LIMIT:-3}
+      RECOMMEND_MAX_LIMIT: ${RECOMMEND_MAX_LIMIT:-10}
     volumes:
       - ./logs:/var/log/ideaquest   # ホスト impl/logs にログを出力（gitignore・解析用）。prod は永続先へ。
     ports:
