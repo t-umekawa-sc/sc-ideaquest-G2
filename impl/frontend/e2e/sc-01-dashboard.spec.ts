@@ -86,19 +86,24 @@ test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog",
   await page.locator("#password").fill(ACME.password);
   await page.getByRole("button", { name: "ログイン" }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
-  await createOwnedQuest(page); // 「自分のクエスト」セクションの前提＝自作クエストを用意（seed 非依存）。
+  const ownId = await createOwnedQuest(page); // 「所有」タブの前提＝自作クエストを用意（seed 非依存）。
   await page.goto("/");
   await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
-  // 自分の作成クエストがあるので「自分のクエスト」セクションが出る（参加中とは別枠）。
-  await expect(page.locator('section[aria-label="自分のクエスト"]')).toBeVisible({ timeout: 8000 });
-  // API が is_owner を返し、参加中(=is_owner:false)と自作(=true)が混在する。
+  // 自作クエストは「参加中・所有」パネルの「所有」タブに出る（参加中とタブで分離・2026-10-08）。
+  const joinedOwned = page.locator('section[aria-label="参加中・所有"]');
+  await expect(joinedOwned).toBeVisible({ timeout: 8000 });
+  await joinedOwned.getByRole("tab", { name: /所有/ }).click();
+  await expect(joinedOwned.locator(`a[href="/quests/${ownId}"]`)).toBeVisible({ timeout: 8000 });
+  // API が is_owner を返し、参加中(=is_owner:false)と自作(=true)を区別できる。
   const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
   const qs: Array<{ is_owner?: boolean }> = dash.quests ?? [];
   expect(qs.every((q) => typeof q.is_owner === "boolean")).toBe(true);
   expect(qs.some((q) => q.is_owner)).toBe(true);
-  // 下書きカード（アイデア）は編集ダイアログ導線＝?edit=1（存在すれば）。
-  const draftHrefs = await page
-    .locator('section[aria-label="下書き"] a.draft-card')
+  // 下書きカード（アイデア）は編集ダイアログ導線＝Zone B「あなたの番」の下書きタブ。
+  const yourTurn = page.locator('section[aria-label="あなたの番"]');
+  await yourTurn.getByRole("tab", { name: /下書き/ }).click();
+  const draftHrefs = await yourTurn
+    .locator('a.draft-card')
     .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute("href") || ""));
   for (const h of draftHrefs) {
     // idea 下書き→ ?edit=1／quest 下書き→ /edit／評価下書き→ /eval のいずれか（詳細ページ直リンクは廃止）。
@@ -124,7 +129,10 @@ test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (
   try {
     await page.goto("/");
     await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
-    const card = page.locator(`section[aria-label="下書き"] a.draft-card[href="/ideas/${ideaId}/edit"]`);
+    // 下書きは Zone B「あなたの番」の下書きタブに入る＝タブを開いてカードを探す（2026-10-08 タブ集約）。
+    const yourTurn = page.locator('section[aria-label="あなたの番"]');
+    await yourTurn.getByRole("tab", { name: /下書き/ }).click();
+    const card = yourTurn.locator(`a.draft-card[href="/ideas/${ideaId}/edit"]`);
     await expect(card).toBeVisible({ timeout: 8000 }); // href が /edit（詳細直リンク/?edit=1 でない）
     await card.click();
     await page.waitForURL(new RegExp(`/ideas/${ideaId}/edit`), { timeout: 8000 });

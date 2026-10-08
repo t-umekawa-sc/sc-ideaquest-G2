@@ -381,7 +381,6 @@ export function DashboardView({
       <div className="draft-card__cta">{d.kind === "evaluation" ? "採点を続ける ✎" : "続きを書く ✎"}</div>
     </Link>
   );
-  const bHasAny = bCounts.vote + bCounts.req + bCounts.draft > 0;
 
   // ===== Zone D 見つける／Zone E マイ（ダッシュボード再設計 Phase1・§3）=====
   const D_PANEL = 3;   // Zone D パネルの初期表示（§3.1）
@@ -527,8 +526,8 @@ export function DashboardView({
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
 
       {/* D 見つける（新設）＝お知らせ／募集中コンテスト／おすすめクエスト（参加機会・告知／再設計 §3 Zone D・表示順1）。
-          個別パネルは0件でも枠を残し空状態メッセージ（§3.1 改訂）。ゾーン全体が空（お知らせ・募集中・おすすめとも0）なら非表示。 */}
-      {(announcements.length + openContests.length + recommended.length > 0) && (
+          個別パネルは0件でも枠を残し空状態メッセージ（§3.1 改訂）。ゾーンはロード後は常に表示（B案・2026-10-08＝空でも枠＋空状態でレイアウト安定）。 */}
+      {data !== null && (
         <motion.section aria-label="見つける" {...flowMotion(1)}>
           <div className="dash-3col">
             {/* 📢 運営からのお知らせ（FR-49・§4.3a 選別済み最大3）＝📌ピン/未読バッジ・すべて見る→SC-95。 */}
@@ -570,8 +569,8 @@ export function DashboardView({
       )}
 
       {/* E マイ＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト・A案）。よく行く先（再設計 §3 Zone E・表示順2）。
-          全件は「すべて見る」→標準ダイアログ（混在型のため一覧ページに寄せきれない・§3）。ゾーン全体が空なら非表示。 */}
-      {(joinedAll.length + ownedAll.length + followingAll.length + requestedAll.length > 0) && (
+          全件は「すべて見る」→標準ダイアログ（混在型のため一覧ページに寄せきれない・§3）。ゾーンはロード後は常に表示（B案・空でも空状態）。 */}
+      {data !== null && (
         <motion.section aria-label="マイ" {...flowMotion(1)}>
           <div className="dash-2col">
             {/* 参加中／所有＝タブ集約（ユーザー要望・既定＝参加中）。所有＝自作クエスト（is_owner）。 */}
@@ -629,9 +628,9 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（0件なら非表示・再設計 §3 Zone B・表示順3）。
+      {/* B あなたの番（要対応）＝未投票/承認待ち/下書きをタブ集約（ロード後は常に表示・B案・再設計 §3 Zone B・表示順3）。
           ユーザー要望でセグメント→下線タブ＋カード枠で囲う。 */}
-      {bHasAny && (
+      {data !== null && (
         <motion.section aria-label="あなたの番" {...flowMotion(1)}>
           <section className="card dash-zone-card">
             <div className="dash-tabs" role="tablist" aria-label="要対応の種別">
