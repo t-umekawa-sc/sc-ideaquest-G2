@@ -94,6 +94,10 @@
 | P-TC-456 | api | 評価の変更履歴＝確定ごとに版（下書きは版なし・§3.6） | evaluator | `PUT .../evaluation`（draft→submitted→submitted〔総評変更〕） | `GET .../evaluation/me` の `revisions` が rev2＋rev1（新しい順・初版空・rev2 に overall_comment） | §3.6／migration 0040 |
 | P-TC-457 | api | 同一内容の再確定は版を進めない（既存仕様踏襲） | evaluator | `PUT .../evaluation`（同値 submitted×2） | `revisions` は rev1 のみ | §3.6 |
 | P-TC-458 | api | コンセプト評価の確定版差分（recommendation=scalar） | 2版 | `GET .../evaluation/revisions/2/diff` | recommendation＝scalar・overall_comment＝text | §3.6 |
+| P-TC-460 | int | **concept_evaluate ワーカー成功で AI 評価が入る**（8観点＋Go/Pivot/Kill・FR-50） | active コンセプト＋fake chat が構造化JSON | `enqueue_ai_job(concept_evaluate)`→`process_ai_jobs_once` | job=succeeded・`concept_evaluations` に `kind='ai'`/submitted/party/`recommendation`/`ai_job_id`/model＋8観点スコア＋版1（editor NULL） | P.5a／FR-50 |
+| P-TC-461 | int | **出力不正（推奨欠落/中核不足）は job=failed・AI 評価は作らない**（graceful） | fake chat が不正JSON | 同上 | job=failed（`error.code='invalid_output'`）・AI 評価0件 | P.5a／§6-5 |
+| P-TC-462 | api | **再生成は評価者権限保持者が可**（202＋queued・regenerated_by 入り・手動のみ） | ACME-01=owner（評価者）・active コンセプト | `POST /concepts/{id}/ai-evaluation/regenerate` | 202・`{job_id,status:'queued'}`・`ai_jobs` に concept_evaluate（`input.concept_id`/`regenerated_by`） | P.5a／FR-50 |
+| P-TC-463 | api | **評価者権限が無い再生成は 403** | ACME-01=vote のみのパーティー員 | 同上 | 403 | P.5a／P.0 |
 
 ## 6. コンセプト投票 API（P.5b・SC-61 §4.5）
 

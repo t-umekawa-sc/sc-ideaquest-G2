@@ -304,6 +304,27 @@ class ConceptEvaluatorDTO(BaseModel):
     scores: dict[str, int] = {}
     overall_comment: str | None = None
     comments: dict[str, str] = {}
+    visibility: str | None = None         # party/limited/private（代表コメント母集団・#13・F.1.1 同型）
+    submitted_at: datetime | None = None  # 同点タイブレーク「先に確定」用
+
+
+class ConceptAiEvaluationDTO(BaseModel):
+    """コンセプト AI 評価の別枠ブロック（FR-50・P.5a）＝8観点＋Go/Pivot/Kill 推奨。"""
+
+    scores: dict[str, int] = {}
+    comments: dict[str, str] = {}
+    overall_comment: str | None = None
+    recommendation: str | None = None
+    model: str | None = None
+    generated_at: datetime | None = None
+    job_id: str | None = None
+
+
+class ConceptAiEvaluationJobResponse(BaseModel):
+    """コンセプト AI 評価の生成/再生成 enqueue 応答（202 相当・P.5a）。"""
+
+    job_id: str
+    status: str = "queued"
 
 
 class ConceptEvaluationAggregateDTO(BaseModel):
@@ -312,6 +333,7 @@ class ConceptEvaluationAggregateDTO(BaseModel):
     evaluator_count: int = 0
     recommendations: dict[str, int] = {}
     evaluators: list[ConceptEvaluatorDTO] = []
+    ai_evaluation: ConceptAiEvaluationDTO | None = None  # AI 評価の別枠ブロック（FR-50・P.5a）
     my_evaluation: ConceptEvaluationMeDTO | None = None
     stale: bool = False  # リンク前提の反証で要再評価（SC-62 バナー源・P.7）
     my_permissions: list[str] = []

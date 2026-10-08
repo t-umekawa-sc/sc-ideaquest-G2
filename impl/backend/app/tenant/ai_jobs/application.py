@@ -365,6 +365,15 @@ def _build_messages(job: AiJob, ts=None) -> list[dict]:
             return ai_eval.build_messages(ts, uuid.UUID(str(idea_id)))
         except ai_eval.AiEvalError as exc:
             raise _PermanentError(str(exc)) from exc
+    if job.task_type == "concept_evaluate":
+        from app.tenant.concepts import ai_eval as concept_ai_eval
+        concept_id = (job.input or {}).get("concept_id")
+        if not concept_id:
+            raise _PermanentError("input.concept_id is required for concept_evaluate")
+        try:
+            return concept_ai_eval.build_messages(ts, uuid.UUID(str(concept_id)))
+        except concept_ai_eval.AiEvalError as exc:
+            raise _PermanentError(str(exc)) from exc
     if job.task_type == "info_summarize":
         text = (job.input or {}).get("text", "")
         if not text:
@@ -528,21 +537,21 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
         job = repo.get(session, job_id)
         if job is None:
             return "skip"
-        # idea_evaluate＝生成結果(JSON)を evaluations に AI 評価として保存（検証失敗＝ジョブ failed＝人間評価のみで進行）。
-        if task_type == "idea_evaluate":
-            from app.tenant.evaluations import ai_eval
+        # idea_evaluate/concept_evaluate＝生成結果(JSON)を評価として保存（検証失敗＝ジョブ failed＝人間評価のみで進行）。
+        if task_type in ("idea_evaluate", "concept_evaluate"):
             inp = job.input or {}
             reg_by = inp.get("regenerated_by")
+            editor = uuid.UUID(str(reg_by)) if reg_by else None
             try:
-                ai_eval.apply_result(
-                    session,
-                    idea_id=uuid.UUID(str(inp.get("idea_id"))),
-                    ai_job_id=job.id,
-                    model=result.model,
-                    editor_id=uuid.UUID(str(reg_by)) if reg_by else None,
-                    text=result.text,
-                )
-            except ai_eval.AiEvalError as exc:
+                if task_type == "idea_evaluate":
+                    from app.tenant.evaluations import ai_eval
+                    ai_eval.apply_result(session, idea_id=uuid.UUID(str(inp.get("idea_id"))),
+                                         ai_job_id=job.id, model=result.model, editor_id=editor, text=result.text)
+                else:
+                    from app.tenant.concepts import ai_eval as concept_ai_eval
+                    concept_ai_eval.apply_result(session, concept_id=uuid.UUID(str(inp.get("concept_id"))),
+                                                 ai_job_id=job.id, model=result.model, editor_id=editor, text=result.text)
+            except ValueError as exc:  # AiEvalError（ValueError 派生）＝出力不正＝恒久失敗
                 job.status = "failed"
                 job.error = {"code": "invalid_output", "detail": str(exc)}
                 job.finished_at = now

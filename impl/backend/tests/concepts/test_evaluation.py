@@ -307,3 +307,38 @@ def test_p_tc_458_eval_revision_diff(env, client):
     diff = client.get(f"/api/v1/concepts/{cid}/evaluation/revisions/2/diff").json()
     assert diff["from_revision"] == 1 and diff["to_revision"] == 2
     assert diff["fields"]["recommendation"]["kind"] == "scalar"
+
+
+# ---- P.5a コンセプト AI 評価 再生成（FR-50・評価者権限のみ・手動のみ） ----
+
+def test_p_tc_462_regenerate_ai_evaluation_evaluator_enqueues(client, env):
+    """P-TC-462: 評価者権限保持者は AI 評価を生成/再生成できる＝202＋queued concept_evaluate（regenerated_by 入り）。"""
+    from app.tenant.ai_jobs.orm import AiJob
+    _login_seed(client)
+    qid = env.make_quest()  # ACME-01 = owner（評価者）
+    cid = env.seed_active_concept(qid)
+    jid = None
+    try:
+        r = client.post(f"/api/v1/concepts/{cid}/ai-evaluation/regenerate", headers=_csrf(client))
+        assert r.status_code == 202, r.text
+        body = r.json()
+        assert body["status"] == "queued" and body["job_id"]
+        jid = uuid.UUID(body["job_id"])
+        with get_tenant_session(env.db_identifier) as ts:
+            job = ts.query(AiJob).filter(AiJob.id == jid).one()
+            assert job.task_type == "concept_evaluate" and (job.input or {}).get("concept_id") == str(cid)
+            assert (job.input or {}).get("regenerated_by") == str(env.user_id)
+    finally:
+        if jid:
+            with get_tenant_session(env.db_identifier) as ts:
+                ts.execute(AiJob.__table__.delete().where(AiJob.id == jid))
+                ts.commit()
+
+
+def test_p_tc_463_regenerate_ai_evaluation_requires_evaluator(client, env):
+    """P-TC-463: 評価者権限が無いパーティー員の再生成は 403（owner/quest_admin でも評価者権限無ければ不可）。"""
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote"])  # ACME-01 = vote のみ（非評価者）
+    cid = env.seed_active_concept(qid, author=env.other_id)
+    r = client.post(f"/api/v1/concepts/{cid}/ai-evaluation/regenerate", headers=_csrf(client))
+    assert r.status_code == 403, r.text

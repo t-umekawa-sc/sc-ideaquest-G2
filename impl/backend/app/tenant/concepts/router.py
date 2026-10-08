@@ -18,6 +18,7 @@ from app.tenant.concepts.schemas import (
     AssumptionDetailDTO,
     AssumptionListResponse,
     AssumptionPatchRequest,
+    ConceptAiEvaluationJobResponse,
     ConceptCreateRequest,
     ConceptDecisionLogResponse,
     ConceptDecisionRequest,
@@ -409,6 +410,17 @@ def put_evaluation(
     verify_csrf(request)
     result = service.put_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, body=body)
     return ConceptEvaluationMeDTO(**result)
+
+
+@router.post("/concepts/{concept_id}/ai-evaluation/regenerate", response_model=ConceptAiEvaluationJobResponse, status_code=202)
+def regenerate_ai_evaluation(
+    concept_id: str, request: Request, session: dict = Depends(require_me),
+) -> ConceptAiEvaluationJobResponse:
+    """AI 評価を生成/再生成（P.5a・**評価者権限保持者のみ**・手動のみ）。完了は 409・会社モデル無効は 422。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.regenerate_ai_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
+    return ConceptAiEvaluationJobResponse(**result)
 
 
 # ---- コンセプト投票（P.5b） ----

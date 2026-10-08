@@ -1018,14 +1018,18 @@ def get_evaluation_aggregate(account_id, company_id, concept_id) -> dict:
         is_manager = _is_manager(ts, quest, user)
         visible = [e for e in submitted if _can_view_eval(concept, user, e, is_manager)]
         scores_by_eval = repo.get_scores_for_evaluations(ts, [e.id for e in visible])
-        users = quests_repo.get_users_by_ids(ts, {e.evaluator_id for e in visible}) if visible else {}
+        # AI 評価（FR-50）＝数値集計には人間と同列で算入、個票は evaluators[] から外し ai_evaluation 別枠。
+        humans = [e for e in visible if e.evaluator_kind != "ai"]
+        ai_evals = [e for e in visible if e.evaluator_kind == "ai"]
+        users = quests_repo.get_users_by_ids(ts, {e.evaluator_id for e in humans}) if humans else {}
         by_aspect: dict[str, list[int]] = {}
-        recommendations: dict[str, int] = {}
-        evaluators = []
-        for e in visible:
-            rows = scores_by_eval.get(e.id, [])
-            for s in rows:
+        for e in visible:  # 数値集計は AI 含む全可視 submitted
+            for s in scores_by_eval.get(e.id, []):
                 by_aspect.setdefault(s.aspect, []).append(s.score)
+        recommendations: dict[str, int] = {}  # 推奨分布は人間のみ（AI の推奨は ai_evaluation 別枠）
+        evaluators = []
+        for e in humans:
+            rows = scores_by_eval.get(e.id, [])
             if e.recommendation:
                 recommendations[e.recommendation] = recommendations.get(e.recommendation, 0) + 1
             u = users.get(e.evaluator_id)
@@ -1038,17 +1042,54 @@ def get_evaluation_aggregate(account_id, company_id, concept_id) -> dict:
                 "scores": {s.aspect: s.score for s in rows},
                 "overall_comment": e.overall_comment,
                 "comments": {s.aspect: s.comment for s in rows if s.comment is not None},
+                "visibility": e.visibility,
+                "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
             })
+        ai_block = None
+        if ai_evals:
+            e = ai_evals[0]
+            rows = scores_by_eval.get(e.id, [])
+            ai_block = {
+                "scores": {s.aspect: s.score for s in rows},
+                "comments": {s.aspect: s.comment for s in rows if s.comment is not None},
+                "overall_comment": e.overall_comment,
+                "recommendation": e.recommendation,
+                "model": e.model,
+                "generated_at": e.submitted_at.isoformat() if e.submitted_at else None,
+                "job_id": str(e.ai_job_id) if e.ai_job_id else None,
+            }
         aspects = {a: (sum(v) / len(v)) for a, v in by_aspect.items() if v}
         core = [aspects[a] for a in repo.CORE_ASPECTS if a in aspects]
         my_eval = _me_eval_payload(ts, repo.get_evaluation(ts, cid, user.id)) if _is_evaluator(ts, quest, user) else None
         stale = any(link.is_stale for link in repo.list_links_for_concept(ts, cid))
         return {
             "aspects": aspects, "overall_avg": (sum(core) / len(core)) if core else None,
-            "evaluator_count": len(visible), "recommendations": recommendations,
-            "evaluators": evaluators, "my_evaluation": my_eval, "stale": stale,
+            "evaluator_count": len(humans), "recommendations": recommendations,
+            "evaluators": evaluators, "ai_evaluation": ai_block, "my_evaluation": my_eval, "stale": stale,
             "my_permissions": _my_permissions(ts, concept, quest, user),
         }
+
+
+def regenerate_ai_evaluation(account_id, company_id, concept_id) -> dict:
+    """コンセプト AI 評価を生成/再生成（P.5a・**評価者権限保持者のみ**・手動のみ＝自動起動しない）。完了は 409。
+
+    `regenerated_by` を入力に載せると版の editor に実行者が記録される（FR-50・ai_eval.apply_result 対応）。
+    """
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        _require_evaluator(ts, quest, user)  # 評価者権限のみ（403）＝アイデアと同型（F.7.3）
+        _guard_not_completed(quest)
+        uid = user.id
+        q_id = quest.id if quest is not None else None
+    from app.tenant.ai_jobs import application as ai_app
+    job_id = ai_app.enqueue_ai_job(
+        company.db_identifier, task_type="concept_evaluate", requested_by_id=uid,
+        input={"concept_id": str(cid), "regenerated_by": str(uid)}, ref_quest_id=q_id,
+    )
+    return {"job_id": str(job_id), "status": "queued"}
 
 
 def put_evaluation(account_id, company_id, concept_id, *, body) -> dict:

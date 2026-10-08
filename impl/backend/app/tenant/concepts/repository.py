@@ -316,6 +316,36 @@ def upsert_evaluation(
     return ev, True
 
 
+def get_ai_evaluation(session: Session, concept_id: uuid.UUID) -> ConceptEvaluation | None:
+    """AI 評価（`evaluator_kind='ai'`・1コンセプト最新1件・部分ユニーク）を取得。無ければ None（FR-50）。"""
+    return session.execute(
+        select(ConceptEvaluation).where(ConceptEvaluation.concept_id == concept_id, ConceptEvaluation.evaluator_kind == "ai")
+    ).scalars().first()
+
+
+def upsert_ai_evaluation(
+    session: Session, concept_id: uuid.UUID, *, ai_job_id: uuid.UUID, model: str | None,
+    overall_comment: str | None, recommendation: str | None,
+) -> tuple[ConceptEvaluation, bool]:
+    """AI 評価を登録/更新（1コンセプト最新 AI 評価1件・`evaluator_id=NULL`・生成完了＝即 submitted・party・FR-50）。"""
+    existing = get_ai_evaluation(session, concept_id)
+    if existing is not None:
+        existing.ai_job_id = ai_job_id
+        existing.model = model
+        existing.overall_comment = overall_comment
+        existing.recommendation = recommendation
+        existing.status = "submitted"
+        return existing, False
+    ev = ConceptEvaluation(
+        id=uuid.uuid4(), concept_id=concept_id, evaluator_id=None, evaluator_kind="ai",
+        ai_job_id=ai_job_id, model=model, overall_comment=overall_comment, recommendation=recommendation,
+        status="submitted", visibility="party",
+    )
+    session.add(ev)
+    session.flush()
+    return ev, True
+
+
 def replace_scores(
     session: Session, concept_evaluation_id: uuid.UUID, entries: list[tuple[str, int, str | None]],
 ) -> None:
