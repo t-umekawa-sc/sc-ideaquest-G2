@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import uuid
 from datetime import date, datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 
 from app.control_plane.auth.orm import Company
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -293,10 +295,12 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         published = body.status == "published"
         actor_id = user.id
+        new_idea_id = idea.id
         ts.commit()
     if published:  # フォロワーへ new_ideas 通知（H quest_watch_update・C.9/FR-40・post-commit・公開者除外）
         from app.tenant.quests import application as quests_app
         quests_app.notify_quest_watch_new_ideas(company_id, qid, actor_id=actor_id)
+        _enqueue_idea_ai_evaluation(company.db_identifier, new_idea_id, actor_id)  # AI 評価 自動起動（F.7.1）
     return detail
 
 
@@ -356,6 +360,25 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
     return detail
 
 
+def _enqueue_idea_ai_evaluation(db_identifier: str, idea_id, user_id) -> None:
+    """公開(published)時に AI 評価ジョブ（idea_evaluate）を自動投入（FR-50・F.7.1）。
+
+    **graceful**＝会社でモデル未有効/タスク無効・enqueue 失敗でも公開は止めない（AI 評価は付かず人間評価のみで進行）。
+    入力は参照のみ（`{idea_id}`）＝文脈はワーカーが実行直前に収集（F.7.2）。
+    自動起動はデプロイ単位の opt-in（`llm_auto_evaluate_on_publish`・既定 OFF＝LLM 基盤を伴わない環境では投入しない）。
+    """
+    if not get_settings().llm_auto_evaluate_on_publish:
+        return
+    try:
+        from app.tenant.ai_jobs import application as ai_app
+        ai_app.enqueue_ai_job(
+            db_identifier, task_type="idea_evaluate", requested_by_id=user_id,
+            input={"idea_id": str(idea_id)}, ref_idea_id=idea_id,
+        )
+    except Exception:  # noqa: BLE001 — AI 評価の失敗で公開を止めない（graceful・§6-4）
+        logging.getLogger("app").warning("idea_evaluate auto-enqueue skipped for idea=%s", idea_id, exc_info=True)
+
+
 def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
     """下書きを公開（draft→published・アトミック・D.2）。draft 以外は 409。投稿者本人 or owner/quest_admin。"""
     iid = _parse_uuid(idea_id, field="idea_id")
@@ -394,6 +417,7 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
     # フォロワーへ new_ideas 通知（H quest_watch_update・C.9/FR-40・post-commit・公開者除外）
     from app.tenant.quests import application as quests_app
     quests_app.notify_quest_watch_new_ideas(company_id, q_id, actor_id=actor_id)
+    _enqueue_idea_ai_evaluation(company.db_identifier, iid, actor_id)  # AI 評価 自動起動（F.7.1）
     return detail
 
 

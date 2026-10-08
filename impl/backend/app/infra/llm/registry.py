@@ -33,6 +33,8 @@ class ModelSpec:
 _TASK_DEFAULTS: dict[str, str] = {
     "info_summarize": "qwen3-light",   # 初版の縦1本
     "iso_generate": "qwen3-swallow",   # 2本目（高品質日本語）
+    "idea_evaluate": "qwen3-swallow",  # 3本目＝アイデア評価（FR-50・構造化JSON・日本語採点）
+    "concept_evaluate": "qwen3-swallow",  # 4本目＝コンセプト評価（8観点＋Go/Pivot/Kill・手動のみ）
     "strategy_align_semantic": "qwen3-light",
     "info_contradiction": "qwen3-light",
     "concept_premise_check": "qwen3-light",

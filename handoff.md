@@ -27,7 +27,15 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **migration `0057_ai_evaluation`（company・適用済）**＝evaluations/concept_evaluations 拡張＋版 editor_id nullable（`impl/backend/migrations/company/versions/0057_ai_evaluation.py`）。`\d evaluations` で列/制約確認済。
 - **ORM/schema**＝`evaluations/orm.py`・`concepts/orm.py`（新列・nullable）、`evaluations/schemas.py`・`concepts/schemas.py`（Visibility Literal に `private`）。
 - **private 可視範囲**＝`evaluations/application.py` `_can_view_evaluation`／`concepts/application.py` `_can_view_eval` を `is_manager and visibility=='limited'` に（private は owner/quest_admin にも非表示・投稿者＋評価者のみ）。
-- **テスト**＝**F-TC-213**（api・private は manager にも非表示・`tests/evaluations/test_api.py`・**旧実装で赤→新実装で緑を確認**）／**F-TC-214**（e2e・`e2e/sc-22-eval-visibility.spec.ts`・範囲外に非表示を psql seed で検証・緑）。TC md＝`doc/テスト/F_評価.md`。評価 pytest 33 passed・concepts 77 passed・e2e 緑・TCトレーサビリティ ✅(1033)。
+- **テスト**＝**F-TC-213**（api・private は manager にも非表示・`tests/evaluations/test_api.py`・**旧実装で赤→新実装で緑を確認**）／**F-TC-214**（e2e・`e2e/sc-22-eval-visibility.spec.ts`・範囲外に非表示を psql seed で検証・緑）。
+
+### 3-3. AI 評価ワーカー＋自動起動＋F.1 集計分離（完了・2回目の commit）
+- **`idea_evaluate` ワーカー**＝`app/tenant/evaluations/ai_eval.py`（`build_messages(ts, idea_id)`＝アイデア＋クエスト文脈で5観点ルーブリック＋構造化JSON 要求／`apply_result(...)`＝JSON 検証→`repo.upsert_ai_evaluation` で kind='ai' 保存＋`replace_scores`＋版スナップ）。`repository.py` に `get_ai_evaluation`/`upsert_ai_evaluation` 追加。
+- **ai_jobs 結線**＝`application.py` `_build_messages(job, ts)` に idea_evaluate 分岐（評価ドメインへ遅延 import 委譲）＋成功時フックで `apply_result`（検証失敗＝job failed `invalid_output`）。registry `_TASK_DEFAULTS` に `idea_evaluate`/`concept_evaluate`=qwen3-swallow。
+- **自動起動**＝`ideas/application.py` `_enqueue_idea_ai_evaluation`（create_idea 公開・publish_idea の post-commit）。**デプロイ opt-in フラグ `llm_auto_evaluate_on_publish`（既定 OFF・`config.py`）で gate**＝LLM 基盤を伴わない dev/test では自動投入しない（共有DBジョブ汚染も回避）。prod は env `LLM_AUTO_EVALUATE_ON_PUBLISH=true` で ON。
+- **F.1 集計分離**＝`evaluations/application.py` `_aggregate` を「数値集計(aspects/overall_avg)は AI 含む／`evaluators[]` は人間のみ・`evaluator_count` も人間のみ／AI は `ai_evaluation` 別枠」に。評価者個票に `submitted_at`/`visibility` 付与（代表コメント/#13 用・F.1.1）。コイン(F.4)は全 submitted で AI 算入（既存のまま）。
+- **テスト**＝**F-TC-215/216/217**（int・`tests/evaluations/test_ai_eval.py`＝worker 成功で AI 評価生成／不正出力で failed＋AI評価0件／公開ヘルパーが queued ジョブ投入〔フラグON〕）。
+- 回帰＝評価35・ideas/ai_jobs 併走147・strategy/concepts 105 passed・TCトレーサビリティ ✅(1036)。TC md＝`doc/テスト/F_評価.md`。
 
 ## 4. 現在の状態（動作 / テスト）
 - **壊れているもの＝無し**。private 可視範囲は api+e2e で緑。
@@ -50,12 +58,14 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 7. 次にやること（優先順・⑥ AI 評価本体の実装）
 > 設計は全確定・基盤(private/スキーマ)は実装済。残りは AI 評価パイプライン＋評価パネルUI。**TC md 先行→red-green**（テスト規約§5）。画面は**モック先行済→backend 結線**（§フロント実装フロー）。実装レイアウトを正（モックは一致済だが最終はコンポーネント）。
 
-1. **backend：AI評価ジョブ**＝`task_type=idea_evaluate`（S.3）worker 実装＝入力`{idea_id}`→会社DBから本文/クエスト/関連情報/経営資料(embedding top-k A-2)収集→プロンプト(5観点ルーブリック・構造化JSON)→`evaluations` に `kind='ai'`/`status='submitted'`/`visibility='party'` upsert（部分ユニーク・上書き前に版スナップ）。**自動起動**＝アイデア `published` 遷移の post-commit で enqueue（F.7.1・Idempotency=idea_id+内容リビジョン）。**再生成EP** `POST /ideas/{id}/ai-evaluation/regenerate`（評価者権限のみ・F.7.3）。gateway=`app/infra/llm/gateway.py`・worker 参考=`app/tenant/ai_jobs/application.py`・既存 `iso_generate`/`info_summarize` が手本。
-2. **backend：コンセプト** `task_type=concept_evaluate`（8観点＋recommendation・**手動のみ** `POST /concepts/{id}/ai-evaluation/regenerate`・P.5a）。RAG に前提/検証(assumptions/validations)も含む。
-3. **backend：F.1 集計に AI 算入＋代表コメント用データ**＝`GET /ideas|concepts/{id}/evaluation` の `evaluators[]` に観点別スコア/コメント/submitted_at、`ai_evaluation` 別枠、`evaluator_count` は人間のみ。コイン(F.4)は kind 非区別で既に全 submitted 算入（確認）。
-4. **frontend：評価パネル**＝`IdeaDetailView`/`ConceptDetailView` の評価結果パネルを代表1件(タブ=`.dash-tabs`)＋他N件＋仕切り線＋「コメント」card-title＋**AI評価ブロック別枠**＋**#13 評価詳細モーダル**(URL付きモーダル・全評価者スコアカード)。SC-25/SC-62 に **private radio** 追加。モック3枚が実装の正。代表選定はクライアント側で可。
-5. **失敗通知/SC-04**＝`ai_task_failed` を評価者権限保持者＋owner/quest_admin へ／自動起動ジョブは `created_by=NULL`。
-6. 仕上げ＝型再生成(`npm run codegen`)・`npm run build`・vitest・targeted pytest・TCトレーサビリティ・**UI実ブラウザ目視**（verify-ui-visually-before-done）。
+> **済（3-3）**＝idea_evaluate worker・自動起動(flag gate)・F.1 集計分離(ai_evaluation別枠＋evaluators人間のみ＋submitted_at/visibility)。以下が残り。
+
+1. **backend：再生成EP** `POST /ideas/{id}/ai-evaluation/regenerate`（F.7.3）＝**評価者権限(FR-27)保持者のみ**（owner/quest_admin でも評価者権限無ければ 403）・`enqueue_ai_job(idea_evaluate, input={idea_id, regenerated_by: user_id})`（`regenerated_by` を入れると版 editor に記録される＝ai_eval.apply_result 対応済）・完了凍結409・会社モデル無効422。router(F) に追加。TC=F-TC-21x。
+2. **backend：コンセプト** `task_type=concept_evaluate`（8観点＋recommendation・**手動のみ** `POST /concepts/{id}/ai-evaluation/regenerate`・P.5a）＝ai_eval と同型の `concepts/ai_eval.py`（recommendation 必須・RAG に前提/検証 assumptions/validations 含む）＋concepts repo に upsert_ai_evaluation＋concepts `_aggregate` を AI 分離（recommendations も人間のみ数える等）。worker 分岐追加。
+3. **backend：RAG 強化**（任意・品質）＝ai_eval.build_messages に関連情報(info_links top)＋経営資料(entity_embeddings cosine top-k・A-2)を足す（現状はアイデア＋クエストのみ）。
+4. **backend：失敗通知の宛先**＝現状 `_notify_completion` は requester のみ。F.7/§6-5 の「評価者権限保持者＋owner/quest_admin」へ拡張（idea_evaluate 失敗時）。
+5. **frontend：評価パネル**＝`IdeaDetailView`/`ConceptDetailView` を代表1件(タブ=`.dash-tabs`・高評価/合意既定/懸念)＋他N件＋仕切り線＋「コメント」card-title＋**AI評価ブロック別枠**(`ai_evaluation` を表示)＋**#13 評価詳細モーダル**(URL付きモーダル・全評価者スコアカード)。SC-25/SC-62 に **private radio** 追加。型再生成後 `evaluators[].scores/comments/submitted_at`・`ai_evaluation` を使う。モック3枚(`doc/画面設計/mocks/_*検討.html`)が実装の正。代表選定はクライアント側で可。
+6. 仕上げ＝型再生成(`npm run codegen`)・`npm run build`・vitest・targeted pytest・TCトレーサビリティ・**UI実ブラウザ目視**（verify-ui-visually-before-done）。自動起動を dev で試すなら `impl/.env` に `LLM_AUTO_EVALUATE_ON_PUBLISH=true`＋`--profile ai` llm-worker 起動。
 
 ### 前セッションからの持ち越し（未着手）
 - ④【討議】おすすめクエスト選出アルゴリズム（ユーザー案への意見→合意後実装）。

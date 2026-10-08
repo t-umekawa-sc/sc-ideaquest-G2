@@ -390,29 +390,52 @@ def _validate_evaluation(body) -> None:
 
 
 def _aggregate(evaluations, scores_by_eval, ts) -> dict:
-    """可視な submitted 評価から観点別平均・総合平均・評価者内訳を算出（5観点均等）。"""
-    users = quests_repo.get_users_by_ids(ts, {e.evaluator_id for e in evaluations}) if evaluations else {}
+    """可視な submitted 評価から観点別平均・総合平均・評価者内訳を算出（5観点均等・FR-50）。
+
+    AI 評価（`evaluator_kind='ai'`）は**数値集計（aspects/overall_avg）には人間と同列で算入**するが、
+    個票は `evaluators[]` から外し `ai_evaluation` 別枠で返す（人間の評価者一覧と混ぜない・F.1/F.7.4）。
+    `evaluator_count` は人間の提出済み人数（AI は数えない）。
+    """
+    humans = [e for e in evaluations if e.evaluator_kind != "ai"]
+    ai_evals = [e for e in evaluations if e.evaluator_kind == "ai"]
+    users = quests_repo.get_users_by_ids(ts, {e.evaluator_id for e in humans}) if humans else {}
+    # 数値集計は AI 含む全可視 submitted（kind 非区別）。
     per_aspect: dict[str, list[int]] = {a: [] for a in ASPECTS}
-    evaluators = []
     for e in evaluations:
-        smap = {s.aspect: s.score for s in scores_by_eval.get(e.id, [])}
-        cmap = {s.aspect: s.comment for s in scores_by_eval.get(e.id, []) if s.comment}
-        for a, v in smap.items():
-            if a in per_aspect:
-                per_aspect[a].append(v)
+        for s in scores_by_eval.get(e.id, []):
+            if s.aspect in per_aspect:
+                per_aspect[s.aspect].append(s.score)
+    # 人間の個票（代表コメント/#13 用に submitted_at・visibility も付す・F.1.1）。
+    evaluators = []
+    for e in humans:
         evaluators.append({
             "evaluator": _author_dto(users.get(e.evaluator_id), e.evaluator_id),
-            "scores": smap,
-            "comments": cmap,
+            "scores": {s.aspect: s.score for s in scores_by_eval.get(e.id, [])},
+            "comments": {s.aspect: s.comment for s in scores_by_eval.get(e.id, []) if s.comment},
             "overall_comment": e.overall_comment,
+            "visibility": e.visibility,
+            "submitted_at": e.submitted_at,
         })
     aspects = {a: round(sum(vs) / len(vs), 2) for a, vs in per_aspect.items() if vs}
     overall_avg = round(sum(aspects.values()) / len(aspects), 2) if aspects else None
+    # AI 評価（別枠・最新1件）。
+    ai_block = None
+    if ai_evals:
+        e = ai_evals[0]
+        ai_block = {
+            "scores": {s.aspect: s.score for s in scores_by_eval.get(e.id, [])},
+            "comments": {s.aspect: s.comment for s in scores_by_eval.get(e.id, []) if s.comment},
+            "overall_comment": e.overall_comment,
+            "model": e.model,
+            "generated_at": e.submitted_at,
+            "job_id": e.ai_job_id,
+        }
     return {
         "aspects": aspects,
         "overall_avg": overall_avg,
-        "evaluator_count": len(evaluations),
+        "evaluator_count": len(humans),
         "evaluators": evaluators,
+        "ai_evaluation": ai_block,
     }
 
 

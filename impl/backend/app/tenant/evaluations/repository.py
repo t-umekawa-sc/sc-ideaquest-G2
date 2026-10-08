@@ -43,6 +43,37 @@ def upsert_evaluation(
     return ev, True
 
 
+def get_ai_evaluation(session: Session, idea_id: uuid.UUID) -> Evaluation | None:
+    """AI 評価（`evaluator_kind='ai'`・1アイデア最新1件・部分ユニーク）を取得。無ければ None（FR-50）。"""
+    return session.execute(
+        select(Evaluation).where(Evaluation.idea_id == idea_id, Evaluation.evaluator_kind == "ai")
+    ).scalars().first()
+
+
+def upsert_ai_evaluation(
+    session: Session, idea_id: uuid.UUID, *, ai_job_id: uuid.UUID, model: str | None, overall_comment: str | None,
+) -> tuple[Evaluation, bool]:
+    """AI 評価を登録/更新（1アイデア最新 AI 評価1件・`evaluator_id=NULL`・生成完了＝即 submitted・party）。
+
+    返り値＝(evaluation, created)。観点スコアは application が `replace_scores` で置換（FR-50・F.7.2）。
+    """
+    existing = get_ai_evaluation(session, idea_id)
+    if existing is not None:
+        existing.ai_job_id = ai_job_id
+        existing.model = model
+        existing.overall_comment = overall_comment
+        existing.status = "submitted"
+        return existing, False
+    ev = Evaluation(
+        id=uuid.uuid4(), idea_id=idea_id, evaluator_id=None, evaluator_kind="ai",
+        ai_job_id=ai_job_id, model=model, overall_comment=overall_comment,
+        status="submitted", visibility="party",
+    )
+    session.add(ev)
+    session.flush()
+    return ev, True
+
+
 def list_scores(session: Session, evaluation_id: uuid.UUID) -> list[EvaluationScore]:
     return list(
         session.execute(

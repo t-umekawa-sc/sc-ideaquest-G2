@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     llm_worker_poll_interval_seconds: float = 2.0    # ワーカのポーリング間隔
     llm_job_max_attempts: int = 3                    # 失敗リトライ上限（超で failed）
     llm_job_running_reclaim_seconds: int = 300       # running 無更新の孤児回収閾値（設計 §5.4）
+    # アイデア/コンセプトの AI 自動評価（FR-50・F.7.1）。公開時の自動 enqueue をデプロイ単位で opt-in
+    # （LLM ワーカー `--profile ai` と同思想・既定 OFF＝LLM 基盤を伴わない dev/test では自動起動しない）。
+    # 再生成 EP（評価者権限）は本フラグに依らず常時可（明示操作）。
+    llm_auto_evaluate_on_publish: bool = False
 
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""

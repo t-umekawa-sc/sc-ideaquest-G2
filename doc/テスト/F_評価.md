@@ -38,6 +38,9 @@
 | F-TC-111 | api | limited は範囲外に完全非表示（分母にも入れない） | limited 評価（他評価者）＋party 評価 | 範囲外ユーザーで `GET .../evaluation` | limited を除外して集計・`evaluators[]` にも出ない | F.1 |
 | F-TC-112 | api | コイン見込みは visibility 無視で全 submitted 算定 | party1＋limited1（範囲外閲覧） | `GET .../evaluation` | 集計平均は party のみ・`coin.projected` は両方（全 submitted）で算定 | F.1／F.4 |
 | F-TC-213 | api | **private（非公開）は owner/quest_admin にも非表示**（limited より1段狭い）・コインは全 submitted 算入 | party1＋private1（他評価者）を quest_admin が閲覧 | `GET .../evaluation` | private を集計/`evaluators[]` から除外（manager でも見えない）・`coin.projected` は両方で算定 | F.1（visibility private・2026-10-08）／FR-50 |
+| F-TC-215 | int | **idea_evaluate ワーカー成功で AI 評価が入る**（enqueue→worker→gateway(JSON)→evaluations 保存） | published アイデア＋fake chat が構造化JSON を返す | `enqueue_ai_job(idea_evaluate)`→`process_ai_jobs_once` | job=succeeded・`evaluations` に `kind='ai'`/`evaluator_id=NULL`/`submitted`/`party`/`ai_job_id`/`model`＋5観点スコア＋版1（editor_id=NULL＝自動） | F.7.2／FR-50 |
+| F-TC-216 | int | **出力不正は job=failed・AI 評価は作らない**（人間評価のみで進行＝graceful） | fake chat が非JSON を返す | 同上 | job=failed（`error.code='invalid_output'`）・AI 評価0件 | F.7.2／§6-5 |
+| F-TC-217 | int | **公開で idea_evaluate を自動投入**（F.7.1・graceful） | published アイデア | `_enqueue_idea_ai_evaluation(db, idea_id, user_id)` | `ai_jobs` に `task_type='idea_evaluate'`・`ref_idea_id`・`input.idea_id` の queued ジョブ1件 | F.7.1／FR-50 |
 
 ## 3. 選定・投稿者コイン確定 API（F.3/F.4）
 

@@ -350,8 +350,21 @@ def enqueue_ai_job(
     return job_id
 
 
-def _build_messages(job: AiJob) -> list[dict]:
-    """task_type ごとにプロンプトを組む。文脈は enqueue 側ドメインが input に用意済み（本層は汎用のまま）。"""
+def _build_messages(job: AiJob, ts=None) -> list[dict]:
+    """task_type ごとにプロンプトを組む。文脈は enqueue 側ドメインが input に用意済み（本層は汎用のまま）。
+
+    例外＝idea_evaluate/concept_evaluate は参照ID入力なので、実行中セッション `ts` から評価ドメインが文脈を収集する
+    （機微本文の滞留を最小化・F.7.2）＝本層は評価ドメインへ遅延 import で委譲するだけ。
+    """
+    if job.task_type == "idea_evaluate":
+        from app.tenant.evaluations import ai_eval
+        idea_id = (job.input or {}).get("idea_id")
+        if not idea_id:
+            raise _PermanentError("input.idea_id is required for idea_evaluate")
+        try:
+            return ai_eval.build_messages(ts, uuid.UUID(str(idea_id)))
+        except ai_eval.AiEvalError as exc:
+            raise _PermanentError(str(exc)) from exc
     if job.task_type == "info_summarize":
         text = (job.input or {}).get("text", "")
         if not text:
@@ -459,7 +472,7 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
         task_type, requested_model = job.task_type, job.requested_model
         requester = job.requested_by_id
         try:
-            messages = _build_messages(job)
+            messages = _build_messages(job, session)
         except _PermanentError as exc:
             job.status = "failed"
             job.error = {"code": "invalid_input", "detail": str(exc)}
@@ -515,6 +528,28 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
         job = repo.get(session, job_id)
         if job is None:
             return "skip"
+        # idea_evaluate＝生成結果(JSON)を evaluations に AI 評価として保存（検証失敗＝ジョブ failed＝人間評価のみで進行）。
+        if task_type == "idea_evaluate":
+            from app.tenant.evaluations import ai_eval
+            inp = job.input or {}
+            reg_by = inp.get("regenerated_by")
+            try:
+                ai_eval.apply_result(
+                    session,
+                    idea_id=uuid.UUID(str(inp.get("idea_id"))),
+                    ai_job_id=job.id,
+                    model=result.model,
+                    editor_id=uuid.UUID(str(reg_by)) if reg_by else None,
+                    text=result.text,
+                )
+            except ai_eval.AiEvalError as exc:
+                job.status = "failed"
+                job.error = {"code": "invalid_output", "detail": str(exc)}
+                job.finished_at = now
+                _notify_completion(session, job, ok=False)
+                session.commit()
+                _publish_job(requester, company_id, "ai_job.changed", {"job_id": str(job_id), "status": "failed"})
+                return "failed"
         job.status = "succeeded"
         job.result = {"text": result.text}
         job.provider = result.provider
