@@ -399,6 +399,9 @@ export function DashboardView({
     ...joinedQuests.map((q) => ({ kind: "quest" as const, q })),
     ...joinedContests.map((c) => ({ kind: "contest" as const, c })),
   ];
+  // Zone E「所有」タブ＝自分が作成したクエスト（is_owner・非下書き）。参加中（他者作成）とタブで分離（ユーザー要望 2026-10-08）。
+  // 旧設計（§6）で SC-10 一覧へ移設していた「自分のクエスト」を、ダッシュボードでも所有タブとして再掲（再設計§3 改訂）。
+  const ownedAll = quests.filter((q) => q.is_owner).map((q) => ({ kind: "quest" as const, q }));
   const followingAll = [
     ...followed.map((f) => ({ kind: "idea" as const, f })),
     ...followedQuests.map((q) => ({ kind: "quest" as const, q })),
@@ -410,9 +413,12 @@ export function DashboardView({
     ...joinRequests.map((q) => ({ kind: "quest" as const, q })),
     ...requestedContests.map((c) => ({ kind: "contest" as const, c })),
   ];
-  const [eSeeAll, setESeeAll] = useState<null | "joined" | "following" | "requested">(null);
+  const [eSeeAll, setESeeAll] = useState<null | "joined" | "owned" | "following" | "requested">(null);
   const [eSeeAllN, setESeeAllN] = useState(15);
-  const E_TITLE = { joined: "参加中", following: "フォロー中", requested: "参加リクエスト中" };
+  const E_TITLE = { joined: "参加中", owned: "所有", following: "フォロー中", requested: "参加リクエスト中" };
+  // Zone E「参加中／所有」はタブ集約（ユーザー要望・既定＝参加中）。所有＝自作クエスト。
+  const [eJoinedTab, setEJoinedTab] = useState<"joined" | "owned">("joined");
+  const eJoinedCounts = { joined: joinedAll.length, owned: ownedAll.length };
   // Zone E「フォロー中／参加リクエスト中」はタブ集約（ユーザー要望・参加リクエストは通常0件のため既定＝フォロー中）。
   const [eMyTab, setEMyTab] = useState<"following" | "requested">("following");
   // Zone C 議論＝新着/最近を下線タブで1枚に集約（ユーザー要望・モック Zone C）。既定＝新着。
@@ -565,14 +571,33 @@ export function DashboardView({
 
       {/* E マイ＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト・A案）。よく行く先（再設計 §3 Zone E・表示順2）。
           全件は「すべて見る」→標準ダイアログ（混在型のため一覧ページに寄せきれない・§3）。ゾーン全体が空なら非表示。 */}
-      {(joinedAll.length + followingAll.length + requestedAll.length > 0) && (
+      {(joinedAll.length + ownedAll.length + followingAll.length + requestedAll.length > 0) && (
         <motion.section aria-label="マイ" {...flowMotion(1)}>
           <div className="dash-2col">
-            <section className="card dash-zone-card" aria-label="参加中">
-              <div className="section-head"><h2>👣 参加中</h2>{joinedAll.length > E_PANEL && <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll("joined"); }}>すべて見る（全{joinedAll.length}件）→</button>}</div>
-              {joinedAll.length > 0
-                ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
-                : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
+            {/* 参加中／所有＝タブ集約（ユーザー要望・既定＝参加中）。所有＝自作クエスト（is_owner）。 */}
+            <section className="card dash-zone-card" aria-label="参加中・所有">
+              <div className="dash-tabs" role="tablist" aria-label="参加中・所有の種別">
+                {(["joined", "owned"] as const).map((k) => (
+                  <button key={k} type="button" className={`dash-tab${eJoinedTab === k ? " is-active" : ""}`} role="tab" aria-selected={eJoinedTab === k} onClick={() => setEJoinedTab(k)}>
+                    {k === "joined" ? "👣 参加中" : "📜 所有"} <span className="seg-n">{eJoinedCounts[k]}</span>
+                  </button>
+                ))}
+                {eJoinedCounts[eJoinedTab] > E_PANEL && (
+                  <button type="button" className="dash-see-all" onClick={() => { setESeeAllN(15); setESeeAll(eJoinedTab); }}>すべて見る（全{eJoinedCounts[eJoinedTab]}件）→</button>
+                )}
+              </div>
+              <div className="dash-tabstack">
+                <div className="dash-tabpane" aria-hidden={eJoinedTab !== "joined"}>
+                  {joinedAll.length > 0
+                    ? joinedAll.slice(0, E_PANEL).map(renderJoinedRow)
+                    : <p className="dash-panel-empty">参加中のクエスト・コンテストはありません。</p>}
+                </div>
+                <div className="dash-tabpane" aria-hidden={eJoinedTab !== "owned"}>
+                  {ownedAll.length > 0
+                    ? ownedAll.slice(0, E_PANEL).map(renderJoinedRow)
+                    : <p className="dash-panel-empty">自分が作成したクエストはありません。</p>}
+                </div>
+              </div>
             </section>
             {/* フォロー中／参加リクエスト中＝タブ集約（ユーザー要望・Zone B と同じ下線タブ）。既定＝フォロー中（リクエストは通常0件）。 */}
             <section className="card dash-zone-card" aria-label="フォロー中・参加リクエスト中">
@@ -909,15 +934,16 @@ export function DashboardView({
       {/* E マイ「すべて見る」＝参加中（クエスト＋コンテスト）／フォロー中（アイデア＋クエスト）の全件ダイアログ（標準 Modal・混在型・§3）。 */}
       {eSeeAll && (
         <Modal open={!!eSeeAll} onClose={() => setESeeAll(null)} onClosed={() => setESeeAllN(15)}
-          title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length)}件）`} size="lg">
+          title={`${E_TITLE[eSeeAll]}（全${(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "owned" ? ownedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length)}件）`} size="lg">
           <ModalBody>
             {/* Modal は portal で body 直下＝.dash-page スコープが効かないため行スタイルを復活させるラップ（DFT）。 */}
             <div className="dash-page">
               {eSeeAll === "joined" && joinedAll.slice(0, eSeeAllN).map(renderJoinedRow)}
+              {eSeeAll === "owned" && ownedAll.slice(0, eSeeAllN).map(renderJoinedRow)}
               {eSeeAll === "following" && followingAll.slice(0, eSeeAllN).map(renderFollowingRow)}
               {eSeeAll === "requested" && requestedAll.slice(0, eSeeAllN).map(renderRequestRow)}
             </div>
-            {(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length) > eSeeAllN && (
+            {(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "owned" ? ownedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length) > eSeeAllN && (
               <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
                 <button type="button" className="btn btn-outline" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る</button>
               </div>
