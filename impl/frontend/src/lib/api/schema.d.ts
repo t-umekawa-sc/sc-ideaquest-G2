@@ -9676,6 +9676,8 @@ export interface components {
          */
         QuestMemberDTO: {
             user: components["schemas"]["QuestOwnerDTO"];
+            /** Login Id */
+            login_id?: string | null;
             /**
              * Permissions
              * @default []

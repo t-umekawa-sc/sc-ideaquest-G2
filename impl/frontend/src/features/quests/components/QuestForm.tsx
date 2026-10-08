@@ -94,7 +94,7 @@ function questContentSig(o: {
 // inScope=false＝参加グループ外＝失効中（このクエストを参照できない・FR-38・C.0）。UI で明示表示する。
 // deptIds＝当該メンバーが有効所属する全クエストグループ（会社内全件・C.1 group_ids）＝チップ常時表示と
 // 参加グループ変更時のクライアント側 inScope 再判定に使う（req2/3）。
-type Member = { userId: string; name: string; ini: string; perms: Record<PermKey, boolean>; inScope: boolean; deptIds: string[] };
+type Member = { userId: string; name: string; loginId?: string; ini: string; perms: Record<PermKey, boolean>; inScope: boolean; deptIds: string[] };
 
 // 参加グループ集合に対する当該メンバーの参照可否（作成者除く一般メンバー）。
 // 参加グループ 0 件＝全社（全員可）／1 件以上＝自分の所属グループがいずれか一致すれば可（C.0 と同一定義）。
@@ -320,6 +320,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             .map((m) => ({
               userId: m.user.user_id,
               name: m.user.display_name,
+              loginId: m.login_id ?? undefined,
               ini: m.user.display_name.trim().charAt(0) || "?",
               perms: permsFromApi(m.permissions ?? []),
               inScope: m.in_scope ?? true,
@@ -415,7 +416,11 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   );
   // 選択中パーティの絞込（名前／参加部署外＝失効中のみ）＋ページング。
   const filteredMembers = useMemo(
-    () => members.filter((m) => (!selQuery.trim() || m.name.includes(selQuery.trim())) && (!selOutOnly || !m.inScope)),
+    () => members.filter((m) => {
+      const qq = selQuery.trim().toLowerCase();
+      const hit = !qq || m.name.toLowerCase().includes(qq) || (m.loginId ?? "").toLowerCase().includes(qq);  // 名前＋ログインID
+      return hit && (!selOutOnly || !m.inScope);
+    }),
     [members, selQuery, selOutOnly],
   );
   useEffect(() => { setSelShown(SEL_PAGE); }, [selQuery, selOutOnly]);
@@ -484,7 +489,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   function addMember(c: QuestCandidate) {
     // 候補から追加＝所属グループ（全件）を保持し、現在の参加グループで in_scope を判定（req2/3）。
     const cd = c.group_ids ?? [];
-    setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }]);
+    setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, loginId: c.login_id ?? undefined, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }]);
   }
   function addAllCandidates() {
     // 表示中（取得済み・未追加）の候補を一括追加。件数が多い時は確認（サーバーページングのため「表示中」が対象）。
@@ -494,7 +499,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       const have = new Set(m.map((x) => x.userId));
       const add = displayedCandidates
         .filter((c) => !have.has(c.user_id))
-        .map((c) => { const cd = c.group_ids ?? []; return { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }; });
+        .map((c) => { const cd = c.group_ids ?? []; return { userId: c.user_id, name: c.display_name, loginId: c.login_id ?? undefined, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }; });
       return [...m, ...add];
     });
   }
@@ -890,7 +895,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             )}
             {!frozen && members.length > 0 && (
               <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <input className="input" placeholder="選択中を絞り込み（名前）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前で絞り込み" />
+                <input className="input" placeholder="選択中を絞り込み（名前・ログインID）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前・ログインIDで絞り込み" />
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", flexWrap: "wrap" }}>
                   <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-danger" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>グループ外・失効中のみ</button>
                   <button type="button" className="btn btn-sm btn-danger" disabled={filteredMembers.length === 0} onClick={bulkRemoveMembers}>
@@ -925,6 +930,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   <div className="pmember__main">
                     <div className="pmember__top">
                       <span className="pmember__name">{m.name}</span>
+                      {m.loginId && <span className="pmember__login">{m.loginId}</span>}
                       {!m.inScope && <span className="badge badge-danger" title="どの参加グループにも所属していないため、このクエストを参照できません（異動などで失効）">グループ外・失効中</span>}
                     </div>
                     {/* 所属グループは氏名の一行下に表示（先頭N件＋「+M」・ホバーで全件）。 */}

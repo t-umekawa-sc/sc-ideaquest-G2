@@ -1718,6 +1718,8 @@ def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=fro
             "display_name": user.display_name if user else "",
             "avatar_image_url": _image_url(user.avatar_image_path) if user else None,
         },
+        # ログインID（同名メンバーの判別・選択中パーティの絞り込み対象・accounts ミラー）。未同期は null。
+        "login_id": user.login_id if user else None,
         "permissions": repo.get_permissions(ts, member.id),
         "joined_at": member.joined_at,
         "is_creator": is_creator,

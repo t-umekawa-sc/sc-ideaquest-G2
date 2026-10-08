@@ -301,6 +301,8 @@ class QuestMemberDTO(BaseModel):
     """パーティーメンバー1件の応答（C.1 GET .../members と同形・SC-11/SC-12 で再利用）。"""
 
     user: QuestOwnerDTO
+    # ログインID（同名メンバーの判別・選択中パーティの絞り込み対象・accounts のミラー）。未同期は null。
+    login_id: str | None = None
     permissions: list[str] = []
     joined_at: datetime
     is_creator: bool

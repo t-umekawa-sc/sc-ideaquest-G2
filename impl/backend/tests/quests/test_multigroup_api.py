@@ -380,3 +380,22 @@ def test_c_tc_321_candidate_filter_by_login_id(client, env):
     data = {c["user_id"]: c for c in r.json()["data"]}
     assert str(uid) in data, "login_id 部分一致で候補に出ない（名前だけでなく login_id も絞り込み対象のはず）"
     assert data[str(uid)]["login_id"] == login  # DTO に login_id が載る（同名の判別用）
+
+
+def test_c_tc_322_member_dto_includes_login_id(client, env):
+    """C-TC-322: パーティメンバー DTO に login_id（選択中パーティの絞り込み・同名判別用）。"""
+    uid = uuid.uuid4()
+    login = f"zzmem-{uuid.uuid4().hex[:8]}@acme.example"
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(User(id=uid, account_id=uuid.uuid4(), display_name="メンバー同名",
+                    login_id=login, locale="ja", status="active"))
+        ts.flush()
+        qg_repo.upsert_membership(ts, env.group_a, uid)
+        ts.commit()
+    env.extra_users.append(uid)
+    qid = env.seed_quest(groups=[env.group_a], owner=env.user_id, members=[uid])
+    _login_seed(client)
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 200, r.text
+    m = next(m for m in r.json()["members"] if m["user"]["user_id"] == str(uid))
+    assert m["login_id"] == login  # メンバー DTO に login_id が載る（右側絞り込みの材料）

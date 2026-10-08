@@ -41,6 +41,8 @@
 .pmember__main { flex: 1; min-width: 0; }
 .pmember__top { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .pmember__name { font-weight: 600; }
+/* ログインID（同名メンバーの判別・選択中パーティの絞り込み対象）＝氏名の隣に薄く。 */
+.pmember__login { font-size: var(--text-xs); font-weight: 400; color: var(--color-text-muted); }
 .pmember__perms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
 /* 所属グループ（氏名の一行下・先頭N件＋「+M」）。 */
 .pmember__depts { margin-top: 3px; }
