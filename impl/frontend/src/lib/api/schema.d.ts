@@ -9205,6 +9205,8 @@ export interface components {
             user_id: string;
             /** Display Name */
             display_name: string;
+            /** Login Id */
+            login_id?: string | null;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
             /**

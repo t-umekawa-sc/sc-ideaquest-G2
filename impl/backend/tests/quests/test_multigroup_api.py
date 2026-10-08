@@ -358,3 +358,25 @@ def test_c_tc_235_member_group_ids_full_memberships(client, env):
     assert groups[str(env.b_user)] == {str(env.group_b)}                        # B のみ
     # owner（seed user）は seed 由来の既存所属も持ちうる＝A を含む（superset）で検証。
     assert str(env.group_a) in groups[str(env.user_id)]
+
+
+def test_c_tc_321_candidate_filter_by_login_id(client, env):
+    """C-TC-321: パーティ候補の q 絞り込みが display_name だけでなく login_id にも一致（同名判別）＋DTO に login_id。"""
+    uid = uuid.uuid4()
+    uniq = uuid.uuid4().hex[:8]
+    login = f"zzlogin-{uniq}@acme.example"
+    assert uniq not in "同名ユーザー"  # クエリ文字列は display_name に含まれない＝login_id マッチの確証
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(User(id=uid, account_id=uuid.uuid4(), display_name="同名ユーザー",
+                    login_id=login, locale="ja", status="active"))
+        ts.flush()
+        qg_repo.upsert_membership(ts, env.group_a, uid)
+        ts.commit()
+    env.extra_users.append(uid)  # fixture teardown で物理削除
+
+    _login_seed(client)
+    r = client.get(CANDIDATES, params={"group_ids": [str(env.group_a)], "q": uniq})
+    assert r.status_code == 200, r.text
+    data = {c["user_id"]: c for c in r.json()["data"]}
+    assert str(uid) in data, "login_id 部分一致で候補に出ない（名前だけでなく login_id も絞り込み対象のはず）"
+    assert data[str(uid)]["login_id"] == login  # DTO に login_id が載る（同名の判別用）

@@ -688,7 +688,7 @@ def list_group_member_candidates(
     if exclude_user_ids:
         stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
     if q:
-        stmt = stmt.where(User.display_name.ilike(f"%{q}%"))
+        stmt = stmt.where(or_(User.display_name.ilike(f"%{q}%"), User.login_id.ilike(f"%{q}%")))  # 名前＋ログインIDで絞り込み
     if cursor is not None:
         stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
@@ -726,7 +726,7 @@ def list_cross_group_candidates(
     if exclude_user_ids:
         stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
     if q:
-        stmt = stmt.where(User.display_name.ilike(f"%{q}%"))
+        stmt = stmt.where(or_(User.display_name.ilike(f"%{q}%"), User.login_id.ilike(f"%{q}%")))  # 名前＋ログインIDで絞り込み
     if cursor is not None:
         stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)

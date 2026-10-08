@@ -355,6 +355,8 @@ class QuestCandidateDTO(BaseModel):
 
     user_id: str
     display_name: str
+    # ログインID（同名ユーザーの判別・絞り込み対象・accounts のミラー）。未同期は null。
+    login_id: str | None = None
     avatar_image_url: str | None = None
     # 横断候補（FR-38）で、本人が有効所属する全クエストグループ id（会社内・照会条件に限らず全件・所属バッジ常時表示用）。
     # 全社（照会0件）や単一グループ照会でも所属を示せるよう「照会との積集合」ではなく全件に統一（req2/5）。

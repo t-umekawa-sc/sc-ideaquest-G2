@@ -838,10 +838,10 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 )}
                 <input
                   className="input"
-                  placeholder="名前で絞り込み…"
+                  placeholder="名前・ログインIDで絞り込み…"
                   value={candQuery}
                   onChange={(e) => setCandQuery(e.target.value)}
-                  aria-label="候補を名前で絞り込み"
+                  aria-label="候補を名前・ログインIDで絞り込み"
                 />
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
                   <button type="button" className="btn btn-sm btn-outline" disabled={displayedCandidates.length === 0} onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
@@ -852,7 +852,11 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                     return (
                       <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
                         <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
-                        <span className="cand__name">{c.display_name}</span>
+                        {/* 名前＋ログインID（同名ユーザーの判別・絞り込み対象）。login_id 未同期は名前のみ。 */}
+                        <span className="cand__names">
+                          <span className="cand__name">{c.display_name}</span>
+                          {c.login_id && <span className="cand__login">{c.login_id}</span>}
+                        </span>
                         {/* 所属グループを常に表示（req2）。先頭N件＋「+M」・ホバーで全件（GroupBadges）。 */}
                         <GroupBadges ids={c.group_ids ?? []} names={groupNameById} />
                         <span className="cand__plus" aria-hidden>＋</span>

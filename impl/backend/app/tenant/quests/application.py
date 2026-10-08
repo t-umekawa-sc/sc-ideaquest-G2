@@ -759,6 +759,7 @@ def get_group_member_candidates(
             {
                 "user_id": str(u.id),
                 "display_name": u.display_name,
+                "login_id": u.login_id,
                 "avatar_image_url": _image_url(u.avatar_image_path),
             }
             for u in rows
@@ -799,6 +800,7 @@ def get_quest_group_candidates(
             {
                 "user_id": str(u.id),
                 "display_name": u.display_name,
+                "login_id": u.login_id,
                 "avatar_image_url": _image_url(u.avatar_image_path),
                 "group_ids": [str(g) for g in membership.get(u.id, [])],
             }
