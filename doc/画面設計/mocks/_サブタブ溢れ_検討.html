@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット サブタブ溢れ時UI 検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討＝サブタブ（グループ）が横幅に収まらない時のUIを3案比較。
+     A=2行折り返し／B=左右スクロール矢印／C=一覧ダイアログ（＋オーバーフロー）。
+     トップタブ（情報インプット／全文検索・下線無し・バンド地続き）は _サブタブ_検討.html に準拠。
+     正＝doc/設計ドラフト/情報インプット動的タブ_設計.md §4。静的（切替/DataTable未結線）。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-8); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .opt { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); overflow: hidden; }
+  .opt__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  .opt__head h2 { font-size: var(--text-lg); margin: 0; }
+  .opt__badge { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-full); padding: 2px 10px; }
+  .opt__body { padding: var(--space-5); }
+  .opt__note { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+  .pros { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-5); margin-top: var(--space-2); font-size: var(--text-sm); }
+
+  /* トップタブ（_サブタブ_検討 と同じ＝下線無し・アクティブはバンドと地続き） */
+  .tabs { display: flex; gap: var(--space-1); margin: 0; flex-wrap: wrap; position: relative; z-index: 1; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tab.is-active { color: var(--color-primary-active, var(--color-primary)); font-weight: 700; background: var(--color-primary-soft); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+
+  /* サブメニュー帯 */
+  .subnav { background: var(--color-primary-soft); border: 1px solid var(--color-primary-border, var(--color-border)); border-top: none; border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 0 var(--space-2); display: flex; gap: var(--space-1); align-items: stretch; position: relative; z-index: 0; }
+  .subnav--wrap { flex-wrap: wrap; }
+  .subtab { appearance: none; background: none; border: none; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .subtab.is-active { color: var(--color-primary-active, var(--color-primary)); border-bottom-color: var(--color-primary); }
+  .subtab .n { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .subtab--add { color: var(--color-text-subtle); }
+
+  /* B：左右スクロール矢印 */
+  .subnav--scroll { flex-wrap: nowrap; padding: 0; }
+  .navarrow { flex: 0 0 auto; appearance: none; border: none; background: var(--color-surface); color: var(--color-text); font-size: 16px; width: 34px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-right: 1px solid var(--color-border); }
+  .navarrow:last-child { border-right: none; border-left: 1px solid var(--color-border); }
+  .navarrow:disabled { color: var(--color-text-subtle); cursor: default; }
+  .scroller { flex: 1 1 auto; overflow: hidden; display: flex; gap: var(--space-1); padding: 0 var(--space-2); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
+
+  /* C：オーバーフロー（⋯ すべて）＋ ダイアログ */
+  .subnav--overflow { flex-wrap: nowrap; overflow: hidden; }
+  .subnav--overflow .scroller { overflow: hidden; -webkit-mask-image: none; mask-image: none; }
+  .moretab { flex: 0 0 auto; appearance: none; border: none; background: var(--color-surface); color: var(--color-primary); font: inherit; font-size: var(--text-sm); font-weight: 700; padding: var(--space-3) var(--space-3); cursor: pointer; border-left: 1px solid var(--color-border); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .tabdialog { margin-top: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); box-shadow: var(--shadow-lg); max-width: 420px; }
+  .tabdialog__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-3) 0; }
+  .tabdialog__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: var(--space-3); }
+  .tabdialog__item { display: flex; align-items: center; gap: 6px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--text-sm); }
+  .tabdialog__item:hover { background: var(--color-surface-alt); }
+  .tabdialog__item.is-active { background: var(--color-primary-soft); color: var(--color-primary-active); font-weight: 700; }
+  .tabdialog__item .n { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  .cap { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-3); }
+  .frame { border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+  .frame::after { content: "← 画面幅（例: 920px）で溢れる状態を再現"; display: block; margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-text-subtle); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions"><span class="badge badge-muted">🧭 情報判定権限</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>サブタブ（グループ）が横幅に収まらない時のUI — 3案</h1>
+  <p class="intro">グループが増えてサブメニュー帯の幅に収まらなくなった場合の見せ方。タブは例として12個（全般／カメリオ連携／情報共有／競合動向／法規制・ガイドライン／技術トレンド／顧客の声／社内ナレッジ／展示会・セミナー／IR・投資家／人事・組織／その他）。※静的モック。</p>
+
+  <!-- ===== 案A：2行折り返し ===== -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案A</span><h2>2行に折り返す（wrap）</h2></div>
+    <div class="opt__body">
+      <div class="frame">
+        <div class="tabs"><button class="tab is-active">🧭 情報インプット<span class="tab-count">496</span></button><button class="tab">🔍 全文検索</button></div>
+        <div class="subnav subnav--wrap">
+          <button class="subtab is-active">📁 全般 <span class="n">128</span></button>
+          <button class="subtab">🔗 カメリオ連携 <span class="n">342</span></button>
+          <button class="subtab">📣 情報共有 <span class="n">26</span></button>
+          <button class="subtab">競合動向 <span class="n">54</span></button>
+          <button class="subtab">法規制・ガイドライン <span class="n">37</span></button>
+          <button class="subtab">技術トレンド <span class="n">61</span></button>
+          <button class="subtab">顧客の声 <span class="n">19</span></button>
+          <button class="subtab">社内ナレッジ <span class="n">88</span></button>
+          <button class="subtab">展示会・セミナー <span class="n">12</span></button>
+          <button class="subtab">IR・投資家 <span class="n">8</span></button>
+          <button class="subtab">人事・組織 <span class="n">15</span></button>
+          <button class="subtab">その他 <span class="n">5</span></button>
+          <button class="subtab subtab--add">＋ タブ</button>
+        </div>
+      </div>
+      <p class="opt__note"><b>考え方</b>＝収まらない分は下段へ折り返す。全グループが常に見える。</p>
+      <div class="pros"><div>✅ 全タブ一望・実装が簡単</div><div>✅ 探さず直接押せる</div><div>⚠️ 行数が増え縦を圧迫（10個超で3行も）</div><div>⚠️ 行数でレイアウトが動く</div></div>
+    </div>
+  </section>
+
+  <!-- ===== 案B：左右スクロール矢印 ===== -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案B</span><h2>左右スクロール（‹ › 矢印）</h2></div>
+    <div class="opt__body">
+      <div class="frame">
+        <div class="tabs"><button class="tab is-active">🧭 情報インプット<span class="tab-count">496</span></button><button class="tab">🔍 全文検索</button></div>
+        <div class="subnav subnav--scroll">
+          <button class="navarrow" disabled aria-label="前へ">‹</button>
+          <div class="scroller">
+            <button class="subtab is-active">📁 全般 <span class="n">128</span></button>
+            <button class="subtab">🔗 カメリオ連携 <span class="n">342</span></button>
+            <button class="subtab">📣 情報共有 <span class="n">26</span></button>
+            <button class="subtab">競合動向 <span class="n">54</span></button>
+            <button class="subtab">法規制・ガイドライン <span class="n">37</span></button>
+            <button class="subtab">技術トレンド <span class="n">61</span></button>
+            <button class="subtab">顧客の声 <span class="n">19</span></button>
+            <button class="subtab">社内ナレッジ <span class="n">88</span></button>
+          </div>
+          <button class="navarrow" aria-label="次へ">›</button>
+        </div>
+      </div>
+      <p class="opt__note"><b>考え方</b>＝1行固定で、はみ出しは ‹ › で横スクロール（端はフェード）。縦を使わない。</p>
+      <div class="pros"><div>✅ 常に1行・縦を使わない</div><div>✅ レイアウトが安定</div><div>⚠️ 隠れたタブは見えない（存在に気づきにくい）</div><div>⚠️ 目的のタブまで数回スクロール</div></div>
+    </div>
+  </section>
+
+  <!-- ===== 案C：一覧ダイアログ（⋯ すべて） ===== -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案C</span><h2>入りきらない分は「⋯ すべて」で一覧ダイアログ</h2></div>
+    <div class="opt__body">
+      <div class="frame">
+        <div class="tabs"><button class="tab is-active">🧭 情報インプット<span class="tab-count">496</span></button><button class="tab">🔍 全文検索</button></div>
+        <div class="subnav subnav--overflow">
+          <div class="scroller">
+            <button class="subtab is-active">📁 全般 <span class="n">128</span></button>
+            <button class="subtab">🔗 カメリオ連携 <span class="n">342</span></button>
+            <button class="subtab">📣 情報共有 <span class="n">26</span></button>
+            <button class="subtab">競合動向 <span class="n">54</span></button>
+            <button class="subtab">法規制… <span class="n">37</span></button>
+          </div>
+          <button class="moretab" aria-haspopup="dialog">⋯ すべて (12) ▾</button>
+        </div>
+        <!-- 開いた状態のダイアログ（ポップオーバー） -->
+        <div class="tabdialog" role="dialog" aria-label="タブを選択">
+          <div class="tabdialog__head"><input class="input" type="search" placeholder="タブを検索…" style="flex:1"></div>
+          <div class="tabdialog__grid">
+            <div class="tabdialog__item is-active">📁 全般 <span class="n">128</span></div>
+            <div class="tabdialog__item">🔗 カメリオ連携 <span class="n">342</span></div>
+            <div class="tabdialog__item">📣 情報共有 <span class="n">26</span></div>
+            <div class="tabdialog__item">競合動向 <span class="n">54</span></div>
+            <div class="tabdialog__item">法規制・ガイドライン <span class="n">37</span></div>
+            <div class="tabdialog__item">技術トレンド <span class="n">61</span></div>
+            <div class="tabdialog__item">顧客の声 <span class="n">19</span></div>
+            <div class="tabdialog__item">社内ナレッジ <span class="n">88</span></div>
+            <div class="tabdialog__item">展示会・セミナー <span class="n">12</span></div>
+            <div class="tabdialog__item">IR・投資家 <span class="n">8</span></div>
+            <div class="tabdialog__item">人事・組織 <span class="n">15</span></div>
+            <div class="tabdialog__item">その他 <span class="n">5</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="opt__note"><b>考え方</b>＝よく使う分だけ帯に出し、入りきらない分は「⋯ すべて (N)」ボタン→<strong>検索付き一覧ダイアログ</strong>から選ぶ。タブが非常に多い会社向き。</p>
+      <div class="pros"><div>✅ 1行固定・縦を使わない・全タブに到達可</div><div>✅ 検索でタブを素早く特定（多数に強い）</div><div>⚠️ ダイアログを開く1アクションが要る</div><div>⚠️ 実装がやや重い</div></div>
+    </div>
+  </section>
+
+  <p class="intro">
+    推奨＝<strong>案C（⋯ すべて＋検索ダイアログ）を主軸に、少数時は自然と全部帯に並ぶ</strong>（＝タブが少ない会社は案A/Bと見分けがつかず、増えたら自動で「⋯ すべて」が出る）。
+    縦を絶対に増やしたくない運用なら案B単独、全タブ一望を最優先なら案A。どれで §4 を確定するか、または組み合わせ（例：少数=折り返し／多数=⋯一覧）をご指定ください。
+  </p>
+</main>
+
+</body>
+</html>

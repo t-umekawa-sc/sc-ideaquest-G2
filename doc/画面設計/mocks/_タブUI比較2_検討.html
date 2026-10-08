@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット 動的タブ UI比較 v2（トップタブ維持）検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討v2＝ユーザーのモデルに合わせる＝トップの「🧭情報インプット／🔍全文検索」タブは“そのまま維持”し、
+     「情報インプット」タブの“中”にグループ分けを置く。2変種（A=サブタブ／B=左サイドメニュー＋ラジオ）を比較。
+     参照＝ユーザー提示画像（①トップナビ下にタブ ②左サイドメニューのラジオ/チェック）。
+     正＝doc/設計ドラフト/情報インプット動的タブ_設計.md §4。静的（切替/DataTableは未結線）。v1=_タブUI比較_検討.html は残置。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-8); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .opt { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); overflow: hidden; }
+  .opt__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  .opt__head h2 { font-size: var(--text-lg); margin: 0; }
+  .opt__badge { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-full); padding: 2px 10px; }
+  .opt__body { padding: var(--space-5); }
+  .opt__note { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+  .pros { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-5); margin-top: var(--space-3); font-size: var(--text-sm); }
+
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .page-head h3 { font-size: var(--text-xl); margin: 0; }
+
+  /* トップタブ（SC-50 と同じ体裁＝下線型・そのまま維持） */
+  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-2) 0 0; flex-wrap: wrap; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+  .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
+
+  /* パネル枠（タブの“中”であることを示す） */
+  .panel-inset { border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); padding: var(--space-4) var(--space-5); background: var(--color-surface); }
+
+  /* 変種A：サブタブ（2段目）＝トップタブと混同しないよう“ピル/チップ型”に差別化 */
+  .subtabs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: 0 0 var(--space-3); }
+  .subtab { appearance: none; border: 1px solid var(--color-border); background: var(--color-surface-alt); color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); font-weight: 600; border-radius: var(--radius-full); padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .subtab.is-active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+  .subtab .n { font-size: var(--text-xs); opacity: .85; }
+  .subtab--add { color: var(--color-text-subtle); border-style: dashed; }
+  .subtab--connector:not(.is-active) { color: var(--color-accent, #0891b2); border-color: var(--color-accent, #0891b2); }
+
+  /* 変種B：左サイドメニュー（参照画像②＝カテゴリー=ラジオ / トピック=チェック 風） */
+  .side-layout { display: grid; grid-template-columns: 200px 1fr; gap: var(--space-5); align-items: start; }
+  .sidemenu { font-size: var(--text-sm); display: flex; flex-direction: column; gap: var(--space-4); }
+  .sidemenu__group > .sidemenu__title { font-weight: 700; margin: 0 0 var(--space-2); color: var(--color-text); }
+  .sidemenu label { display: flex; align-items: center; gap: 8px; padding: 4px 2px; cursor: pointer; color: var(--color-text); }
+  .sidemenu label .n { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .sidemenu .addlink { color: var(--color-text-subtle); font-weight: 600; background: none; border: none; font: inherit; cursor: pointer; padding: 4px 2px; text-align: left; }
+  .side-divider { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+
+  .list-toolbar { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin: var(--space-2) 0 var(--space-3); }
+  table.demo { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.demo th, table.demo td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+  table.demo th { color: var(--color-text-muted); font-weight: 600; background: var(--color-surface-alt); white-space: nowrap; }
+  table.demo td .muted { color: var(--color-text-subtle); }
+  .seg-note { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-2); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted">🧭 情報判定権限</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知">🔔</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>情報インプット 動的タブ — UI比較 v2（トップタブ“維持”）</h1>
+  <p class="intro">
+    認識合わせ版。<strong>トップの「🧭 情報インプット」「🔍 全文検索」タブはそのまま維持</strong>し、
+    <strong>「情報インプット」タブの“中”にグループ分け</strong>を置く2変種を比較する（＝あなたのイメージ）。
+    参照＝提示画像 ①トップナビの下にタブが並ぶ → <strong>変種A（サブタブ）</strong>／②左サイドメニューのラジオ・チェック → <strong>変種B（左サイドメニュー）</strong>。
+    ※静的モック。v1（<code>_タブUI比較_検討.html</code>）は残置。
+  </p>
+
+  <!-- ============ 変種A：サブタブ（2段目タブ） ============ -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">変種A</span><h2>情報インプットタブ内に「サブタブ」</h2><span class="muted">— 参照①</span></div>
+    <div class="opt__body">
+      <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+      <!-- トップタブ＝維持 -->
+      <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+        <button class="tab is-active" role="tab" aria-selected="true">🧭 情報インプット<span class="tab-count">496</span></button>
+        <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+      </div>
+
+      <div class="panel-inset">
+        <!-- サブタブ＝グループ（ピル型でトップタブと差別化） -->
+        <div class="subtabs" role="tablist" aria-label="グループ">
+          <button class="subtab is-active" role="tab" aria-selected="true">📁 全般 <span class="n">128</span></button>
+          <button class="subtab subtab--connector" role="tab" aria-selected="false">🔗 カメリオ連携 <span class="n">342</span></button>
+          <button class="subtab" role="tab" aria-selected="false">📣 情報共有 <span class="n">26</span></button>
+          <button class="subtab subtab--add" type="button">＋ タブ</button>
+        </div>
+
+        <!-- 表示条件（状態）＝既存の状態セグメント -->
+        <div class="list-toolbar">
+          <div class="segmented" role="radiogroup" aria-label="状態">
+            <label><input type="radio" name="a-st" checked>すべて</label>
+            <label><input type="radio" name="a-st">未判定</label>
+            <label><input type="radio" name="a-st">判定済</label>
+          </div>
+          <span class="muted" style="font-size:var(--text-xs)">＋ 検索／ソート／列（DataTable 標準）</span>
+        </div>
+
+        <table class="demo">
+          <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th><th>ソース</th></tr></thead>
+          <tbody>
+            <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td><td class="muted">公的機関</td></tr>
+            <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td><td class="muted">展示会</td></tr>
+            <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td><td class="muted">取引先</td></tr>
+          </tbody>
+        </table>
+        <p class="seg-note">「🔗 カメリオ連携」サブタブ＝API取得記事（未判定・自動リンクOFF）。サブタブは<strong>ピル型</strong>にしてトップタブ（下線型）と視覚的に段を分ける。</p>
+      </div>
+
+      <p class="opt__note"><b>考え方</b>＝トップタブ維持＋2段目に<strong>グループのサブタブ</strong>。段ごとに<strong>スタイルを変える</strong>（上=下線／下=ピル）ことで「タブ内タブ」の分かりづらさを抑える。</p>
+      <div class="pros">
+        <div>✅ 既存のトップタブを変えない（全文検索も据え置き）</div>
+        <div>✅ グループが常に一覧でき切替が速い</div>
+        <div>✅ 「タブで束ねる」イメージに直結</div>
+        <div>⚠️ グループが非常に多いと2段目が横に溢れる（スクロール）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 変種B：左サイドメニュー（ラジオ/チェック） ============ -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">変種B</span><h2>情報インプットタブ内に「左サイドメニュー」</h2><span class="muted">— 参照②</span></div>
+    <div class="opt__body">
+      <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+      <!-- トップタブ＝維持 -->
+      <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+        <button class="tab is-active" role="tab" aria-selected="true">🧭 情報インプット<span class="tab-count">496</span></button>
+        <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+      </div>
+
+      <div class="panel-inset">
+        <div class="side-layout">
+          <!-- 左サイドメニュー＝グループ(ラジオ)＋表示条件(ラジオ/チェック)＝参照画像②のカテゴリー/トピック風 -->
+          <aside class="sidemenu" aria-label="絞り込み">
+            <div class="sidemenu__group">
+              <p class="sidemenu__title">グループ</p>
+              <label><input type="radio" name="b-grp" checked><span>📁 全般</span><span class="n">128</span></label>
+              <label><input type="radio" name="b-grp"><span>🔗 カメリオ連携</span><span class="n">342</span></label>
+              <label><input type="radio" name="b-grp"><span>📣 情報共有</span><span class="n">26</span></label>
+              <button class="addlink" type="button">＋ タブを追加</button>
+            </div>
+            <div class="sidemenu__group side-divider">
+              <p class="sidemenu__title">状態</p>
+              <label><input type="radio" name="b-st" checked><span>すべて</span></label>
+              <label><input type="radio" name="b-st"><span>未判定</span></label>
+              <label><input type="radio" name="b-st"><span>判定済</span></label>
+            </div>
+            <div class="sidemenu__group side-divider">
+              <p class="sidemenu__title">影響分類</p>
+              <label><input type="checkbox"><span>機会</span></label>
+              <label><input type="checkbox"><span>脅威</span></label>
+            </div>
+          </aside>
+
+          <!-- 右＝DataTable -->
+          <div>
+            <div class="list-toolbar"><span class="muted" style="font-size:var(--text-xs)">＋ 検索／ソート／列（DataTable 標準）</span></div>
+            <table class="demo">
+              <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th></tr></thead>
+              <tbody>
+                <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td></tr>
+                <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td></tr>
+                <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <p class="opt__note"><b>考え方</b>＝トップタブ維持＋<strong>左サイドメニュー</strong>にグループ（ラジオ）と表示条件（状態ラジオ・影響分類チェック）をまとめる＝参照画像②に忠実。グループと条件を<strong>同じ面で一望</strong>できる。</p>
+      <div class="pros">
+        <div>✅ グループ＋表示条件を一面で選べる（参照②に一致）</div>
+        <div>✅ グループが多くても縦に伸びて収まる</div>
+        <div>✅ トップタブは据え置き</div>
+        <div>⚠️ 左サイドは<strong>新パターン</strong>・横幅を使う（モバイルは折り畳み）</div>
+      </div>
+    </div>
+  </section>
+
+  <p class="intro">
+    どちらも<strong>トップタブ（情報インプット／全文検索）は維持</strong>。
+    グループ数が少なく「タブで束ねる」感を出したいなら<strong>変種A（サブタブ）</strong>、
+    グループ＋複数の表示条件（状態・影響分類…）を一面で絞りたいなら<strong>変種B（左サイドメニュー）</strong>。
+    ラジオ単発（サブタブでもサイドでもなく状態セグメントの隣にグループのセグメントを置くだけ）も可＝ご希望なら追記します。
+  </p>
+</main>
+
+</body>
+</html>

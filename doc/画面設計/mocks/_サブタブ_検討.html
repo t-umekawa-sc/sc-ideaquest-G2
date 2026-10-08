@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット サブタブ（サブメニュー型）検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討＝変種A確定ベース。トップタブ（🧭情報インプット／🔍全文検索・下線型・維持）の“中”に
+     グループのサブタブを置く。見た目は「バッジ/ピル」ではなく、ヘッダーメニューの直下に
+     サブメニューが現れる型（サブメニュー帯＋下線アクティブのサブタブ）。
+     正＝doc/設計ドラフト/情報インプット動的タブ_設計.md §4。静的（切替/DataTable未結線）。v1/v2モックは残置。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-6); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .page-head h3 { font-size: var(--text-xl); margin: 0; }
+
+  /* トップタブ＝SC-50 と同じ下線型（維持） */
+  /* トップタブ行には全幅の下線を引かない（＝下のバンドとの間にスキマ/線を作らない）。アクティブ側はバンドと地続き。 */
+  .tabs { display: flex; gap: var(--space-1); margin: var(--space-2) 0 0; flex-wrap: wrap; position: relative; z-index: 1; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  /* アクティブなトップタブは“帯と同じ下地”にして連結（スキマを埋める）。下の帯へ繋がって見せる。 */
+  .tab.is-active { color: var(--color-primary-active, var(--color-primary)); font-weight: 700; background: var(--color-primary-soft); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+  .tab.is-active .tab-count { background: var(--color-surface); color: var(--color-primary-active); }
+
+  /* サブメニュー帯＝アクティブなトップタブの直下に“地続き”で密着（スキマ無し・線無し・浮き影無し）。 */
+  .subnav { background: var(--color-primary-soft); border: 1px solid var(--color-primary-border, var(--color-border)); border-top: none; border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 0 var(--space-2); display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: stretch; margin-top: 0; position: relative; z-index: 0; }
+  .subtab { appearance: none; background: none; border: none; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .subtab:hover { color: var(--color-text); }
+  .subtab.is-active { color: var(--color-primary-active, var(--color-primary)); border-bottom-color: var(--color-primary); }
+  .subtab .n { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .subtab.is-active .n { color: var(--color-primary-active, var(--color-primary)); }
+  .subtab--connector .ic { color: var(--color-accent, #0891b2); }
+  .subtab--add { color: var(--color-text-subtle); font-weight: 600; }
+
+  .list-toolbar { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin: var(--space-4) 0 var(--space-3); }
+  table.demo { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.demo th, table.demo td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+  table.demo th { color: var(--color-text-muted); font-weight: 600; background: var(--color-surface-alt); white-space: nowrap; }
+  table.demo td .muted { color: var(--color-text-subtle); }
+  .seg-note { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-3); }
+  .state-illu { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px dashed var(--color-border); }
+  .state-illu h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted">🧭 情報判定権限</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知">🔔</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>情報インプット グループ＝サブメニュー型サブタブ（検討）</h1>
+  <p class="intro">
+    トップタブ「🧭 情報インプット／🔍 全文検索」は<strong>維持</strong>。<strong>「情報インプット」を選ぶと、その直下にサブメニュー帯が現れ</strong>、
+    グループ（全般／カメリオ連携／情報共有…）を<strong>サブタブ</strong>として選ぶ。バッジ/ピルではなく、
+    <strong>トップタブに連なるサブメニュー</strong>（下線アクティブ）で段を表現。※静的モック。
+  </p>
+
+  <!-- ===== 状態1：情報インプット タブ選択中（サブメニュー帯が出る） ===== -->
+  <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+  <!-- トップタブ（維持） -->
+  <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+    <button class="tab is-active" role="tab" aria-selected="true">🧭 情報インプット<span class="tab-count">496</span></button>
+    <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+  </div>
+
+  <!-- サブメニュー帯（＝アクティブなトップタブの下に現れる） -->
+  <div class="subnav" role="tablist" aria-label="グループ">
+    <button class="subtab is-active" role="tab" aria-selected="true"><span class="ic">📁</span> 全般 <span class="n">128</span></button>
+    <button class="subtab subtab--connector" role="tab" aria-selected="false"><span class="ic">🔗</span> カメリオ連携 <span class="n">342</span></button>
+    <button class="subtab" role="tab" aria-selected="false"><span class="ic">📣</span> 情報共有 <span class="n">26</span></button>
+    <button class="subtab subtab--add" type="button">＋ タブ</button>
+  </div>
+
+  <!-- 表示条件（状態）＋ DataTable -->
+  <div class="list-toolbar">
+    <div class="segmented" role="radiogroup" aria-label="状態">
+      <label><input type="radio" name="st" checked>すべて</label>
+      <label><input type="radio" name="st">未判定</label>
+      <label><input type="radio" name="st">判定済</label>
+    </div>
+    <span class="muted" style="font-size:var(--text-xs)">＋ 検索／ソート／列（DataTable 標準）</span>
+  </div>
+
+  <table class="demo">
+    <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th><th>ソース</th></tr></thead>
+    <tbody>
+      <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td><td class="muted">公的機関</td></tr>
+      <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td><td class="muted">展示会</td></tr>
+      <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td><td class="muted">取引先</td></tr>
+    </tbody>
+  </table>
+  <p class="seg-note">サブタブはトップタブと同じ<strong>下線アクティブ</strong>（ピル/バッジにしない）。帯に薄い下地を敷き、<strong>アクティブなトップタブから“開いた”</strong>印象にする。「🔗 カメリオ連携」を選ぶとAPI取得記事（未判定・自動リンクOFF）が並ぶ。</p>
+
+  <!-- ===== 状態2：全文検索 タブ選択中（サブメニュー帯は出ない） ===== -->
+  <div class="state-illu">
+    <h4>参考：トップタブ「🔍 全文検索」を選んだとき＝サブメニュー帯は出ない（グループは一覧側の概念のため）</h4>
+    <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+      <button class="tab" role="tab" aria-selected="false">🧭 情報インプット<span class="tab-count">496</span></button>
+      <button class="tab is-active" role="tab" aria-selected="true">🔍 全文検索</button>
+    </div>
+    <div class="list-toolbar">
+      <input class="input" type="search" placeholder="キーワードで全文検索（タイトル・本文・要約）" style="width:360px;max-width:100%">
+    </div>
+    <p class="seg-note">全文検索は会社横断（全グループ対象）。結果カードにグループ名を添える想定。</p>
+  </div>
+
+  <p class="intro">
+    この方向（<strong>トップタブ維持＋直下にサブメニュー型サブタブ・下線アクティブ</strong>）で良ければ、動的タブドラフト §4 をこの仕様で確定し、SC-50 本モックへ移植します。
+    下地色の濃さ・アイコン・＋タブの出し方（管理者のみ）など細部も詰めます。
+  </p>
+</main>
+
+</body>
+</html>

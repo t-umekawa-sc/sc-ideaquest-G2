@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット 動的タブ UI比較 検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討用モック＝SC-50 情報インプットに「動的タブ（内容タブ）」をどう足すかの3案を1枚で比較する。
+     正＝doc/設計ドラフト/情報インプット動的タブ_設計.md §4。静的（DataTableはライブにせず代表行を固定描画）。
+     既存 SC-50 のクラス体系（.page-head/.tabs/.segmented/.badge/.btn）を踏襲し、比較に要る最小の追加CSSのみ本ファイルに置く。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-8); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .opt { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); overflow: hidden; }
+  .opt__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  .opt__head h2 { font-size: var(--text-lg); margin: 0; }
+  .opt__badge { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-full); padding: 2px 10px; }
+  .opt__body { padding: var(--space-5); }
+  .opt__note { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+  .pros { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-5); margin-top: var(--space-3); font-size: var(--text-sm); }
+  .pros b { color: var(--color-text); }
+
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-3); }
+  .page-head h3 { font-size: var(--text-xl); margin: 0; }
+
+  /* タブ（SC-50 と同じ体裁） */
+  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-2) 0 var(--space-4); flex-wrap: wrap; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+  .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
+  .tab--add { color: var(--color-text-subtle); font-weight: 600; }
+  .tab--connector.is-active { color: var(--color-accent, #0891b2); border-bottom-color: var(--color-accent, #0891b2); }
+
+  .list-toolbar { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin: var(--space-3) 0; }
+  .search-bar { margin-left: auto; }
+  .search-bar .input { width: 320px; max-width: 100%; }
+
+  /* 左フォルダ型（案B） */
+  .folder-layout { display: grid; grid-template-columns: 220px 1fr; gap: var(--space-5); align-items: start; }
+  .folder-nav { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-alt); padding: var(--space-2); display: flex; flex-direction: column; gap: 2px; }
+  .folder { appearance: none; background: none; border: none; text-align: left; font: inherit; color: var(--color-text); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .folder:hover { background: var(--color-surface); }
+  .folder.is-active { background: var(--color-primary-soft); color: var(--color-primary-active); font-weight: 700; }
+  .folder .n { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .folder--add { color: var(--color-text-subtle); font-weight: 600; }
+  .folder-sep { height: 1px; background: var(--color-border); margin: var(--space-2) 0; }
+
+  /* 代表テーブル（静的・DataTable の見た目だけ） */
+  table.demo { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.demo th, table.demo td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+  table.demo th { color: var(--color-text-muted); font-weight: 600; background: var(--color-surface-alt); white-space: nowrap; }
+  table.demo td .muted { color: var(--color-text-subtle); }
+  .seg-note { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-2); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted">🧭 情報判定権限</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知">🔔</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>情報インプット 動的タブ — UI 3案 比較（検討）</h1>
+  <p class="intro">
+    会社が動的に足す<strong>「内容タブ」（全般／カメリオ連携／情報共有…）</strong>を、既存 SC-50 の「🧭 情報インプット／🔍 全文検索」タブと二重にならない形でどう見せるか。
+    「<strong>タブ内タブ</strong>」回避の3案を同じ代表データで並べて比較する。正＝<code>doc/設計ドラフト/情報インプット動的タブ_設計.md §4</code>。
+    ※<strong>静的モック</strong>（クリックでの切替・DataTable は未結線）。採用案を決めたら SC-50 本モックへ移植する。
+  </p>
+
+  <!-- ============ 案A：内容タブ＋横断検索バー（推奨） ============ -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案A</span><h2>内容タブ＋横断検索バー</h2><span class="muted">— タブ行は1段だけ／全文検索はバーに格上げ</span></div>
+    <div class="opt__body">
+      <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+      <div class="tabs" role="tablist" aria-label="情報タブ">
+        <button class="tab is-active" role="tab" aria-selected="true">📁 全般<span class="tab-count">128</span></button>
+        <button class="tab tab--connector" role="tab" aria-selected="false">🔗 カメリオ連携<span class="tab-count">342</span></button>
+        <button class="tab" role="tab" aria-selected="false">📣 情報共有<span class="tab-count">26</span></button>
+        <button class="tab tab--add" type="button">＋ タブ</button>
+      </div>
+
+      <div class="list-toolbar">
+        <div class="segmented" role="radiogroup" aria-label="状態">
+          <label><input type="radio" name="a-st" checked>すべて</label>
+          <label><input type="radio" name="a-st">未判定</label>
+          <label><input type="radio" name="a-st">判定済</label>
+        </div>
+        <div class="search-bar"><input class="input" type="search" placeholder="🔍 横断検索（全タブのタイトル・本文・要約）"></div>
+      </div>
+
+      <table class="demo">
+        <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th><th>ソース</th></tr></thead>
+        <tbody>
+          <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td><td class="muted">公的機関</td></tr>
+          <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td><td class="muted">展示会</td></tr>
+          <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td><td class="muted">取引先</td></tr>
+        </tbody>
+      </table>
+      <p class="seg-note">「🔗 カメリオ連携」タブを開くと、API 取得記事（<span class="badge badge-muted">未判定</span>・<span class="badge badge-muted">自動リンクOFF</span>）が並ぶ。</p>
+
+      <p class="opt__note"><b>考え方</b>＝タブ列を<strong>1段（内容タブ）だけ</strong>に。既存の「🔍 全文検索」は<strong>タブをやめて右上の横断検索バーへ格上げ</strong>（全タブ横断で探せる）。</p>
+      <div class="pros">
+        <div>✅ <b>タブが1段</b>でシンプル・「タブ内タブ」が消える</div>
+        <div>✅ 検索が常時アクセス可（タブ切替不要）</div>
+        <div>✅ ユーザーの「タブで束ねる」イメージに最も素直</div>
+        <div>⚠️ 既存の全文検索タブ挙動を<strong>バーへ変更</strong>する必要</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 案B：左フォルダ型サイドナビ ============ -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案B</span><h2>左フォルダ型サイドナビ</h2><span class="muted">— 束=左ナビ／機能タブ=右に維持</span></div>
+    <div class="opt__body">
+      <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+      <div class="folder-layout">
+        <nav class="folder-nav" aria-label="情報タブ">
+          <button class="folder is-active">📁 全般 <span class="n">128</span></button>
+          <button class="folder">🔗 カメリオ連携 <span class="n">342</span></button>
+          <button class="folder">📣 情報共有 <span class="n">26</span></button>
+          <div class="folder-sep"></div>
+          <button class="folder folder--add">＋ タブを追加</button>
+        </nav>
+
+        <div>
+          <div class="tabs" role="tablist" aria-label="表示">
+            <button class="tab is-active" role="tab" aria-selected="true">🧭 一覧</button>
+            <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+          </div>
+          <div class="list-toolbar">
+            <div class="segmented" role="radiogroup" aria-label="状態">
+              <label><input type="radio" name="b-st" checked>すべて</label>
+              <label><input type="radio" name="b-st">未判定</label>
+              <label><input type="radio" name="b-st">判定済</label>
+            </div>
+          </div>
+          <table class="demo">
+            <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th></tr></thead>
+            <tbody>
+              <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td></tr>
+              <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td></tr>
+              <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="opt__note"><b>考え方</b>＝束を<strong>左サイドのフォルダ</strong>（メール／チャンネルの比喩＝「まとまり」に最適）に。右は既存の「一覧／全文検索」を<strong>そのまま維持</strong>＝軸が縦横で分かれ混同しない。</p>
+      <div class="pros">
+        <div>✅ 「まとまり」メタファに最適・束が多くても縦スクロールで収まる</div>
+        <div>✅ 既存の一覧/全文検索を変えずに済む</div>
+        <div>⚠️ 横幅を使う（モバイルは折り畳み必要）</div>
+        <div>⚠️ 左ナビは<strong>新パターン</strong>（他画面に無い＝新規UI）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 案C：束セレクタをツールバーに ============ -->
+  <section class="opt">
+    <div class="opt__head"><span class="opt__badge">案C</span><h2>束セレクタをツールバーに</h2><span class="muted">— タブUIを足さず最小追加</span></div>
+    <div class="opt__body">
+      <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+      <div class="tabs" role="tablist" aria-label="表示">
+        <button class="tab is-active" role="tab" aria-selected="true">🧭 情報インプット<span class="tab-count">496</span></button>
+        <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+      </div>
+      <div class="list-toolbar">
+        <label style="font-size:var(--text-sm);display:flex;align-items:center;gap:6px">タブ
+          <select class="select" style="width:auto"><option>全般 (128)</option><option>カメリオ連携 (342)</option><option>情報共有 (26)</option><option>＋ タブを追加…</option></select>
+        </label>
+        <div class="segmented" role="radiogroup" aria-label="状態">
+          <label><input type="radio" name="c-st" checked>すべて</label>
+          <label><input type="radio" name="c-st">未判定</label>
+          <label><input type="radio" name="c-st">判定済</label>
+        </div>
+      </div>
+      <table class="demo">
+        <thead><tr><th>タイトル / 要約</th><th>状態</th><th>優先度</th><th>影響分類</th></tr></thead>
+        <tbody>
+          <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td>普通</td><td><span class="badge">機会</span></td></tr>
+          <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td>低</td><td><span class="badge">機会</span></td></tr>
+          <tr><td>主要取引先の組織改編メモ</td><td><span class="badge badge-success">判定済</span></td><td>高</td><td><span class="muted">—</span></td></tr>
+        </tbody>
+      </table>
+
+      <p class="opt__note"><b>考え方</b>＝タブUIを足さず、束を<strong>ツールバーのセレクタ</strong>（ドロップダウン）に。既存の一覧/全文検索タブは不変＝<strong>追加UI最小</strong>。</p>
+      <div class="pros">
+        <div>✅ 追加UI最小・混同ゼロ・実装が軽い</div>
+        <div>✅ 既存SC-50をほぼ変えない</div>
+        <div>⚠️ 「タブで束ねる」体験は弱い（束が埋もれる）</div>
+        <div>⚠️ 束の一覧性が低い（開かないと中身が見えない）</div>
+      </div>
+    </div>
+  </section>
+
+  <p class="intro">推奨＝<strong>案A</strong>（ユーザーの「タブで束ねる」イメージに最も近く、タブ内タブも解消）。束が将来とても多くなるなら<strong>案B</strong>が効く。最小変更を最優先なら<strong>案C</strong>。</p>
+</main>
+
+</body>
+</html>
