@@ -16,6 +16,7 @@ import {
   fetchQuestCatalog, followQuest, getCatalogDetail, requestJoinQuest, setQuestRecommended, unfollowQuest, withdrawJoinQuest,
   type QuestCatalogCard, type QuestCatalogDetail,
 } from "../api";
+import { catalogRowMenuKeys, type CatalogMenuKey } from "../catalogMenu";
 
 type Row = QuestCatalogCard;
 type Detail = QuestCatalogDetail;  // カード＋活発度スパーク（catalog-detail）
@@ -126,15 +127,18 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
   };
 
   // フォロー/参加リクエストの行アクション（リスト表示の ⋯・カード/ダイアログと同じ操作）。
+  // どのアクションを出すかは純関数 catalogRowMenuKeys に集約（member/owner でも管理者おすすめトグルを出す）。
   const menuItems = (r: Row): RowMenuItem[] => {
-    const items: RowMenuItem[] = [{ label: "詳細を見る", onClick: () => openDetail(r) }];
-    if (r.my_state === "member") { items.push({ label: "クエストへ", onClick: () => { window.location.href = `/quests/${r.id}`; } }); return items; }
-    items.push({ label: r.my_state === "following" ? "★ フォロー解除" : "☆ フォロー", onClick: () => void toggleFollow(r) });
-    if (r.my_state === "pending") items.push({ label: "申請を取り消す", onClick: () => void withdraw(r) });
-    else if (r.my_state !== "rejected") items.push({ label: "参加をリクエスト", onClick: () => void request(r) });
-    // 管理者のみ＝おすすめ（Zone D 選出のブースト）を設定/解除。
-    if (isAdmin) items.push({ label: r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定", onClick: () => void toggleRecommended(r) });
-    return items;
+    const build: Record<CatalogMenuKey, RowMenuItem> = {
+      detail: { label: "詳細を見る", onClick: () => openDetail(r) },
+      goto: { label: "クエストへ", onClick: () => { window.location.href = `/quests/${r.id}`; } },
+      follow: { label: "☆ フォロー", onClick: () => void toggleFollow(r) },
+      unfollow: { label: "★ フォロー解除", onClick: () => void toggleFollow(r) },
+      withdraw: { label: "申請を取り消す", onClick: () => void withdraw(r) },
+      request: { label: "参加をリクエスト", onClick: () => void request(r) },
+      recommend: { label: r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定", onClick: () => void toggleRecommended(r) },
+    };
+    return catalogRowMenuKeys(r, isAdmin).map((k) => build[k]);
   };
 
   const columns: DataTableColumn<Row>[] = [
@@ -155,7 +159,13 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
     const st = r.my_state;
     return (
       <div className="row-center" style={{ gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end", marginTop: "var(--space-3)" }} onClick={(e) => e.stopPropagation()}>
-        {/* フォロー★はカード右上（ヘッダー）へ移動済み。ここは参加/申請アクションのみ・右寄せ。 */}
+        {/* フォロー★はカード右上（ヘッダー）へ移動済み。ここは参加/申請アクション＋（管理者）おすすめトグル・右寄せ。 */}
+        {/* 管理者のみ＝おすすめ（Zone D 選出のブースト）を設定/解除。my_state に関わらず出す（カタログ掲載＝発見可能＝候補）。 */}
+        {isAdmin && (
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => void toggleRecommended(r)}>
+            {r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定"}
+          </button>
+        )}
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void request(r)}>参加をリクエスト</button>
         )}
