@@ -1025,6 +1025,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/recommended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quests Recommended
+         * @description おすすめの参加可能クエスト（SC-01 ダッシュボード Zone D・C.9.1）＝score 降順上位 limit。
+         *
+         *     候補＝`can_discover_quest` ∩ 未参加 ∩ 非pending。score＝整合率＋直近活発＋管理者お勧め（加重和・config）。
+         *     limit は 1..max にクランプ（既定3）。メタのみ・中身は返さない。読取専用。
+         */
+        get: operations["quests_recommended_api_v1_quests_recommended_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/catalog-detail": {
         parameters: {
             query?: never;
@@ -1064,6 +1087,26 @@ export interface paths {
          * @description フォロー解除（C.9・冪等）。変更系＝Origin/CSRF。
          */
         delete: operations["unfollow_quest_api_v1_quests__quest_id__follow_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/recommended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Quest Recommended
+         * @description 管理者お勧めの設定/解除（C.9.1・`company_account_admin`/`system_admin` のみ・発見可能クエストのみ）。変更系＝Origin/CSRF。
+         */
+        put: operations["set_quest_recommended_api_v1_quests__quest_id__recommended_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -9220,6 +9263,11 @@ export interface components {
              * @default false
              */
             discoverable: boolean;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
         };
         /**
          * QuestCatalogCardDTO
@@ -9265,6 +9313,11 @@ export interface components {
              * @default false
              */
             discoverable: boolean;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
             /** Purpose */
             purpose?: string | null;
         };
@@ -9312,6 +9365,11 @@ export interface components {
              * @default false
              */
             discoverable: boolean;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
             /** Purpose */
             purpose?: string | null;
             activity?: components["schemas"]["QuestActivityDTO"] | null;
@@ -10264,6 +10322,87 @@ export interface components {
         RecentTaskChatsResponse: {
             /** Items */
             items: components["schemas"]["RecentTaskChatDTO"][];
+        };
+        /**
+         * RecommendedQuestCardDTO
+         * @description おすすめの参加可能クエスト1件（SC-01 Zone D・C.9.1）＝カタログカード＋選出スコア（デバッグ/並び確認用）。
+         */
+        RecommendedQuestCardDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Status */
+            status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Idea Count */
+            idea_count: number;
+            owner: components["schemas"]["QuestOwnerDTO"];
+            /**
+             * Quest Groups
+             * @default []
+             */
+            quest_groups: components["schemas"]["QuestGroupRefDTO"][];
+            /** My State */
+            my_state: string;
+            /**
+             * Is Owner
+             * @default false
+             */
+            is_owner: boolean;
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Purpose */
+            purpose?: string | null;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+        };
+        /**
+         * RecommendedQuestsResponse
+         * @description おすすめの参加可能クエスト（SC-01 Zone D・C.9.1）＝score 降順上位 limit。母集団0件は空配列。
+         */
+        RecommendedQuestsResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["RecommendedQuestCardDTO"][];
+        };
+        /**
+         * RecommendedToggleBody
+         * @description 管理者お勧めの設定/解除（C.9.1・company_account_admin 向け）。
+         */
+        RecommendedToggleBody: {
+            /** Recommended */
+            recommended: boolean;
+        };
+        /** RecommendedToggleResponse */
+        RecommendedToggleResponse: {
+            /** Recommended */
+            recommended: boolean;
         };
         /** RefDTO */
         RefDTO: {
@@ -12930,6 +13069,37 @@ export interface operations {
             };
         };
     };
+    quests_recommended_api_v1_quests_recommended_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendedQuestsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     quest_catalog_detail_api_v1_quests__quest_id__catalog_detail_get: {
         parameters: {
             query?: never;
@@ -13010,6 +13180,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FollowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_quest_recommended_api_v1_quests__quest_id__recommended_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecommendedToggleBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendedToggleResponse"];
                 };
             };
             /** @description Validation Error */

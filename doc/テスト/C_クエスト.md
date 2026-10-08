@@ -235,3 +235,14 @@
 | C-TC-312 | api | `GET /quests/recommended`＝未参加の発見可能クエストを score 降順・limit・my_state=none・メタのみ | viewer 未参加の discoverable クエスト複数（整合率/活発に差）＋member/pending/非discoverable のノイズ | viewer ログインで `GET /quests/recommended?limit=3` | `data` は未参加 discoverable のみ・score 降順・最大3件・各 `my_state="none"`・カタログカード形状（中身〔body〕は含まない）・各 `score` 付与 | C.9.1 |
 | C-TC-313 | api | 管理者お勧め（recommended=true）が加重和ブーストで上位化 | 整合率/活発がほぼ同条件の discoverable 2件＝一方のみ `recommended=true` | viewer が `GET /quests/recommended` | `recommended=true` のクエストが上位（admin 成分が加算）／ただし整合率/活発が全く無い無関係クエストでも乗算ゼロで消えはしない（加重和＝ブースト） | C.9.1／§5.6 |
 | C-TC-314 | api | 母集団0件→空配列／limit クランプ | 候補となる discoverable 未参加クエストが無い viewer／limit=0・limit=99 | `GET /quests/recommended`／`?limit=0`／`?limit=99` | 候補無し＝`data:[]`（空状態は枠側）／limit は 1..10 にクランプ（0→1・99→10・最大10件） | C.9.1 |
+
+### 8a. 管理者お勧めトグル（`PUT /quests/{id}/recommended`・SC-13・company_account_admin 向け・follow-up）
+
+> 対象＝`app/tenant/quests/{application,router}.py`（`set_quest_recommended`／`PUT /quests/{quest_id}/recommended`）。管理者のみ `quests.recommended` を設定/解除でき、発見可能クエストに限る（おすすめ候補母集団に効く）・冪等・カタログDTO `recommended` に反映。仕様の正＝C.9.1。対象＝`tests/quests/test_recommended_toggle.py`。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C-TC-315 | api | 管理者が設定/解除＝`quests.recommended` を更新しカタログDTOに反映（冪等） | discoverable クエスト1（recommended=false）・管理者ログイン（company_account_admin） | `PUT /quests/{id}/recommended {recommended:true}` → `GET /quest-catalog` → 再度 `{recommended:false}` | 1回目 200 `{recommended:true}`／カタログの当該行 `recommended=true`・2回目 200 `{recommended:false}`（冪等・解除）・カタログ `recommended=false` | C.9.1 |
+| C-TC-316 | api | 非管理者は 403（一般ユーザーは設定不可・二重防御） | discoverable クエスト1・一般ユーザー（general）ログイン | `PUT /quests/{id}/recommended {recommended:true}` | 403 `forbidden`（`require_company_account_admin`）・`quests.recommended` は不変 | C.9.1／B.0.1 |
+| C-TC-317 | api | 発見不可クエストは 404（存在秘匿＝非discoverable/可視範囲外に立てられない） | 非 discoverable クエスト1・管理者ログイン | `PUT /quests/{id}/recommended {recommended:true}` | 404 `not_found`（`_load_discoverable` 門番・おすすめ候補でないものに立てても無意味＝弾く） | C.9.1／C.9.0 |
+| C-TC-318 | unit | frontend api クライアント写像＝`setQuestRecommended` が `PUT /quests/{id}/recommended` にブール body を載せる | apiFetch をモック | `setQuestRecommended("q1", true)`／`(…, false)` | `PUT /quests/q1/recommended`・body=`{"recommended":true}`／`false`（EP パス/メソッド誤りの回帰防止） | C.9.1 |

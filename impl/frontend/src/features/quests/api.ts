@@ -49,6 +49,12 @@ export function followQuest(questId: string): Promise<{ following: boolean } | n
 export function unfollowQuest(questId: string): Promise<{ following: boolean } | null> {
   return apiFetch<{ following: boolean }>(`/quests/${questId}/follow`, { method: "DELETE" });
 }
+// 管理者お勧めの設定/解除（C.9.1・company_account_admin のみ・SC-13 発見カタログからトグル）。
+export function setQuestRecommended(questId: string, recommended: boolean): Promise<{ recommended: boolean } | null> {
+  return apiFetch<{ recommended: boolean }>(`/quests/${questId}/recommended`, {
+    method: "PUT", body: JSON.stringify({ recommended }),
+  });
+}
 export function requestJoinQuest(questId: string, message?: string): Promise<{ status: string } | null> {
   return apiFetch<{ status: string }>(`/quests/${questId}/join-request`, {
     method: "POST", headers: idempotencyHeader(), body: JSON.stringify({ message: message ?? null }),

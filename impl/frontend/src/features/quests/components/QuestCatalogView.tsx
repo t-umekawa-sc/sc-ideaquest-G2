@@ -13,7 +13,7 @@ import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/c
 import { ApiError } from "@/lib/api/client";
 
 import {
-  fetchQuestCatalog, followQuest, getCatalogDetail, requestJoinQuest, unfollowQuest, withdrawJoinQuest,
+  fetchQuestCatalog, followQuest, getCatalogDetail, requestJoinQuest, setQuestRecommended, unfollowQuest, withdrawJoinQuest,
   type QuestCatalogCard, type QuestCatalogDetail,
 } from "../api";
 
@@ -29,7 +29,9 @@ function reasonOf(err: unknown): string | undefined {
     : undefined;
 }
 
-export function QuestCatalogView() {
+export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
+  // isAdmin＝company_account_admin/system_admin。管理者お勧め（C.9.1・Zone D おすすめ選出の admin 成分）を
+  // ここ（発見カタログ＝おすすめ候補母集団そのもの）からトグルできる。非管理者には一切出さない。
   const snack = useSnackbar();
   const [reload, setReload] = useState(0);
   const [detail, setDetail] = useState<Detail | null>(null);  // 詳細ダイアログの中身（開いているクエスト）
@@ -69,6 +71,16 @@ export function QuestCatalogView() {
     } catch {
       snack({ type: "error", msg: "操作に失敗しました。" });
     }
+  };
+
+  // 管理者お勧めの設定/解除（C.9.1・管理者のみ）。成功で一覧再取得＋開いているダイアログの recommended を楽観更新。
+  const toggleRecommended = async (r: Row) => {
+    const next = !r.recommended;
+    const res = await setQuestRecommended(r.id, next).catch(() => null);
+    if (!res) { snack({ type: "error", msg: "おすすめの変更に失敗しました。" }); return; }
+    setReload((k) => k + 1);
+    setDetail((d) => (d && d.id === r.id ? { ...d, recommended: next } : d));
+    snack({ type: "success", msg: next ? "⭐ おすすめに設定しました。" : "おすすめを解除しました。" });
   };
 
   // 参加をリクエスト＝理由（任意）を入力するモーダルを開く（3経路共通）。
@@ -120,12 +132,19 @@ export function QuestCatalogView() {
     items.push({ label: r.my_state === "following" ? "★ フォロー解除" : "☆ フォロー", onClick: () => void toggleFollow(r) });
     if (r.my_state === "pending") items.push({ label: "申請を取り消す", onClick: () => void withdraw(r) });
     else if (r.my_state !== "rejected") items.push({ label: "参加をリクエスト", onClick: () => void request(r) });
+    // 管理者のみ＝おすすめ（Zone D 選出のブースト）を設定/解除。
+    if (isAdmin) items.push({ label: r.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定", onClick: () => void toggleRecommended(r) });
     return items;
   };
 
   const columns: DataTableColumn<Row>[] = [
     { key: "title", label: "クエスト", locked: true, width: 260, filter: { type: "text" }, searchVal: (r) => r.title, render: (r) => r.title },
-    { key: "status", label: "状態", width: 100, render: (r) => <span className="badge">{STATUS_LABEL[r.status] ?? r.status}</span> },
+    { key: "status", label: "状態", width: 120, render: (r) => (
+      <span className="row-center" style={{ gap: "var(--space-1)", flexWrap: "wrap" }}>
+        <span className="badge">{STATUS_LABEL[r.status] ?? r.status}</span>
+        {r.recommended && <span className="badge badge-recommended" title="運営のおすすめ">⭐</span>}
+      </span>
+    ) },
     { key: "deadline", label: "締切", width: 120, sortable: true, sortVal: (r) => r.deadline ?? "", render: (r) => r.deadline ?? "—" },
     { key: "member_count", label: "👥", width: 70, align: "num", sortable: true, sortVal: (r) => r.member_count, render: (r) => r.member_count },
     { key: "my", label: "あなた", width: 110, render: (r) => (STATE_LABEL[r.my_state] ? <span className="badge badge-success">{STATE_LABEL[r.my_state]}</span> : <span className="muted">—</span>) },
@@ -168,7 +187,10 @@ export function QuestCatalogView() {
             <span className="card-title">{r.title}</span>
           </span>
           {/* ステータスはタイトル行と上下中央（.between の align-items:center）。★はその上（右上角・絶対配置）。 */}
-          <span className="badge">{STATUS_LABEL[r.status] ?? r.status}</span>
+          <span className="row-center" style={{ gap: "var(--space-1)" }}>
+            {r.recommended && <span className="badge badge-recommended" title="運営のおすすめ">⭐ おすすめ</span>}
+            <span className="badge">{STATUS_LABEL[r.status] ?? r.status}</span>
+          </span>
         </div>
         {r.purpose ? <div className="muted text-sm line-clamp-2" style={{ margin: "var(--space-1) 0" }}>{r.purpose}</div> : null}
         <div className="quest-card__meta">
@@ -219,6 +241,8 @@ export function QuestCatalogView() {
           onFollow={toggleFollow}
           onRequest={request}
           onWithdraw={withdraw}
+          isAdmin={isAdmin}
+          onToggleRecommended={toggleRecommended}
         />
       )}
 
@@ -251,9 +275,10 @@ export function QuestCatalogView() {
   );
 }
 
-function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWithdraw }: {
+function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWithdraw, isAdmin, onToggleRecommended }: {
   row: Detail; open: boolean; onClose: () => void; onClosed: () => void;
   onFollow: (r: Row) => void; onRequest: (r: Row) => void; onWithdraw: (r: Row) => void;
+  isAdmin: boolean; onToggleRecommended: (r: Row) => void;
 }) {
   const st = row.my_state;
   return (
@@ -268,6 +293,7 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
                 <div className="dialog-subject__title">{row.title}</div>
                 <div className="dialog-subject__meta">
                   <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
+                  {row.recommended && <span className="badge badge-recommended" title="運営のおすすめ">⭐ おすすめ</span>}
                   {/* フォロー中は右上の follow-toggle が表す（緑バッジは出さない）。他状態はバッジ表示。 */}
                   {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
                 </div>
@@ -312,6 +338,12 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
       <ModalFooter>
         {/* フォローはヘッダー右上へ移動（アイデア詳細と同位置）。フッターは 閉じる（左）→ 状態別 → 主要アクション（右）。 */}
         <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>閉じる</button>
+        {/* 管理者のみ＝おすすめ（Zone D 選出ブースト）の設定/解除。閉じる（左）の隣に配置。 */}
+        {isAdmin && (
+          <button type="button" className="btn btn-outline" onClick={() => onToggleRecommended(row)}>
+            {row.recommended ? "⭐ おすすめ解除" : "⭐ おすすめに設定"}
+          </button>
+        )}
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
         {(st === "none" || st === "following") && (

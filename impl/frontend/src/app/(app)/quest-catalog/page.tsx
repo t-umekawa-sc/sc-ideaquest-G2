@@ -8,5 +8,7 @@ import { getServerSession } from "@/lib/session";
 export default async function QuestCatalogPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <QuestCatalogView />;
+  // 管理者お勧めトグル（C.9.1）は company_account_admin/system_admin のみ（API も require_company_account_admin で二重防御）。
+  const isAdmin = session.system_role === "company_account_admin" || session.system_role === "system_admin";
+  return <QuestCatalogView isAdmin={isAdmin} />;
 }

@@ -66,6 +66,8 @@ class QuestCardDTO(BaseModel):
     is_owner: bool = False
     # 発見カタログ掲載（FR-40・C.9.0）＝一覧の列/ソート/絞込・複製プリフィルに使う。
     discoverable: bool = False
+    # 管理者お勧め（C.9.1・おすすめ選出の admin 成分＝`quests.recommended`）＝SC-13 で管理者がトグル。
+    recommended: bool = False
 
 
 class QuestListResponse(BaseModel):
@@ -128,6 +130,17 @@ class RecommendedQuestsResponse(BaseModel):
 
 class FollowResponse(BaseModel):
     following: bool
+
+
+class RecommendedToggleBody(BaseModel):
+    """管理者お勧めの設定/解除（C.9.1・company_account_admin 向け）。"""
+
+    model_config = ConfigDict(extra="forbid")
+    recommended: bool
+
+
+class RecommendedToggleResponse(BaseModel):
+    recommended: bool
 
 
 class JoinRequestBody(BaseModel):

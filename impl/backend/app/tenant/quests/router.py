@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
+from app.control_plane.admin.deps import require_company_account_admin
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info.schemas import LinkDispositionRequest, RelatedInfoItemDTO, RelatedInfoResponse
@@ -45,6 +46,8 @@ from app.tenant.quests.schemas import (
     QuestPermissionsResponse,
     QuestResultDTO,
     RecommendedQuestsResponse,
+    RecommendedToggleBody,
+    RecommendedToggleResponse,
     QuestPublishRequest,
     QuestTransitionRequest,
     QuestUpdateRequest,
@@ -139,6 +142,19 @@ def unfollow_quest(quest_id: str, request: Request, session: dict = Depends(requ
     result = quest_service.unfollow_quest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
     return FollowResponse(**result)
+
+
+@router.put("/quests/{quest_id}/recommended", response_model=RecommendedToggleResponse)
+def set_quest_recommended(
+    quest_id: str, body: RecommendedToggleBody, request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> RecommendedToggleResponse:
+    """管理者お勧めの設定/解除（C.9.1・`company_account_admin`/`system_admin` のみ・発見可能クエストのみ）。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.set_quest_recommended(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, recommended=body.recommended)
+    return RecommendedToggleResponse(**result)
 
 
 @router.post("/quests/{quest_id}/join-request", response_model=JoinRequestResponse, status_code=201)

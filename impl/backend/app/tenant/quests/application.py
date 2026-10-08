@@ -265,6 +265,8 @@ def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats) -> dict:
         "is_owner": quest.owner_id == viewer_id,
         # 発見カタログ掲載（FR-40・C.9.0）＝一覧の列/ソート/絞込・複製プリフィルに使う。
         "discoverable": bool(quest.discoverable),
+        # 管理者お勧め（C.9.1・おすすめ選出の admin 成分）＝SC-13 で管理者がトグル・おすすめ上位化に効く。
+        "recommended": bool(quest.recommended),
     }
 
 
@@ -2184,6 +2186,26 @@ def unfollow_quest(account_id, company_id, quest_id) -> dict:
         repo.remove_quest_follow(ts, iid, user.id)
         ts.commit()
     return {"following": False}
+
+
+def set_quest_recommended(account_id, company_id, quest_id, *, recommended: bool) -> dict:
+    """管理者お勧め `quests.recommended` の設定/解除（C.9.1・`company_account_admin` 向け・冪等）。
+
+    おすすめ選出（SC-01 Zone D）の admin 成分に効く。候補母集団＝発見可能クエストのみ（非 discoverable に
+    立てても候補に入らず無意味）＝**発見門番**（`_load_discoverable`）で可視でないクエストは 404（存在秘匿）。
+    認可はルータの `require_company_account_admin` で強制するが、application でも権威 role を再確認（二重防御）。
+    """
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if not _is_company_admin(account_id):
+        raise AppError(403, "forbidden")  # 二重防御（権威＝control DB の Account.system_role）
+    with get_tenant_session(company.db_identifier) as ts:
+        _user, quest, _visible = _load_discoverable(ts, account_id, iid)  # 発見不可は 404
+        quest.recommended = bool(recommended)
+        ts.commit()
+    return {"recommended": bool(recommended)}
 
 
 def request_join(account_id, company_id, quest_id, *, message=None) -> dict:

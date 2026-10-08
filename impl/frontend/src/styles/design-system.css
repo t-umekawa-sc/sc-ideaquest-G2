@@ -714,6 +714,8 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
 .badge-success { background: var(--color-agree-bg); color: var(--color-success); }
 .badge-danger  { background: var(--color-disagree-bg); color: var(--color-danger); }
 .badge-muted   { background: var(--color-surface-alt); color: var(--color-text-muted); }
+/* 運営のおすすめ（⭐・SC-13／Zone D 選出のブースト表示）＝アンバー系（コインと同系統）。 */
+.badge-recommended { background: #FEF3C7; color: var(--color-warning); }
 
 /* 投票カウント */
 .vote-agree    { color: var(--color-agree); font-weight: 700; }
