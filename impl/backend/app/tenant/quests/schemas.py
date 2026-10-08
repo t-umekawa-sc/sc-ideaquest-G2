@@ -114,6 +114,18 @@ class QuestCatalogResponse(BaseModel):
     page_info: QuestOffsetPageInfo
 
 
+class RecommendedQuestCardDTO(QuestCatalogCardDTO):
+    """おすすめの参加可能クエスト1件（SC-01 Zone D・C.9.1）＝カタログカード＋選出スコア（デバッグ/並び確認用）。"""
+
+    score: float = 0.0
+
+
+class RecommendedQuestsResponse(BaseModel):
+    """おすすめの参加可能クエスト（SC-01 Zone D・C.9.1）＝score 降順上位 limit。母集団0件は空配列。"""
+
+    data: list[RecommendedQuestCardDTO] = []
+
+
 class FollowResponse(BaseModel):
     following: bool
 

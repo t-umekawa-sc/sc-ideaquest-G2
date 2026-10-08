@@ -41,6 +41,9 @@ class Quest(CompanyBase):
     # 発見公開フラグ（掲示板 SC-13 に出すか・per-quest opt-in・既定 OFF・FR-40／§5.6）。
     # ON でも中身は非公開＝メタのみ（発見門番 can_discover_quest）。
     discoverable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # 管理者お勧めフラグ（SC-01 おすすめの参加可能クエスト・Zone D・ダッシュボード再設計 Phase3／§5.6）。
+    # おすすめ選出スコア w_align·整合率 + w_active·直近活発 + w_admin·recommended の admin 成分（加重和ブースト）。
+    recommended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # アイデア→クエスト昇格（FR-47・決定H）の由来参照。コンテストの有望アイデアを独立業務クエストへ種継ぎした
     # 際に由来を保持（トレーサビリティ）。通常作成は NULL。コンテストの backing quest（contests.quest_id）とは別物。
     origin_idea_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ideas.id"), nullable=True)

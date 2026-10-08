@@ -1014,6 +1014,57 @@ def join_request_status_map(session: Session, user_id: uuid.UUID, quest_ids: lis
     return {qid: st for qid, st in rows}
 
 
+# --- おすすめクエスト選出（SC-01 Zone D・C.9.1・ダッシュボード再設計 Phase3） ---
+
+def list_recommend_candidates(session: Session, user_id: uuid.UUID, visible_group_ids: list[uuid.UUID]) -> list[Quest]:
+    """おすすめ候補の母集団＝`can_discover_quest`（`_discoverable_conds`）∩ 未参加（有効 member でない）
+    ∩ 参加申請 pending でない（＝「これから参加できる」ものに限る）。Quest 行の配列を返す（スコア付けは application）。"""
+    from sqlalchemy import exists, not_
+
+    conds = _discoverable_conds(user_id, visible_group_ids)
+    active_member = exists().where(
+        QuestMember.quest_id == Quest.id, QuestMember.user_id == user_id, QuestMember.removed_at.is_(None))
+    pending_req = exists().where(
+        QuestJoinRequest.quest_id == Quest.id, QuestJoinRequest.user_id == user_id,
+        QuestJoinRequest.status == "pending")
+    conds += [not_(active_member), not_(pending_req)]
+    return list(session.execute(select(Quest).where(*conds)).scalars().all())
+
+
+def recent_activity_counts(session: Session, quest_ids: list[uuid.UUID], since: datetime) -> dict:
+    """候補クエストの窓内活動件数（quest_id→int）＝公開アイデア追加＋チャット投稿＋新規参加/申請の合算（C.9.1）。
+
+    - 公開アイデア＝`status='published'`・未削除・`created_at>=since`
+    - チャット＝公開アイデアのチャット横断件数（`chat_repo.message_counts_by_quest`）
+    - 参加/申請＝`quest_members.joined_at>=since`（有効参加）＋`quest_join_requests.created_at>=since`
+    返り値は候補すべてのキーを含む（活動0でも0）。"""
+    from app.tenant.chat import repository as chat_repo
+    from app.tenant.ideas.orm import Idea
+
+    counts = {qid: 0 for qid in quest_ids}
+    if not quest_ids:
+        return counts
+    for qid, n in session.execute(
+        select(Idea.quest_id, func.count()).where(
+            Idea.quest_id.in_(quest_ids), Idea.status == "published",
+            Idea.deleted_at.is_(None), Idea.created_at >= since)
+        .group_by(Idea.quest_id)).all():
+        counts[qid] = counts.get(qid, 0) + int(n)
+    for qid, n in chat_repo.message_counts_by_quest(session, quest_ids, since).items():
+        counts[qid] = counts.get(qid, 0) + int(n)
+    for qid, n in session.execute(
+        select(QuestMember.quest_id, func.count()).where(
+            QuestMember.quest_id.in_(quest_ids), QuestMember.removed_at.is_(None),
+            QuestMember.joined_at >= since).group_by(QuestMember.quest_id)).all():
+        counts[qid] = counts.get(qid, 0) + int(n)
+    for qid, n in session.execute(
+        select(QuestJoinRequest.quest_id, func.count()).where(
+            QuestJoinRequest.quest_id.in_(quest_ids),
+            QuestJoinRequest.created_at >= since).group_by(QuestJoinRequest.quest_id)).all():
+        counts[qid] = counts.get(qid, 0) + int(n)
+    return counts
+
+
 # --- フォロー（watch） ---
 
 def get_quest_follow(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestFollow | None:

@@ -417,6 +417,29 @@ def daily_message_counts(session: Session, thread_id: uuid.UUID, since: datetime
     return [(d, int(n)) for d, n in rows]
 
 
+def message_counts_by_quest(session: Session, quest_ids: list[uuid.UUID], since: datetime) -> dict:
+    """複数クエスト横断の窓内メッセージ数（おすすめ選出の活発度・C.9.1）＝quest_id→件数。
+
+    各クエストの公開アイデア（`status='published'`・未削除）のチャット群を横断合算（削除メッセージ除外・`created_at>=since`）。
+    N+1 回避の一括版（`daily_message_counts_for_quest` と同じ母集合）。
+    """
+    if not quest_ids:
+        return {}
+    rows = session.execute(
+        select(Idea.quest_id, func.count())
+        .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, ChatMessage.thread_id == ChatThread.id)
+        .join(Idea, ChatGroup.idea_id == Idea.id)
+        .where(
+            Idea.quest_id.in_(quest_ids), Idea.status == "published", Idea.deleted_at.is_(None),
+            ChatMessage.is_deleted.is_(False), ChatMessage.created_at >= since,
+        )
+        .group_by(Idea.quest_id)
+    ).all()
+    return {qid: int(n) for qid, n in rows}
+
+
 def daily_message_counts_for_quest(session: Session, quest_id: uuid.UUID, since: datetime) -> list[tuple]:
     """クエスト横断の日次メッセージ数（発見カタログ活発度・C.9.1）。
 

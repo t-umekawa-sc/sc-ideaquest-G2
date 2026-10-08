@@ -222,3 +222,16 @@
 | C-TC-281 | api | quest_watch_update＝new_ideas/completed | discoverable クエスト（owner 別）＋viewer がフォロー | owner が公開アイデア作成→`transition` を completed まで | フォロワー viewer に `event=new_ideas`（公開者＝行為者は除外）と `event=completed` が生成（すべてメタ級・本文なし） | C.9／H／FR-40 |
 | C-TC-282 | api | 参加リクエストの業務通知メール（会社トグル ON・既定） | 実アカウント owner の discoverable クエストに viewer が申請→owner が承認 | `POST join-request`／`POST approve` | `mail_outbox` に `join_request_received`（owner 宛・to_email/params.quest_title）＋`join_request_decided`（申請者宛・params.result=approved）が積まれる | FR-40／§4／H |
 | C-TC-283 | api | 会社トグル OFF で業務通知メール不送信 | ACME-01 の `notify_email_enabled=false`（一時） | viewer が `POST join-request` | `mail_outbox` に `join_request_received` が積まれない（会社が OFF）。セキュリティ系は本トグル対象外＝別経路 | FR-40／§4 |
+
+## 8. おすすめクエスト選出（SC-01 Zone D・C.9.1・ダッシュボード再設計 Phase3）
+
+> 対象＝`app/tenant/quests/{repository,application,router}.py`（`GET /quests/recommended`）。候補母集団（`can_discover_quest` ∩ 未参加 ∩ 非pending）・直近窓の活動集計・加重和スコア（整合率平均＋活発度＋管理者お勧めブースト）・上位 limit・メタのみ返却を検証。仕様の正＝[`../API設計/C_クエスト・パーティー・権限.md`](../API設計/C_クエスト・パーティー・権限.md) C.9.1・[`../データモデル.md`](../データモデル.md) §5.6 `recommended`・[`../設計ドラフト/ダッシュボード再設計・お知らせ_設計.md`](../設計ドラフト/ダッシュボード再設計・お知らせ_設計.md) §8a。対象＝`tests/quests/test_recommend.py`。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C-TC-309 | int | 候補母集団＝`can_discover_quest` ∩ 未参加 ∩ 非pending | discoverable×未参加／discoverable×既にmember／discoverable×pending申請中／非discoverable の4クエスト（owner別・viewer視点） | `list_recommend_candidates(viewer, visible_group_ids)` | 未参加の discoverable のみ返す（member/pending/非discoverable は除外） | C.9.1／C.9.0 |
+| C-TC-310 | int | 直近窓の活動件数集計（窓外は数えない・3種合算） | 候補クエストに〔窓内：公開アイデア1＋チャット2＋新規参加1〕と〔窓外：古い公開アイデア1〕 | `recent_activity_counts([qid], window_days=30)` | 当該 qid の件数＝窓内のみ合算（=4）・窓外のアイデアは含まない | C.9.1／§5.6 |
+| C-TC-311 | unit | スコア＝加重和（align/active/admin）・母集団内 max 正規化・上位 limit・tie-break | 整合率/活発/recommended が既知の候補3件（スコア計算素材をスタブ） | `score_and_rank(candidates, weights, limit=2)` | `w_align·align+w_active·active+w_admin·admin` 降順で上位2件・同点は `updated_at` 降順→id・active は母集団 max で正規化（max=0 なら全0） | C.9.1／設計§8a |
+| C-TC-312 | api | `GET /quests/recommended`＝未参加の発見可能クエストを score 降順・limit・my_state=none・メタのみ | viewer 未参加の discoverable クエスト複数（整合率/活発に差）＋member/pending/非discoverable のノイズ | viewer ログインで `GET /quests/recommended?limit=3` | `data` は未参加 discoverable のみ・score 降順・最大3件・各 `my_state="none"`・カタログカード形状（中身〔body〕は含まない）・各 `score` 付与 | C.9.1 |
+| C-TC-313 | api | 管理者お勧め（recommended=true）が加重和ブーストで上位化 | 整合率/活発がほぼ同条件の discoverable 2件＝一方のみ `recommended=true` | viewer が `GET /quests/recommended` | `recommended=true` のクエストが上位（admin 成分が加算）／ただし整合率/活発が全く無い無関係クエストでも乗算ゼロで消えはしない（加重和＝ブースト） | C.9.1／§5.6 |
+| C-TC-314 | api | 母集団0件→空配列／limit クランプ | 候補となる discoverable 未参加クエストが無い viewer／limit=0・limit=99 | `GET /quests/recommended`／`?limit=0`／`?limit=99` | 候補無し＝`data:[]`（空状態は枠側）／limit は 1..10 にクランプ（0→1・99→10・最大10件） | C.9.1 |

@@ -188,6 +188,16 @@ class Settings(BaseSettings):
     # 再生成 EP（評価者権限）は本フラグに依らず常時可（明示操作）。
     llm_auto_evaluate_on_publish: bool = False
 
+    # おすすめクエスト選出（SC-01 ダッシュボード Zone D・ダッシュボード再設計 Phase3）。
+    # score = w_align·整合率 + w_active·直近活発 + w_admin·recommended（各成分 0..1 正規化の加重和）。
+    # 「参加可」は候補母集団のハードフィルタ（can_discover_quest ∩ 未参加 ∩ 非pending）であり重み化しない。
+    recommend_weight_align: float = 0.45          # 経営資料整合率の重み（適用資料の平均マッチ度）
+    recommend_weight_active: float = 0.35         # 直近活発度の重み（窓内活動を母集団 max で正規化）
+    recommend_weight_admin: float = 0.20          # 管理者お勧め（quests.recommended）の加重和ブースト
+    recommend_active_window_days: int = 30        # 「直近活発」の集計窓（公開アイデア＋チャット＋参加/申請）
+    recommend_default_limit: int = 3              # パネル既定件数（Zone D 最大3）
+    recommend_max_limit: int = 10                 # limit の上限（クランプ）
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

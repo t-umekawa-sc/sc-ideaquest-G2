@@ -1971,6 +1971,81 @@ def get_catalog_detail(account_id, company_id, quest_id) -> dict:
         return dto
 
 
+# --- おすすめの参加可能クエスト（SC-01 Zone D・C.9.1・ダッシュボード再設計 Phase3） ---
+
+def _align_for_quest(ts, quest_id) -> float:
+    """クエストの経営資料整合率＝適用資料 × 公開アイデアの平均マッチ度（0..1・R.2 の `quest_match_by_doc` 流用）。
+    資料0件/アイデア0件→0。読取のみ（LLM を呼ばず既存 `idea_alignment` キャッシュを集計）。"""
+    from app.tenant.strategy import repository as strategy_repo
+
+    docs = strategy_repo.strategy_docs_for_quest(ts, quest_id)
+    if not docs:
+        return 0.0
+    idea_ids = [i.id for i in ideas_repo.list_published_ideas_for_quest(ts, quest_id)]
+    if not idea_ids:
+        return 0.0
+    agg = strategy_repo.quest_match_by_doc(ts, idea_ids, [d[0] for d in docs])
+    vals = [a["avg"] for a in (agg.get(d[0]) for d in docs) if a]
+    return (sum(vals) / len(vals)) if vals else 0.0
+
+
+def score_and_rank(items, *, w_align, w_active, w_admin, limit):
+    """おすすめスコア＝加重和（align/active/admin）で降順ランク・上位 `limit`（純関数・C-TC-311）。
+
+    `items`＝`[{align:0..1, active_raw:int, admin:0/1, updated_at, id}]`。`active` は母集団内 max で 0..1 正規化
+    （max=0 なら全て 0）。tie-break＝score 降順 → `updated_at` 降順 → `id` 昇順。各要素に `active`/`score` を付す。"""
+    max_active = max((it["active_raw"] for it in items), default=0)
+    ranked = []
+    for it in items:
+        active = (it["active_raw"] / max_active) if max_active else 0.0
+        score = w_align * it["align"] + w_active * active + w_admin * it["admin"]
+        ranked.append({**it, "active": active, "score": score})
+    ranked.sort(key=lambda it: (-it["score"], -it["updated_at"].timestamp(), str(it["id"])))
+    return ranked[:limit]
+
+
+def get_recommended_quests(account_id, company_id, *, limit=None) -> dict:
+    """おすすめの参加可能クエスト（SC-01 Zone D・C.9.1）。候補＝`can_discover_quest` ∩ 未参加 ∩ 非pending を
+    加重和スコアで上位 `limit`。メタのみ（中身は返さない）。グレースフル＝整合率/活動が欠けても 0 成分で続行。"""
+    from app.core.config import get_settings
+
+    s = get_settings()
+    lim = s.recommend_default_limit if limit is None else limit
+    lim = max(1, min(int(lim), s.recommend_max_limit))  # 1..max にクランプ
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
+        candidates = repo.list_recommend_candidates(ts, user.id, visible)
+        if not candidates:
+            return {"data": []}
+        since = datetime.now(timezone.utc) - timedelta(days=s.recommend_active_window_days)
+        activity = repo.recent_activity_counts(ts, [q.id for q in candidates], since)
+        items = []
+        for q in candidates:
+            try:
+                align = _align_for_quest(ts, q.id)
+            except Exception:  # noqa: BLE001 — 整合率欠損は 0 成分で続行（おすすめは補助機能）
+                align = 0.0
+            items.append({
+                "quest": q, "id": q.id, "updated_at": q.updated_at,
+                "align": align, "active_raw": int(activity.get(q.id, 0)),
+                "admin": 1.0 if q.recommended else 0.0,
+            })
+        ranked = score_and_rank(
+            items, w_align=s.recommend_weight_align, w_active=s.recommend_weight_active,
+            w_admin=s.recommend_weight_admin, limit=lim)
+        rows = [it["quest"] for it in ranked]
+        dtos = _catalog_dtos(ts, rows, user.id)
+        for dto, it in zip(dtos, ranked):  # _catalog_dtos は rows の順序を保つ
+            dto["score"] = round(it["score"], 6)
+        return {"data": dtos}
+
+
 _ACTIVITY_DAYS = 14
 
 

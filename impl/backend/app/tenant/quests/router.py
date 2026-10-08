@@ -44,6 +44,7 @@ from app.tenant.quests.schemas import (
     QuestPartyUpdateRequest,
     QuestPermissionsResponse,
     QuestResultDTO,
+    RecommendedQuestsResponse,
     QuestPublishRequest,
     QuestTransitionRequest,
     QuestUpdateRequest,
@@ -93,6 +94,23 @@ def quest_catalog(
         q=q, category=category, group_id=group_id, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page,
     )
     return QuestCatalogResponse(**result)
+
+
+# 注: 単一セグメント `/quests/recommended` は動的 `/quests/{quest_id}` より前に宣言する（"recommended" が
+# quest_id に捕捉されるのを防ぐ・FastAPI は宣言順でマッチ）。
+@router.get("/quests/recommended", response_model=RecommendedQuestsResponse)
+def quests_recommended(
+    request: Request,
+    limit: int | None = Query(default=None, ge=0),
+    session: dict = Depends(require_me),
+) -> RecommendedQuestsResponse:
+    """おすすめの参加可能クエスト（SC-01 ダッシュボード Zone D・C.9.1）＝score 降順上位 limit。
+
+    候補＝`can_discover_quest` ∩ 未参加 ∩ 非pending。score＝整合率＋直近活発＋管理者お勧め（加重和・config）。
+    limit は 1..max にクランプ（既定3）。メタのみ・中身は返さない。読取専用。"""
+    result = quest_service.get_recommended_quests(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), limit=limit)
+    return RecommendedQuestsResponse(**result)
 
 
 @router.get("/quests/{quest_id}/catalog-detail", response_model=QuestCatalogDetailDTO)
