@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>評価詳細モーダル 検討（#13）— ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* #13 作成者向け 評価詳細（コメント＋得点）＝SC-22/SC-61 から開く URL付きモーダル。評価者ごとの個別スコアカードを一覧。 */
+  body { background: var(--color-bg); min-height: 100vh; }
+  .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.42); padding: var(--space-8) var(--space-4); overflow: auto; }
+  .m13 { width: 680px; max-width: 100%; margin: 0 auto; background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
+  .m13h { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+  .m13h h2 { margin: 0; font-size: var(--text-lg); }
+  .m13h .sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-top: 2px; }
+  .m13b { padding: var(--space-4) var(--space-5) var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); max-height: 70vh; overflow: auto; }
+  .m13x { border: 0; background: none; font-size: var(--text-xl); cursor: pointer; color: var(--color-text-muted); line-height: 1; }
+
+  /* 評価者ごとのスコアカード */
+  .sc { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+  .sc__head { display: flex; align-items: center; gap: var(--space-2); }
+  .sc__name { font-weight: 700; white-space: nowrap; }
+  .sc__head .avatar { flex: 0 0 auto; }
+  .sc__meta { margin-left: auto; color: var(--color-text-muted); font-size: var(--text-xs); }
+  .avatar.sm { --avatar-size: 24px; }
+
+  .score-row { display: grid; grid-template-columns: 104px 1fr 34px; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+  .score-row__label { font-size: var(--text-sm); }
+  .score-bar { height: 8px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
+  .score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+  .score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
+  /* 観点別コメントは「項目名」と横位置をずらすためバー開始位置まで字下げ（ラベル幅＋gap）。未入力は淡色イタリックで「コメントなし」＝行高を揃える。 */
+  .score-row__cmt { padding-left: calc(104px + var(--space-3)); margin: 0 0 var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }
+  .score-row__cmt.is-empty { font-style: italic; opacity: .55; }
+  .eval-section-label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: var(--space-3) 0 var(--space-1); }
+  .sc__overall { border-left: 3px solid var(--color-primary-border); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3); font-size: var(--text-sm); line-height: 1.7; }
+
+  /* AI スコアカード（別枠・紫アクセント） */
+  :root { --ai-accent: #7c5cff; --ai-accent-soft: #efeaff; --ai-accent-border: #d6ccff; }
+  .sc.ai { border-color: var(--ai-accent-border); }
+  .sc.ai .score-bar > i { background: var(--ai-accent); }
+  .sc.ai .sc__overall { border-left-color: var(--ai-accent-border); background: var(--ai-accent-soft); }
+  .ai-badge { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); font-weight: 700; color: var(--ai-accent); background: var(--ai-accent-soft); border: 1px solid var(--ai-accent-border); border-radius: var(--radius-full); padding: 1px 8px; }
+  .sc.ai .avatar__img.placeholder { background: var(--ai-accent); color: #fff; }
+
+  .vis-note { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-2) var(--space-3); }
+  .rec { display:inline-flex; align-items:center; gap:4px; font-weight:700; font-size:var(--text-xs); border-radius:var(--radius-full); padding:1px 9px; border:1px solid transparent; }
+  .rec.pivot { color:#9a6b00; background:#fdf1d6; border-color:#f0dca3; }
+  .scope-switch { display:flex; gap:var(--space-2); }
+  .scope-switch .btn-sm { font-size: var(--text-xs); }
+</style>
+</head>
+<body>
+<div class="backdrop">
+  <div class="m13" role="dialog" aria-modal="true" aria-label="評価詳細">
+    <div class="m13h">
+      <div>
+        <h2>評価詳細</h2>
+        <div class="sub">夜間配送ルートの統合最適化 ・ 評価者2名＋AI</div>
+      </div>
+      <button class="m13x" aria-label="閉じる">×</button>
+    </div>
+    <div class="m13b">
+      <div class="vis-note">🔎 公開範囲（パーティ全員／限定／非公開）に応じて、<strong>あなたに公開されている評価のみ</strong>を表示します（範囲外は含みません・F.0/F.1）。この画面は投稿者以外の閲覧者も開けます。<strong>投稿者は自分のアイデアへの全評価を公開範囲に関わらず閲覧できます</strong>。</div>
+
+      <!-- 評価者1（人間・個別スコアカード） -->
+      <div class="sc">
+        <div class="sc__head">
+          <span class="avatar sm"><span class="avatar__img placeholder">山</span></span>
+          <span class="sc__name">山田 太郎</span>
+          <span class="sc__meta">2026-10-06 確定 ・ 🔓 パーティ全員</span>
+        </div>
+        <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+        <p class="score-row__cmt">既存の配車にない統合発想。類似の社内事例は無い。</p>
+        <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:70%"></i></span><span class="score-row__val">3.5</span></div>
+        <p class="score-row__cmt">拠点間の調整が鍵。パイロットの3拠点選定を早めに。</p>
+        <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">コスト</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="eval-section-label">総評</div>
+        <div class="sc__overall">実現性の担保が課題だが、コスト効果と環境貢献を両立できる点は非常に魅力的。まず首都圏3拠点のパイロットで数字を出せれば、全社展開の説得力が一気に高まる。</div>
+      </div>
+
+      <!-- 評価者2（人間） -->
+      <div class="sc">
+        <div class="sc__head">
+          <span class="avatar sm"><span class="avatar__img placeholder">田</span></span>
+          <span class="sc__name">田中 一郎</span>
+          <span class="sc__meta">2026-10-07 確定 ・ 🔕 非公開（あなたと評価者のみ）</span>
+        </div>
+        <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:66%"></i></span><span class="score-row__val">3.3</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:86%"></i></span><span class="score-row__val">4.3</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">コスト</span><span class="score-bar"><i style="width:84%"></i></span><span class="score-row__val">4.2</span></div>
+        <p class="score-row__cmt">削減幅が大きく、初期投資も小さい。費用対効果は高い。</p>
+        <div class="eval-section-label">総評</div>
+        <div class="sc__overall">費用対効果が明確で優先度は高い。実行に移すなら早期に物流部と合意形成を進めたい。</div>
+      </div>
+
+      <!-- AI 評価（別枠スコアカード） -->
+      <div class="sc ai">
+        <div class="sc__head">
+          <span class="avatar sm"><span class="avatar__img placeholder">AI</span></span>
+          <span class="sc__name">AI評価</span>
+          <span class="ai-badge">🤖 qwen3-swallow</span>
+          <span class="sc__meta">2026-10-08 14:32 生成</span>
+        </div>
+        <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:84%"></i></span><span class="score-row__val">4.2</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:64%"></i></span><span class="score-row__val">3.2</span></div>
+        <p class="score-row__cmt">3拠点の需要変動差が大きく、ルート統合の調整コストが読みにくい。</p>
+        <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+        <p class="score-row__cmt">経営資料「中期物流戦略」の重点領域と一致（embedding 類似 上位）。</p>
+        <div class="score-row"><span class="score-row__label">コスト</span><span class="score-bar"><i style="width:82%"></i></span><span class="score-row__val">4.1</span></div>
+        <p class="score-row__cmt is-empty">コメントなし</p>
+        <div class="eval-section-label">総評</div>
+        <div class="sc__overall">積載率改善による運行コスト削減は定量効果が見込め、経営方針との整合も高い。拠点間の運用調整が実現性の主リスク。パイロットのKPIを事前に定義することを推奨。</div>
+      </div>
+
+      <div class="vis-note">※ コンセプトの評価詳細（SC-61）も同じモーダルで、観点が <strong>8観点</strong>・各カードに <span class="rec pivot">↻ Pivot</span> のような Go/Pivot/Kill 推奨バッジが付く（それ以外は同一）。</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

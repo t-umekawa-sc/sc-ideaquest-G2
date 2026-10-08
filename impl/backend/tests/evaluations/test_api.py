@@ -174,6 +174,26 @@ def test_f_tc_111_limited_hidden_but_coin_counts(client, env):
     assert body["coin"]["projected"] == 30       # visibility 無視＝(2+4)/2=3 → 30
 
 
+def test_f_tc_213_private_hidden_even_from_manager(client, env):
+    """F-TC-213: private（非公開＝投稿者＋その評価者のみ）は owner/quest_admin にも非表示（limited より1段狭い）。
+
+    コインは visibility 無視で全 submitted 算入（現行どおり）＝FR-50/§9・2026-10-08。
+    ACME-01 は quest_admin（manager）だが author でも当該評価者でもない＝private の範囲外。
+    """
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_perms=["quest_admin"])   # ACME-01 = quest_admin（manager）
+    idea = env.make_idea(quest_id=qid, author=env.other_id)
+    env.add_member(qid, env.third_id, ["evaluator"])
+    env.seed_evaluation(idea, env.other_id, val=2, visibility="party")     # 可視
+    env.seed_evaluation(idea, env.third_id, val=4, visibility="private")   # manager にも非表示
+    r = client.get(EVAL(idea))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["evaluator_count"] == 1          # party の1件のみ（private は manager にも出さない）
+    assert body["aspects"]["novelty"] == 2.0     # private を分母に入れない
+    assert body["coin"]["projected"] == 30       # visibility 無視＝(2+4)/2=3 → 30
+
+
 # ---- F.2 登録/更新 ----
 
 def test_f_tc_102_draft_partial_no_grant(client, env):

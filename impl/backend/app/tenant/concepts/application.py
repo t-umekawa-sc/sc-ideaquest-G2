@@ -973,11 +973,12 @@ def get_concept_eval_revision_diff(account_id, company_id, concept_id, revision,
 
 
 def _can_view_eval(concept, user, ev, is_manager: bool) -> bool:
+    # party＝全員／limited＝投稿者＋評価者＋owner/quest_admin／private＝投稿者＋評価者のみ（2026-10-08・F と同型）。
     if ev.visibility == "party":
         return True
     if ev.evaluator_id == user.id or concept.author_id == user.id:
         return True
-    return is_manager
+    return is_manager and ev.visibility == "limited"
 
 
 def _validate_submitted_eval(body) -> None:

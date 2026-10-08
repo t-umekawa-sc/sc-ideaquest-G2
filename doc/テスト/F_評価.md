@@ -37,6 +37,7 @@
 | F-TC-110 | api | 集計取得（観点別平均・総合・評価者一覧・coin.projected） | submitted 2名（evaluator 権限） | `GET .../evaluation` | `aspects`/`overall_avg`/`evaluator_count=2`/`evaluators[]`/`coin.projected` | F.1 |
 | F-TC-111 | api | limited は範囲外に完全非表示（分母にも入れない） | limited 評価（他評価者）＋party 評価 | 範囲外ユーザーで `GET .../evaluation` | limited を除外して集計・`evaluators[]` にも出ない | F.1 |
 | F-TC-112 | api | コイン見込みは visibility 無視で全 submitted 算定 | party1＋limited1（範囲外閲覧） | `GET .../evaluation` | 集計平均は party のみ・`coin.projected` は両方（全 submitted）で算定 | F.1／F.4 |
+| F-TC-213 | api | **private（非公開）は owner/quest_admin にも非表示**（limited より1段狭い）・コインは全 submitted 算入 | party1＋private1（他評価者）を quest_admin が閲覧 | `GET .../evaluation` | private を集計/`evaluators[]` から除外（manager でも見えない）・`coin.projected` は両方で算定 | F.1（visibility private・2026-10-08）／FR-50 |
 
 ## 3. 選定・投稿者コイン確定 API（F.3/F.4）
 
@@ -76,3 +77,4 @@
 | F-TC-208 | api | 非パーティー員の選定/解除は 404（存在秘匿・IDOR） | 作成者=other・seed は非メンバー・公開アイデア | `POST/DELETE /ideas/{id}/select`（seed） | いずれも 404（`_resolve_evaluable_idea` の門番） | F.0 |
 | F-TC-209 | api | 提出済み評価0件の集計は空 | party・提出0のアイデア | `GET /ideas/{id}/evaluation` | `evaluator_count=0`・`overall_avg=null`・`coin.projected=0` | F.1 |
 | F-TC-210 | e2e | 既存評価を無変更で再確定＝API を呼ばず info「変更はありません」（保存ボタン統一・再確定の誤通知防止） | API で submitted 評価を作成→`/ideas/{id}/eval`（プリフィル済） | 何も変えず「評価を確定」 | `info`「変更はありません」が出て「評価を更新しました」は出ない＝無変更の再確定で putEvaluation を呼ばない（状態=submitted・内容不変）。draft→submitted 等の状態遷移は対象外 | デザイン標準 §14／F.2 |
+| F-TC-214 | e2e | **公開範囲外の閲覧者に評価が表示されない**（private＝投稿者＋その評価者のみ・owner でも不可） | owner=ACME-01 の quest に、別ユーザ author の published アイデア＋別ユーザの `private` 評価（総評=秘密）を psql seed | ACME-01 で `/ideas/{id}` を表示 | 秘密総評・private のスコア平均がどこにも出ない＝「まだ提出済みの評価がありません」（可視0件）。範囲外には完全非表示（owner でも private は見えない） | F.1（visibility private・2026-10-08）／FR-50 |

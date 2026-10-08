@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>評価パネル 代表コメント（タブ切替）検討 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-22 右レール「評価結果」パネルの検討モック。観点別コメント/総評を「観点ごと代表1件」に絞り、
+     代表の選び方を タブ（高評価/合意=平均に近い/懸念=最低）で切替。既定=合意。代表行に「他N件→詳細(#13)」。
+     実装クラス（eval-head/eval-avg/score-row/eval-section-label/eval-overall/eval-comment）踏襲。 */
+  body { background: var(--color-bg); }
+  .rail { max-width: 380px; margin: var(--space-6) auto; }
+
+  .eval-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+  .eval-avg { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); }
+  .eval-avg__num { font-size: var(--text-3xl); font-weight: 800; color: var(--color-primary); line-height: 1; }
+  .eval-avg__max { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .eval-avg__coin { margin-left: auto; font-size: var(--text-sm); }
+  .score-row { display: grid; grid-template-columns: 76px 1fr 30px; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
+  .score-row__label { font-size: var(--text-sm); }
+  .score-bar { height: 8px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
+  .score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+  .score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
+
+  .eval-section-label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: var(--space-4) 0 var(--space-2); display:flex; align-items:center; gap: var(--space-2); }
+  .eval-sep { border: 0; border-top: 1px solid var(--color-border); margin: var(--space-4) 0 0; }
+  .eval-section-label .hint-mini { font-weight: 400; font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  /* 代表の選び方タブ＝ダッシュボードの .dash-tabs/.dash-tab（未投票/承認待ち/下書き）と同じ下線タブに統一 */
+  .dash-tabs { display: flex; align-items: flex-end; gap: var(--space-1); row-gap: var(--space-2); flex-wrap: wrap; border-bottom: 2px solid var(--color-border); margin-bottom: var(--space-3); }
+  .dash-tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-2) var(--space-3); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background .12s, color .12s; }
+  .dash-tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
+  .dash-tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
+
+  .eval-overall { display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-overall__item { border-left: 3px solid var(--color-primary-border); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3); }
+  .eval-comments { display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-comment { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+  .eval-comment:first-child { border-top: 0; padding-top: 0; }
+  .eval-comment__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); flex-wrap: wrap; }
+  .eval-comment__aspect { }
+  /* コメントは項目名と横位置をずらして字下げ（評価者行の下にぶら下げる） */
+  .eval-comment__text { margin: var(--space-1) 0 0; padding-left: 30px; font-size: var(--text-sm); line-height: 1.7; }
+  .eval-overall__item .eval-comment__text { padding-left: 0; }
+  .more-link { margin-left: auto; font-size: var(--text-xs); white-space: nowrap; }
+  .more-link a { color: var(--color-primary); cursor: pointer; }
+  .cmt-empty { color: var(--color-text-muted); font-style: italic; opacity: .6; font-size: var(--text-sm); padding-left: 30px; margin: var(--space-1) 0 0; }
+</style>
+</head>
+<body>
+<div class="rail">
+  <section class="card" aria-label="評価結果">
+    <div class="eval-head">
+      <h2 class="card-title" style="margin:0">評価結果</h2>
+      <button class="btn btn-sm btn-outline" type="button">☆ このアイデアを選定</button>
+    </div>
+
+    <div class="eval-avg">
+      <span class="eval-avg__num">3.8</span>
+      <span class="eval-avg__max">/ 5.0（平均・評価者3名）</span>
+      <span class="eval-avg__coin"><span class="pixel-stat coin">◆ +38</span></span>
+    </div>
+    <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+    <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:73%"></i></span><span class="score-row__val">3.7</span></div>
+    <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:57%"></i></span><span class="score-row__val">2.8</span></div>
+    <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:83%"></i></span><span class="score-row__val">4.2</span></div>
+    <div class="score-row"><span class="score-row__label" title="低コストほど高得点">コスト</span><span class="score-bar"><i style="width:85%"></i></span><span class="score-row__val">4.3</span></div>
+
+    <!-- スコア（観点平均）とコメントは別の意味合いなので仕切り線で区切る -->
+    <hr class="eval-sep">
+
+    <!-- 代表の選び方タブ（観点別コメント・総評に共通適用）＝ダッシュボードと同じ下線タブ -->
+    <!-- 「コメント」は「評価結果」と同格の見出し＝card-title フォントに合わせる -->
+    <h2 class="card-title" style="margin:var(--space-4) 0 var(--space-2)">コメント</h2>
+    <div class="dash-tabs" role="tablist" aria-label="代表コメントの選び方">
+      <button class="dash-tab" data-tab="high" role="tab" aria-selected="false">高評価</button>
+      <button class="dash-tab is-active" data-tab="avg" role="tab" aria-selected="true">合意</button>
+      <button class="dash-tab" data-tab="low" role="tab" aria-selected="false">懸念</button>
+    </div>
+    <div class="hint-mini" style="margin:0 0 var(--space-2);font-size:var(--text-xs);color:var(--color-text-muted)">
+      観点・総評ごとに<strong id="tabDesc">平均に最も近い</strong>評価者のコメントを1件表示（同点は先の評価）。「他N件」で全件（評価詳細）へ。
+    </div>
+
+    <!-- 総評（代表1件） -->
+    <div class="eval-section-label">総評</div>
+    <div class="eval-overall" id="overallWrap"></div>
+
+    <!-- 観点別コメント（観点ごと代表1件） -->
+    <div class="eval-section-label">観点別コメント</div>
+    <div class="eval-comments" id="aspectWrap"></div>
+
+    <p class="role-note" style="margin-top:var(--space-3)">
+      5観点は<strong>均等平均</strong>。コインは <code>round(平均×10)</code>（最大50）。コメントは<strong>観点ごと代表1件</strong>表示（全件は「評価詳細」＝#13）。
+    </p>
+    <div class="modal__foot" style="margin-top:var(--space-4)">
+      <a class="btn btn-primary" href="#">評価する / 編集</a>
+    </div>
+  </section>
+</div>
+
+<script>
+  // 各タブ（high=最高得点 / avg=平均に近い / low=最低得点）の代表コメント。others=その観点に付いた他コメント数。
+  const AV = (who,ini,cmt,others)=>({who,ini,cmt,others});
+  const ASPECTS = [
+    { label:'新規性', high:AV('山田 太郎','山','既存の配車にない統合発想。社内に類似事例なし。',0), avg:AV('山田 太郎','山','既存の配車にない統合発想。社内に類似事例なし。',0), low:AV('山田 太郎','山','既存の配車にない統合発想。社内に類似事例なし。',0) },
+    { label:'影響度', high:AV('田中 一郎','田','全社展開すれば削減インパクトは大きい。',1), avg:AV('田中 一郎','田','全社展開すれば削減インパクトは大きい。',1), low:AV('佐藤 花子','佐','効果は拠点次第で、全社一律の効果は読みにくい。',1) },
+    { label:'実現度', high:AV('山田 太郎','山','拠点間の調整が鍵。パイロットの3拠点選定を早めに。',2), avg:AV('田中 一郎','田','段階導入なら現実的。まず1拠点から。',2), low:AV('佐藤 花子','佐','技術的に困難。要件が重く、PoC を前提にすべき。',2) },
+    { label:'適合性', high:AV('山田 太郎','山','中期物流戦略の重点領域に直結。',1), avg:AV('佐藤 花子','佐','方針とは合うが、対象範囲の定義が曖昧。',1), low:AV('佐藤 花子','佐','方針とは合うが、対象範囲の定義が曖昧。',1) },
+    { label:'コスト', high:AV('山田 太郎','山','初期投資が小さく、着手のハードルは低い。',1), avg:AV('田中 一郎','田','費用対効果は明確で優先度は高い。',1), low:AV('田中 一郎','田','費用対効果は明確で優先度は高い。',1) },
+  ];
+  // 総評（代表1件・全体平均で選定）。
+  const OVERALL = {
+    high: AV('山田 太郎','山','実現性の担保は課題だが、コスト効果と環境貢献を両立できる点は非常に魅力的。まず3拠点パイロットで数字を。',2),
+    avg:  AV('田中 一郎','田','費用対効果が明確で優先度は高い。実行に移すなら早期に物流部と合意形成を進めたい。',2),
+    low:  AV('佐藤 花子','佐','技術リスクが高く、現状の前提では実現性に不安。PoC で要件を固めてから投資判断すべき。',2),
+  };
+  const TAB_DESC = { high:'最も高く評価した', avg:'平均に最も近い', low:'最も低く評価した' };
+
+  function avatar(ini){ return `<span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">${ini}</span></span>`; }
+  function moreLink(n){ return n>0 ? `<span class="more-link"><a>他${n}件 →</a></span>` : ''; }
+
+  function render(tab){
+    document.getElementById('tabDesc').textContent = TAB_DESC[tab];
+    // 総評
+    const o = OVERALL[tab];
+    document.getElementById('overallWrap').innerHTML = `
+      <div class="eval-overall__item">
+        <div class="eval-comment__head">${avatar(o.ini)}<span class="chat-msg__name">${o.who}</span>${moreLink(o.others)}</div>
+        <p class="eval-comment__text">${o.cmt}</p>
+      </div>`;
+    // 観点別
+    document.getElementById('aspectWrap').innerHTML = ASPECTS.map(a=>{
+      const r = a[tab];
+      return `<div class="eval-comment">
+        <div class="eval-comment__head"><span class="badge badge-muted eval-comment__aspect">${a.label}</span>${avatar(r.ini)}<span class="chat-msg__name">${r.who}</span>${moreLink(r.others)}</div>
+        <p class="eval-comment__text">${r.cmt}</p>
+      </div>`;
+    }).join('');
+  }
+  const tabs = document.querySelectorAll('.dash-tabs .dash-tab');
+  tabs.forEach(b=> b.addEventListener('click', ()=>{
+    tabs.forEach(x=>{ const on = x===b; x.setAttribute('aria-selected', on?'true':'false'); x.classList.toggle('is-active', on); });
+    render(b.dataset.tab);
+  }));
+  render('avg');
+</script>
+</body>
+</html>

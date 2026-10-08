@@ -352,15 +352,18 @@ def _viewer_is_manager(ts, quest, user) -> bool:
 
 
 def _can_view_evaluation(idea, user, ev, is_manager: bool) -> bool:
-    """評価の閲覧可否（visibility 適用・F.1）。party＝全員／limited＝投稿者＋当該評価者＋owner/quest_admin。
+    """評価の閲覧可否（visibility 適用・F.1）。party＝全員／limited＝投稿者＋当該評価者＋owner/quest_admin／
+    private＝投稿者＋当該評価者のみ（owner/quest_admin も不可・limited より 1 段狭い・2026-10-08）。
 
     `is_manager`＝`_viewer_is_manager`（ページ内不変）を受け取り、per-評価の権限クエリ（N+1）を避ける。
     """
     if ev.visibility == "party":
         return True
+    # limited/private 共通＝投稿者＋当該評価者は常に可視。
     if ev.evaluator_id == user.id or idea.author_id == user.id:
         return True
-    return is_manager
+    # owner/quest_admin は limited のみ可（private は投稿者＋評価者に閉じる）。
+    return is_manager and ev.visibility == "limited"
 
 
 def _guard_not_completed(quest) -> None:

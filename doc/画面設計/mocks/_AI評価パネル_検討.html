@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI評価パネル 検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討用モック。SC-22 評価パネルのクラス体系（eval-*・score-row 等）を踏襲し、AI評価ブロックだけ追加検討する。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-6); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .note-band { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* 評価パネル共通（SC-22 mock から踏襲） */
+  .eval-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+  .eval-avg { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); }
+  .eval-avg__num { font-size: var(--text-3xl); font-weight: 800; color: var(--color-primary); line-height: 1; }
+  .eval-avg__max { color: var(--color-text-muted); }
+  .eval-avg__coin { margin-left: auto; font-size: var(--text-sm); }
+  .score-row { display: grid; grid-template-columns: 96px 1fr 34px; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+  .score-row__label { font-size: var(--text-sm); }
+  .score-bar { height: 8px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
+  .score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+  .score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
+  .eval-comments { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-section-label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: var(--space-4) 0 var(--space-2); }
+  .eval-overall { display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-overall__item { border-left: 3px solid var(--color-primary-border); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3); }
+  .eval-comment { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+  .eval-comment:first-child { border-top: 0; padding-top: 0; }
+  .eval-comment__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+  .eval-comment__aspect { margin-left: auto; }
+  .eval-comment__text { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: 1.7; }
+
+  /* --- AI評価ブロック（検討ポイント） --- */
+  /* 人間評価と視覚的に区別：AIアクセント色＋ロボットバッジ＋カード左帯 */
+  :root { --ai-accent: #7c5cff; --ai-accent-soft: #efeaff; --ai-accent-border: #d6ccff; }
+  .ai-eval { border-left: 4px solid var(--ai-accent); }
+  .ai-badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 700;
+    color: var(--ai-accent); background: var(--ai-accent-soft); border: 1px solid var(--ai-accent-border);
+    border-radius: var(--radius-full); padding: 2px 10px; }
+  .ai-meta { color: var(--color-text-muted); font-size: var(--text-xs); margin: 0; }
+  .ai-eval .score-bar > i { background: var(--ai-accent); }
+  .ai-eval .eval-overall__item { border-left-color: var(--ai-accent-border); background: var(--ai-accent-soft); }
+  .ai-eval .avatar__img.placeholder { background: var(--ai-accent); color: #fff; }
+  /* Go/Pivot/Kill 推奨チップ（コンセプト） */
+  .rec-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: var(--text-sm);
+    border-radius: var(--radius-full); padding: 3px 12px; border: 1px solid transparent; }
+  .rec-chip.go { color: #0a7d4b; background: #e3f7ec; border-color: #b7e8cd; }
+  .rec-chip.pivot { color: #9a6b00; background: #fdf1d6; border-color: #f0dca3; }
+  .rec-chip.kill { color: #b42318; background: #fde7e5; border-color: #f4c3bd; }
+  /* 再生成（AiGenerateControl 分割ボタン）のイメージ */
+  .split-btn { display: inline-flex; }
+  .split-btn .btn-primary { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .split-btn .split-caret { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.35); padding-inline: var(--space-2); }
+  details.ai-revs { margin-top: var(--space-3); }
+  details.ai-revs > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .rev-row { display: flex; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); padding: 2px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI評価パネル 検討モック（SC-22 / SC-62）</h1>
+  <div class="note-band">
+    検討点：人間評価とは<strong>別枠カード</strong>で「🤖 AI評価」を出す。集計平均・付与コインには AI も算入（§F.1/F.4）だが個票は別枠。<br>
+    再生成は<strong>評価者権限保持者のみ</strong>。#13＝作成者（被評価者）も得点＋コメントを visibility 範囲内で閲覧可。
+  </div>
+
+  <!-- ============ アイデア評価（右レール想定・幅固定） ============ -->
+  <h1 style="font-size:var(--text-base);color:var(--color-text-muted)">① アイデア評価（5観点）</h1>
+
+  <!-- 人間評価（既存・#13で作成者にも詳細表示） -->
+  <section class="card" aria-label="評価結果">
+    <div class="eval-head">
+      <h2 class="card-title" style="margin:0">評価結果</h2>
+      <span class="badge badge-muted" title="評価者が指定した公開範囲">🔓 公開: パーティー全員</span>
+    </div>
+    <div class="eval-avg">
+      <span class="eval-avg__num">4.1</span><span class="eval-avg__max">/ 5.0（平均・評価者2名＋AI）</span>
+      <span class="eval-avg__coin"><span class="pixel-stat coin">◆ +41</span></span>
+    </div>
+    <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:88%"></i></span><span class="score-row__val">4.4</span></div>
+    <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+    <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:68%"></i></span><span class="score-row__val">3.4</span></div>
+    <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:88%"></i></span><span class="score-row__val">4.4</span></div>
+    <div class="score-row"><span class="score-row__label" title="低コストほど高得点">コスト<span class="muted">ⓘ</span></span><span class="score-bar"><i style="width:86%"></i></span><span class="score-row__val">4.3</span></div>
+
+    <div class="eval-section-label">総評</div>
+    <div class="eval-overall">
+      <div class="eval-overall__item">
+        <div class="eval-comment__head">
+          <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">山</span></span>
+          <span class="chat-msg__name">山田 太郎</span>
+        </div>
+        <p class="eval-comment__text">実現性の担保が課題だが、コスト効果と環境貢献を両立できる点は魅力的。まず3拠点パイロットで数字を。</p>
+      </div>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-3)">▲ #13＝作成者（被評価者）もこの得点＋コメントを visibility 範囲内で閲覧可。</p>
+  </section>
+
+  <!-- ★ AI評価ブロック（新規） -->
+  <section class="card ai-eval" aria-label="AI評価">
+    <div class="eval-head">
+      <span class="ai-badge">🤖 AI評価</span>
+      <span class="badge badge-muted" title="実行モデル">qwen3-swallow</span>
+    </div>
+    <p class="ai-meta" style="margin-top:var(--space-1)">2026-10-08 14:32 生成 ・ 独立した評価者として採点（集計・コインに算入）</p>
+
+    <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+    <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:84%"></i></span><span class="score-row__val">4.2</span></div>
+    <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:64%"></i></span><span class="score-row__val">3.2</span></div>
+    <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+    <div class="score-row"><span class="score-row__label" title="低コストほど高得点">コスト<span class="muted">ⓘ</span></span><span class="score-bar"><i style="width:82%"></i></span><span class="score-row__val">4.1</span></div>
+
+    <div class="eval-section-label">総評</div>
+    <div class="eval-overall">
+      <div class="eval-overall__item">
+        <div class="eval-comment__head">
+          <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">AI</span></span>
+          <span class="chat-msg__name">AI評価</span>
+        </div>
+        <p class="eval-comment__text">積載率改善による運行コスト削減は定量効果が見込め、経営方針「物流効率化」との整合も高い。一方で拠点間の運用調整が実現性の主リスク。パイロットのKPIを事前に定義することを推奨。</p>
+      </div>
+    </div>
+
+    <div class="eval-section-label">観点別の根拠</div>
+    <div class="eval-comments">
+      <div class="eval-comment">
+        <div class="eval-comment__head">
+          <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">AI</span></span>
+          <span class="chat-msg__name">AI評価</span>
+          <span class="badge badge-muted eval-comment__aspect">適合性</span>
+        </div>
+        <p class="eval-comment__text">経営資料「中期物流戦略」の重点領域と一致（embedding 類似 上位）。</p>
+      </div>
+      <div class="eval-comment">
+        <div class="eval-comment__head">
+          <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">AI</span></span>
+          <span class="chat-msg__name">AI評価</span>
+          <span class="badge badge-muted eval-comment__aspect">実現度</span>
+        </div>
+        <p class="eval-comment__text">3拠点の需要変動差が大きく、ルート統合の調整コストが読みにくい。</p>
+      </div>
+    </div>
+
+    <details class="ai-revs">
+      <summary>再生成の履歴（2版）</summary>
+      <div class="rev-row"><span>v2</span><span>2026-10-08 14:32</span><span>再生成：田中（評価者）</span></div>
+      <div class="rev-row"><span>v1</span><span>2026-10-07 09:10</span><span>自動生成（共有時）</span></div>
+    </details>
+
+    <div class="modal__foot" style="margin-top:var(--space-4)">
+      <span class="split-btn">
+        <button class="btn btn-primary">AI評価を再生成</button>
+        <button class="btn btn-primary split-caret" title="モデルを選択">▾</button>
+      </span>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-2)">▲ 再生成は<strong>評価者権限保持者のみ</strong>（owner/quest_admin でも評価者権限が無ければ非表示）。</p>
+  </section>
+
+  <!-- ============ コンセプト評価（8観点＋Go/Pivot/Kill） ============ -->
+  <h1 style="font-size:var(--text-base);color:var(--color-text-muted)">② コンセプト評価（8観点＋Go/Pivot/Kill・SC-62）</h1>
+
+  <section class="card ai-eval" aria-label="コンセプト AI評価">
+    <div class="eval-head">
+      <span class="ai-badge">🤖 AI評価</span>
+      <span class="rec-chip pivot">↻ Pivot 推奨</span>
+    </div>
+    <p class="ai-meta" style="margin-top:var(--space-1)">qwen3-swallow ・ 2026-10-08 15:05 生成（手動）・ 前提/検証を踏まえて採点</p>
+
+    <div class="score-row"><span class="score-row__label">望ましさ</span><span class="score-bar"><i style="width:84%"></i></span><span class="score-row__val">4.2</span></div>
+    <div class="score-row"><span class="score-row__label">実現可能性</span><span class="score-bar"><i style="width:60%"></i></span><span class="score-row__val">3.0</span></div>
+    <div class="score-row"><span class="score-row__label">採算・事業性</span><span class="score-bar"><i style="width:56%"></i></span><span class="score-row__val">2.8</span></div>
+    <div class="score-row"><span class="score-row__label">前提検証の強さ</span><span class="score-bar"><i style="width:48%"></i></span><span class="score-row__val">2.4</span></div>
+    <div class="score-row"><span class="score-row__label">差別化</span><span class="score-bar"><i style="width:78%"></i></span><span class="score-row__val">3.9</span></div>
+    <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:72%"></i></span><span class="score-row__val">3.6</span></div>
+    <div class="score-row"><span class="score-row__label">持続可能性</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+    <div class="score-row"><span class="score-row__label">知的財産</span><span class="score-bar"><i style="width:50%"></i></span><span class="score-row__val">2.5</span></div>
+
+    <div class="eval-section-label">総評＋Go/Pivot/Kill の根拠</div>
+    <div class="eval-overall">
+      <div class="eval-overall__item">
+        <div class="eval-comment__head">
+          <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">AI</span></span>
+          <span class="chat-msg__name">AI評価</span>
+          <span class="rec-chip pivot eval-comment__aspect">Pivot</span>
+        </div>
+        <p class="eval-comment__text">価値仮説の望ましさは高いが、採算モデルの前提（単価×継続率）が未検証で ROI の確度が低い。中核前提「月額継続率60%」の検証イベントが不足。ターゲットを継続利用が見込める既存顧客に絞る Pivot を推奨。</p>
+      </div>
+    </div>
+
+    <div class="modal__foot" style="margin-top:var(--space-4)">
+      <span class="split-btn">
+        <button class="btn btn-primary">AI評価を生成 / 再生成</button>
+        <button class="btn btn-primary split-caret" title="モデルを選択">▾</button>
+      </span>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-2)">▲ コンセプトは<strong>自動起動なし＝手動のみ</strong>・<strong>評価者権限保持者のみ</strong>。AI も Go/Pivot/Kill を根拠付きで出す。</p>
+  </section>
+</div>
+</body>
+</html>

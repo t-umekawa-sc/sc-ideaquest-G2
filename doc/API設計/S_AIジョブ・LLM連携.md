@@ -48,6 +48,8 @@
 ## S.3 モデル指定なしの既定挙動（後方互換）
 
 - `model` 省略＝`task_type` 既定キー（設計 §3.3・§4.1）で実行。**初版の最初の task_type＝`info_summarize`**（既定 `qwen3-light`）／2本目 **`iso_generate`（既定 `qwen3-swallow`・実装済 2026-10-02）**＝経営資料の Markdown から ISO56001 §6 のたたき台を生成（R ドメイン R.5a が内部 enqueue・dev ライブ完走確認済）。
+- **3本目＝`idea_evaluate`（既定 `qwen3-swallow`・実行方式 `queued-worker`・FR-50）**＝アイデアを独立した評価者として5観点採点（構造化 JSON 出力）。**入力＝`{idea_id}`（参照のみ）**＝本文/RAG 文脈はワーカーが実行直前に会社 DB から収集（機微本文の滞留を最小化・§S.7）。`ref_idea_id`＝完了通知の遷移先（SC-22）。`result=`{evaluation_id, scores, model, truncated?}`。起動＝アイデア公開（`published`）時に**ドメイン F が自動 enqueue**（F.7.1）＋評価者権限保持者による再生成（F.7.3）。保存/集計/コインは[F 評価 §F.7](./F_評価.md)。構造化出力必須（§S.2 ガードレール(5) で非対応キーを弾く）。正＝[アイデアLLM自動評価 設計](../設計ドラフト/アイデアLLM自動評価_設計.md)。
+- **4本目＝`concept_evaluate`（既定 `qwen3-swallow`・`queued-worker`・FR-50）**＝コンセプトを独立した評価者として**8観点＋Go/Pivot/Kill 推奨**を採点（構造化 JSON）。**入力＝`{concept_id}`（参照のみ）**。RAG＝コンセプト本体＋由来アイデア＋**前提/検証(assumptions/validations)**＋経営資料 embedding＋8観点ルーブリック。`ref` でコンセプト詳細（SC-61）へ遷移。`result=`{concept_evaluation_id, scores(8), recommendation, model, truncated?}`。**起動＝手動のみ**（評価者権限保持者が[P.5a](./P_コンセプト.md) の生成/再生成 EP から enqueue・アイデアの自動起動とは対照）。保存/集計は[P 評価 §P.5a](./P_コンセプト.md)。設計 §11。
 - registry（論理キー→{provider, model, params, external, billing, enabled}）は**システム全体のカタログ＝コード/設定側**。dev/prod の物理差は設定で吸収し、キー名は同一に保つ（アプリ無改修で載せ替え・設計 §3.2）。
 
 ## S.4 進捗・キャンセル（リアルタイム連携・§L）

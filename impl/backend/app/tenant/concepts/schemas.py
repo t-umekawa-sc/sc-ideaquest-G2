@@ -257,7 +257,8 @@ class LinkDTO(BaseModel):
 # ---- コンセプト評価（P.5） ----
 
 EvalStatus = Literal["draft", "submitted"]
-EvalVisibility = Literal["party", "limited"]
+# private＝投稿者＋その評価者のみ（owner/quest_admin 不可・2026-10-08・F と同 enum）。
+EvalVisibility = Literal["party", "limited", "private"]
 Recommendation = Literal["go", "pivot", "kill"]
 
 

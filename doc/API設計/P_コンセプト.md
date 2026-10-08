@@ -104,13 +104,29 @@
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
 | `GET /concepts/{concept_id}/evaluation/me` | 自分の評価/下書き | パス: `concept_id` | `{status, scores〔{aspect:score}〕, comments〔{aspect:comment}〕, overall_comment, recommendation, visibility, submitted_at}`。未作成は空 |
-| `GET /concepts/{concept_id}/evaluation` | 評価集計（visibility 適用） | パス: `concept_id` | `aspects`〔観点別平均〕・`overall_avg`・`evaluator_count`・`recommendations`〔Go/Pivot/Kill の内訳〕・`evaluators[]`〔可視分のみ〕・`my_evaluation` |
+| `GET /concepts/{concept_id}/evaluation` | 評価集計（visibility 適用） | パス: `concept_id` | `aspects`〔観点別平均〕・`overall_avg`・`evaluator_count`〔人間のみ〕・`recommendations`〔Go/Pivot/Kill の内訳〕・`evaluators[]`〔可視分のみ・各観点スコア/コメント/総評/`recommendation`/`submitted_at`〕・**`ai_evaluation`**〔AI 評価の別枠ブロック・P.5a〕・`my_evaluation` |
 | `PUT /concepts/{concept_id}/evaluation` | upsert（下書き/確定） | `{status: draft\|submitted, scores{中核5必須・補助3任意}, comments?, overall_comment, recommendation, visibility?}` | 更新後の自分の評価。**`submitted` で中核5(1..5)＋総評＋`recommendation` 必須をサーバー検証** |
 
 - **観点＝中核5（desirability/feasibility/viability/assumption_strength/differentiation）必須＋補助3（novelty/sustainability/ip）任意**（§3.6・ISO §8.3.3 準拠・`concept_eval_aspect`）。集計の重み付けは実装時。
 - **`recommendation`（評価者の Go/Pivot/Kill 推奨）**＝候補比較・選定の道具（§3.6）。集計 `recommendations` で分布を可視化。
-- `visibility`（party/limited）は F と同 enum・同挙動（limited は範囲外に完全非表示・集計分母から除外）。
+- `visibility`（party/limited/**private**）は F と同 enum・同挙動（limited/private は範囲外に完全非表示・集計分母から除外／`private`＝投稿者＋その評価者のみ・owner/quest_admin 不可・2026-10-08）。
 - **XP/コイン付与は第一版では行わない**（アイデア評価と同型にするかは実装時＝F の XP+30/コイン連動を踏襲するか要判断）。
+- **コメントの代表表示（SC-61）／評価詳細モーダル（#13）**＝F.1.1/F.1.2 と同型＝観点別コメント・総評は代表1件（タブ＝高評価/合意/懸念・母集団は可視評価・同点は先の確定）＋「他N件→評価詳細」。評価詳細は閲覧者全員が開け、各自の可視範囲に従う（新規 EP 不要・本集計を再利用）。
+
+### P.5a コンセプト AI 評価（独立した評価者・FR-50・2026-10-08）
+
+> アイデア評価（[F.7](./F_評価.md)）と同型。LLM が**8観点＋Go/Pivot/Kill 推奨**を付与し、人間評価と並んで集計・表示する（別枠）。書き込みはジョブ経路のみ。基盤＝[S](./S_AIジョブ・LLM連携.md)（`task_type=concept_evaluate`）。正＝[アイデアLLM自動評価 設計 §11](../設計ドラフト/アイデアLLM自動評価_設計.md)。
+
+| メソッド/パス | 概要 | リクエスト | レスポンス |
+| --- | --- | --- | --- |
+| `POST /concepts/{concept_id}/ai-evaluation/regenerate` | AI 評価を**生成/再生成**（enqueue） | パス: `concept_id`／`Idempotency-Key`（任意） | 202＋`{job_id, status:'queued'}` |
+
+- **起動＝手動のみ**（アイデアの `published` 自動起動とは対照＝コンセプトは反復更新が多いため・設計 §11）。初回生成も再生成も本 EP。
+- **権限＝`evaluator`（FR-27・当該クエストの評価者権限保持者）のみ**（owner/quest_admin でも評価者権限が無ければ 403・F.7.3 と同）。
+- ワーカーが `concept_evaluations` に `evaluator_kind='ai'`・`evaluator_id=NULL`・`ai_job_id`・`model`・`status='submitted'`・`visibility='party'` で upsert（部分ユニーク `UNIQUE(concept_id) WHERE evaluator_kind='ai'`）。**`recommendation` も AI が出す**（go/pivot/kill＋根拠）。上書き前は `concept_evaluation_revisions`（§5.22b）へ版スナップ。
+- **集計算入**＝`aspects`/`overall_avg`/`recommendations` に AI を同列算入（kind 非区別）。個票は `ai_evaluation` 別枠（P.5 GET）。
+- **RAG**＝コンセプト本体＋由来アイデア＋**紐づく前提(assumptions)と検証(assumption_validations)**＋経営資料 embedding＋8観点ルーブリック（設計 §11）。
+- **失敗通知・SC-04 表示**＝F と同方針（失敗は評価者権限保持者＋owner/quest_admin へ通知／自動起動が無いので手動ジョブは実行者の SC-04 に出る）。会社でモデル未有効/タスク無効は 422（graceful）。
 
 ## P.5b コンセプト投票（賛成/反対・軽い参加シグナル・§3.4）
 

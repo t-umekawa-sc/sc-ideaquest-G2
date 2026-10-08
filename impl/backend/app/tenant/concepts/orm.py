@@ -98,11 +98,15 @@ class ConceptEvaluation(CompanyBase):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     concept_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id"), nullable=False)
-    evaluator_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # AI 評価（evaluator_kind='ai'）は evaluator_id=NULL／人間は NOT NULL（CHECK・FR-50・migration 0057）。
+    evaluator_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    evaluator_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="human", server_default="human")  # human/ai
+    ai_job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ai_jobs.id"), nullable=True)
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)  # AI 評価の実行物理モデル名（監査）
     overall_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation: Mapped[str | None] = mapped_column(String(16), nullable=True)  # 評価者の Go/Pivot/Kill 推奨
+    recommendation: Mapped[str | None] = mapped_column(String(16), nullable=True)  # 評価者の Go/Pivot/Kill 推奨（AI も出す）
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft", server_default="draft")
-    visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="party", server_default="party")
+    visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="party", server_default="party")  # party/limited/private
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -162,7 +166,8 @@ class ConceptEvaluationRevision(CompanyBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     evaluation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("concept_evaluations.id", ondelete="CASCADE"), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # 人間評価は編集者 NOT NULL／AI 評価の版は NULL（自動）or 再生成した評価者（FR-50・migration 0057）。
+    editor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # scores/comments/overall_comment/recommendation/visibility
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

@@ -13,7 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 ASPECTS = ("novelty", "impact", "feasibility", "fit", "cost")
 
 EvaluationStatus = Literal["draft", "submitted"]
-EvaluationVisibility = Literal["party", "limited"]
+# private＝投稿者＋その評価者のみ（owner/quest_admin も不可・limited より 1 段狭い・2026-10-08）。
+EvaluationVisibility = Literal["party", "limited", "private"]
 
 
 # ---- request（登録/更新・F.2） ----

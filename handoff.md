@@ -6,82 +6,70 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 更新: 2026-10-08（セッション末）。
 - ブランチ: `main`（main 直 push が慣習）。
-- 最新コミット: **本セッションのまとめコミット（⑥アイデアLLM自動評価の設計ドラフト起票＋AI基盤レベル方針）を push 済み**。直前は `e1779ea9`（①AIモデル選択UI＋UI標準刷新）。正確なハッシュは `git log --oneline -3` で確認。
-- working tree: コミット後 **clean**・`origin/main` 同期済みの想定（再開時 `git status` で確認）。
-- alembic heads（**本セッションで新規 migration なし**・ファイル基準）: control=`0020_signup_challenges`／company=`0056_info_curators_into_user_capabilities`。
+- **未コミットの作業あり**（本セッションは commit していない）。`git status` で確認し、必要に応じてまとめてコミット（red-green 証跡はコミットメッセージへ＝テスト規約 §5.1）。
+- working tree: 変更多数（下記 §3）。コンテナは起動済み（db/redis/minio/mailhog/backend/frontend）＝セッション末は `docker compose ps` で確認。
+- alembic heads: control=`0020_signup_challenges`／company=**`0057_ai_evaluation`**（本セッションで新規・**適用済み**）。
 
 ## 2. プロジェクトのゴール
-ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝**ユーザー指摘txt の消化＋仕様確定済みの未実装機能**を順次処理。①AIモデル選択UI まで消化済み。本セッションは**討議⑥（アイデアLLM自動評価＋RAG）を詰めて設計ドラフト起票**（コード未変更）。
+ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝**⑥ アイデア/コンセプトの LLM 自動評価（FR-50）の正式反映＋実装**。
 
-## 3. 今回やったこと（変更ファイルと理由）
-> 本セッションは**討議と設計ドラフトのみ・プロダクトコードは一切変更していない**。変更＝新規設計ドラフト md 1本と handoff、自分の記憶（メモリ）。
+## 3. 今回やったこと（⑥ 正式反映の設計明文化＋基盤実装・private 可視範囲）
+> UI はユーザーとモックで反復確認して仕様確定 → 設計文書へ明文化 → 基盤スライスを red-green 実装、という流れ。
 
-### 3-1. ⑥ アイデアLLM自動評価＋RAG の設計討議 → ドラフト起票
-- 新規 `doc/設計ドラフト/アイデアLLM自動評価_設計.md` を**他ドラフトと同体裁**で起票（§0〜§10・論点表A〜I・保留論点§7-補・実装順§10）。
-- **位置づけ（ユーザー決定）＝AI は独立した評価者**。目的は〈公平性・評価する/される側のギクシャク回避〉。人間評価者は介入せず自分の言葉で別途評価。**AI 評価は「参考値」ではなく正当な1評価**として集計・コインに正式算入（ユーザーが討議中に「参考値」を明示訂正）。**AI 評価しか付かないケースも想定**＝その場合も投稿者へ集計/コイン付与。
-- **データモデル（決定）＝`evaluations` を拡張**（別テーブルにしない）。`evaluator_kind`(human|ai)追加・`evaluator_id` nullable・`ai_job_id`/`model` 保持・AI1件/ideaは部分ユニークindex（WHERE kind='ai'）。→ F.1集計/F.4コインの既存ロジックを**無改修で流用（DRY）**。表示は kind で別ブロック。
-- **集計・報酬（決定）**＝F.1平均・F.4コインに AI 込み。**F.4確定トリガは従来維持**（全評価者submitted or quest completed・再計算なし）。AI 単独時は quest completed で確定。**XPは現仕様維持**（投稿者XPは選定+200のみ／評価者XP+30はAIに付かない＝アカウント無し）。
-- **起動（決定）**＝アイデア共有(published)時に自動 enqueue（`ref_idea_id`）＋再生成ボタン(quest_admin)。
-- **表示（決定）**＝作成者(被評価者)はAI評価の全文を詳細閲覧可・評価者が採点中に見えても可（気づきの好意的影響として許容）。
-- **基盤**＝新task_type `idea_evaluate`（既定 qwen3-swallow・構造化JSON出力）。RAG＝クエスト本文＋関連情報＋経営資料(embedding top-k・既存A-2基盤)＋5観点ルーブリック。`AiGenerateControl`（分割ボタン）再利用。会社でモデル未有効/task無効なら生成スキップ(graceful)。
+### 3-1. 設計・仕様の明文化（完了）
+- **FR-50**（`doc/要件定義/README.md`）＝アイデア/コンセプト LLM 自動評価（AI は独立した正当な1評価者・集計/コイン算入・別枠表示）。
+- **データモデル**（`doc/データモデル.md`）＝enum `evaluation_evaluator_kind`(human/ai) 追加／§5.21 evaluations に `evaluator_kind`/`ai_job_id`/`model` 追加・`evaluator_id` nullable・部分ユニーク `UNIQUE(idea_id) WHERE kind='ai'`・整合CHECK／§5.22b 版 `editor_id` nullable／§5.43 concept_evaluations も同型／**`evaluation_visibility` に `private` 追加**（投稿者＋その評価者のみ・owner/quest_admin 不可＝limited より1段狭い）。
+- **API設計**＝`F_評価.md` に F.7（AI評価＝自動起動F.7.1/保存F.7.2/再生成EP F.7.3〔評価者権限のみ〕/表示F.7.4/セキュリティ）＋**F.1.1 代表コメント表示（タブ＝高評価/合意〔既定〕/懸念・観点ごと代表1件＋他N件）**＋**F.1.2 #13 評価詳細モーダル（閲覧者全員・可視範囲準拠）**＋private 可視ロジック。`P_コンセプト.md` に P.5a（コンセプトAI評価＝8観点＋Go/Pivot/Kill・**手動のみ**）＋代表表示。`S_AIジョブ・LLM連携.md` S.3 に `idea_evaluate`/`concept_evaluate`。
+- **画面**＝SC-22/SC-61 に AI評価ブロック・代表コメント(タブ)・#13 導線・private を反映。SC-25 に public範囲 private 追記。
+- **UIモック（実装レイアウト＝正に一致・shared.css/実装クラス踏襲）**＝`doc/画面設計/mocks/_AI評価パネル_検討.html`（AIブロック・アイデア5観点/コンセプト8観点+Go/Pivot/Kill）・`_評価パネル代表コメント_検討.html`（評価結果パネル＝ダッシュボード `.dash-tabs` と同じタブ・代表1件・仕切り線・「コメント」を card-title）・`_評価詳細モーダル_検討.html`（#13＝評価者ごとスコアカード・コメント字下げ・未入力は「コメントなし」で行高統一）。
 
-### 3-2. AI実行基盤の「レベル」方針を討議 → レベル1維持で決定
-- 討議内容＝AI に「手順まで考えさせる／ツールを使わせる」エージェント化（レベル2/3）を先行構築すべきか。
-- **決定＝AI実行基盤はレベル1（OpenAI互換の単発チャット補完＋バックエンドが決定論的に用意するRAG）のまま維持**。レベル2（LLMがツール選択→ハーネスが実行して結果を戻す多往復）の先行構築は**見送り**。
-- **原則（ユーザー判断）**＝タスクが既知なら必要な情報取得はバックエンドが決定論的に先回りして揃える（レベル1）。LLMにツール選択を委ねる（レベル2）のは、何が求められているか事前に分からない**開放的な状況＝チャットのようなUI**に限る。消費者が出る前の基盤先行構築はしない（YAGNI・抽象を外すリスク）。
-- 用語整理（討議で確認）＝**ツール**＝実行コード（決定論・呼んで結果が返る／合成しても「合成ツール」でスキルにならない）。**スキル**＝LLMが読む自然言語の手順書＝ライブラリに置き必要時にLLM自身が選んで読み込む再利用プロンプト(progressive disclosure)・手順が多様で選択が要る世界で初めて価値。レベル1=1往復・情報は全部こちら用意／レベル2=多往復・固定ツールをLLMが1手ずつ選ぶ／レベル3=計画+スキル選択+メモリ(大規模・上位モデル必須)。
-- この方針はドラフト §9 に明記。gateway は `impl/backend/app/infra/llm/gateway.py`＝単発補完（`complete()`・`tool_calls` は未パース＝`gateway.py:95-96`）。ワーカー実行部＝`impl/backend/app/tenant/ai_jobs/application.py:450-528`（`_build_messages`→`gateway.complete`→`job.result`）。
+### 3-2. 基盤実装（完了・red-green 済）
+- **migration `0057_ai_evaluation`（company・適用済）**＝evaluations/concept_evaluations 拡張＋版 editor_id nullable（`impl/backend/migrations/company/versions/0057_ai_evaluation.py`）。`\d evaluations` で列/制約確認済。
+- **ORM/schema**＝`evaluations/orm.py`・`concepts/orm.py`（新列・nullable）、`evaluations/schemas.py`・`concepts/schemas.py`（Visibility Literal に `private`）。
+- **private 可視範囲**＝`evaluations/application.py` `_can_view_evaluation`／`concepts/application.py` `_can_view_eval` を `is_manager and visibility=='limited'` に（private は owner/quest_admin にも非表示・投稿者＋評価者のみ）。
+- **テスト**＝**F-TC-213**（api・private は manager にも非表示・`tests/evaluations/test_api.py`・**旧実装で赤→新実装で緑を確認**）／**F-TC-214**（e2e・`e2e/sc-22-eval-visibility.spec.ts`・範囲外に非表示を psql seed で検証・緑）。TC md＝`doc/テスト/F_評価.md`。評価 pytest 33 passed・concepts 77 passed・e2e 緑・TCトレーサビリティ ✅(1033)。
 
-## 4. 現在の状態（動作 / 壊れているもの / テスト）
-- **プロダクトコード変更なし**＝ビルド/テストの状態は前セッション（`e1779ea9`）から不変。frontend `npm run build` ✅／vitest 252 passed・backend pytest 28 passed（§8 の方法で再実行可）。
-- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅（code 1031 件）。本セッション開始時に確認済み。
-- **コンテナ**＝セッション開始時は全て exited（WSL/Docker 再起動後）。再開は `cd impl && docker compose up -d`。
-- **壊れているもの＝無し**。
-- 変更したのは `doc/設計ドラフト/アイデアLLM自動評価_設計.md`（新規）・`handoff.md`・メモリのみ。
+## 4. 現在の状態（動作 / テスト）
+- **壊れているもの＝無し**。private 可視範囲は api+e2e で緑。
+- backend は本セッションで `up -d --build` 済み（0057 適用のため）。frontend も up 済み。
+- **AI 評価本体は未実装**（下記 §7）。現状は「人間評価＋private 可視範囲」まで。
 
-## 5. 詰まっている点（試して失敗したこと・なぜ）
-- 本セッションは討議中心で技術的な詰まりは無し。
-- 前セッションからの教訓は有効＝共有ユーティリティ(.btn等)の上書きは特異度を1段上げる（Next の CSS チャンク順・memory `next-css-chunk-order-specificity`）／UI修正は新コンテナ起動後に実ブラウザ目視（`verify-ui-visually-before-done`）／baked backend の pytest は `-v` マウント or `up -d --build backend`。
+## 5. 詰まっている点
+- e2e の psql seed＝SQL は**単一行**で書く（`psql` ヘルパーが `JSON.stringify` するため改行が `\n` リテラル化して壊れる）。chat 中核は `chat_thread` へ刷新済み＝`chat_messages` に `chat_group_id` は無い／idea 削除前に `chat_groups`（詳細表示で生成される）を消す。
+- backend ベイク＝新規/未コミットテストの反映は `docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest ...`（§8）。ORM 変更を本体に効かせるには `up -d --build backend`。
 
-## 6. 決定事項と根拠（採用しなかった案も）
-- **⑥ AI評価＝独立した評価者・正当な1評価**（参考値でない・集計/コイン算入）。不採用＝参考ドラフト型（人間が確認して反映＝ユーザー思想「評価者が介入すると違う・自分の言葉で付けるべき」に反する）／作成者向けフィードバック型（集計に効かない）。
-- **データモデル＝evaluations拡張**。不採用＝別テーブル完全分離（F.1/F.4二重実装＝DRY違反）／擬似アカウント（accounts/XP/権限汚染）。
-- **コイン確定＝従来トリガ維持／XP＝現仕様維持**。
-- **AI実行基盤＝レベル1維持**（§3-2）。不採用＝レベル2/3 先行構築（消費者無しで抽象を外す＝YAGNI・小型ローカルモデルはツール使用/計画が不安定）。
-- 詳細根拠はドラフト §7 論点表（A〜I）。
+## 6. 決定事項（⑥・すべて確定）
+- AI＝独立した正当な1評価（参考値でない・集計/コイン算入）／evaluations 拡張（別テーブルにしない・DRY）。
+- **再生成＝評価者権限（FR-27）保持者のみ**（owner/quest_admin でも評価者権限無ければ不可）。**再生成は版として残す**（§5.22b）。**バックフィル不要**（新規 published のみ・既存遡及なし）。
+- **コンセプト AI 評価＝手動のみ（自動起動しない）**・8観点＋Go/Pivot/Kill 推奨も AI が出す。
+- **SC-25 折り畳みなし（常時表示）**／**生成失敗通知＝評価者権限保持者＋owner/quest_admin**／**SC-04 表示**＝自動起動ジョブは system 所有(created_by=NULL)で個人SC-04に出さない・再生成は実行者のSC-04に出る。
+- **公開範囲 `private`（新規・人間評価にも適用）**＝投稿者＋その評価者のみ・集計/コインは現行どおり（visibility 無視で全 submitted 算入）。
+- **評価パネルのコメント＝観点ごと代表1件**（タブ＝高評価/合意〔既定〕/懸念・母集団=可視評価・同点は先の確定）＋**総評も代表1件**＋「他N件→#13」。**#13 評価詳細は投稿者に限らず閲覧者全員**（可視範囲準拠）。AIは別枠。
+- 詳細根拠＝`doc/設計ドラフト/アイデアLLM自動評価_設計.md`（§7論点表・§11 コンセプト適用）。
 
-## 7. 次にやること（優先順・ファイル/関数レベル）
-> 着手前にコードで現況裏取り（memory `handoff-notes-often-stale`）。**次セッション最優先＝⑥正式反映に着手**（ユーザー決定）。
+## 7. 次にやること（優先順・⑥ AI 評価本体の実装）
+> 設計は全確定・基盤(private/スキーマ)は実装済。残りは AI 評価パイプライン＋評価パネルUI。**TC md 先行→red-green**（テスト規約§5）。画面は**モック先行済→backend 結線**（§フロント実装フロー）。実装レイアウトを正（モックは一致済だが最終はコンポーネント）。
 
-1. **⑥ アイデアLLM自動評価の正式反映に着手**（最優先）。ドラフト `doc/設計ドラフト/アイデアLLM自動評価_設計.md` §10 の順で：
-   - (a) FR 採番（`doc/要件定義/README.md`）。
-   - (b) `doc/データモデル.md` §5.21-§5.22 に `evaluator_kind`／`evaluator_id` nullable／`ai_job_id`／`model`／部分ユニークindex を追記 → company DB migration 新規。
-   - (c) `doc/API設計/F_評価.md` に AI評価の書き込み経路(ジョブ結果)・再生成EP・集計への算入／`doc/API設計/S_AIジョブ・LLM連携.md` に `task_type=idea_evaluate` を追記。
-   - (d) `doc/画面設計/screens/SC-22`（AI評価ブロック）・`SC-25`（採点中表示）更新・遷移図確認。
-   - (e) TC md 先行（F/S ドメイン）→ 実装（migration→backend ジョブ/保存/集計→frontend 表示/再生成）。
-   - **保留論点（実装前に詰める・ドラフト§7-補）**＝SC-25採点中にAIブロックを折り畳むオプション要否／AI評価の再生成履歴を変更履歴標準で版管理するか／生成失敗のquest_admin通知要否／既存published アイデアへのバックフィル要否。
-2. **④【討議】おすすめクエスト選出アルゴリズム**＝ユーザー案「参加可×経営資料整合率高×直近活発×管理者お勧めマーク、得点上位をパネル最大件数」への意見→合意後に実装（残るもう1つの討議案件）。
-3. **#13 アイデア作成者向け 評価詳細（コメント＋得点）閲覧画面**＝評価ドメイン(F)・SC-22/SC-25 周辺。⑥と同ドメインで相乗り可。既存の可視範囲（visibility=party/limited・F.1集計）を裏取りしてスコープ確定。
-4. **（フォロー・小）DataTable「表示件数」セレクタのカスタム `.combobox` 化**（`impl/frontend/src/components/ui/DataTable.tsx:1146` 付近・ユーザー決定で後回し・全一覧影響のため floatHead/横スクロール目視要）。
-5. **（フォロー）`/info-curators` backend EP と N.5 テストの retire**（generic 能力EPへ移行済・`impl/backend/app/tenant/info/router.py`・削除前に `is_curator`/`list_curators` 以外の参照が無いか grep）。
-6. **② AI処理状況のリアルタイム反映 E2E**（SC-04 ai-jobs・realtime L/WS・共有DB非冪等注意 memory `e2e-full-not-idempotent-shared-db`）。
+1. **backend：AI評価ジョブ**＝`task_type=idea_evaluate`（S.3）worker 実装＝入力`{idea_id}`→会社DBから本文/クエスト/関連情報/経営資料(embedding top-k A-2)収集→プロンプト(5観点ルーブリック・構造化JSON)→`evaluations` に `kind='ai'`/`status='submitted'`/`visibility='party'` upsert（部分ユニーク・上書き前に版スナップ）。**自動起動**＝アイデア `published` 遷移の post-commit で enqueue（F.7.1・Idempotency=idea_id+内容リビジョン）。**再生成EP** `POST /ideas/{id}/ai-evaluation/regenerate`（評価者権限のみ・F.7.3）。gateway=`app/infra/llm/gateway.py`・worker 参考=`app/tenant/ai_jobs/application.py`・既存 `iso_generate`/`info_summarize` が手本。
+2. **backend：コンセプト** `task_type=concept_evaluate`（8観点＋recommendation・**手動のみ** `POST /concepts/{id}/ai-evaluation/regenerate`・P.5a）。RAG に前提/検証(assumptions/validations)も含む。
+3. **backend：F.1 集計に AI 算入＋代表コメント用データ**＝`GET /ideas|concepts/{id}/evaluation` の `evaluators[]` に観点別スコア/コメント/submitted_at、`ai_evaluation` 別枠、`evaluator_count` は人間のみ。コイン(F.4)は kind 非区別で既に全 submitted 算入（確認）。
+4. **frontend：評価パネル**＝`IdeaDetailView`/`ConceptDetailView` の評価結果パネルを代表1件(タブ=`.dash-tabs`)＋他N件＋仕切り線＋「コメント」card-title＋**AI評価ブロック別枠**＋**#13 評価詳細モーダル**(URL付きモーダル・全評価者スコアカード)。SC-25/SC-62 に **private radio** 追加。モック3枚が実装の正。代表選定はクライアント側で可。
+5. **失敗通知/SC-04**＝`ai_task_failed` を評価者権限保持者＋owner/quest_admin へ／自動起動ジョブは `created_by=NULL`。
+6. 仕上げ＝型再生成(`npm run codegen`)・`npm run build`・vitest・targeted pytest・TCトレーサビリティ・**UI実ブラウザ目視**（verify-ui-visually-before-done）。
 
 ### 前セッションからの持ち越し（未着手）
-- Turnstile `size:flexible` 幅の実ブラウザ目視（`impl/.env` の `#TURNSTILE_*` を外して `/signup` 確認・確認後 dev既定へ戻す）。
-- SC-01 設計書 §3〜9 を5ゾーン再設計に整合（`doc/画面設計/screens/SC-01_ダッシュボード.md`）。
-- アイデアコンテスト Phase2（妥当性解析・自動表彰スケジューラ＝LLM/スケジューラ基盤前提・MVP外）。
+- ④【討議】おすすめクエスト選出アルゴリズム（ユーザー案への意見→合意後実装）。
+- Turnstile `size:flexible` 幅の実ブラウザ目視。SC-01 設計書 §3〜9 を5ゾーン再設計に整合。アイデアコンテスト Phase2。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。
-- 起動：`cd impl && docker compose up -d`。backend=`http://localhost:8000`・frontend=`http://localhost:3000`・openapi=`http://localhost:8000/openapi.json`・MailHog=`http://localhost:8025`。
-- **workers（必ず `--build`）**：`cd impl && docker compose --profile workers up -d --build worker mail-worker`（LLM 実行を試すなら `--profile ai` + `llm-worker`）。確認後 `docker compose stop worker mail-worker llm-worker`。
-- 反映（ソースベイク・volumes無）：`cd impl && docker compose up -d --build backend|frontend`。**ビルド完了を待ってから**（`RunningFor`「数秒前」＋`curl -sf http://localhost:3000/login`）検証。型再生成＝backend 再ビルド後 `cd impl/frontend && npm run codegen`。
+- 起動：`cd impl && docker compose up -d`。backend=`:8000`・frontend=`:3000`・openapi=`:8000/openapi.json`・MailHog=`:8025`。
+- workers（必ず `--build`）：`cd impl && docker compose --profile workers up -d --build worker mail-worker`（LLM 実行は `--profile ai` + `llm-worker`）。確認後 `docker compose stop worker mail-worker llm-worker`。
+- 反映（ソースベイク）：`cd impl && docker compose up -d --build backend|frontend`（ビルド完了待ち＋`curl -sf :3000/login`）。型再生成＝`cd impl/frontend && npm run codegen`。
 - DB直接：`cd impl && docker compose exec -T db psql -U ideaquest -d ideaquest_control`（control）／`-d ideaquest_company_acme`（会社）。資格＝`ideaquest`/`ideaquest`。
 - テスト：
-  - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`／e2e `npx playwright test <spec> -g "<TC>" --workers=1`。
+  - frontend `cd impl/frontend && npm run build`／`npx vitest run <path>`／e2e `npx playwright test <spec> -g "<TC>" --workers=1`。
   - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット/新規テスト反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`。
   - TC トレーサビリティ：`cd /home/t-umekawa/sc-ideaquest-G2 && python3 scripts/check_tc_traceability.py`（リポジトリ**ルート**で実行）。
-- `.env`（`impl/.env`・gitignore 追跡外）現状＝dev 共有スタック既定（`IQ_DEFAULT_COMPANY_CODE=`空・`TURNSTILE_*` コメントアウト＝CAPTCHA無効）。
-- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin・会社`OPS`）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`（public＋self_signup）。
-- dev 会社id（control DB companies）：ACME-01=`debba8dc-7f32-4705-abd8-61f2d77e23c1`／OPS=`d249a8ea-5109-4974-ad46-e0da36a546e6`／DEMO=`a5e28360-043a-4b61-b659-664ab0107f2f`。
-- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`(Playwright chromium)を作り**使い終わったら削除**。**必ず新コンテナ起動後に実行**（§5）。
+- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`。
+- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`(Playwright chromium)を作り**使い終わったら削除**（本セッションでモックを `file://` で撮って検証）。**必ず新コンテナ起動後に実行**。
