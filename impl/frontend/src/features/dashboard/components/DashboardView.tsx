@@ -453,7 +453,9 @@ export function DashboardView({
   const renderRecommendedRow = (q: DashboardData["recommended_quests"][number]) => (
     <div key={q.id} className="dash-row">
       <div className="dash-row__main">
-        <div className="dash-row__title"><Link href={`/quests/${q.id}`}>{q.title}</Link></div>
+        {/* おすすめ＝未参加の発見可能クエスト＝メンバー専用の詳細(/quests/{id})は参照エラー。SC-13 の「参加前」ダイアログを開く
+            （クエストを探すと同じ）＝発見カタログに ?quest= を付けて遷移し、その場でダイアログを自動で開く。 */}
+        <div className="dash-row__title"><Link href={`/quest-catalog?quest=${q.id}`}>{q.title}</Link></div>
         <div className="dash-row__sub">{q.owner?.display_name ? `${q.owner.display_name} ・ ` : ""}👥 {q.member_count ?? 0}</div>
       </div>
       {/* ダッシュボードは星マークのみ（枠なし・共有 .follow-star）。未フォロー＝白抜き☆（押下で一覧から外れる）。 */}

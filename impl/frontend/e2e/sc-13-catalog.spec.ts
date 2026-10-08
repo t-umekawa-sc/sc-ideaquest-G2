@@ -43,6 +43,24 @@ test("C-TC-267 catalog dialog plays close animation (DFT-E-014)", async ({ page 
   await expect(page.locator(".modal")).toHaveCount(0, { timeout: 2000 });
 });
 
+test("C-TC-320 ?quest= 深リンクで参加前ダイアログが自動で開く（ダッシュおすすめの飛び先・DFT）", async ({ page }) => {
+  // ダッシュボード Zone D「おすすめのクエスト」のリンク先＝未参加の発見可能クエスト。
+  // /quests/{id}（メンバー専用詳細）だと参照エラーになるため、/quest-catalog?quest=<id> で参加前ダイアログを開く。
+  await gotoAuthed(page);
+  // デモ discoverable クエストの id をカードの data-id から取得。
+  await page.goto("/quest-catalog");
+  const card = page.locator(".quest-card").filter({ hasText: DEMO_TITLE }).first();
+  await expect(card).toBeVisible();
+  const qid = await card.getAttribute("data-id");
+  expect(qid).toBeTruthy();
+  // 深リンク＝?quest=<id> で参加前ダイアログが自動で開く。
+  await page.goto(`/quest-catalog?quest=${qid}`);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("クエストの詳細（参加前）")).toBeVisible();
+  await expect(dialog.getByText(DEMO_TITLE)).toBeVisible();
+});
+
 test("C-TC-268 reduce-motion suppresses modal CRT animation, keeps behavior", async ({ page }) => {
   // 抑制 ON（OS reduce）＝CRT 電源ON/OFF 演出は出ない（`--crt-in` クラス自体を付けない）が、
   // 情報（ダイアログ本文）は残り・閉じる挙動も保つ（即時クローズ）。テスト規約 §6・デザイン標準 §4.9。

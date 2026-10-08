@@ -5,7 +5,7 @@
 // カードクリック→詳細ダイアログ（多めのメタ＋参加リクエスト）／リスト表示は ⋯ メニューから同操作。
 // 中身（アイデア/チャット/評価）は非公開＝参加後（メタのみ表示）。
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { QuestIcon } from "@/components/layout";
 import { ActivitySpark, DataTable, EmptyState, Modal, ModalBody, ModalFooter, RowMenu, useSnackbar } from "@/components/ui";
@@ -47,6 +47,15 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
     const res = await fetchQuestCatalog(state, signal);
     if (!res) return { rows: [], total: 0, pinned: [] };
     return { rows: res.data, total: res.page_info.total, pinned: res.pinned ?? [] };
+  }, []);
+
+  // ダッシュボード Zone D「おすすめのクエスト」等からの深リンク（/quest-catalog?quest=<id>）＝
+  // 指定クエストの「参加前」ダイアログを自動で開く（未参加の発見可能クエストはメンバー専用詳細を開けないため）。
+  // window.location で読む＝useSearchParams の Suspense 境界要件を避ける（クライアント限定・初回のみ）。
+  useEffect(() => {
+    const qid = new URLSearchParams(window.location.search).get("quest");
+    if (!qid) return;
+    void getCatalogDetail(qid).then((d) => { if (d) { setDetail(d); setDialogOpen(true); } });
   }, []);
 
   // ダイアログを開く＝一覧カードで即描画し、活発度スパーク付きの詳細（catalog-detail）を後追いで結合。
