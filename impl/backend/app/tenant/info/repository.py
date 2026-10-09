@@ -773,6 +773,7 @@ def create_template(
     created_by_id: uuid.UUID,
     name: str,
     body_html: str,
+    body: dict | None = None,
     description: str | None = None,
     title_template: str | None = None,
     defaults: dict | None = None,
@@ -780,10 +781,12 @@ def create_template(
     is_active: bool = True,
     template_id: uuid.UUID | None = None,
 ) -> InfoTemplate:
-    """テンプレートを1件作成（N.5b）。name の有効内一意は DB 部分一意索引が最終担保（呼び出し側が 409 判定）。"""
+    """テンプレートを1件作成（N.5b）。`body`＝本文ひな形 PM-JSON 正本（省略時は空 doc・`body_html` はその派生）。
+    name の有効内一意は DB 部分一意索引が最終担保（呼び出し側が 409 判定）。"""
     tpl = InfoTemplate(
         id=template_id or uuid.uuid4(), created_by_id=created_by_id, name=name, description=description,
-        title_template=title_template, body_html=body_html, defaults=defaults or {},
+        title_template=title_template, body=body if body is not None else {"type": "doc", "content": []},
+        body_html=body_html, defaults=defaults or {},
         sort_order=sort_order, is_active=is_active,
     )
     session.add(tpl)

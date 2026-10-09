@@ -162,20 +162,28 @@ def test_n_tc_305_admin_list_includes_inactive_excludes_deleted(tpl_ctx):
 
 # ---- 4.2 application（N-TC-310〜315）---------------------------------------
 
+def _pm(text: str = "（記入）") -> dict:
+    """テスト用 PM-JSON（1段落）。テンプレ本文ひな形は PM-JSON（TipTap）で授受（TT4）。"""
+    return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
+
+
 def _create_req(**kw):
     kw.setdefault("name", _uniq("tpl"))
-    kw.setdefault("body_html", "<p>（記入）</p>")
+    kw.setdefault("body", _pm("（記入）"))
     return InfoTemplateCreateRequest(**kw)
 
 
 def test_n_tc_310_body_html_sanitized(tpl_ctx):
-    """N-TC-310: 本文ひな形は保存時 nh3 サニタイズ（管理者作成でも例外にしない）。"""
-    res = svc.create_template(tpl_ctx.account_id, tpl_ctx.company_id,
-                              body=_create_req(body_html='<p onclick="x()">hi</p><script>alert(1)</script>'
-                                                         '<a href="javascript:evil()">l</a>'))
+    """N-TC-310: 本文ひな形は保存境界で PM-JSON をサニタイズ（管理者作成でも例外にしない・W-TC 群と対）。"""
+    dirty_pm = {"type": "doc", "content": [{"type": "paragraph", "content": [
+        {"type": "text", "text": "hi"},
+        {"type": "text", "text": "l", "marks": [{"type": "link", "attrs": {"href": "javascript:evil()"}}]},
+        {"type": "text", "text": "<script>alert(1)</script>"},
+    ]}]}
+    res = svc.create_template(tpl_ctx.account_id, tpl_ctx.company_id, body=_create_req(body=dirty_pm))
     tpl_ctx.templates.append(uuid.UUID(res["id"]))
     bh = res["body_html"]
-    assert "<script" not in bh and "onclick" not in bh and "javascript:" not in bh
+    assert "<script" not in bh and "onclick" not in bh and "javascript:" not in bh  # 不正リンク除去・生タグエスケープ
 
 
 def test_n_tc_311_unknown_defaults_key_422(tpl_ctx):
@@ -212,7 +220,7 @@ def test_n_tc_313_valid_defaults_roundtrip(tpl_ctx):
 def test_n_tc_314_edit_delete_does_not_touch_existing_info(tpl_ctx):
     """N-TC-314: テンプレの編集/論理削除は既存 info_items（source_template_id 参照）に影響しない（疎結合）。"""
     res = svc.create_template(tpl_ctx.account_id, tpl_ctx.company_id,
-                              body=_create_req(body_html="<p>original</p>"))
+                              body=_create_req(body=_pm("original")))
     tid = uuid.UUID(res["id"]); tpl_ctx.templates.append(tid)
     # テンプレ由来で info_item を作成。
     with get_tenant_session(tpl_ctx.db_identifier) as ts:
@@ -221,7 +229,7 @@ def test_n_tc_314_edit_delete_does_not_touch_existing_info(tpl_ctx):
         ts.flush(); iid = item.id; tpl_ctx.items.append(iid); ts.commit()
     # テンプレを編集→論理削除。
     svc.update_template(tpl_ctx.account_id, tpl_ctx.company_id, str(tid),
-                        body=InfoTemplateUpdateRequest(body_html="<p>CHANGED</p>"))
+                        body=InfoTemplateUpdateRequest(body=_pm("CHANGED")))
     svc.delete_template(tpl_ctx.account_id, tpl_ctx.company_id, str(tid))
     with get_tenant_session(tpl_ctx.db_identifier) as ts:
         got = repo.get_info_item(ts, iid)
@@ -274,7 +282,7 @@ def test_n_tc_320_picker_visible_to_general(client, tpl_admin, tpl_ctx):
     """N-TC-320: ピッカー供給＝会社内 active 全員（非管理者）が有効テンプレを取得。"""
     _login_admin(client, tpl_admin)
     created = _track(tpl_ctx, client.post(
-        TEMPLATES, json={"name": _uniq("ピッカー"), "body_html": "<p>x</p>"}, headers=_csrf(client)).json())
+        TEMPLATES, json={"name": _uniq("ピッカー"), "body": _pm("x")}, headers=_csrf(client)).json())
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)  # 一般ユーザー
     r = client.get(TEMPLATES)
     assert r.status_code == 200
@@ -285,7 +293,7 @@ def test_n_tc_321_detail_active_only(client, tpl_admin, tpl_ctx):
     """N-TC-321: 適用詳細は有効のみ 200／無効は 404。"""
     _login_admin(client, tpl_admin)
     created = _track(tpl_ctx, client.post(
-        TEMPLATES, json={"name": _uniq("詳細"), "body_html": "<h2>見出し</h2>"}, headers=_csrf(client)).json())
+        TEMPLATES, json={"name": _uniq("詳細"), "body": _pm("見出し")}, headers=_csrf(client)).json())
     tid = created["id"]
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     assert client.get(f"{TEMPLATES}/{tid}").status_code == 200
@@ -307,7 +315,7 @@ def test_n_tc_322_admin_list_requires_admin(client, tpl_admin, tpl_ctx):
 def test_n_tc_323_writes_require_admin(client, tpl_ctx):
     """N-TC-323: 作成/編集/削除は会社管理者のみ・一般は 403。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-    assert client.post(TEMPLATES, json={"name": _uniq("x"), "body_html": "<p>x</p>"},
+    assert client.post(TEMPLATES, json={"name": _uniq("x"), "body": _pm("x")},
                        headers=_csrf(client)).status_code == 403
     assert client.patch(f"{TEMPLATES}/{uuid.uuid4()}", json={"name": "y"},
                         headers=_csrf(client)).status_code == 403
@@ -318,10 +326,10 @@ def test_n_tc_324_create_and_name_conflict(client, tpl_admin, tpl_ctx):
     """N-TC-324: 作成（管理者）→ 201／同名は 409。"""
     _login_admin(client, tpl_admin)
     name = _uniq("重複チェック")
-    r1 = client.post(TEMPLATES, json={"name": name, "body_html": "<p>x</p>"}, headers=_csrf(client))
+    r1 = client.post(TEMPLATES, json={"name": name, "body": _pm("x")}, headers=_csrf(client))
     assert r1.status_code == 201
     _track(tpl_ctx, r1.json())
-    r2 = client.post(TEMPLATES, json={"name": name, "body_html": "<p>y</p>"}, headers=_csrf(client))
+    r2 = client.post(TEMPLATES, json={"name": name, "body": _pm("y")}, headers=_csrf(client))
     assert r2.status_code == 409
 
 
@@ -329,7 +337,7 @@ def test_n_tc_325_activate_toggle_affects_picker(client, tpl_admin, tpl_ctx):
     """N-TC-325: 有効/無効トグル＝無効はピッカーから除外・activate で復帰。"""
     _login_admin(client, tpl_admin)
     created = _track(tpl_ctx, client.post(
-        TEMPLATES, json={"name": _uniq("トグル"), "body_html": "<p>x</p>"}, headers=_csrf(client)).json())
+        TEMPLATES, json={"name": _uniq("トグル"), "body": _pm("x")}, headers=_csrf(client)).json())
     tid = created["id"]
     assert client.post(f"{TEMPLATES}/{tid}/deactivate", headers=_csrf(client)).status_code == 200
     assert all(t["id"] != tid for t in client.get(TEMPLATES).json()["data"])  # ピッカーから消える
@@ -341,7 +349,7 @@ def test_n_tc_326_delete_is_logical(client, tpl_admin, tpl_ctx):
     """N-TC-326: 削除は論理（204）・ピッカーと管理既定から除外。"""
     _login_admin(client, tpl_admin)
     created = _track(tpl_ctx, client.post(
-        TEMPLATES, json={"name": _uniq("論理削除"), "body_html": "<p>x</p>"}, headers=_csrf(client)).json())
+        TEMPLATES, json={"name": _uniq("論理削除"), "body": _pm("x")}, headers=_csrf(client)).json())
     tid = created["id"]
     assert client.delete(f"{TEMPLATES}/{tid}", headers=_csrf(client)).status_code == 204
     assert all(t["id"] != tid for t in client.get(TEMPLATES).json()["data"])              # ピッカー除外

@@ -75,7 +75,8 @@ class InfoTemplate(CompanyBase):
     name: Mapped[str] = mapped_column(Text, nullable=False)                      # 有効内一意（部分一意索引）
     description: Mapped[str | None] = mapped_column(Text, nullable=True)         # ピッカー副文
     title_template: Mapped[str | None] = mapped_column(Text, nullable=True)      # タイトル雛形（穴埋め可）
-    body_html: Mapped[str] = mapped_column(Text, nullable=False)                 # 本文ひな形（サニタイズ済）
+    body: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{\"type\":\"doc\",\"content\":[]}'::jsonb"))  # 本文ひな形 PM-JSON 正本
+    body_html: Mapped[str] = mapped_column(Text, nullable=False)                 # pm_to_html(body) の派生（表示用・サニタイズ済）
     defaults: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")  # 属性既定値（§3-1）
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")

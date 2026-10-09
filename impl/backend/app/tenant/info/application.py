@@ -1295,7 +1295,7 @@ def _template_pick_dto(tpl) -> dict:
 def _template_detail_dto(tpl) -> dict:
     return {
         "id": str(tpl.id), "name": tpl.name, "description": tpl.description,
-        "title_template": tpl.title_template, "body_html": tpl.body_html,
+        "title_template": tpl.title_template, "body": tpl.body, "body_html": tpl.body_html,
         "defaults": tpl.defaults or {}, "sort_order": tpl.sort_order, "is_active": tpl.is_active,
     }
 
@@ -1373,17 +1373,18 @@ def create_template(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> di
     name = (body.name or "").strip()
     if not name:
         raise AppError(422, "validation_error", detail="名称は必須です", errors=[{"field": "name"}])
-    if not (body.body_html or "").strip():
-        raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body_html"}])
+    pm = derive.sanitize_pm(body.body)  # PM-JSON を無害化（正本）→ 表示用HTML派生
+    if not derive.pm_to_text(pm).strip():
+        raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body"}])
     defaults = _validate_template_defaults(body.defaults)
-    body_html = derive.sanitize_html(body.body_html) or ""
+    body_html = derive.pm_to_html(pm) or ""
     title_template = (body.title_template or None)
     with get_tenant_session(company.db_identifier) as ts:
         user = _resolve_admin_user(ts, account_id)
         if repo.template_name_exists(ts, name):
             raise AppError(409, "conflict", detail="同名の有効なテンプレートがあります", errors=[{"field": "name"}])
         tpl = repo.create_template(
-            ts, created_by_id=user.id, name=name, body_html=body_html, description=(body.description or None),
+            ts, created_by_id=user.id, name=name, body=pm, body_html=body_html, description=(body.description or None),
             title_template=title_template, defaults=defaults,
             sort_order=(body.sort_order or 0), is_active=(True if body.is_active is None else bool(body.is_active)),
         )
@@ -1417,10 +1418,12 @@ def update_template(account_id: uuid.UUID, company_id: uuid.UUID, template_id: s
             tpl.description = (body.description or None)
         if "title_template" in sent:
             tpl.title_template = (body.title_template or None)
-        if "body_html" in sent:
-            if not (body.body_html or "").strip():
-                raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body_html"}])
-            tpl.body_html = derive.sanitize_html(body.body_html) or ""
+        if "body" in sent:
+            pm = derive.sanitize_pm(body.body)  # PM-JSON を無害化（正本）→ 表示用HTML派生
+            if not derive.pm_to_text(pm).strip():
+                raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body"}])
+            tpl.body = pm
+            tpl.body_html = derive.pm_to_html(pm) or ""
         if "defaults" in sent:
             tpl.defaults = _validate_template_defaults(body.defaults)
         if "sort_order" in sent and body.sort_order is not None:

@@ -394,11 +394,14 @@ class InfoTemplatePickListResponse(BaseModel):
 
 
 class InfoTemplateDetailDTO(BaseModel):
-    """適用用の1件詳細（GET /info-templates/{id}）＝本文/既定/タイトル雛形を含む。"""
+    """適用用の1件詳細（GET /info-templates/{id}）＝本文/既定/タイトル雛形を含む。
+
+    `body`（PM-JSON）を情報登録フォームの共有エディタへ適用する（SC-51）。`body_html` は派生（表示用）。"""
     id: str
     name: str
     description: str | None = None
     title_template: str | None = None
+    body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # PM-JSON（適用用）
     body_html: str
     defaults: dict = {}
     sort_order: int = 0
@@ -428,11 +431,11 @@ class InfoTemplateAdminListResponse(BaseModel):
 
 
 class InfoTemplateCreateRequest(BaseModel):
-    """POST /info-templates（会社管理者）。body_html はサーバー sanitize・defaults はキー/値検証（N.5b）。"""
+    """POST /info-templates（会社管理者）。body（PM-JSON）はサーバー sanitize・defaults はキー/値検証（N.5b）。"""
     name: str
     description: str | None = None
     title_template: str | None = None
-    body_html: str
+    body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # 本文ひな形 PM-JSON
     defaults: dict | None = None
     sort_order: int | None = None
     is_active: bool | None = None
@@ -443,7 +446,7 @@ class InfoTemplateUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     title_template: str | None = None
-    body_html: str | None = None
+    body: dict[str, Any] | None = None  # 本文ひな形 PM-JSON
     defaults: dict | None = None
     sort_order: int | None = None
     is_active: bool | None = None
