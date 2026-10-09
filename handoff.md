@@ -4,77 +4,59 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`、**残作業の正本は `doc/バックログ/未実装・ギャップ一覧.md`**。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-09（リッチテキスト TipTap 移行セッション）。
+- 更新: 2026-10-09（**リッチテキスト TipTap 移行＝TT5 チャット完了＝移行完遂**セッション）。
 - ブランチ: `main`（main 直 push が慣習・毎コミット push 済み）。
-- 最新コミット: リッチテキスト TipTap 移行＝サニタイズ中核(`1f95aae9`)＋お知らせ(TT1/TT2・`7cc72c03`)＋情報インプット(TT0b-items/TT3・`e2ac5cd6`)＋エディタ縦伸び修正(`d0b00aba`)＋情報テンプレPM-JSON(TT4a・`447ad0fd`)＋SC-55/SC-51(TT4b・`bdd5271a`)。working tree は push 後 clean（※`doc/JasperReports/` とその設計doc変更はユーザー追加資料＝未コミットで残置）。
-- alembic heads: company=**`0063_info_templates_pm_json`（今セッションで追加＝テンプレ本文 PM-JSON／`0061`お知らせ・`0062`情報）**／control=`0020_signup_challenges`（変更なし）。
+- 最新コミット（新しい順）: `2dc40161` TT5 frontend（チャット TipTap＋@メンション・PM-JSON）／`e2295e8c` TT5 backend（`chat_messages.body` jsonb・migration 0064＋4層）／`c3a2cc06` 小改修（リッチテキスト・フォーカス枠の太さ統一＋情報カテゴリを multiselect 化）。working tree は push 後 clean。
+- alembic heads: company=**`0064_chat_messages_pm_json`**（今セッション追加＝チャット本文 PM-JSON／`0061`お知らせ・`0062`情報・`0063`テンプレ）／control=`0020_signup_challenges`（変更なし）。
 
 ## 2. プロジェクトのゴール
-ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘の消化＋仕様確定済み未実装機能の処理。
+ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘の消化＋仕様確定済み未実装機能の処理。**リッチテキスト統一（TipTap 移行）は TT5 で完遂＝全系統が PM-JSON 正本**。
 
 ## 3. 今回やったこと（新しい順・理由つき）
-0c. **リッチテキスト TipTap 移行＝D5 情報テンプレート完成（TT4）**。(a) backend（`447ad0fd`）＝migration **0063**（`info_templates.body` jsonb）＋テンプレ DTO/`create_template`/`update_template` を PM-JSON（`sanitize_pm`/`pm_to_html`・必須チェックは `pm_to_text` 空判定）＋admin DTO に `body`/`title_template`（無効テンプレも編集/複製可）。(b) frontend（`bdd5271a`）＝**SC-55 情報テンプレ管理**（新規 `features/info-templates`・DataTable＋登録/編集モーダル〔共有エディタ・属性既定グリッド・カテゴリ・有効無効/複製/論理削除〕＋`admin/info-templates` ルート＋AppNav 導線）＋**SC-51 ピッカー**（`InfoFormPanel`・新規時のみ・適用で本文 PM-JSON＋`title_template`〔{{today}}展開〕＋属性既定〔curatorのみ〕・上書き確認・picker read は info-input/api に追加＝循環回避）。検証＝tests/info 99・build/vitest 258・SC-55 作成→SC-51 適用を Playwright 目視（エラー0）。
-0b. **リッチテキスト TipTap 移行＝情報インプット縦スライス（TT0b-items/TT3）を完了**（お知らせと同型）。
-   - backend＝migration **0062**（`info_items.body` jsonb 正本・`body_html`/`body_text` は `pm_to_html`/`pm_to_text` 派生）＋`InfoCreate/Update/DetailDTO` を `body` 授受へ＋`create_info_item`/`update_info_item` を `sanitize_pm`→派生へ＋`repository.create_info_item(body=...)`＋`derive.py` 再エクスポート。**版管理は無改修**（スナップショットは派生 `body_html` 保持＝`changed_fields=["body_html"]` 不変）。**自動リンク/全文検索も不変**（`body_text` 経由）。**info_templates は未変更**（TT4 で SC-55 と一体）。
-   - frontend＝`InfoFormPanel.tsx`/`InfoDetailView.tsx` の独自 contentEditable を共有 `RichTextEditor`（PM-JSON）へ＋word cloud/要約は `wordcloud.pmText`（client 版 PM→平文）＋手書き型 `InfoInput`/`InfoPatch`/`InfoDetail` を `body` へ（info は codegen 非依存の手書き型）。
-   - 検証＝`tests/info` **99**・回帰 **166 passed**・build/vitest green・情報登録フォームで TipTap＋word cloud を Playwright 目視（エラー0）。
-0. **リッチテキスト TipTap 移行＝セキュリティ中核＋共有エディタ＋お知らせ縦スライス（TT-sec/TT1/TT2）を完了**（§6 の決定に基づく・security-first で保存境界から着手）。
-   - **(TT-sec) 保存境界サニタイズ中核**＝`app/core/richtext.py` に `sanitize_pm`（PM-JSON 許可リスト検証→canonical・冪等）/`pm_to_html`（決定的直列化・内部で必ず sanitize＝多層防御）/`pm_to_text`（平文＝全文検索）。TC＝新ドメイン `doc/テスト/W_リッチテキスト.md` **W-TC-001〜015**（test-first・red15→green15・commit `1f95aae9`）。
-   - **(TT1) 共有 TipTap エディタ**＝`components/richtext/RichTextEditorImpl.tsx`（TipTap v3・StarterKit〔underline無効/link設定〕＋Image＋TableKit・`preset:document|chat`・value=PM-JSON）＋`RichTextEditor.tsx`＝**`next/dynamic` ssr:false ラッパ（§4-4=A）**＋`richtext.css`（ProseMirror）。`RichTextView` は server-sanitized HTML 描画のまま（SSR 可・無改修）。deps＝`@tiptap/react|starter-kit|pm|extension-image|extension-table`（package.json・lock は gitignore）。
-   - **(TT2) お知らせ縦スライス**＝migration **0061**（`announcements.body` jsonb 正本・`body_html`/`body_text` は派生へ）＋orm/schemas/application/router を PM-JSON 授受へ＋`AnnouncementAdminView` を PM-JSON 化＋codegen。U-TC-106 を悪性 PM-JSON 無害化へ改訂。
-   - 検証＝回帰 announcements/core/info/dashboard/search **166 passed**・build green・vitest **258**・トレーサビリティ **✅1097**・お知らせ作成モーダルで TipTap 描画を Playwright 目視（エラー0）。
-1. **D5 情報インプット テンプレート機能の設計反映＋backend＋テスト＋モックを完了**（commit `6ed3fab0`＝backend/設計/テスト、`ef4511ab`＝モック）。
-   - 設計反映（正本）＝FR-41 に ⑩内部情報テンプレートを追記（`doc/要件定義/README.md`）／データモデル `§5.37b info_templates`＋`info_items.source_template_id`（`doc/データモデル.md`）／API `N.5b`（7 EP・`doc/API設計/N_情報インプット.md`）／画面 SC-51 `§6b` ピッカー＋**新規 SC-55 テンプレート管理**（`doc/画面設計/screens/SC-50_情報インプット.md`・新規 `SC-55_情報テンプレート管理.md`）＋画面遷移図／テスト md `N-TC-300〜326`（`doc/テスト/N_情報インプット.md`）。
-   - backend（既存 `impl/backend/app/tenant/info/` に4層追加）＝migration `migrations/company/versions/0060_info_templates.py`（`info_templates` 表＋`info_items.source_template_id`・部分一意 `UNIQUE(name) WHERE deleted_at IS NULL`）／`orm.py`（`InfoTemplate`＋`InfoItem.source_template_id`）／`schemas.py`（検証用 enum frozenset 群＋`TEMPLATE_DEFAULT_SCALARS`＋テンプレ DTO 群）／`repository.py`（`create_template`/`get_template`/`template_name_exists`/`list_active_templates`/`list_templates_admin`/`soft_delete_template`＋`create_info_item` に `source_template_id`）／`application.py`（`_validate_template_defaults`・`list_templates_for_picker`/`get_template_detail`/`list_templates_admin`/`create_template`/`update_template`/`set_template_active`/`delete_template`・nh3 サニタイズは `derive.sanitize_html`）／`router.py`（7 EP＝ピッカー/詳細=`require_me`・`admin=1`/書込=`require_company_account_admin`＋CSRF/Origin）。
-   - テスト＝`tests/info/test_templates.py` 19件（repository/application/API）。red-green 実測済（`_validate_template_defaults` を一時バイパスで N-TC-311/312/313 を赤→復元で緑）。
-   - モック（フロント実装フロー規約＝モック先行）＝`doc/画面設計/mocks/SC-55_情報テンプレート管理.html`（新規・DataTable＋登録/編集モーダル）／`SC-50_情報インプット.html`（§6b ピッカー追記＝新規時のみ表示・{{today}}展開・上書き確認）。headless Chromium で JSエラー0＋適用動作を確認済み。
-2. **セッション末にリッチテキスト統一（TipTap 移行）を確認し、D5 frontend の進め方を転換**（コードはまだ無し・**決定のみ**）。引継＝`doc/セッション調整/引継/2026-10-09_リッチテキスト2系統統一-tiptap移行.md`／設計＝`doc/設計ドラフト/リッチテキスト2系統統一(TipTap移行)_設計.md`。バックログ台帳に `1-b. TipTap 移行（TT0〜TT5）` を出典付きで起票し、D5 行を「設計+backend+テスト済／frontend は TipTap 待ち」へ更新。
+2. **小改修2件（`c3a2cc06`・ユーザー指摘）**。(a) 共有エディタ `richtext.css`＝フォーカス時にツールバー(`.rt__bar`)の不透明背景が親の inset 枠を覆い、ヘッダー領域だけ枠線が細く見えた→`.rt:focus-within .rt__bar` に上/左/右 inset を足し入力領域と同じ 2px に統一。(b) 情報カテゴリをチェックボックス群→共有 `Multiselect`（候補のみ/自由入力なし・style-guide `.multiselect`）へ＝`InfoFormPanel`(SC-51)・`InfoTemplateAdminView`(SC-55)・`InfoDetailView`(詳細キュレーション)の3箇所。
+1. **リッチテキスト TipTap 移行＝TT5 チャット（最終ステップ・移行完遂）**。保存形式も plain→**PM-JSON 全面移行**（ユーザー決定＝既存チャットデータは全削除可）。
+   - **backend（`e2295e8c`）**＝migration **0064**（既存チャットデータ削除→`chat_messages.body` text→jsonb）＋orm(body jsonb)/schemas(`ChatMessageDTO` に `body_html` 追加)/application(投稿・編集で `sanitize_pm`・空判定 `pm_to_text`・DTO に `body_html=pm_to_html`・引用抜粋 `pm_to_text`)/repository(`list_message_bodies`=要約入力を `pm_to_text` 平文化)。**quests 結果のピン抜粋も `pm_to_text` 化**（`quests/application.py`）。**メンション処理は不変**＝クライアントが展開済 `mentions[]` を送り `_validate_mentions` が受理（@全員＝番兵 `__all__` をフロントで全メンバー user_id へ展開）。
+   - **frontend（`2dc40161`）**＝`IdeaChatView` のコンポーザを textarea＋自前ポップ/書式ツールバー → 共有 `RichTextEditor`(chat プリセット)＋**`@tiptap/extension-mention`**（新規 `components/richtext/mention.ts`＝候補=パーティメンバー＋「全員」番兵・素 DOM の候補ポップアップ）へ。表示は `renderTextHtml` 廃止→サーバ `body_html`。`render.ts`＝`resolveMentionIds`(PM-JSON ノード走査)＋`pmText`。本文は PM-JSON（送信/編集で `JSON.stringify`）。Enter 送信（候補表示中は候補選択優先＝`RichTextEditorImpl` の `onSubmit` を `document.querySelector(".mention-pop")` でガード）。直近チャットプレビュー（IdeaDetailView/ConceptDetailView）は `pmText` 平文化。メンション強調 CSS（`[data-type="mention"]`/`.mention`）。
+   - **設計正本反映**＝データモデル §5.16（body jsonb）／API E.1(DTO body_html)・E.2(body=PM-JSON・空判定 pm_to_text・全員番兵 __all__)／テスト md E_チャット.md（E-TC-211/229 を廃止=サーバ pm_to_html/W-TC-006 へ移管・E-TC-230 を PM-JSON 走査へ移植）。
+   - **検証**＝backend tests/chat 30＋concepts/solutions/realtime/contests/quests 関連 63＋quest 結果 12 すべて green（`tests/pm.py` ヘルパで PM-JSON 投稿へ移行）。frontend build／vitest(chat 14)／トレーサビリティ ✅1096。**Playwright で idea チャットに実投稿＝@全員 候補ドロップダウン→番兵ノード挿入→送信→`<span data-type="mention" data-id="__all__">@全員</span>` 強調描画＋Enter 送信を目視（コンソールエラー0）**。
 
 ## 4. 現在の状態（動作 / テスト）
-- **backend/frontend とも今セッションで `up -d --build` 済み＝新コード稼働中**（お知らせ PM-JSON EP・TipTap エディタとも提供中）。お知らせ作成モーダルで TipTap を Playwright 目視済み（エラー0）。
-- 今セッションで green を確認＝`tests/core/test_richtext_pm.py` 15件・`tests/announcements` 14件・`tests/info` 99件・回帰 info/announcements/core/dashboard/search **166 passed**・frontend build green・vitest **258 passed**。**フル `tests/` 全体は未実行＝未確認**。
-- migration `0061`（お知らせ）・`0062`（情報）・`0063`（テンプレ）は company DB（acme/acme2/demo）に `up -d --build` の bootstrap で適用済み。
-- **TC トレーサビリティ ✅ 1097**（`python3 scripts/check_tc_traceability.py`・リポジトリルート）。
-- **リッチテキスト移行の残＝TT5（チャット）のみ**。お知らせ・情報インプット・情報テンプレート（D5 SC-55/SC-51）は移行完了。チャットは plain のまま。
+- **backend/frontend とも今セッションで `up -d --build` 済み＝新コード稼働中**（チャット PM-JSON EP・TipTap メンションエディタとも提供中）。idea チャットで Playwright 目視済み。
+- migration `0064`（チャット）は company DB（acme/acme2/demo）に `up -d --build` の bootstrap で適用済み（既存チャットは削除済み）。
+- **フル `tests/` 全体は未実行＝未確認**（今回は chat 関連ドメイン中心に green 確認）。
+- **TC トレーサビリティ ✅ 1096**（`python3 scripts/check_tc_traceability.py`・リポジトリルート）。
+- **リッチテキスト TipTap 移行は完遂**（お知らせ 0061・情報 0062・テンプレ 0063・チャット 0064）。残系統なし。
 
 ## 5. 詰まっている点（試して失敗・回避策）
-- **TipTap v3＝StarterKit が link/underline を内包**（v2 と違う）。document プリセットで追加が要るのは Image と `TableKit`（`@tiptap/extension-table` の `TableKit` が table/row/header/cell を一括）。underline は backend 許可リスト外なので `StarterKit.configure({ underline:false })` で無効化し整合させる。
-- **TipTap の link `HTMLAttributes` 等を `as const` にすると型エラー**＝`protocols` が readonly 配列になり `Partial<LinkOptions>` に不一致。`as const` を外す。
-- **PM-JSON の `body_text`（平文）はユーザーが文字入力した `<` を残す**＝正しい挙動（タグではない）。XSS ではない（抜粋は React が `{excerpt}` でエスケープ描画）。テストで `"<" not in text` と書くと誤判定＝構造タグ（`<strong>`/`<p>`）の非在で検証する。
-- **frontend の `package-lock.json` は gitignore**＝TipTap 依存は `package.json` のみ commit（コンテナ build 時に resolve）。
-- **info-input feature は手書き型**（`api.ts` の `InfoInput`/`InfoPatch`・`types.ts` の `InfoDetail`）＝codegen 非依存。PM-JSON 化では手で `body` へ直す（announcements は生成型 schema.d.ts で codegen だけで済む・対照的）。
-- **版管理（`info_item_revisions`）は PM-JSON 化でも無改修**＝スナップショット `_content_snapshot` が派生 `body_html` を保持し、`INFO_REVISION_FIELDS` も `body_html` のまま＝`changed_fields` は `body_html` を報告し続ける（版は表示用 HTML 履歴ゆえ正しい）。content 変更検知は `_CONTENT_FIELDS` を `body` に変えるだけ。
-- **`AppError` の属性は `.status`**（`.status_code` ではない）＝テストで一度踏んだ（`app/core/errors.py:71`）。
-- **テンプレテストの teardown FK 順序**＝`info_items` を消す前に `info_item_revisions`/`entity_tokens(owner_type='info')`/`info_links`/`info_item_categories` を消す（`create_info_item` が版/トークン/auto リンクを作るため）。さらに **factory 由来の管理者アカウント（`tpl_admin`）の会社DB users を消す前に、その管理者が作った `info_templates` を消す**必要があり、API テストは fixture 引数順を `(client, tpl_admin, tpl_ctx)` にして teardown 順（tpl_ctx が先）を担保した。
-- **`defaults` のカテゴリキー名**＝設計ドラフトは `category_ids[]` だが、実装は `info_items` と同じ `categories`（`info_category` enum コード配列）に統一。データモデル/API/テスト md も `categories` に修正済み（ドラフトのみ旧名が残置＝歴史）。
-- **共有 dev DB のノイズ**（継続）＝テンプレ名は毎回一意化（uuid 接尾）し、作成した template/info_item は teardown で物理削除。
+- **チャット本文の multipart `body` は PM-JSON を `JSON.stringify` した文字列**で送る＝backend `sanitize_pm` が str/JSON いずれも受容し dict 化。plain 文字列（非 JSON）を送ると `sanitize_pm` が空 doc 化し 422（空判定 `pm_to_text`）になる＝**テストは必ず `tests/pm.py` の `pm_body()`（＝PM-JSON JSON 文字列）で投稿**する。検証は `pm_text()`。
+- **Enter 送信とメンション候補選択の競合**＝`editorProps.handleKeyDown`（onSubmit）は suggestion プラグインより**先に**走るため、候補表示中の Enter で送信が先に発火してしまう。`document.querySelector(".mention-pop")` が在る時は送信しないガードで候補選択に譲る（`RichTextEditorImpl`）。
+- **`@tiptap/extension-mention` は未導入だった**（過去 handoff の「node_modules にある」は誤り）＝`npm install @tiptap/extension-mention@^3.31.4` で追加済（package.json・lock は gitignore）。型は `@tiptap/suggestion` の `SuggestionProps`/`SuggestionKeyDownProps` を使う（command の props は `MentionNodeAttrs`＝id/label が `string|null`・独自型注釈を付けると不一致で build 落ち）。
+- **concepts 独自 `/concept-chat-scopes/{id}/messages`（JSON）EP は frontend 未使用のレガシー**（ConceptChatView は共有 `IdeaChatView` を使う）だが backend テスト（`tests/concepts/test_chat.py` 前半）が残る。plain 文字列を jsonb 列へ入れてもスカラーとして round-trip するため**未改修でテスト緑**（＝今回は触っていない。将来の掃除候補）。
+- **共有チャット `ChatMessageDTO.body` は codegen で object 型**になる＝frontend で `{m.body}` を直接テキスト描画していた箇所（IdeaDetailView/ConceptDetailView のプレビュー）は `pmText(m.body)` へ要変更（済）。新規に body を使う時は注意。
+- **チャット本文を読む backend 箇所は全て `pm_to_text`/`pm_to_html` 経由へ移行済み**（application DTO/引用抜粋・repository 要約・quests ピン抜粋）。`chat_messages.body` を新たに読む時は必ず派生関数を通す（生 dict をテキスト扱いしない）。
+- **目視検証の下地**＝seed 一般ユーザーがアクセスできる公開アイデアチャットが無かったため、既存公開アイデア `d15c0000-…-0101`（クエスト `…-002`）に seed ユーザーを quest_members＋comment 権限で追加して検証した（dev データ・残置）。teardown で作った test メッセージは notifications→chat_mentions/reactions/activities→chat_messages の順で物理削除（FK）。
 
 ## 6. 決定事項と根拠
-- **SC-55 採番**＝情報ファミリ（SC-50/51/52）に隣接する空き番号。会社マスタだが情報機能の一部のため 5x 系。
-- **`info_templates` と `info_items` は疎結合**＝登録後の情報はテンプレを参照せず不変。由来のみ `source_template_id`（NULL 許容 FK）に記録。存在しない id は NULL 無視、論理削除済み id は行が残るので記録（`create_info_item` で `get_template(include_deleted=True)` で解決）。
-- **テンプレ管理＝会社管理者**（`require_company_account_admin`＝`company_account_admin`/`system_admin`）、**閲覧/適用＝会社内 active 全員**（`require_me`）。`admin=1` 一覧は1ルートでロール再検証。
-- **【重要・方針転換 2026-10-09】リッチテキストは TipTap に全面移行してから D5 frontend を実装**。
-  - 範囲＝**全部（TT1〜TT5）やり切る**（ユーザー決定）。
-  - **保存形式＝PM-JSON（設計 §4-2 の選択肢2）**。§4 既定案（HTML 据え置き）は**不採用**。理由＝richtext は死活要件で将来拡張（表/画像/協調 Yjs）・直列化の決定性・サニタイズ相性で PM-JSON が優位。最大の難点だった「既存 `body_html` のデータ移行コスト」は**既存データ全削除可（全てテストデータ・ユーザー言明）**で消えるため、PM-JSON が妥当。→ ユーザーの問い「より良い対応は2で良い？」への回答＝**Yes（2=PM-JSON を推奨・採用）**。
-  - document プリセットの拡張＝**基本（見出し/リスト/強調/リンク/引用）＋画像(MinIO 再ホスト)＋表＋コードブロック**。チャットは軽量プリセット。
-  - チャット（TT5）は最後＝当面 plain 据え置き、メンション契約 E-TC-211/229 を移植してからノード化。
-  - **§4-4 バンドル/SSR＝決定済（A・ユーザー 2026-10-09）＝実装済**＝`RichTextEditor` は `next/dynamic` の `ssr:false` で TipTap 本体（`RichTextEditorImpl`）を遅延ロード／`RichTextView` は SSR 可（server-sanitized HTML 描画）。初期バンドルはエディタ搭載画面に局所化（build 済・お知らせ管理で確認）。
+- **チャット保存形式＝PM-JSON（全面移行・既存データ削除）**（ユーザー決定 2026-10-09）＝他系統（お知らせ/情報/テンプレ）と統一。
+- **@全員 の構造化表現＝候補ドロップダウンに「全員」を出し、選択で番兵 mention ノード `{id:"__all__", label:"全員"}` を1個挿入**（ユーザー決定）。送信時に `resolveMentionIds` が全メンバー user_id へ展開（E-TC-230 の意味を保持）。表示は `pm_to_html` が `@全員` を強調描画。サーバーのメンション契約は不変。
+- **表示強調はサーバ `body_html` へ移管**＝クライアント `renderTextHtml`（旧 E-TC-211/229）は廃止。mention ノード直列化は W-TC-006 が担保。
+- **メンション宛先 `mentions[]` はクライアント展開のまま**（backend のメンション処理に手を入れない＝波及最小・安全）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
-> 着手前に実コードで裏取り。残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`（`1-b` の **TT5 のみ**）。**TT-sec/TT1/TT2/TT0b-items/TT3/TT4 は完了済み**（§3-0c/0b/0）。参照実装＝announcements(0061)・info_items(0062)・info_templates(0063)。
-
-1. **TT5 チャット（最後・別EP）**＝`features/chat/components/IdeaChatView.tsx`・`features/chat/render.ts`＋`render.test.ts`。chat プリセット（実装済）へ置換＋**メンション拡張を追加**（`@tiptap/extension-mention`・`sanitize_pm` の mention ノードと整合済）＋E-TC-211/229 契約移植。保存形式を plain→PM-JSON に変える場合はデータ移行＋通知/検索/メンション抽出など plain 派生処理の棚卸しが要る（波及大・別EP）。ideas/concepts へ波及注意（memory `chat-thread-independence`）。受入ゲート＝ユーザー動作確認。
-2. 完了時＝`impl/README.md` 現況更新・バックログ台帳から完了行削除・handoff 全文更新。
-3. **（別件・保留）** `doc/JasperReports/`＋設計doc 変更はユーザーが追加した帳票連携(D1)の参照資料。次タスク候補（台帳 D1）。
+> 着手前に実コードで裏取り。**リッチテキスト移行は完遂＝残なし**。残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`。
+1. **（候補）D1 帳票連携（JasperReports・ドメイン V）**＝設計済・実装未着手。`reports`/`billing` ドメイン・router とも無し。縦1本＝SC-92 使用料請求書→API V.x→レンダラ port→PDF。TC 先出し済＝`doc/テスト/V_帳票.md`。設計＝`doc/設計ドラフト/帳票連携(JasperReports)_設計.md`＋`doc/JasperReports/`（参考資料）。
+2. **（候補・掃除）concepts 独自 scope messages（`/concept-chat-scopes/{id}/messages`・JSON）**＝frontend 未使用のレガシー。共有チャットに一本化するか、PM-JSON 化して整合させるか要判断（現状スカラー round-trip で緑だが、本文は PM-JSON 正本という一貫性からは外れる）。
+3. **（任意）フル `tests/` 全体実行**で TT5 の波及総点検（今回は chat 関連中心）。共有 dev DB は非冪等なので事前に acme/acme2 drop→bootstrap（memory `e2e-full-not-idempotent-shared-db`）。
+4. 完了時＝`impl/README.md` 現況更新・バックログ台帳から完了行削除・handoff 全文更新。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。compose は `impl/compose.yaml`。
 - 起動：`cd impl && docker compose up -d`。backend=`:8000`・frontend=`:3000`・openapi=`:8000/openapi.json`・MailHog=`:8025`・MinIO=`:9000`/コンソール`:9001`。
 - **反映（ソースベイク・volumes 無）**：`cd impl && docker compose up -d --build backend|frontend`。env だけ変えた時は `docker compose up -d backend`（再ビルド不要）。型再生成＝`cd impl/frontend && npm run codegen`（backend 再ビルド後）。
 - テスト：
-  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット/新規テスト反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（entrypoint が bootstrap=migrate+seed→pytest）。今セッションのテンプレテストはこの方式で green。
+  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット/新規テスト・新 migration 反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（entrypoint が bootstrap=migrate+seed→pytest）。今セッションの TT5 テストはこの方式で green。
   - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`／e2e `npx playwright test <spec> -g "<TC>" --workers=1`。
   - TC トレーサビリティ：`cd /home/t-umekawa/sc-ideaquest-G2 && python3 scripts/check_tc_traceability.py`（リポジトリ**ルート**で実行）。
 - DB直接：`cd impl && docker compose exec -T db psql -U ideaquest -d ideaquest_control`（control）／`-d ideaquest_company_acme`（会社）。資格＝`ideaquest`/`ideaquest`。
 - ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`。
-- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り**使い終わったら削除**。モックの目視は `file:///.../doc/画面設計/mocks/SC-xx_*.html` を chromium で開く（shared.js の DataTable/iqSnack/iqConfirm が動く）。
+- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り**使い終わったら削除**。ログインは hydration 待ち必須（`#company_code`/`#login_id`/`#password` を fill する前に ~1.2s 待つ）。
