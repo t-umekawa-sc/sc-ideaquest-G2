@@ -137,7 +137,7 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 | `REPORT_RENDERER` | `none` | `jasper`/`fallback`/`none`（着脱スイッチ） |
 | `JASPER_BASE_URL` | `http://jasper:8000` | 内部エンドポイント |
 | `JASPER_TIMEOUT_SECONDS` | `30` | タイムアウト |
-| `JASPER_SHARED_SECRET` | （空） | S2S 認証ヘッダ |
+| `JASPER_SHARED_SECRET` | （空） | S2S 認証ヘッダ。**env 直置きは §17.5 G1 で撤回**＝compose `secrets:` ファイルマウント（`/run/secrets/<name>`）で供給する |
 
 - jrxml テンプレートは Jasper サービスのイメージ内（`reports/{group}/{id}.jrxml`）にバージョン管理。
 - 本番要件（ネットワーク分離・ヘルスチェック・JVM headless）は [本番デプロイ要件](../本番デプロイ要件.md) に追記。
@@ -195,6 +195,8 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 - [ ] [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md) の詳細確定（本書と同時起票済・ドラフト）。
 - [ ] [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に請求書アクションの節を追記。
 - [ ] [本番デプロイ要件](../本番デプロイ要件.md) に Jasper コンテナ（内部ネットワーク・ヘルスチェック）を追記。
+- [ ] S2S 秘密の供給を env から compose `secrets:` ファイルマウントへ訂正（§17.5 G1）＝[API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md) の env 記載・[シークレット管理(SOPS) 設計](シークレット管理(SOPS)_設計.md) 消費者側へ反映。
+- [ ] 請求書 DL の監査ログ（§17.5 G3）を [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)・[テスト V_帳票](../テスト/V_帳票.md) に TC 付きで追記。
 
 ## 17. リファクタリング／Docker 再チェック（2026-10-09 追記）
 
