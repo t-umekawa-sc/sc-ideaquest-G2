@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -105,8 +106,6 @@ def render(req: RenderRequest, x_report_secret: str | None = Header(default=None
     json_data, params, json_query = view(req.data)
     workdir = tempfile.mkdtemp(prefix="jasper-")  # テナント間衝突回避（§17.3.1）＝一意ディレクトリ
     try:
-        import json
-
         data_file = os.path.join(workdir, "data.json")
         with open(data_file, "w", encoding="utf-8") as fh:
             json.dump(json_data, fh, ensure_ascii=False)
