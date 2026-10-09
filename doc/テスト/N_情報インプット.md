@@ -181,3 +181,50 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | N-TC-226 | e2e | この情報からクエスト作成→作成後はダイアログを閉じて呼び元（情報詳細ダイアログ）へ戻る（詳細へ遷移しない・登録系ダイアログ標準） | `user@acme.example`・情報詳細（seed i30） | 「この情報からクエストを作成」→件名入力→「下書きを作成」 | 作成後 URL が `/info-items/{INFO_ID}` に戻り from-info ダイアログ(`#qfi-name`)は閉じ・情報詳細が見えている（`/quests/{id}` へ遷移しない）・下書きクエストは作成済み（一覧で件名が引ける） | SC-50／C.2／N.3／デザイン標準 §4.1 |
 | N-TC-227 | e2e | 作成した下書きをクエスト一覧から開いても from-info ダイアログが再表示されない（Step B 回帰） | N-TC-226 で作成した下書き | クエスト一覧で当該下書きを開く（行クリック→`/quests/{id}/edit`）＋直アクセス/リロード | from-info ダイアログ(`#qfi-name`)が出ず、QuestForm 編集(`#q_name`)が開く（intercept・standalone とも） | SC-50／C.2／N.3／`99c9e256` |
+
+## 4. 内部情報テンプレート（会社共通マスタ・N.5b・§5.37b・SC-55／SC-51 ピッカー）
+
+> 2026-10-09 追加＝[情報インプットテンプレート機能 設計](../設計ドラフト/情報インプットテンプレート機能_設計.md)の実体化。`info_templates`（会社DB）＝本文ひな形＋属性既定の会社共通マスタ。管理＝会社管理者（`company_account_admin`/`system_admin`）・閲覧/適用＝会社内 active 全員。テンプレートと情報は疎結合（登録後の `info_items` はテンプレ非参照・由来のみ `source_template_id`）。本文ひな形は保存時 nh3 サニタイズ・`defaults` はキー/値検証。対象＝backend `app/tenant/info/`（orm/repository/application/router/schemas）＋migration（`info_templates`＋`info_items.source_template_id`）／frontend `features/info-templates`（SC-55）＋`features/info-input`（SC-51 §6b ピッカー）。
+
+### 4.1 repository（会社DB・一意制約・論理削除・ピッカー一覧）
+
+| TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-300 | int | テンプレート作成・取得（会社DB・監査列・defaults jsonb round-trip） | — | `create_template(name,body_html,defaults={...})`→`get_template(id)` | 作成した行が取得でき `defaults` が jsonb として往復・`created_by_id`/`created_at` が入る・`is_active=true`/`sort_order=0` 既定 | §5.37b |
+| N-TC-301 | int | 名称は有効内一意（`deleted_at IS NULL`）＝重複作成は制約違反 | 同名の有効テンプレート1件 | 同名で `create_template` | 部分一意 `UNIQUE(name) WHERE deleted_at IS NULL` で拒否（アプリは 409 にマップ） | §5.37b／N.5b |
+| N-TC-302 | int | 論理削除済みの名称は再利用可 | 同名テンプレートを作成→`soft_delete`（`deleted_at` セット） | 同名で再度 `create_template` | 作成できる（削除済みは一意対象外）・旧行は `deleted_at` 保持 | §5.37b／§9-2 |
+| N-TC-303 | int | 無効（`is_active=false`）も一意対象に含める（紛らわしさ回避） | 同名の無効テンプレート1件 | 同名で `create_template` | 拒否（無効でも `deleted_at IS NULL` なら一意対象） | §5.37b／§9-2 |
+| N-TC-304 | int | ピッカー一覧＝有効のみ・`sort_order`→`name` 昇順・論理削除/無効を除外 | 有効2件（sort_order 違い）＋無効1件＋論理削除1件 | `list_active_templates()` | 有効2件のみを `sort_order`→`name` 昇順で返す（無効/削除は出ない） | N.5b／§5.37b |
+| N-TC-305 | int | 管理一覧＝無効も含む・論理削除は既定除外（`include_deleted` で含む）・DataTable 委譲 | 有効/無効/論理削除を各1件 | `list_templates_admin(include_deleted=False/True)` | 既定は有効+無効（削除除外）／`include_deleted=True` で削除も含む・`q` で name/description 絞り込み | N.5b／§1.8.1 |
+
+### 4.2 application（サニタイズ・defaults 検証・論理削除は情報不変）
+
+| TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-310 | int | 本文ひな形は保存時 nh3 サニタイズ（本文と同一許可リスト・管理者作成でも例外にしない） | `<script>` や `onclick`・`javascript:` を含む `body_html` | `create_template`/`update_template` | 危険タグ/属性/スキームが除去された `body_html` で保存される（多層防御） | N.5b(1)／§N.7／コーディング規約 §2.2 |
+| N-TC-311 | int | `defaults` の未知キーは 422（既知属性に限る） | `defaults={"bogus_key":"x"}` | `create_template` | `422 invalid_template_defaults`（未知キー拒否） | N.5b(2)／§5.37b |
+| N-TC-312 | int | `defaults` の値は当該 enum に実在（会社拡張含む）／`categories` は実在 | `defaults={"scope":"not_an_enum"}`／不実在 category | `create_template` | enum 不在・不実在 category は 422（値検証） | N.5b(2)／§3-1 |
+| N-TC-313 | int | 正当な `defaults`（scope/source/classification/categories）は保存できる | `defaults={"scope":"internal","source":"customer","categories":[<実在>]}` | `create_template`→`get_template` | 検証を通り jsonb に格納・取得で往復 | N.5b／§3-1 |
+| N-TC-314 | int | テンプレートの編集/論理削除は既存 info_items（source_template_id 参照）に影響しない（疎結合） | テンプレ由来で作成した `info_item`（`source_template_id` 付き）＋当該テンプレ | テンプレを `update`（本文変更）→`soft_delete` | 既存 `info_item` の `body_html`/属性は不変・`source_template_id` は履歴として残る（FK は NULL 許容で削除後も ID 保持） | §5.37b／§2 疎結合 |
+| N-TC-315 | int | `source_template_id` は存在しない/削除済み id でも info 作成を受理（履歴記録） | 論理削除済みテンプレの id | `create_info_item(..., source_template_id=deleted_id)` | 作成成功・`source_template_id` に当該 id を記録（由来の履歴・外部キーは NULL 許容） | N.5b／§5.33 |
+
+### 4.3 API 認可・CRUD（会社管理者のみ書込・admin=1）
+
+| TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-320 | api | ピッカー供給＝会社内 active 全員が有効テンプレを取得（軽量 DTO） | 有効テンプレ2件・一般ユーザー（非管理者）でログイン | `GET /info-items`… ではなく `GET /info-templates` | 200・`data=[{id,name,description}]`（有効のみ・sort順）＝非管理者でも閲覧可 | N.5b |
+| N-TC-321 | api | 適用詳細＝`GET /info-templates/{id}`（本文/既定含む）・無効/論理削除は 404 | 有効1件・無効1件・論理削除1件 | 各 id で `GET /info-templates/{id}` | 有効＝200（body_html/defaults/title_template）／無効・論理削除＝404 | N.5b |
+| N-TC-322 | api | 管理一覧（`admin=1`）は会社管理者のみ・非管理者は 403 | 一般ユーザーと管理者 | `GET /info-templates?admin=1` 両者 | 管理者＝200（DataTable・無効含む）／一般＝403 `forbidden` | N.5b／コーディング規約 §1.6 |
+| N-TC-323 | api | 作成/編集/削除は会社管理者のみ・非管理者は 403（UI非依存・サーバー強制） | 一般ユーザー | `POST`/`PATCH`/`DELETE /info-templates` | いずれも 403 `forbidden`（越権をサーバーで弾く） | N.5b／コーディング規約 §1.6 |
+| N-TC-324 | api | 作成（管理者・Idempotency）→一覧に出る／名称重複は 409 | 管理者 | `POST /info-templates`（正当）→同名で再 `POST` | 1回目 201・2回目 409 `conflict`（有効内名称一意） | N.5b(3)／§5.37b |
+| N-TC-325 | api | 有効/無効トグル（新規ピッカーから除外・既存情報は不変） | 管理者・有効テンプレ1件 | `POST /info-templates/{id}/deactivate`→`GET /info-templates` | deactivate 後はピッカー `GET /info-templates` に出ない（`is_active=false`）／activate で復帰 | N.5b |
+| N-TC-326 | api | 削除は論理（トゥームストーン）・204・ピッカー/管理既定から除外 | 管理者・テンプレ1件 | `DELETE /info-templates/{id}` | 204・`deleted_at`/`deleted_by_id` セット・`GET /info-templates`（ピッカー）と `admin=1`（既定）から消える | N.5b／§5.37b |
+
+### 4.4 frontend（SC-55 管理・SC-51 ピッカー適用）
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-330 | unit | 管理一覧クエリ組立（admin=1・q/is_active/sort ホワイトリスト） | QueryState | `infoTemplateAdminParams(state)` | `admin=1`＋ホワイトリストの `q`/`is_active`/`sort` のみをクエリに載せる | §1.8.1／N.5b |
+| N-TC-331 | unit | ピッカー適用＝本文ひな形流し込み＋属性既定プリフィル＋日付目印展開 | テンプレ詳細（`body_html`/`defaults`/`title_template` に `{{today}}`） | `applyTemplate(template, today)` | フォーム state の `body_html`/属性/`title` がテンプレ値になり `{{today}}` が当日日付に置換される | SC-50 §6b／§4 |
+| N-TC-332 | e2e | SC-55 管理＝テンプレを追加→一覧に出る→無効化で有効バッジが変わる | 管理者 `kanri@acme.example` が `/admin/info-templates` | 「＋テンプレートを追加」→名称/本文入力→保存→RowMenu「無効にする」 | 追加したテンプレが一覧に出る・無効化で「無効」バッジ＝DataTable 再クエリ（refreshToken）で反映。作成分は後始末で削除 | SC-55／N.5b |
+| N-TC-333 | e2e | SC-51 ピッカーで選ぶと本文/属性がプリフィルされる（新規登録時のみ表示） | `user@acme.example`・有効テンプレ1件を seed→`/info-items/new` | 「テンプレートから作成」で選択 | 本文欄にひな形が入る（編集時/続報登録時はピッカー非表示）／入力済みなら上書き確認が出る | SC-50 §6b／N.5b |

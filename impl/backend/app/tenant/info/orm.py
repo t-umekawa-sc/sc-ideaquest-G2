@@ -17,7 +17,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,7 +51,35 @@ class InfoItem(CompanyBase):
     triage: Mapped[str | None] = mapped_column(String(24), nullable=True)            # info_triage（#13）
     triage_reason: Mapped[str | None] = mapped_column(Text, nullable=True)           # 判定理由（#14）
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 由来テンプレート（§5.37b・分析用）。疎結合＝登録後は参照しない・テンプレ論理削除後も ID は履歴として残す。
+    source_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("info_templates.id"), nullable=True)
     # 共通監査（§2.1）
+    created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InfoTemplate(CompanyBase):
+    """内部情報テンプレート（会社共通マスタ・§5.37b・FR-41 ⑩・[情報インプットテンプレート機能 設計]）。
+
+    情報登録モーダル（SC-51）の入力の起点＝選ぶと本文ひな形（`body_html`）＋属性既定値（`defaults` jsonb）が
+    フォームへ入る。管理＝会社管理者・閲覧/適用＝会社内 active 全員。テンプレと情報は疎結合（登録後の
+    `info_items` はテンプレ非参照・由来のみ `source_template_id`）。本文ひな形は保存時 nh3 サニタイズ。
+    論理削除（`deleted_at`）＝トゥームストーン（監査保持・`ideas` 方式）。名称は有効内一意（§9-2）。
+    """
+    __tablename__ = "info_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(Text, nullable=False)                      # 有効内一意（部分一意索引）
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)         # ピッカー副文
+    title_template: Mapped[str | None] = mapped_column(Text, nullable=True)      # タイトル雛形（穴埋め可）
+    body_html: Mapped[str] = mapped_column(Text, nullable=False)                 # 本文ひな形（サニタイズ済）
+    defaults: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")  # 属性既定値（§3-1）
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

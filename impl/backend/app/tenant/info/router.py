@@ -27,6 +27,11 @@ from app.tenant.info.schemas import (
     InfoLinkKindRequest,
     InfoListResponse,
     InfoRevisionDiffResponse,
+    InfoTemplateAdminListResponse,
+    InfoTemplateCreateRequest,
+    InfoTemplateDetailDTO,
+    InfoTemplatePickListResponse,
+    InfoTemplateUpdateRequest,
     InfoUpdateRequest,
     WordCloudResponse,
 )
@@ -337,3 +342,106 @@ def unreject_info_link(link_id: str, request: Request, session: dict = Depends(r
     result = info_service.unreject_link(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), link_id)
     return InfoLinkDTO(**result)
+
+
+# ---- 内部情報テンプレート（/info-templates・N.5b・§5.37b）------------------
+# 閲覧/適用＝会社内 active 全員（require_me）／管理（admin=1・作成/編集/削除）＝会社管理者（サーバー強制）。
+
+
+@router.get("/info-templates")
+def list_info_templates(
+    request: Request,
+    admin: int = 0,                       # admin=1 で管理一覧（DataTable・会社管理者のみ）
+    q: str | None = None,
+    is_active: str | None = None,         # 管理一覧の絞込（true/false）
+    include_deleted: bool = False,
+    sort: str | None = None,              # sort_order/name/-updated_at
+    page: int | None = Query(default=None, ge=1),
+    per_page: int | None = Query(default=None, ge=1, le=100),
+    session: dict = Depends(require_me),
+):
+    """テンプレート一覧（N.5b）＝既定はピッカー供給（有効のみ・軽量）／`admin=1` は管理一覧（会社管理者）。読取専用。
+
+    1ルートで2用途＝`admin=1` の時だけ会社管理者ロールをサーバーで再検証（非管理者は 403）。
+    """
+    if admin:
+        require_company_account_admin(request)  # 管理一覧は会社管理者のみ（UI非依存・サーバー強制）
+        result = info_service.list_templates_admin(
+            uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+            q=q, is_active=is_active, include_deleted=include_deleted, sort=sort, page=page, per_page=per_page)
+        return InfoTemplateAdminListResponse(**result)
+    result = info_service.list_templates_for_picker(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+    return InfoTemplatePickListResponse(**result)
+
+
+@router.get("/info-templates/{template_id}", response_model=InfoTemplateDetailDTO)
+def get_info_template(template_id: str, request: Request, session: dict = Depends(require_me)) -> InfoTemplateDetailDTO:
+    """テンプレート詳細（適用用・N.5b）＝有効のみ。無効/論理削除/他テナントは 404。会社内 active 全員。読取専用。"""
+    result = info_service.get_template_detail(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), template_id)
+    return InfoTemplateDetailDTO(**result)
+
+
+@router.post("/info-templates", response_model=InfoTemplateDetailDTO, status_code=201)
+def create_info_template(
+    body: InfoTemplateCreateRequest,
+    request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> InfoTemplateDetailDTO:
+    """テンプレート追加（SC-55・N.5b）＝会社管理者。body_html サニタイズ＋defaults 検証＋name 一意（409）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.create_template(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
+    return InfoTemplateDetailDTO(**result)
+
+
+@router.patch("/info-templates/{template_id}", response_model=InfoTemplateDetailDTO)
+def update_info_template(
+    template_id: str,
+    body: InfoTemplateUpdateRequest,
+    request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> InfoTemplateDetailDTO:
+    """テンプレート編集（SC-55・N.5b・部分更新）＝会社管理者。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.update_template(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), template_id, body=body)
+    return InfoTemplateDetailDTO(**result)
+
+
+@router.post("/info-templates/{template_id}/activate", response_model=InfoTemplateDetailDTO)
+def activate_info_template(
+    template_id: str, request: Request, session: dict = Depends(require_company_account_admin),
+) -> InfoTemplateDetailDTO:
+    """有効化（SC-55・N.5b）＝会社管理者。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.set_template_active(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), template_id, active=True)
+    return InfoTemplateDetailDTO(**result)
+
+
+@router.post("/info-templates/{template_id}/deactivate", response_model=InfoTemplateDetailDTO)
+def deactivate_info_template(
+    template_id: str, request: Request, session: dict = Depends(require_company_account_admin),
+) -> InfoTemplateDetailDTO:
+    """無効化（SC-55・N.5b＝新規ピッカーから除外・既存情報は不変）＝会社管理者。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.set_template_active(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), template_id, active=False)
+    return InfoTemplateDetailDTO(**result)
+
+
+@router.delete("/info-templates/{template_id}", status_code=204)
+def delete_info_template(
+    template_id: str, request: Request, session: dict = Depends(require_company_account_admin),
+) -> None:
+    """テンプレート削除（SC-55・N.5b・論理）＝会社管理者。既存 info_items（source_template_id）は不変。"""
+    verify_origin(request)
+    verify_csrf(request)
+    info_service.delete_template(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), template_id)

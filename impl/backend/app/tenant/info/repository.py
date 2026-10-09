@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core import list_query as lq
 from app.tenant.capabilities import repository as caps_repo
 from app.tenant.capabilities.orm import UserCapability
-from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink
+from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoTemplate
 
 # 情報判定権限（情報インプットの curator）は②会社レベル能力レジストリ `user_capabilities` に統合（FR-47・決定D）。
 # 旧 `info_curators` テーブルは migration 0056 で user_capabilities へ移行のうえ DROP（1能力1テーブルの増殖を止める・DRY）。
@@ -234,13 +234,14 @@ def create_info_item(
     summary: str | None = None,
     source_url: str | None = None,
     parent_info_id: uuid.UUID | None = None,
+    source_template_id: uuid.UUID | None = None,
     info_id: uuid.UUID | None = None,
 ) -> InfoItem:
     """情報を1件作成（低摩擦登録＝status=raw・N.2）。派生（body_text/summary）は呼び出し側が算出して渡す。"""
     item = InfoItem(
         id=info_id or uuid.uuid4(), created_by_id=created_by_id, title=title,
         body_html=body_html, body_text=body_text, summary=summary, source_url=source_url,
-        parent_info_id=parent_info_id, status="raw",
+        parent_info_id=parent_info_id, source_template_id=source_template_id, status="raw",
     )
     session.add(item)
     return item
@@ -752,3 +753,96 @@ def word_cloud(session: Session, *, limit: int) -> list[dict]:
          "weight": round(int(cnt) / max_c, 4) if max_c else None}
         for tok, cnt in rows
     ]
+
+
+# ---- 内部情報テンプレート（info_templates・N.5b・§5.37b）--------------------
+# 管理一覧（admin=1）のソートホワイトリスト（§1.8.1・列 flags は backend が正）。
+_TEMPLATE_SORTS = {
+    "sort_order": (InfoTemplate.sort_order.asc(), InfoTemplate.name.asc()),
+    "name": (InfoTemplate.name.asc(),),
+    "-updated_at": (InfoTemplate.updated_at.desc(),),
+}
+
+
+def create_template(
+    session: Session,
+    *,
+    created_by_id: uuid.UUID,
+    name: str,
+    body_html: str,
+    description: str | None = None,
+    title_template: str | None = None,
+    defaults: dict | None = None,
+    sort_order: int = 0,
+    is_active: bool = True,
+    template_id: uuid.UUID | None = None,
+) -> InfoTemplate:
+    """テンプレートを1件作成（N.5b）。name の有効内一意は DB 部分一意索引が最終担保（呼び出し側が 409 判定）。"""
+    tpl = InfoTemplate(
+        id=template_id or uuid.uuid4(), created_by_id=created_by_id, name=name, description=description,
+        title_template=title_template, body_html=body_html, defaults=defaults or {},
+        sort_order=sort_order, is_active=is_active,
+    )
+    session.add(tpl)
+    return tpl
+
+
+def get_template(session: Session, template_id: uuid.UUID, *, include_deleted: bool = False) -> InfoTemplate | None:
+    """テンプレート1件（既定は論理削除を除外）。適用/管理編集の取得に使う。"""
+    stmt = select(InfoTemplate).where(InfoTemplate.id == template_id)
+    if not include_deleted:
+        stmt = stmt.where(InfoTemplate.deleted_at.is_(None))
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def template_name_exists(session: Session, name: str, *, exclude_id: uuid.UUID | None = None) -> bool:
+    """有効（deleted_at IS NULL）内に同名テンプレートがあるか（無効も対象・§9-2）＝409 の事前判定。"""
+    stmt = select(InfoTemplate.id).where(InfoTemplate.name == name, InfoTemplate.deleted_at.is_(None))
+    if exclude_id is not None:
+        stmt = stmt.where(InfoTemplate.id != exclude_id)
+    return session.execute(stmt.limit(1)).first() is not None
+
+
+def list_active_templates(session: Session) -> list[InfoTemplate]:
+    """ピッカー供給（有効のみ・sort_order→name 昇順・N.5b）＝SC-51 §6b。"""
+    return list(session.execute(
+        select(InfoTemplate)
+        .where(InfoTemplate.deleted_at.is_(None), InfoTemplate.is_active.is_(True))
+        .order_by(InfoTemplate.sort_order.asc(), InfoTemplate.name.asc())
+    ).scalars().all())
+
+
+def list_templates_admin(
+    session: Session,
+    *,
+    q: str | None = None,
+    is_active: bool | None = None,
+    include_deleted: bool = False,
+    sort: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[InfoTemplate], int]:
+    """管理一覧（admin=1・DataTable・§1.8.1）＝無効も含む・論理削除は既定除外。(rows, total) を返す。"""
+    conds = []
+    if not include_deleted:
+        conds.append(InfoTemplate.deleted_at.is_(None))
+    if is_active is not None:
+        conds.append(InfoTemplate.is_active.is_(is_active))
+    if q:
+        like = f"%{q.strip()}%"
+        conds.append(func.coalesce(InfoTemplate.name, "").ilike(like)
+                     | func.coalesce(InfoTemplate.description, "").ilike(like))
+    total = session.execute(
+        select(func.count()).select_from(InfoTemplate).where(*conds)
+    ).scalar_one()
+    order = _TEMPLATE_SORTS.get(sort or "sort_order", _TEMPLATE_SORTS["sort_order"])
+    rows = list(session.execute(
+        select(InfoTemplate).where(*conds).order_by(*order).offset(offset).limit(limit)
+    ).scalars().all())
+    return rows, int(total)
+
+
+def soft_delete_template(session: Session, tpl: InfoTemplate, *, deleted_by_id: uuid.UUID, now) -> None:
+    """論理削除（トゥームストーン・N.5b・§5.37b）＝deleted_at/deleted_by_id をセット（行は残す）。"""
+    tpl.deleted_at = now
+    tpl.deleted_by_id = deleted_by_id

@@ -3,7 +3,7 @@
 > API 全体規約は [`README.md`](./README.md) 第1章（特に §1.5 会社DB動的ルーティング・§1.6 認可・§1.8/§1.8.1 一覧/DataTable・§1.9 冪等・§1.10 添付・§1.11 全文検索）を参照。
 > 設計の正＝[情報インプット機能 設計](../設計ドラフト/情報インプット機能_設計.md)（残論点は §11 で確定）。データモデル＝[データモデル](../データモデル.md) §5.33〜5.37・§3（`info_*` enum）。要件＝[FR-41](../要件定義/README.md#6-機能要件)。
 
-対象画面＝**情報インプット 一覧/登録/詳細（SC-xx 新規・未採番）＋各成果物（アイデア/コンセプト/クエスト）の「関連情報」パネル**。すべて**テナントAPI**（会社DB＝`info_items`/`info_item_categories`/`info_links`/`info_tokens`/`info_curators`）。**サーバは外部 URL を取りに行かない（手動貼付のみ＝SSRF 対象外・§N.7）**。
+対象画面＝**情報インプット 一覧/登録/詳細（SC-xx 新規・未採番）＋各成果物（アイデア/コンセプト/クエスト）の「関連情報」パネル**。すべて**テナントAPI**（会社DB＝`info_items`/`info_item_categories`/`info_links`/`info_tokens`/`info_curators`/`info_templates`）。**サーバは外部 URL を取りに行かない（手動貼付のみ＝SSRF 対象外・§N.7）**。
 
 ## N.0 アクター・認可スコープ
 
@@ -85,6 +85,28 @@
 
 - **識別子＝`account_id`（管理面の自然キー・2026-09-21 実装）**＝会社アカウント管理は account 中心（`info_curators.user_id` へはサーバーが `account_id→会社DB users` で解決）。スコープ＝**会社（テナント）単位**（設計 §11-①）＝`company_id` は受けずセッション会社固定。quest 系権限（C.0 の6権限）とは別軸。**付与導線＝会社アカウント管理（SC-93 `/admin/accounts`）に同居**＝`InfoCuratorSection`。**UI はクエストグループ管理（SC-90）と同構成**＝付与済みユーザーの**一覧（DataTable・行の ⋯ メニューから「情報判定権限を剥奪」）**＋**「＋ 権限を付与する」ボタン→ メンバー追加ダイアログ風**（会社ディレクトリ検索＋もっと見る＋各行の「付与」で連続付与）。**配置＝アカウント一覧の次**（SC-92 と統一）。**加えて、system_admin が“自社”を SC-92 会社詳細（`/admin/companies/{id}`）で開いたとき（セッション会社＝表示中会社）にも同セクションを表示する（2026-09-21 B 対応）**＝session-scoped API がそのまま自社に効くため新 EP 不要。**他社（表示中会社≠セッション会社）では非表示**（クロステナント付与は未対応）。
 
+## N.5b 内部情報テンプレート（会社共通マスタ・[情報インプットテンプレート機能](../設計ドラフト/情報インプットテンプレート機能_設計.md)）
+
+> 情報登録モーダル（SC-51）の**入力の起点**。選ぶと本文ひな形（見出し＋記入欄プレースホルダ）＋属性既定値がフォームへ入る。**マスタ管理＝会社管理者**（`company_account_admin`／`system_admin`）・**閲覧/適用＝会社内 active 全員**。テンプレートと情報は疎結合（登録後の `info_items` はテンプレ非参照・§5.37b）。管理 UI＝SC-55。データ＝[データモデル §5.37b](../データモデル.md#537b-info_templates内部情報テンプレート会社共通マスタ情報インプットテンプレート機能)。
+
+| メソッド/パス | 概要 | リクエスト | レスポンス |
+| --- | --- | --- | --- |
+| `GET /info-templates` | **ピッカー供給**（有効のみ・`sort_order`→`name` 昇順） | — | `data`=`[{id, name, description}]`（軽量）。会社内 active 全員。`is_active=false`/論理削除は除外 |
+| `GET /info-templates/{id}` | **適用用 1件詳細**（本文/既定含む） | パス: `template_id` | `{id, name, description, title_template, body_html, defaults, sort_order, is_active}`。会社内 active 全員（無効/論理削除は 404） |
+| `GET /info-templates?admin=1` | **管理一覧**（DataTable 契約 §1.8.1） | クエリ: `admin=1`＋`q`（name/description）／`is_active`（絞込）／`include_deleted`（既定 false）／`sort`（`sort_order`〔既定〕/`name`/`-updated_at`）／`limit`/`cursor` | `data`=`[{id, name, description, defaults_summary〔既定属性のチップ用サマリ〕, is_active, sort_order, updated_by, updated_at}]`＋`page_info`。**会社管理者のみ**（非管理者が `admin=1` は 403） |
+| `POST /info-templates` | 追加 | ボディ: `name`（必須・有効内一意）・`description?`・`title_template?`・`body_html`（必須・保存時 nh3 サニタイズ）・`defaults?`（§5.37b・キー/値検証）・`sort_order?`・`is_active?`（既定 true）。ヘッダ `Idempotency-Key`（§1.9） | 作成したテンプレート。**会社管理者のみ**。検証失敗は 422（下記） |
+| `PATCH /info-templates/{id}` | 編集（部分更新） | ボディ: 上記の任意サブセット。`body_html` 変更時は再サニタイズ・`name` 変更時は一意再検証 | 更新後のテンプレート。**会社管理者のみ** |
+| `POST /info-templates/{id}/activate` | 有効化 | — | `is_active=true`。**会社管理者のみ** |
+| `POST /info-templates/{id}/deactivate` | 無効化（新規ピッカーから除外・既存情報は不変） | — | `is_active=false`。**会社管理者のみ** |
+| `DELETE /info-templates/{id}` | 削除（論理＝トゥームストーン） | — | 204・`deleted_at`/`deleted_by_id` セット。**会社管理者のみ**。既存 `info_items`（`source_template_id` 参照）は不変。論理削除済みの `name` は再利用可 |
+
+- **サーバ側検証（application 層・違反は 422＋明示コード）**＝
+  (1) **`body_html` を nh3 サニタイズ**（本文と同一許可リスト＝§N.7。管理者作成でも例外にしない＝多層防御）。`title_template` も平文化/サニタイズ。
+  (2) **`defaults` のキーは既知属性に限る**（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_class`/`impact_level`/`impact_timing`／`categories`＝`info_category` enum コードの配列）＝未知キーは 422 `invalid_template_defaults`。**値は当該 enum（会社拡張含む）に実在**・`categories` は実在する `info_category`。不正値は 422。
+  (3) **`name` は有効（`deleted_at IS NULL`）内で一意**（無効も一意対象）＝重複は 409 `conflict`。
+- **適用はクライアント主体**＝`GET /info-templates/{id}` で取得した `body_html`/`defaults`/`title_template` をフォームへ流し込むだけ（専用「適用」EP は不要・登録は従来の `POST /info-items`）。由来を残す場合は `POST /info-items` のボディに任意 `source_template_id` を載せる（存在しない/論理削除済み id でも受理＝履歴記録・外部キーは NULL 許容）。**日付目印はクライアントで展開**（サーバ側テンプレエンジン無し・§4）。
+- 認可失敗＝**403 `forbidden`**（非管理者の書き込み/`admin=1`）／他テナントは **404**（存在秘匿）。
+
 ## N.6 類似度・ワードクラウド（派生・内部処理）
 
 - **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。**`body_text`（平文）**をストップワード除去→`info_tokens`（§5.36）。**保存時に同期**（単一情報は軽量＝バックグラウンド不要・§12-2）。一覧ワードクラウド＝保存済みトークンの集計／入力ダイアログのプレビュー＝`POST /info-items/word-cloud-preview`（草稿を同期トークン化・永続しない）。
@@ -113,8 +135,9 @@
 - **情報インプット 一覧**（`GET /info-items`＝DataTable サーバー委譲）／**登録**（`POST`＝低摩擦・全ユーザー）／**詳細**（`GET /info-items/{id}`＝属性付与〔`info_curator`〕・ワードクラウド・関連リンク）。
 - 各成果物（アイデア/コンセプト/クエスト）画面の**「関連情報」パネル**＝`GET /{artifact}/related-info`（一致度上位＋`kind` バッジ・手動追加/棄却）。
 - 情報判定権限の付与＝会社アカウント管理（SC-90 系）に同居。
+- **内部情報テンプレート（§N.5b）**＝登録モーダル（**SC-51**）のテンプレートピッカー（`GET /info-templates`＋適用は `GET /info-templates/{id}`）／テンプレート管理マスタ（**SC-55**・会社管理者・DataTable＝`GET /info-templates?admin=1`＋URLモーダルの登録/編集）。
 
 ## N.9 MVP 境界・Phase2
 
-- **MVP**＝手動貼付＋属性（低摩擦=全ユーザー／curated=`info_curator`）／キーワード類似の**自動リンク（既定=related）**／手動種別変更＋手動追加/棄却／**反証→通知＋要再評価（per-link）**／XSS・URL 検証／ワードクラウド。**＋2026-09-19 追加（§12）**＝続報（`parent_info_id`・親リンクをスナップショット複製）／ワードクラウド同期化＋ダイアログ内プレビュー（`POST /info-items/word-cloud-preview`）／要約（抽出型 `summarize_text` を保存時同期生成）／リッチテキスト（`body_html`+`body_text`・nh3 サニタイズ・画像 `POST /info-items/images` で MinIO 再ホスト）。
-- **Phase2**＝埋め込み類似・矛盾の自動検出・**LLM 生成要約**（`summarize_text` 差替え・内部データ外部送信ポリシー要）・enum の会社ごと拡張（#7/#8）・重複統合（MVP は同一 URL 警告のみ）。
+- **MVP**＝手動貼付＋属性（低摩擦=全ユーザー／curated=`info_curator`）／キーワード類似の**自動リンク（既定=related）**／手動種別変更＋手動追加/棄却／**反証→通知＋要再評価（per-link）**／XSS・URL 検証／ワードクラウド。**＋2026-09-19 追加（§12）**＝続報（`parent_info_id`・親リンクをスナップショット複製）／ワードクラウド同期化＋ダイアログ内プレビュー（`POST /info-items/word-cloud-preview`）／要約（抽出型 `summarize_text` を保存時同期生成）／リッチテキスト（`body_html`+`body_text`・nh3 サニタイズ・画像 `POST /info-items/images` で MinIO 再ホスト）。**＋2026-10-09 追加＝内部情報テンプレート（§N.5b）**＝会社共通マスタ（`info_templates`）・SC-51 ピッカー＋SC-55 管理・本文ひな形（見出し＋プレースホルダ）＋属性既定プリフィル・日付のみクライアント展開・`info_items.source_template_id` で由来記録。
+- **Phase2**＝埋め込み類似・矛盾の自動検出・**LLM 生成要約**（`summarize_text` 差替え・内部データ外部送信ポリシー要）・enum の会社ごと拡張（#7/#8）・重複統合（MVP は同一 URL 警告のみ）・**テンプレートの個人/部門別・curator への管理開放・変数差込拡張（作成者名/クエスト名等）**。

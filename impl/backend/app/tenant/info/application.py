@@ -20,6 +20,7 @@ from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.tokens import repository as tokens_repo
 from app.tenant.info.schemas import (
+    CATEGORY_VALUES,
     IMPACT_CLASS_VALUES,
     LINK_DISPOSITION_VALUES,
     LINK_KIND_VALUES,
@@ -27,6 +28,7 @@ from app.tenant.info.schemas import (
     PRIORITY_VALUES,
     SOURCE_VALUES,
     STATUS_VALUES,
+    TEMPLATE_DEFAULT_SCALARS,
 )
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests.summarize import summarize_text
@@ -512,6 +514,13 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
     if not derive.is_valid_source_url(body.source_url):
         raise AppError(422, "validation_error", detail="出典URLは http/https のみです", errors=[{"field": "source_url"}])
     parent_uuid = _parse_uuid(body.parent_info_id, field="parent_info_id") if body.parent_info_id else None
+    # 由来テンプレート（§5.37b・任意・分析用）。不正な UUID 文字列は無視（NULL）＝由来記録は壊さない。
+    tpl_uuid = None
+    if getattr(body, "source_template_id", None):
+        try:
+            tpl_uuid = uuid.UUID(str(body.source_template_id))
+        except ValueError:
+            tpl_uuid = None
 
     # 属性（キュレーション）＝curator のみ。送られた項目だけ付与（§85）。
     _cur_scalar = ("priority", "source", "classification", "scope", "target_business",
@@ -539,10 +548,13 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
             raise AppError(403, "forbidden", detail="属性の付与は情報判定権限（info_curator）が必要です")
         if parent_uuid is not None and repo.get_info_item(ts, parent_uuid) is None:
             raise AppError(422, "validation_error", detail="親情報が見つかりません", errors=[{"field": "parent_info_id"}])
+        # FK（info_templates）違反を避けつつ由来を記録＝実在（論理削除済みも行は残る）する id のみ採用・不在は NULL（§5.37b）。
+        if tpl_uuid is not None and repo.get_template(ts, tpl_uuid, include_deleted=True) is None:
+            tpl_uuid = None
         item = repo.create_info_item(
             ts, created_by_id=user.id, title=title, body_html=body_html or None,
             body_text=body_text or None, summary=summary, source_url=(body.source_url or None),
-            parent_info_id=parent_uuid,
+            parent_info_id=parent_uuid, source_template_id=tpl_uuid,
         )
         ts.flush()
         repo.replace_tokens(ts, item.id, tokens)
@@ -1237,3 +1249,214 @@ def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int =
             return {"tokens": []}
         tokens = repo.word_cloud(ts, limit=limit)
     return {"tokens": tokens}
+
+
+# ---- 内部情報テンプレート（/info-templates・N.5b・§5.37b）------------------
+
+def _validate_template_defaults(defaults: dict | None) -> dict:
+    """テンプレート属性既定値の検証（N.5b(2)）＝キーは既知属性に限り・値は当該 enum/category に実在。
+
+    返り値＝正規化した defaults（空値は捨てる）。違反は 422 `invalid_template_defaults`。
+    """
+    if not defaults:
+        return {}
+    if not isinstance(defaults, dict):
+        raise AppError(422, "invalid_template_defaults", detail="属性既定値の形式が不正です")
+    out: dict = {}
+    for key, val in defaults.items():
+        if key == "categories":
+            if val in (None, [], ""):
+                continue
+            if not isinstance(val, list) or any(c not in CATEGORY_VALUES for c in val):
+                raise AppError(422, "invalid_template_defaults",
+                               detail="情報カテゴリの既定が不正です", errors=[{"field": "defaults.categories"}])
+            out["categories"] = list(dict.fromkeys(val))  # 重複除去
+        elif key in TEMPLATE_DEFAULT_SCALARS:
+            if val in (None, ""):
+                continue
+            if val not in TEMPLATE_DEFAULT_SCALARS[key]:
+                raise AppError(422, "invalid_template_defaults",
+                               detail=f"{key} の既定値が不正です", errors=[{"field": f"defaults.{key}"}])
+            out[key] = val
+        else:
+            raise AppError(422, "invalid_template_defaults",
+                           detail=f"未知の属性キーです: {key}", errors=[{"field": f"defaults.{key}"}])
+    return out
+
+
+def _template_pick_dto(tpl) -> dict:
+    return {"id": str(tpl.id), "name": tpl.name, "description": tpl.description}
+
+
+def _template_detail_dto(tpl) -> dict:
+    return {
+        "id": str(tpl.id), "name": tpl.name, "description": tpl.description,
+        "title_template": tpl.title_template, "body_html": tpl.body_html,
+        "defaults": tpl.defaults or {}, "sort_order": tpl.sort_order, "is_active": tpl.is_active,
+    }
+
+
+def list_templates_for_picker(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """ピッカー供給（SC-51 §6b・N.5b）＝有効のみ・会社内 active 全員が閲覧可。読取専用。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        return {"data": []}
+    with get_tenant_session(company.db_identifier) as ts:
+        if profile_repo.get_user_by_account(ts, account_id) is None:
+            raise AppError(401, "unauthenticated")
+        return {"data": [_template_pick_dto(t) for t in repo.list_active_templates(ts)]}
+
+
+def get_template_detail(account_id: uuid.UUID, company_id: uuid.UUID, template_id: str) -> dict:
+    """適用用の1件詳細（SC-51・N.5b）＝有効のみ。無効/論理削除/他テナントは 404。会社内 active 全員。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(template_id, field="template_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        if profile_repo.get_user_by_account(ts, account_id) is None:
+            raise AppError(401, "unauthenticated")
+        tpl = repo.get_template(ts, tid)
+        if tpl is None or not tpl.is_active:
+            raise AppError(404, "not_found")
+        return _template_detail_dto(tpl)
+
+
+def list_templates_admin(account_id: uuid.UUID, company_id: uuid.UUID, *,
+                         q: str | None = None, is_active: str | None = None,
+                         include_deleted: bool = False, sort: str | None = None,
+                         page: int | None = None, per_page: int | None = None) -> dict:
+    """管理一覧（SC-55・admin=1・N.5b）＝無効含む・論理削除は既定除外。番号ページャ（§1.8.1）。
+
+    認可（会社管理者）は router の require_company_account_admin で担保。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    page = page or 1
+    per_page = min(per_page or 20, 100)
+    active_filter = {"true": True, "false": False}.get((is_active or "").lower()) if is_active else None
+    if sort and sort not in {"sort_order", "name", "-updated_at"}:
+        raise AppError(422, "validation_error", detail="sort が不正です", errors=[{"field": "sort"}])
+    with get_tenant_session(company.db_identifier) as ts:
+        rows, total = repo.list_templates_admin(
+            ts, q=q, is_active=active_filter, include_deleted=include_deleted, sort=sort,
+            offset=(page - 1) * per_page, limit=per_page)
+        # 更新者表示名（N+1 回避で一括）。作成者を更新者の代理として表示（監査は updated_at を見せる）。
+        updater_ids = [r.created_by_id for r in rows]
+        users = repo.users_by_ids(ts, updater_ids) if updater_ids else {}
+        data = [{
+            "id": str(r.id), "name": r.name, "description": r.description,
+            "defaults": r.defaults or {}, "is_active": r.is_active, "sort_order": r.sort_order,
+            "updated_by": (users[r.created_by_id].display_name if r.created_by_id in users else None),
+            "updated_at": r.updated_at,
+        } for r in rows]
+    return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
+
+
+def _resolve_admin_user(ts, account_id: uuid.UUID):
+    user = profile_repo.get_user_by_account(ts, account_id)
+    if user is None:
+        raise AppError(401, "unauthenticated")
+    return user
+
+
+def create_template(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
+    """テンプレート追加（SC-55・N.5b）＝会社管理者。body_html サニタイズ＋defaults 検証＋name 有効内一意（409）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    name = (body.name or "").strip()
+    if not name:
+        raise AppError(422, "validation_error", detail="名称は必須です", errors=[{"field": "name"}])
+    if not (body.body_html or "").strip():
+        raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body_html"}])
+    defaults = _validate_template_defaults(body.defaults)
+    body_html = derive.sanitize_html(body.body_html) or ""
+    title_template = (body.title_template or None)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _resolve_admin_user(ts, account_id)
+        if repo.template_name_exists(ts, name):
+            raise AppError(409, "conflict", detail="同名の有効なテンプレートがあります", errors=[{"field": "name"}])
+        tpl = repo.create_template(
+            ts, created_by_id=user.id, name=name, body_html=body_html, description=(body.description or None),
+            title_template=title_template, defaults=defaults,
+            sort_order=(body.sort_order or 0), is_active=(True if body.is_active is None else bool(body.is_active)),
+        )
+        ts.flush()
+        new_id = tpl.id
+        ts.commit()
+        tpl = repo.get_template(ts, new_id)
+    return _template_detail_dto(tpl)
+
+
+def update_template(account_id: uuid.UUID, company_id: uuid.UUID, template_id: str, *, body) -> dict:
+    """テンプレート編集（SC-55・N.5b・部分更新）＝会社管理者。送られたキーのみ更新（model_fields_set）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(template_id, field="template_id")
+    sent = body.model_fields_set
+    with get_tenant_session(company.db_identifier) as ts:
+        _resolve_admin_user(ts, account_id)
+        tpl = repo.get_template(ts, tid)
+        if tpl is None:
+            raise AppError(404, "not_found")
+        if "name" in sent:
+            name = (body.name or "").strip()
+            if not name:
+                raise AppError(422, "validation_error", detail="名称は必須です", errors=[{"field": "name"}])
+            if repo.template_name_exists(ts, name, exclude_id=tid):
+                raise AppError(409, "conflict", detail="同名の有効なテンプレートがあります", errors=[{"field": "name"}])
+            tpl.name = name
+        if "description" in sent:
+            tpl.description = (body.description or None)
+        if "title_template" in sent:
+            tpl.title_template = (body.title_template or None)
+        if "body_html" in sent:
+            if not (body.body_html or "").strip():
+                raise AppError(422, "validation_error", detail="本文ひな形は必須です", errors=[{"field": "body_html"}])
+            tpl.body_html = derive.sanitize_html(body.body_html) or ""
+        if "defaults" in sent:
+            tpl.defaults = _validate_template_defaults(body.defaults)
+        if "sort_order" in sent and body.sort_order is not None:
+            tpl.sort_order = int(body.sort_order)
+        if "is_active" in sent and body.is_active is not None:
+            tpl.is_active = bool(body.is_active)
+        tpl.updated_at = datetime.now(timezone.utc)
+        ts.commit()
+        tpl = repo.get_template(ts, tid)
+    return _template_detail_dto(tpl)
+
+
+def set_template_active(account_id: uuid.UUID, company_id: uuid.UUID, template_id: str, *, active: bool) -> dict:
+    """有効/無効トグル（SC-55・N.5b）＝会社管理者。無効＝新規ピッカーから除外（既存情報は不変）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(template_id, field="template_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        _resolve_admin_user(ts, account_id)
+        tpl = repo.get_template(ts, tid)
+        if tpl is None:
+            raise AppError(404, "not_found")
+        tpl.is_active = active
+        tpl.updated_at = datetime.now(timezone.utc)
+        ts.commit()
+        tpl = repo.get_template(ts, tid)
+    return _template_detail_dto(tpl)
+
+
+def delete_template(account_id: uuid.UUID, company_id: uuid.UUID, template_id: str) -> None:
+    """テンプレート削除（SC-55・N.5b・論理）＝会社管理者。既存 info_items（source_template_id）は不変。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(template_id, field="template_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _resolve_admin_user(ts, account_id)
+        tpl = repo.get_template(ts, tid)
+        if tpl is None:
+            raise AppError(404, "not_found")
+        repo.soft_delete_template(ts, tpl, deleted_by_id=user.id, now=datetime.now(timezone.utc))
+        ts.commit()

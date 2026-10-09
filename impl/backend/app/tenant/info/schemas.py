@@ -22,6 +22,33 @@ IMPACT_CLASS_VALUES: frozenset[str] = frozenset({"opportunity", "threat", "other
 LINK_TARGET_VALUES: frozenset[str] = frozenset({"ideas", "concepts", "quests", "assumptions"})
 LINK_KIND_VALUES: frozenset[str] = frozenset({"related", "supporting", "refuting"})
 LINK_DISPOSITION_VALUES: frozenset[str] = frozenset({"pending", "adopted", "declined"})
+# テンプレート属性既定値（§3-1）の検証用＝残りの単一選択 enum（labels.ts と一致）。
+CLASSIFICATION_VALUES: frozenset[str] = frozenset({"information", "idea", "request", "knowledge", "proposal", "other"})
+SCOPE_VALUES: frozenset[str] = frozenset({"external", "internal", "other"})
+TARGET_BUSINESS_VALUES: frozenset[str] = frozenset({
+    "innovation", "bpo", "generative_provider", "it_infra_network", "software_dev", "it_service_ops", "other",
+})
+IMPACT_LEVEL_VALUES: frozenset[str] = frozenset({"unknown", "none", "minor", "moderate", "major", "severe"})
+IMPACT_TIMING_VALUES: frozenset[str] = frozenset({
+    "unknown", "within_3y", "within_1y", "within_6m", "within_3m", "already",
+})
+CATEGORY_VALUES: frozenset[str] = frozenset({
+    "ext_economy", "ext_politics_law", "ext_society_culture", "ext_industry", "ext_competitor",
+    "ext_technology", "ext_geography", "ext_other", "internal_tech", "internal_capability",
+    "internal_process", "internal_people", "internal_customer", "internal_partner",
+    "internal_finance", "internal_culture", "internal_hr",
+})
+# テンプレート defaults の「スカラ属性キー → 許可 enum 値」（§3-1）。categories は別（複数・CATEGORY_VALUES）。
+TEMPLATE_DEFAULT_SCALARS: dict[str, frozenset[str]] = {
+    "priority": PRIORITY_VALUES,
+    "source": SOURCE_VALUES,
+    "classification": CLASSIFICATION_VALUES,
+    "scope": SCOPE_VALUES,
+    "target_business": TARGET_BUSINESS_VALUES,
+    "impact_class": IMPACT_CLASS_VALUES,
+    "impact_level": IMPACT_LEVEL_VALUES,
+    "impact_timing": IMPACT_TIMING_VALUES,
+}
 
 
 class InfoCreatorDTO(BaseModel):
@@ -111,6 +138,7 @@ class InfoCreateRequest(BaseModel):
     triage_reason: str | None = None
     due_date: str | None = None
     categories: list[str] | None = None
+    source_template_id: str | None = None  # 由来テンプレート（§5.37b・任意・分析用・存在しなくても受理）
 
 
 class InfoUpdateRequest(BaseModel):
@@ -349,6 +377,75 @@ class InfoCuratorsResponse(BaseModel):
 class InfoCuratorGrantRequest(BaseModel):
     """POST /info-curators（付与・N.5）。対象は会社内アカウント（account_id）。"""
     account_id: str
+
+
+# ---- 内部情報テンプレート（/info-templates・N.5b・§5.37b）------------------
+class InfoTemplatePickDTO(BaseModel):
+    """ピッカー供給の軽量 DTO（GET /info-templates・有効のみ）＝SC-51 §6b。"""
+    id: str
+    name: str
+    description: str | None = None
+
+
+class InfoTemplatePickListResponse(BaseModel):
+    """GET /info-templates の応答（ピッカー一覧）。"""
+    data: list[InfoTemplatePickDTO] = []
+
+
+class InfoTemplateDetailDTO(BaseModel):
+    """適用用の1件詳細（GET /info-templates/{id}）＝本文/既定/タイトル雛形を含む。"""
+    id: str
+    name: str
+    description: str | None = None
+    title_template: str | None = None
+    body_html: str
+    defaults: dict = {}
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class InfoTemplateAdminDTO(BaseModel):
+    """管理一覧の1行（GET /info-templates?admin=1・DataTable）＝SC-55。
+
+    `defaults`（属性既定値の生 dict）を返し、チップ表示のラベル化は frontend labels.ts で行う（DRY＝
+    enum ラベルを backend に二重定義しない）。
+    """
+    id: str
+    name: str
+    description: str | None = None
+    defaults: dict = {}                # 既定属性（frontend がチップ化・labels.ts でラベル解決）
+    is_active: bool = True
+    sort_order: int = 0
+    updated_by: str | None = None
+    updated_at: datetime
+
+
+class InfoTemplateAdminListResponse(BaseModel):
+    """GET /info-templates?admin=1 の応答（番号ページャ・§1.8.1）。"""
+    data: list[InfoTemplateAdminDTO] = []
+    page_info: InfoOffsetPageInfo
+
+
+class InfoTemplateCreateRequest(BaseModel):
+    """POST /info-templates（会社管理者）。body_html はサーバー sanitize・defaults はキー/値検証（N.5b）。"""
+    name: str
+    description: str | None = None
+    title_template: str | None = None
+    body_html: str
+    defaults: dict | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+
+class InfoTemplateUpdateRequest(BaseModel):
+    """PATCH /info-templates/{id}（部分更新・会社管理者）。送られたキーのみ更新（model_fields_set）。"""
+    name: str | None = None
+    description: str | None = None
+    title_template: str | None = None
+    body_html: str | None = None
+    defaults: dict | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
 
 
 # InfoDetailDTO.attachments は前方参照（InfoAttachmentDTO は後方定義）＝解決を明示。
