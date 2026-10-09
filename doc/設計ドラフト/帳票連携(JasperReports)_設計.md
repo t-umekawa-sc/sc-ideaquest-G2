@@ -195,3 +195,53 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 - [ ] [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md) の詳細確定（本書と同時起票済・ドラフト）。
 - [ ] [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に請求書アクションの節を追記。
 - [ ] [本番デプロイ要件](../本番デプロイ要件.md) に Jasper コンテナ（内部ネットワーク・ヘルスチェック）を追記。
+
+## 17. リファクタリング／Docker 再チェック（2026-10-09 追記）
+
+> §1（R1〜R7）がアーキテクチャ層の課題を扱うのに対し、本節は**サンプルの Docker・依存・サービスコード内部**をリファクタリング観点で精査した結果。移植（§15 の手順4）で**そのままでは動かない実バグ**と、§4 の「最小2点」に収まらない改修点を明文化する。実体＝`doc/JasperReports/…/v_pythonjasper/`。
+
+### 17.1 サンプルの「そのままでは動かない」バグ（移植時に必修正）
+
+| # | 箇所 | 問題 | 対処 |
+|---|---|---|---|
+| D1 | `Dockerfile.txt:6` `dnf -y install python39 && \  ## …` | 行継続 `\` の**後ろ**にコメントが続き、`\` が末尾でないため空白エスケープ扱い→コメント語が `dnf` 引数に。**ビルド失敗** | 末尾コメントを除去（または別行コメント化） |
+| D2 | `requirements.txt:1,2,4` `fastapi　# …` | `#` 前が**全角スペース U+3000**。pip は区切り空白と見なさず不正パッケージ名に。**依存解決失敗** | 全角除去＋インラインコメント削除 |
+| D3 | `Dockerfile.txt:5` `dnf -y update` | 非再現ビルド（アンチパターン） | 固定タグ運用・`update` 撤去 |
+| D4 | `requirements.txt:3` `pyreportjasper`（版未固定） | 再現性なし | 版ピン（backend の pyproject 作法に合わせる） |
+
+### 17.2 Docker 構成のリファクタ（§10 を実物対比で具体化）
+
+- **ポート非公開**＝サンプル `docker-compose.yaml:4` `ports:["8000:8000"]` は撤去し内部到達のみ（§10 の意図を実物対比で明記）。
+- **ソースをベイク**＝`docker-compose.yaml:6` の bind mount `.:/app` は撤去し、jrxml 込みでイメージにベイク（当プロジェクト方針＝backend も volumes 無し）。
+- **無関係サービス除外**＝サンプル compose の `nextjs-ui`（:3000）は連携対象外。
+- **イメージのスリム化**＝`almalinux:8` + `java-11-openjdk-**devel**`（コンパイラ一式）は実行には過剰。`java-11-openjdk-**headless**` へ。`python39` の要否も検討（backend は `python:3.12-slim`）。
+- **ヘルスチェック**＝Jasper サービスに `/health` EP ＋ `HEALTHCHECK` を追加（`impl/compose.yaml` は全サービスに healthcheck あり。MVP compose 時点で必要・本番要件へ丸投げしない）。
+- **非 root 実行**＝専用ユーザで起動。
+- **JasperStarter/JVM 資産のベイク**＝`pyreportjasper` は JasperStarter バイナリ＋JVM リソースを要し初回取得が走り得る。閉域/再現性のため**ビルド時にベイク**。
+
+### 17.3 Jasper サービス側改修の補足（§4「最小2点」に追加）
+
+§4 の (a) jrxml→JSON アダプタ化・(b) `/render` JSON body 化に加え、以下も必須。
+
+1. **一時ファイルの衝突**（§8 の補強）＝`jasper_service.py:31` は `/tmp/{report_id}` 固定。データ・プッシュ後は複数テナントが同一 `report_key` を同時出力すると `/tmp/同名` で競合/取り違え。`tempfile.mkdtemp()` で一意化し `finally` で削除。
+2. **Jasper 側にも多層防御のパス検証**（R5 の補強）＝backend レジストリの whitelist に加え、Jasper も `reports/{group}/{report_id}.jrxml` を**リクエストから組み立てる**（`jasper_service.py:30`）ため、`..`/絶対パス拒否を Jasper 側にも入れる（defense in depth）。
+3. **DB 配管の全撤去**＝`[DATABASE]` 節だけでなく `configparser` 読込・`DB_CONFIG`（`jasper_service.py:5-22`）・`drivers/` ・`[JDBC]` 節まで一掃。
+4. **JSON 入力口**＝`jasper.config(data_file=<json>, json_query=…, db_connection=None)` で JSON データソースはネイティブ対応（実装者向け補足）。
+5. **返却形**＝`/tmp` 経由の `FileResponse` をやめ `Response(bytes)` で返す（R6 の実装面）。
+6. **デッドコード除去**＝`jasper_service.py:38` の `os.environ['JAVA_OPTS']=…` は Dockerfile `ENV`（:21）と重複。
+7. **エラー漏洩**＝`jasper_python_main.py:27` の `str(e)` 直返し（500）はサニタイズ（`errors.py` をサービス側にも）。
+8. **CORS 撤去**＝`CORSMiddleware(allow_origins=["*"])`（`jasper_python_main.py:8`）は S2S 化で削除（R2）。
+
+### 17.4 軽微
+
+- サンプル `config.ini` に実在風の資格情報（`163.43.70.68`/`admin1234`）が残存。サンプルゆえ実害は低いが **impl へ持ち込まない**。
+- （将来最適化）JVM コールドスタート回避＝ビルド時に `.jrxml`→`.jasper` プリコンパイルし、リクエスト毎のコンパイルを省く。
+
+### 17.5 現状システム構成・横断セキュリティ要件との突合（追加指摘）
+
+> §11 がアプリ層の認可・テナント・パス対策を押さえるのに対し、本小節は**現状の `impl/compose.yaml`・横断の秘密管理／セキュリティ要件**に照らして、ドラフトに未反映だった改修点を補う。根拠＝[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)・[シークレット管理(SOPS) 設計](シークレット管理(SOPS)_設計.md)・[本番デプロイ要件](../本番デプロイ要件.md)。
+
+- **G1 S2S 秘密の供給方式を横断方針に合わせる**＝§10 表は `JASPER_SHARED_SECRET` を env で渡す前提だが、[シークレット管理(SOPS) 設計](シークレット管理(SOPS)_設計.md) §5 が確定した方針は**「鍵・秘密は env でなく compose `secrets:` ファイルマウント（`/run/secrets/<name>`・読取専用）」**（セキュリティ一覧 §11「シークレット管理サービスを利用」「秘密鍵を Git/イメージに埋め込まない」）。本連携は**その消費者**として、S2S 秘密を**ファイルマウントで供給**し、compose には参照だけ書く（カメリオ連携と同じ扱い＝DRY）。§10 の env 直置きは撤回。
+- **G2 ネットワーク分離の機構を明記（現状 compose に未接地）**＝現状 `impl/compose.yaml` は**カスタム network 定義ゼロ**＝全サービスが既定 bridge で相互到達可（既存 `ollama` もホスト公開）。**「公開ポートを張らない」だけでは分離にならない**（同一 bridge の他コンテナから到達可）。Jasper は `internal: true` の専用 network に隔離し、到達可能なのは backend のみに限定する（セキュリティ一覧 §16「外部通信をネットワークレベルでも制限」）。本機構は [本番デプロイ要件](../本番デプロイ要件.md) にも追記（§16 TODO）。
+- **G3 監査ログ**＝使用料請求書 DL は**他社の財務情報を扱う機微な管理者操作**。セキュリティ一覧 §15（「アクセス/変更を監査」「追跡用 ID とともにサーバログへ」）に従い、**誰が・どの会社の・どの期間の請求書を・いつ DL したか**を既存 system logging（JSONL＋request_id/tenant 相関）へ記録する。請求書**本文（PII/金額）はログに残さない**（同 §11/§15）。
+- **軽微（要件表にあり未記載）**＝(a) SSRF（§16）＝Jasper URL は固定 env でユーザー入力由来にしない旨を明記し、**応答サイズ上限**を設定（タイムアウトは §9 にあり）。(b) XXE/デシリアライズ（§17）＝Jasper は XML(jrxml)＋JSON を処理。jrxml はベイク（信頼済）だが、**受領 JSON のサイズ上限/DoS 対策**と XXE 無効化を一言添える。

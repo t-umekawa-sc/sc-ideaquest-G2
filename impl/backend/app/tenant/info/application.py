@@ -1351,6 +1351,7 @@ def list_templates_admin(account_id: uuid.UUID, company_id: uuid.UUID, *,
         users = repo.users_by_ids(ts, updater_ids) if updater_ids else {}
         data = [{
             "id": str(r.id), "name": r.name, "description": r.description,
+            "title_template": r.title_template, "body": r.body,
             "defaults": r.defaults or {}, "is_active": r.is_active, "sort_order": r.sort_order,
             "updated_by": (users[r.created_by_id].display_name if r.created_by_id in users else None),
             "updated_at": r.updated_at,

@@ -8409,7 +8409,7 @@ export interface components {
         };
         /**
          * InfoTemplateCreateRequest
-         * @description POST /info-templates（会社管理者）。body_html はサーバー sanitize・defaults はキー/値検証（N.5b）。
+         * @description POST /info-templates（会社管理者）。body（PM-JSON）はサーバー sanitize・defaults はキー/値検証（N.5b）。
          */
         InfoTemplateCreateRequest: {
             /** Name */
@@ -8418,8 +8418,10 @@ export interface components {
             description?: string | null;
             /** Title Template */
             title_template?: string | null;
-            /** Body Html */
-            body_html: string;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /** Defaults */
             defaults?: {
                 [key: string]: unknown;
@@ -8432,6 +8434,8 @@ export interface components {
         /**
          * InfoTemplateDetailDTO
          * @description 適用用の1件詳細（GET /info-templates/{id}）＝本文/既定/タイトル雛形を含む。
+         *
+         *     `body`（PM-JSON）を情報登録フォームの共有エディタへ適用する（SC-51）。`body_html` は派生（表示用）。
          */
         InfoTemplateDetailDTO: {
             /** Id */
@@ -8442,6 +8446,10 @@ export interface components {
             description?: string | null;
             /** Title Template */
             title_template?: string | null;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /** Body Html */
             body_html: string;
             /**
@@ -8473,8 +8481,10 @@ export interface components {
             description?: string | null;
             /** Title Template */
             title_template?: string | null;
-            /** Body Html */
-            body_html?: string | null;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            } | null;
             /** Defaults */
             defaults?: {
                 [key: string]: unknown;

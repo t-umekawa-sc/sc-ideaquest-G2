@@ -417,6 +417,8 @@ class InfoTemplateAdminDTO(BaseModel):
     id: str
     name: str
     description: str | None = None
+    title_template: str | None = None  # タイトル雛形（編集/複製のプリフィル用）
+    body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # 本文ひな形 PM-JSON（編集/複製用・無効も含む）
     defaults: dict = {}                # 既定属性（frontend がチップ化・labels.ts でラベル解決）
     is_active: bool = True
     sort_order: int = 0

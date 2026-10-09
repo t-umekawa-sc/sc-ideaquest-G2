@@ -4,10 +4,13 @@
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Combobox, Field, FormFooterError, FormSummary, useFormErrorNotice } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, useConfirm, useFormErrorNotice } from "@/components/ui";
 import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import { ApiError } from "@/lib/api/client";
-import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, uploadInfoImageApi } from "../api";
+import {
+  addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail,
+  getInfoTemplateForApply, listInfoTemplatesForPicker, uploadInfoImageApi, type InfoTemplatePickItem,
+} from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
@@ -69,6 +72,38 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     void fetchInfoCapabilities(ac.signal).then((c) => setCanCurate(c.can_curate)).catch(() => {});
     return () => ac.abort();
   }, []);
+  // テンプレートピッカー（SC-51 §6b）＝新規登録（続報でない）時のみ。選ぶと本文ひな形＋属性既定をプリフィル。
+  const confirm = useConfirm();
+  const [templates, setTemplates] = useState<InfoTemplatePickItem[]>([]);
+  const [selectedTpl, setSelectedTpl] = useState("");
+  useEffect(() => {
+    if (parentId) return;  // 続報は非表示
+    const ac = new AbortController();
+    void listInfoTemplatesForPicker(ac.signal).then((r) => { if (r) setTemplates(r.data); }).catch(() => {});
+    return () => ac.abort();
+  }, [parentId]);
+  const applyTemplate = async (id: string) => {
+    if (!id) { setSelectedTpl(""); return; }
+    // 入力済みなら上書き確認（空ならそのまま適用）。
+    if (title.trim() || pmText(body).trim()) {
+      const ok = await confirm({ title: "テンプレートを適用", msg: "入力済みの内容がテンプレートで置き換わります。よろしいですか？", confirmLabel: "適用する" });
+      if (!ok) return;
+    }
+    const d = await getInfoTemplateForApply(id).catch(() => null);
+    if (!d) return;
+    setSelectedTpl(id);
+    const today = new Date().toLocaleDateString("sv-SE");  // YYYY-MM-DD（{{today}} 展開）
+    setTitle((d.title_template || "").replaceAll("{{today}}", today));
+    setBody((d.body as RichTextValue) ?? EMPTY_DOC);
+    if (canCurate && d.defaults) {  // 属性既定は curator のみ反映（非curator は送っても付与されない＝403回避）
+      const df = d.defaults as Record<string, unknown>;
+      const s = (k: string) => (typeof df[k] === "string" ? (df[k] as string) : "");
+      setPriority(s("priority")); setSource(s("source")); setClassification(s("classification"));
+      setScope(s("scope")); setBusiness(s("target_business")); setImpact(s("impact_level"));
+      setImpactClass(s("impact_class")); setTiming(s("impact_timing"));
+      setCategories(Array.isArray(df.categories) ? (df.categories as string[]) : []);
+    }
+  };
   const [links, setLinks] = useState<StagedLink[]>([]);
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -177,6 +212,14 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     <>
       <div className="modal__body info-dlg">
         <FormSummary title="入力内容をご確認ください" errors={[formError, titleErr, urlErr].filter(Boolean) as string[]} innerRef={summaryRef} />
+        {!parentId && templates.length ? (
+          <Field className="dialog-section is-quiet" id="im-tpl" label="🗂 テンプレートから作成（任意）"
+            hint="選ぶと本文のひな形と分類の既定が入ります（すべて編集できます）。{{today}} は当日の日付へ展開。">
+            <Combobox id="im-tpl" ariaLabel="テンプレートから作成" value={selectedTpl} onChange={(v) => void applyTemplate(v)}
+              options={[{ value: "", label: "テンプレートを使わない（白紙から入力）" },
+                ...templates.map((t) => ({ value: t.id, label: t.description ? `${t.name}（${t.description}）` : t.name }))]} />
+          </Field>
+        ) : null}
         {parent ? (
           <details className="disclosure disclosure--ref" open style={{ marginBottom: "var(--space-3)" }}>
             <summary><span>🧵 続報元の情報を表示：<strong>{parent.title}</strong></span></summary>

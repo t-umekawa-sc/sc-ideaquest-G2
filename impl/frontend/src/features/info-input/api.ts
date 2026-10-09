@@ -258,3 +258,17 @@ export async function fetchRelatedInfo(
   const r = await apiFetch<{ data: RelatedInfoItem[] }>(`/${targetType}/${targetId}/related-info`, { signal });
   return r?.data ?? [];
 }
+
+// ---- テンプレートピッカー（SC-51 §6b・会社共通マスタ SC-55 が供給・会社内 active 全員） ----
+// 適用は GET /info-templates/{id}（有効のみ）＝本文ひな形(PM-JSON)＋属性既定をフォームへプリフィル。
+export interface InfoTemplatePickItem { id: string; name: string; description?: string | null; }
+export interface InfoTemplateApply {
+  id: string; name: string; title_template?: string | null;
+  body?: Record<string, unknown> | null; defaults?: Record<string, unknown>;
+}
+export function listInfoTemplatesForPicker(signal?: AbortSignal): Promise<{ data: InfoTemplatePickItem[] } | null> {
+  return apiFetch<{ data: InfoTemplatePickItem[] }>(`/info-templates`, { signal });
+}
+export function getInfoTemplateForApply(id: string, signal?: AbortSignal): Promise<InfoTemplateApply | null> {
+  return apiFetch<InfoTemplateApply>(`/info-templates/${encodeURIComponent(id)}`, { signal });
+}
