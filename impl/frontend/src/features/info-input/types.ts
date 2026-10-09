@@ -47,6 +47,21 @@ export interface InfoItem {
 
 export type InfoStatusFilter = "all" | "raw" | "curated" | "archived";
 
+// --- 動的タブ（info_tabs・N.5c・D4）＝backend InfoTabDTO と一致。 ---
+export interface InfoTab {
+  id: string;
+  name: string;
+  kind: "system" | "user" | "connector";
+  sort_order: number;
+  status: "active" | "archived";
+  color?: string | null;
+  icon_url?: string | null;
+  description?: string | null;
+  connector_ref?: string | null;
+  is_system: boolean;
+  count: number;
+}
+
 // --- 一覧カード DTO（GET /info-items・サーバー委譲）＝backend InfoItemCardDTO と一致。 ---
 // 本文（body_html/links 明細）は含めない＝一覧は軽量カード（詳細は Phase B の GET /info-items/{id}）。
 export interface InfoCreator {
@@ -57,6 +72,7 @@ export interface InfoCreator {
 export interface InfoCard {
   id: string;
   parent_info_id?: string | null;
+  tab_id?: string | null;  // 所属タブ（D4・移動UI/表示）
   title: string;
   summary?: string | null;
   match_snippet?: string | null; // 全文検索（q）時の一致箇所抜粋＝要約に無い語での一致も可視化（§1.11）

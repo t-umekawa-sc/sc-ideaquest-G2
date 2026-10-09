@@ -3570,7 +3570,7 @@ export interface paths {
         };
         /**
          * Get Capabilities
-         * @description 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。読取専用。
+         * @description 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か／タブ管理可。読取専用。
          */
         get: operations["get_capabilities_api_v1_info_capabilities_get"];
         put?: never;
@@ -3579,6 +3579,50 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Info Tabs
+         * @description タブ一覧（sort_order 順・各タブ件数付き・§N.5c）。会社内 active 全員が読取。読取専用。
+         */
+        get: operations["list_info_tabs_api_v1_info_tabs_get"];
+        put?: never;
+        /**
+         * Create Info Tab
+         * @description タブ作成（admin/curator・kind=user のみ・予約語/同名検証・§N.5c）。
+         */
+        post: operations["create_info_tab_api_v1_info_tabs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-tabs/{tab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Info Tab
+         * @description タブ更新（名称/色/アイコン/説明/並べ替え/アーカイブ・admin/curator・§N.5c）。
+         */
+        patch: operations["update_info_tab_api_v1_info_tabs__tab_id__patch"];
         trace?: never;
     };
     "/api/v1/info-items": {
@@ -3653,6 +3697,46 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/move-tab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Info Items Tab
+         * @description タブ一括移動（curator＋登録者・権限外混在は 403・§N.5c）。静的パス＝動的 `/info-items/{id}` より前に定義。
+         */
+        post: operations["move_info_items_tab_api_v1_info_items_move_tab_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/tab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Move Info Item Tab
+         * @description タブ移動（1件・curator＋登録者・§N.5c）。
+         */
+        patch: operations["move_info_item_tab_api_v1_info_items__info_id__tab_patch"];
         trace?: never;
     };
     "/api/v1/info-items/images": {
@@ -8004,11 +8088,16 @@ export interface components {
         };
         /**
          * InfoCapabilitiesResponse
-         * @description 現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。
+         * @description 現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator か／タブ管理可（D4）。
          */
         InfoCapabilitiesResponse: {
             /** Can Curate */
             can_curate: boolean;
+            /**
+             * Manage Tabs
+             * @default false
+             */
+            manage_tabs: boolean;
         };
         /**
          * InfoCreateRequest
@@ -8026,6 +8115,10 @@ export interface components {
             source_url?: string | null;
             /** Parent Info Id */
             parent_info_id?: string | null;
+            /** Tab Id */
+            tab_id?: string | null;
+            /** Auto Link Enabled */
+            auto_link_enabled?: boolean | null;
             /** Priority */
             priority?: string | null;
             /** Source */
@@ -8232,6 +8325,8 @@ export interface components {
             id: string;
             /** Parent Info Id */
             parent_info_id?: string | null;
+            /** Tab Id */
+            tab_id?: string | null;
             /** Title */
             title: string;
             /** Summary */
@@ -8275,6 +8370,25 @@ export interface components {
              * @default 0
              */
             follow_up_count: number;
+        };
+        /** InfoItemMoveTabRequest */
+        InfoItemMoveTabRequest: {
+            /** Tab Id */
+            tab_id: string;
+        };
+        /** InfoItemsMoveTabRequest */
+        InfoItemsMoveTabRequest: {
+            /** Info Ids */
+            info_ids: string[];
+            /** Tab Id */
+            tab_id: string;
+        };
+        /** InfoItemsMoveTabResponse */
+        InfoItemsMoveTabResponse: {
+            /** Moved */
+            moved: number;
+            /** Tab Id */
+            tab_id: string;
         };
         /**
          * InfoLinkCandidateDTO
@@ -8432,6 +8546,71 @@ export interface components {
              * @default 0
              */
             archived: number;
+        };
+        /** InfoTabCreateRequest */
+        InfoTabCreateRequest: {
+            /** Name */
+            name: string;
+            /** Color */
+            color?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Description */
+            description?: string | null;
+        };
+        /** InfoTabDTO */
+        InfoTabDTO: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Status */
+            status: string;
+            /** Color */
+            color?: string | null;
+            /** Icon Url */
+            icon_url?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Connector Ref */
+            connector_ref?: string | null;
+            /** Is System */
+            is_system: boolean;
+            /** Count */
+            count: number;
+        };
+        /**
+         * InfoTabUpdateRequest
+         * @description 部分更新（名称/色/アイコン/説明/並べ替え/アーカイブ）。送られた項目だけ適用。
+         */
+        InfoTabUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** InfoTabsCanDTO */
+        InfoTabsCanDTO: {
+            /** Manage Tabs */
+            manage_tabs: boolean;
+        };
+        /** InfoTabsResponse */
+        InfoTabsResponse: {
+            /** Tabs */
+            tabs: components["schemas"]["InfoTabDTO"][];
+            can: components["schemas"]["InfoTabsCanDTO"];
         };
         /**
          * InfoTemplateCreateRequest
@@ -18456,6 +18635,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                tab_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -18503,6 +18683,94 @@ export interface operations {
             };
         };
     };
+    list_info_tabs_api_v1_info_tabs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTabsResponse"];
+                };
+            };
+        };
+    };
+    create_info_tab_api_v1_info_tabs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoTabCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTabDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_info_tab_api_v1_info_tabs__tab_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tab_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoTabUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTabDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_info_items_api_v1_info_items_get: {
         parameters: {
             query?: {
@@ -18512,6 +18780,7 @@ export interface operations {
                 source?: string | null;
                 impact_class?: string | null;
                 roots_only?: boolean;
+                tab_id?: string | null;
                 sort?: string | null;
                 pin_ids?: string | null;
                 page?: number | null;
@@ -18692,6 +18961,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InfoRevisionDiffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_info_items_tab_api_v1_info_items_move_tab_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoItemsMoveTabRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoItemsMoveTabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_info_item_tab_api_v1_info_items__info_id__tab_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoItemMoveTabRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
                 };
             };
             /** @description Validation Error */

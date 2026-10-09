@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import type {
   InfoAttachment, InfoCard, InfoDetail, InfoLink, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoLinkTarget,
-  InfoListResult, InfoRevisionDiff, InfoStatusFilter, RelatedInfoItem, WordCloudToken,
+  InfoListResult, InfoRevisionDiff, InfoStatusFilter, InfoTab, RelatedInfoItem, WordCloudToken,
 } from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
@@ -18,6 +18,7 @@ const INFO_ENUM_FILTERS = new Set(["priority", "source", "impact_class"]);
 export interface InfoListExtra {
   status?: InfoStatusFilter; // 状態タブ（all/raw/curated）＝server の status フィルタ
   rootsOnly?: boolean; // 続報を束ねる＝roots_only
+  tabId?: string | null; // 動的タブ絞り（D4・「すべて」/未指定は全件）
 }
 
 export function infoListParams(state: QueryState, extra: InfoListExtra = {}): URLSearchParams {
@@ -34,6 +35,7 @@ export function infoListParams(state: QueryState, extra: InfoListExtra = {}): UR
   }
   if (extra.status && extra.status !== "all") qs.set("status", extra.status);
   if (extra.rootsOnly) qs.set("roots_only", "true");
+  if (extra.tabId) qs.set("tab_id", extra.tabId); // 「すべて」の id/未指定は送らない＝全件（特殊ビュー）
   if (state.pinIds.length) qs.set("pin_ids", state.pinIds.join(",")); // 固定行（ピン）＝サーバーで解決（§1.8.1④）
   qs.set("page", String(state.page));
   qs.set("per_page", String(state.perPage));
@@ -53,9 +55,38 @@ export async function searchInfoItems(q: string, signal?: AbortSignal): Promise<
   return res?.data ?? [];
 }
 
-export async function fetchWordCloud(limit = 40, signal?: AbortSignal): Promise<WordCloudToken[]> {
-  const res = await apiFetch<{ tokens: WordCloudToken[] }>(`/info-items/word-cloud?limit=${limit}`, { signal });
+export async function fetchWordCloud(limit = 40, tabId?: string | null, signal?: AbortSignal): Promise<WordCloudToken[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (tabId) qs.set("tab_id", tabId);  // 「すべて」/未指定は全件
+  const res = await apiFetch<{ tokens: WordCloudToken[] }>(`/info-items/word-cloud?${qs.toString()}`, { signal });
   return res?.tokens ?? [];
+}
+
+// --- 動的タブ（/info-tabs・N.5c・D4）--- 一覧＝会社内全員・作成/更新＝admin/curator・移動＝curator＋登録者。
+export async function fetchInfoTabs(signal?: AbortSignal): Promise<{ tabs: InfoTab[]; can: { manage_tabs: boolean } }> {
+  const res = await apiFetch<{ tabs: InfoTab[]; can: { manage_tabs: boolean } }>(`/info-tabs`, { signal });
+  return res ?? { tabs: [], can: { manage_tabs: false } };
+}
+export interface InfoTabInput { name?: string; color?: string | null; icon_image_path?: string | null; description?: string | null; sort_order?: number; status?: string; }
+export async function createInfoTabApi(input: InfoTabInput): Promise<InfoTab> {
+  const res = await apiFetch<InfoTab>("/info-tabs", { method: "POST", body: JSON.stringify(input) });
+  emit();
+  return res as InfoTab;
+}
+export async function updateInfoTabApi(id: string, patch: InfoTabInput): Promise<InfoTab> {
+  const res = await apiFetch<InfoTab>(`/info-tabs/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
+  emit();
+  return res as InfoTab;
+}
+export async function moveInfoItemTabApi(infoId: string, tabId: string): Promise<InfoDetail> {
+  const res = await apiFetch<InfoDetail>(`/info-items/${encodeURIComponent(infoId)}/tab`, { method: "PATCH", body: JSON.stringify({ tab_id: tabId }) });
+  emit();
+  return res as InfoDetail;
+}
+export async function moveInfoItemsTabApi(infoIds: string[], tabId: string): Promise<{ moved: number; tab_id: string }> {
+  const res = await apiFetch<{ moved: number; tab_id: string }>("/info-items/move-tab", { method: "POST", body: JSON.stringify({ info_ids: infoIds, tab_id: tabId }) });
+  emit();
+  return res as { moved: number; tab_id: string };
 }
 
 // 詳細（GET /info-items/{id}）＝全属性＋links〔target_title 解決〕＋thread＋tokens_top＋can（Phase B）。
@@ -73,6 +104,8 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
       body: input.body,  // PM-JSON（保存時 sanitize_pm）
       source_url: input.source_url || null,
       parent_info_id: input.parent_info_id ?? null,
+      tab_id: input.tab_id ?? null,  // 登録先タブ（D4・省略時「すべて」・続報は親継承）
+      auto_link_enabled: input.auto_link_enabled ?? null,  // 自動類似リンク対象（D4・既定 true）
       // 属性（curator が登録時に付与＝§85）。非curator は null のまま＝送っても付与されない。
       priority: input.priority ?? null, source: input.source ?? null, classification: input.classification ?? null,
       scope: input.scope ?? null, target_business: input.target_business ?? null, impact_level: input.impact_level ?? null,
@@ -85,10 +118,10 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
   return res as InfoDetail;
 }
 
-// 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。
-export async function fetchInfoCapabilities(signal?: AbortSignal): Promise<{ can_curate: boolean }> {
-  const res = await apiFetch<{ can_curate: boolean }>("/info-capabilities", { signal });
-  return res ?? { can_curate: false };
+// 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か／タブ管理可（D4）。
+export async function fetchInfoCapabilities(signal?: AbortSignal): Promise<{ can_curate: boolean; manage_tabs: boolean }> {
+  const res = await apiFetch<{ can_curate: boolean; manage_tabs: boolean }>("/info-capabilities", { signal });
+  return res ?? { can_curate: false, manage_tabs: false };
 }
 
 // 貼付画像の再ホスト（POST /info-items/images・Phase C slice4・§12-4）＝multipart。
@@ -235,6 +268,8 @@ export interface InfoInput {
   summary?: string;
   source_url?: string | null;
   parent_info_id?: string | null;
+  tab_id?: string | null;             // 登録先タブ（D4）
+  auto_link_enabled?: boolean | null; // 自動類似リンク対象（D4・既定 true）
   priority?: string | null;
   source?: string | null;
   classification?: string | null;

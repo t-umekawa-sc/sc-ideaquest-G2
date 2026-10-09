@@ -9,16 +9,18 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Avatar, DataTable, Modal, ModalBody, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import {
-  archiveInfoItemApi, deleteInfoItemApi, fetchInfoItems, fetchWordCloud, INFO_CHANGED_EVENT, searchInfoItems,
-  unarchiveInfoItemApi,
+  archiveInfoItemApi, deleteInfoItemApi, fetchInfoItems, fetchInfoTabs, fetchWordCloud, INFO_CHANGED_EVENT,
+  moveInfoItemTabApi, searchInfoItems, unarchiveInfoItemApi,
 } from "../api";
 import {
   CATEGORY_LABEL, IMPACT_CLASS_LABEL, PRIORITY_LABEL, SOURCE_LABEL, STATUS_LABEL,
 } from "../labels";
-import type { InfoCard, InfoStatusFacets, InfoStatusFilter, WordCloudToken } from "../types";
+import type { InfoCard, InfoStatusFacets, InfoStatusFilter, InfoTab, WordCloudToken } from "../types";
+import { InfoTabsModal } from "./InfoTabsModal";
+import { MoveTabDialog } from "./MoveTabDialog";
 import "../info-input.css";
 
 const summaryText = (r: InfoCard) => r.summary ?? "";
@@ -73,6 +75,13 @@ export function InfoListView() {
   const [fts, setFts] = useState(""); // 全文検索クエリ（サーバー q＝title＋本文）
   const [ftResults, setFtResults] = useState<InfoCard[]>([]);
   const [ftLoading, setFtLoading] = useState(false);
+  // 動的タブ（D4）＝サブタブ帯。activeTabId は選択中タブ（空=すべて／「すべて」の id を送っても backend が全件解決）。
+  const [tabs, setTabs] = useState<InfoTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>(""); // 空=未選択（＝すべて／全件）
+  const [manageTabs, setManageTabs] = useState(false);
+  const [tabsModalOpen, setTabsModalOpen] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<InfoCard | null>(null); // タブ移動（1件）対象
 
   // 外部変更（登録/編集＝Phase C で結線後）で一覧・ワードクラウドを再取得。
   useEffect(() => {
@@ -81,23 +90,43 @@ export function InfoListView() {
     return () => window.removeEventListener(INFO_CHANGED_EVENT, onChanged);
   }, []);
 
-  // ワードクラウド（会社横断の語の俯瞰・GET /info-items/word-cloud）。
+  // 動的タブ一覧（GET /info-tabs・件数付き・manage_tabs）。既定選択＝「すべて」(system)。
   useEffect(() => {
     const ac = new AbortController();
-    void fetchWordCloud(40, ac.signal).then(setWordCloud).catch(() => {});
+    void fetchInfoTabs(ac.signal).then((res) => {
+      setTabs(res.tabs);
+      setManageTabs(res.can.manage_tabs);
+      // activeTabId が未選択 or 既にアーカイブ/消滅したタブなら「すべて」(system) へ。
+      setActiveTabId((cur) => (cur && res.tabs.some((t) => t.id === cur && t.status === "active"))
+        ? cur
+        : (res.tabs.find((t) => t.is_system)?.id ?? ""));
+    }).catch(() => {});
     return () => ac.abort();
   }, [refreshToken]);
 
-  // 一覧のサーバークエリ（DataTable が state 変化ごとに呼ぶ）。status/rootsOnly/refreshToken を反映＝依存に含める。
+  // ワードクラウド（選択タブに絞る・「すべて」は全件・GET /info-items/word-cloud?tab_id=）。
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchWordCloud(40, activeTabId || undefined, ac.signal).then(setWordCloud).catch(() => {});
+    return () => ac.abort();
+  }, [refreshToken, activeTabId]);
+
+  // 一覧のサーバークエリ。status/rootsOnly/activeTabId/refreshToken を反映＝依存に含める。
   const serverQuery = useCallback(
     async (state: QueryState, signal: AbortSignal): Promise<ServerResult<InfoCard>> => {
-      const res = await fetchInfoItems(state, { status, rootsOnly }, signal);
+      const res = await fetchInfoItems(state, { status, rootsOnly, tabId: activeTabId || undefined }, signal);
       if (!res) return { rows: [], total: 0, pinned: [] };
       setFacets(res.facets ?? EMPTY_FACETS);
       return { rows: res.data, total: res.page_info.total, pinned: res.pinned ?? [] };
     },
-    [status, rootsOnly, refreshToken],
+    [status, rootsOnly, activeTabId, refreshToken],
   );
+
+  const selectTab = useCallback((id: string) => {
+    setActiveTabId(id);
+    setRefreshToken((n) => n + 1); // DataTable 再クエリ（QueryState 外の外部コントロール＝refreshToken bump）
+    setOverflowOpen(false);
+  }, []);
 
   // 全文検索タブ（サーバー q）。
   useEffect(() => {
@@ -120,6 +149,7 @@ export function InfoListView() {
       ];
       list.push({ label: "続報を登録", onClick: () => router.push(`/info-items/new?parent=${rootId}`) });
       list.push({ label: "内容・属性を編集", onClick: () => router.push(`/info-items/${r.id}`) }); // 詳細でインライン編集（作成者=内容／curator=属性）
+      list.push({ label: "タブを移動", onClick: () => setMoveTarget(r) }); // curator＋登録者（権限はサーバー再検証・D4）
       if (r.status === "raw") {
         list.push({
           label: "削除（未判定）", danger: true,
@@ -286,6 +316,29 @@ export function InfoListView() {
 
       {tab === "list" && (
         <>
+          {/* 動的タブ（サブメニュー型サブタブ・D4）＝「すべて」(system) 既定・会社の動的タブ・溢れは「⋯ すべて」。 */}
+          <div className="info-subtabs" role="tablist" aria-label="情報タブ">
+            {(tabs.length > 6 ? tabs.slice(0, 6) : tabs).map((t) => {
+              const active = (activeTabId || tabs.find((x) => x.is_system)?.id) === t.id;
+              return (
+                <button key={t.id} type="button" role="tab" aria-selected={active}
+                  className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
+                  {t.name}<span className="info-subtab__n">{t.count}</span>
+                </button>
+              );
+            })}
+            {tabs.length > 6 && (
+              <button type="button" className="info-subtab info-subtab--more" onClick={() => setOverflowOpen(true)}>
+                ⋯ すべて ({tabs.length})
+              </button>
+            )}
+            {manageTabs && (
+              <button type="button" className="info-subtab info-subtab--add" onClick={() => setTabsModalOpen(true)}>
+                ＋ タブ
+              </button>
+            )}
+          </div>
+
           <div className="section-head">
             <h2>情報一覧</h2>
             <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -368,6 +421,44 @@ export function InfoListView() {
           )}
         </section>
       )}
+
+      {tabsModalOpen && (
+        <InfoTabsModal tabs={tabs} onClose={() => setTabsModalOpen(false)}
+          onChanged={() => setRefreshToken((n) => n + 1)} />
+      )}
+      {moveTarget && (
+        <MoveTabDialog item={moveTarget} tabs={tabs} onClose={() => setMoveTarget(null)}
+          onMoved={() => { setMoveTarget(null); setRefreshToken((n) => n + 1); }} />
+      )}
+      {overflowOpen && (
+        <OverflowTabsDialog tabs={tabs} activeId={activeTabId || tabs.find((t) => t.is_system)?.id || ""}
+          onPick={(id) => selectTab(id)} onClose={() => setOverflowOpen(false)} />
+      )}
     </div>
+  );
+}
+
+// 溢れ時のタブ選択（案C「⋯ すべて (N)」＝検索付き一覧ダイアログ・D4）。
+function OverflowTabsDialog({ tabs, activeId, onPick, onClose }: {
+  tabs: InfoTab[]; activeId: string; onPick: (id: string) => void; onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = tabs.filter((t) => t.name.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <Modal open onClose={onClose} title="タブを選択" size="md">
+      <ModalBody>
+        <input className="input" type="search" placeholder="タブを検索…" value={q}
+          onChange={(e) => setQ(e.target.value)} autoFocus aria-label="タブを検索" />
+        <div className="info-taballgrid" role="listbox" aria-label="全タブ">
+          {filtered.map((t) => (
+            <button key={t.id} type="button" role="option" aria-selected={t.id === activeId}
+              className={`info-taballgrid__item${t.id === activeId ? " is-active" : ""}`}
+              onClick={() => onPick(t.id)}>
+              <span>{t.name}</span><span className="info-subtab__n">{t.count}</span>
+            </button>
+          ))}
+        </div>
+      </ModalBody>
+    </Modal>
   );
 }

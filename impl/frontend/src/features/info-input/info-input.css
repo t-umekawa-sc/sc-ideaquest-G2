@@ -239,3 +239,44 @@
 .ri-dispose__choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .ri-dispose__choice { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; font-size: var(--text-sm); }
 .ri-dispose__choice.is-on { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); font-weight: 600; }
+
+/* 動的タブ（サブメニュー型サブタブ・D4・SC-50 §3b）＝トップタブ直下に地続きの帯（primary-soft）。
+   見本＝doc/画面設計/mocks/_サブタブ_検討.html／_サブタブ溢れ_検討.html。 */
+.info-subtabs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  border: 1px solid var(--color-border); border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: var(--space-2) var(--space-3); margin-bottom: var(--space-4);
+}
+.info-subtab {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: transparent; cursor: pointer;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-text);
+  border-bottom: 2px solid transparent;
+}
+.info-subtab:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.info-subtab.is-active { font-weight: 700; color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.info-subtab__n { font-size: var(--text-xs); color: var(--color-text-muted); }
+.info-subtab.is-active .info-subtab__n { color: var(--color-primary); }
+.info-subtab--more { margin-left: auto; color: var(--color-primary); font-weight: 600; }
+.info-subtab--add { color: var(--color-text-muted); }
+
+/* 溢れ時「⋯ すべて」ダイアログの全タブグリッド。 */
+.info-taballgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: var(--space-3); }
+.info-taballgrid__item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  padding: 8px 12px; border-radius: var(--radius-sm); font-size: var(--text-sm); text-align: left;
+}
+.info-taballgrid__item:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.info-taballgrid__item.is-active { background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-weight: 700; }
+
+/* タブ管理モーダル。 */
+.info-tabmgr { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; }
+.info-tabmgr__row { display: flex; align-items: center; gap: var(--space-2); }
+.info-tabmgr__row .input { flex: 1; }
+.info-tabmgr__sys { color: var(--color-text-muted); font-size: var(--text-sm); }
+.info-tabmgr__add { display: flex; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
+.info-tabmgr__add .input { flex: 1; }

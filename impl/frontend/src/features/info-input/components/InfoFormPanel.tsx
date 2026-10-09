@@ -8,7 +8,7 @@ import { Combobox, Field, FormFooterError, FormSummary, Multiselect, useConfirm,
 import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import { ApiError } from "@/lib/api/client";
 import {
-  addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail,
+  addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, fetchInfoTabs,
   getInfoTemplateForApply, listInfoTemplatesForPicker, uploadInfoImageApi, type InfoTemplatePickItem,
 } from "../api";
 import {
@@ -16,7 +16,7 @@ import {
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoInput } from "../api";
-import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget, InfoTab } from "../types";
 import { cloudTokens, demoSummary, pmText } from "../wordcloud";
 import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
@@ -49,6 +49,19 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     fetchInfoDetail(parentId, ac.signal).then((d) => { if (d) setParent(d); }).catch(() => {});
     return () => ac.abort();
   }, [parentId]);
+
+  // 登録先タブ（D4）＝既定「すべて」(system)／続報は親のタブを継承（selector 非表示）。自動類似リンクは既定 ON。
+  const [tabs, setTabs] = useState<InfoTab[]>([]);
+  const [tabId, setTabId] = useState<string>("");
+  const [autoLink, setAutoLink] = useState(true);
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchInfoTabs(ac.signal).then((res) => {
+      setTabs(res.tabs);
+      setTabId((cur) => cur || res.tabs.find((t) => t.is_system)?.id || "");
+    }).catch(() => {});
+    return () => ac.abort();
+  }, []);
 
   const [title, setTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -164,6 +177,9 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     const input: InfoInput = {
       title: t, body, summary: summary ?? demoSummary(pmText(body)), source_url: url,
       parent_info_id: parentId ?? null,
+      // 続報は親のタブを継承（tab_id 省略＝backend が親から継承）。新規は選択タブ（省略時「すべて」）。
+      tab_id: parentId ? null : (tabId || null),
+      auto_link_enabled: autoLink,
       priority: priority || null, source: source || null, classification: classification || null, scope: scope || null,
       target_business: business || null, categories, impact_level: impact || null, impact_class: impactClass || null,
       impact_timing: timing || null, triaged_on: triagedOn || null, triage: triage || null, triage_reason: reason || null,
@@ -231,6 +247,19 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
               <div className="hint" style={{ marginTop: 8 }}>この情報の<strong>続報</strong>として登録します。親の<strong>未棄却の関連リンク</strong>は登録時に <code>origin=auto</code> で自動的に引き継がれます（登録後に詳細から編集可）。</div>
             </div>
           </details>
+        ) : null}
+
+        {/* 登録先タブ（D4）＝新規のみ（続報は親のタブを継承）。既定「すべて」。「カメリオ連携」も手動登録先に選べる。 */}
+        {!parentId && tabs.length > 0 ? (
+          <Field className="dialog-section is-quiet" id="im-tab" label="登録先タブ"
+            hint="この情報を束ねるタブ。未選択は「すべて」。タブは分類であり閲覧制限ではありません。">
+            <Combobox id="im-tab" ariaLabel="登録先タブ" value={tabId} onChange={setTabId}
+              options={tabs.filter((t) => t.status === "active").map((t) => ({ value: t.id, label: t.is_system ? `${t.name}（既定）` : t.name }))} />
+            <label className="checkbox" style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+              <input type="checkbox" checked={autoLink} onChange={(e) => setAutoLink(e.target.checked)} />
+              <span>自動で類似のアイデア/クエストに関連づける（外部連携の大量取り込み等はオフを推奨）</span>
+            </label>
+          </Field>
         ) : null}
 
         <Field className="dialog-section is-quiet" id="im-title" label="タイトル" required error={titleErr}>
