@@ -38,12 +38,14 @@
 /* ワードクラウド（一覧上部・語頻度の可視化） */
 /* min-height＝語の有無/タブ切替で上下にずれないよう常に同じ高さのパネルを確保（ユーザー指摘・D4）。
    空の時は見出し下にプレースホルダを中央寄せで出す。 */
-.info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; align-content: flex-start;
+.info-page .wordcloud { position: relative; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; align-content: flex-start;
   min-height: 12rem; box-sizing: border-box;   /* 満杯（すべて＝約3行）を収める高さに固定＝空タブでも同じ高さ */
   padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
+/* 見出しは常に左上に固定（通常フロー・空でも位置を変えない）。 */
 .info-page .wordcloud__title { width: 100%; font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
-.info-page .wordcloud.is-empty { align-content: center; }
-.info-page .wordcloud__empty { width: 100%; text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
+/* 空のプレースホルダだけ、見出しを除いた領域の中央に絶対配置（見出しは動かさない）。 */
+.info-page .wordcloud__empty { position: absolute; left: var(--space-4); right: var(--space-4); top: calc(50% + 0.75rem);
+  transform: translateY(-50%); text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
 .wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); cursor: pointer; }
 
 /* 状態・影響のバッジ色 */
