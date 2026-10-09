@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット サブタブ＝タブ操作（ホバー⋮メニュー）検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討＝サブタブの「編集/削除」を「＋ タブ」から分離し、各タブの“ホバーで出る縦三点メニュー（⋮）”へ移す案。
+     ・「＋ タブ」は「追加」専用。
+     ・システム予約タブ「すべて」には ⋮ を出さない（改名/アーカイブ不可）。
+     ・user/connector タブはホバー（またはフォーカス）で ⋮ が現れ、開くと「編集」「削除」。
+     正＝doc/設計ドラフト/情報インプット動的タブ_設計.md §4。静的モック（切替/メニューは見せ方の確認用）。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-6); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .page-head h3 { font-size: var(--text-xl); margin: 0; }
+
+  /* トップタブ＝SC-50 と同じ下線型（維持・帯と地続き） */
+  .tabs { display: flex; gap: var(--space-1); margin: var(--space-2) 0 0; flex-wrap: wrap; position: relative; z-index: 1; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .tab.is-active { color: var(--color-primary); font-weight: 700; background: var(--color-primary-soft); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+
+  /* サブメニュー帯＝アクティブなトップタブの直下に地続き（borderless・soft ストリップ）。 */
+  .subnav { background: var(--color-primary-soft); border-radius: 0 var(--radius) var(--radius) var(--radius); padding: var(--space-2) var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: stretch; }
+
+  /* サブタブ＝ラベル＋（非予約のみ）ホバーで現れる ⋮。下線アクティブ（太め）。 */
+  .subtab { position: relative; appearance: none; background: none; border: none; font: inherit; font-size: var(--text-sm); color: var(--color-text); padding: 8px 6px; cursor: pointer; border-bottom: 3px solid transparent; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .subtab:hover { color: var(--color-text); }
+  .subtab.is-active { color: var(--color-primary); font-weight: 700; border-bottom-color: var(--color-primary); }
+  .subtab .n { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .subtab.is-active .n { color: var(--color-primary); }
+
+  /* ⋮ ケバブ＝非予約タブのみ・既定は不可視、ホバー/フォーカス/メニュー開で表示。 */
+  .subtab__kebab { opacity: 0; pointer-events: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 2px; border: none; background: transparent; border-radius: var(--radius-full); color: var(--color-text-muted); cursor: pointer; transition: opacity .12s, background .12s; }
+  .subtab:hover .subtab__kebab, .subtab:focus-within .subtab__kebab, .subtab.is-open .subtab__kebab { opacity: 1; pointer-events: auto; }
+  .subtab__kebab:hover { background: color-mix(in srgb, var(--color-primary) 14%, transparent); color: var(--color-text); }
+
+  /* ⋮ メニュー（編集/削除）＝タブ直下にドロップ。 */
+  .subtab__menu { position: absolute; top: 100%; right: 0; z-index: 20; min-width: 140px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.12)); padding: 4px; display: none; }
+  .subtab.is-open .subtab__menu { display: block; }
+  .subtab__menu button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none; background: none; font: inherit; font-size: var(--text-sm); color: var(--color-text); padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+  .subtab__menu button:hover { background: var(--color-primary-soft); }
+  .subtab__menu button.is-danger { color: var(--color-danger); }
+
+  .subtab--add { color: var(--color-text-subtle); font-weight: 600; }
+  .seg-note { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
+  .demo { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .demo th, .demo td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--color-border); }
+  .cap { font-size: var(--text-xs); color: var(--color-text-subtle); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions"><span class="badge badge-muted">🧭 情報判定権限</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>サブタブのタブ操作＝ホバーで ⋮（編集/削除）／「＋ タブ」は追加専用（検討）</h1>
+  <p class="intro">
+    「＋ タブ」に編集/削除が同居する違和感を解消。<strong>各タブ（システム予約「すべて」以外）をホバー</strong>すると
+    <strong>縦三点 ⋮</strong> が現れ、押すと<strong>「編集」「削除」</strong>を選べる。「＋ タブ」は<strong>追加だけ</strong>。
+    「すべて」には ⋮ を出さない（改名/アーカイブ不可）。※静的モック（ホバー挙動＋メニュー開の見せ方）。
+  </p>
+
+  <div class="page-head"><h3>情報インプット</h3><button class="btn btn-primary" type="button">＋ 情報を登録</button></div>
+
+  <!-- トップタブ（維持・帯と地続き） -->
+  <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+    <button class="tab is-active" role="tab" aria-selected="true">🧭 情報インプット<span class="tab-count">496</span></button>
+    <button class="tab" role="tab" aria-selected="false">🔍 全文検索</button>
+  </div>
+
+  <!-- サブメニュー帯＝「すべて」(予約・⋮なし)／user・connector(ホバーで⋮) -->
+  <div class="subnav" role="tablist" aria-label="情報タブ">
+    <!-- 予約タブ＝⋮なし -->
+    <button class="subtab is-active" role="tab" aria-selected="true">すべて <span class="n">496</span></button>
+
+    <!-- user タブ＝ホバーで ⋮（ここでは1つ目をホバー状態で例示） -->
+    <span class="subtab" role="tab" aria-selected="false" style="padding-right:2px">
+      カメリオ連携 <span class="n">342</span>
+      <button class="subtab__kebab" type="button" aria-label="カメリオ連携 の操作" style="opacity:1;pointer-events:auto">⋮</button>
+    </span>
+
+    <!-- user タブ＝⋮メニューを開いた状態で例示（編集/削除） -->
+    <span class="subtab is-open" role="tab" aria-selected="false" style="padding-right:2px">
+      情報共有 <span class="n">26</span>
+      <button class="subtab__kebab" type="button" aria-label="情報共有 の操作">⋮</button>
+      <span class="subtab__menu" role="menu">
+        <button type="button" role="menuitem">✏️ 編集</button>
+        <button type="button" role="menuitem" class="is-danger">🗑 削除</button>
+      </span>
+    </span>
+
+    <!-- 通常（非ホバー）＝⋮は隠れている -->
+    <span class="subtab" role="tab" aria-selected="false">競合動向 <span class="n">54</span>
+      <button class="subtab__kebab" type="button" aria-label="競合動向 の操作">⋮</button>
+    </span>
+
+    <!-- 追加専用 -->
+    <button class="subtab subtab--add" type="button">＋ タブ</button>
+  </div>
+
+  <div class="demo" style="margin-top:var(--space-4)">
+    <table class="demo">
+      <thead><tr><th>タイトル / 要約</th><th>状態</th><th>影響分類</th></tr></thead>
+      <tbody>
+        <tr><td>改正個人情報保護法ガイドライン公表</td><td><span class="badge badge-success">判定済</span></td><td><span class="badge">機会</span></td></tr>
+        <tr><td>業界展示会レポート（要約）</td><td><span class="badge badge-muted">未判定</span></td><td><span class="badge">機会</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="seg-note">
+    ポイント＝<strong>「＋ タブ」＝追加専用</strong>／<strong>編集・削除は各タブの ⋮</strong>（ホバー/フォーカスで出現・システム「すべて」は非表示）。
+    「削除」は論理削除（アーカイブ＝物理削除なし）＝配下に情報があるタブは先に移動が必要（文言は「削除」か「アーカイブ」か要相談）。
+  </p>
+  <p class="cap">凡例＝1つ目(カメリオ連携)＝ホバーで ⋮ 出現／2つ目(情報共有)＝⋮ を押してメニュー展開（編集/削除）／3つ目(競合動向)＝通常時は ⋮ 非表示。</p>
+</main>
+
+</body>
+</html>
