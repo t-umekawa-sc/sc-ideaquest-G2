@@ -25,8 +25,15 @@ from app.tenant.info.schemas import (
     InfoLinkCreateRequest,
     InfoLinkDTO,
     InfoLinkKindRequest,
+    InfoItemMoveTabRequest,
+    InfoItemsMoveTabRequest,
+    InfoItemsMoveTabResponse,
     InfoListResponse,
     InfoRevisionDiffResponse,
+    InfoTabCreateRequest,
+    InfoTabDTO,
+    InfoTabsResponse,
+    InfoTabUpdateRequest,
     InfoTemplateAdminListResponse,
     InfoTemplateCreateRequest,
     InfoTemplateDetailDTO,
@@ -38,11 +45,19 @@ from app.tenant.info.schemas import (
 
 router = APIRouter(prefix="/api/v1", tags=["info"])
 
+_ADMIN_ROLES = ("system_admin", "company_account_admin")
+
+
+def _is_admin(session: dict) -> bool:
+    """会社アカウント管理者（＋system_admin 上位互換）か（タブ管理の admin 側判定・access_gate と同基準）。"""
+    return session.get("system_role") in _ADMIN_ROLES
+
 
 @router.get("/info-items/word-cloud", response_model=WordCloudResponse)
 def get_word_cloud(
     request: Request,
     limit: int = Query(default=40, ge=1, le=200),
+    tab_id: str | None = None,          # タブ絞り（D4・「すべて」/未指定は全件）
     session: dict = Depends(require_me),
 ) -> WordCloudResponse:
     """ワードクラウド＝保存済みトークンの頻度集計（SC-50・N.6）。読取専用。
@@ -50,16 +65,50 @@ def get_word_cloud(
     `/info-items/{id}`（Phase B）より前に定義＝静的パスを動的パスに優先させる。
     """
     result = info_service.get_word_cloud(
-        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), limit=limit)
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), limit=limit, tab_id=tab_id)
     return WordCloudResponse(**result)
 
 
 @router.get("/info-capabilities", response_model=InfoCapabilitiesResponse)
 def get_capabilities(request: Request, session: dict = Depends(require_me)) -> InfoCapabilitiesResponse:
-    """現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。読取専用。"""
+    """現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か／タブ管理可。読取専用。"""
     result = info_service.get_capabilities(
-        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), is_admin=_is_admin(session))
     return InfoCapabilitiesResponse(**result)
+
+
+# ---- 動的タブ（/info-tabs・移動・N.5c・§5.37c・D4）--------------------------
+
+@router.get("/info-tabs", response_model=InfoTabsResponse)
+def list_info_tabs(request: Request, session: dict = Depends(require_me)) -> InfoTabsResponse:
+    """タブ一覧（sort_order 順・各タブ件数付き・§N.5c）。会社内 active 全員が読取。読取専用。"""
+    result = info_service.list_info_tabs(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), is_admin=_is_admin(session))
+    return InfoTabsResponse(**result)
+
+
+@router.post("/info-tabs", response_model=InfoTabDTO, status_code=201)
+def create_info_tab(body: InfoTabCreateRequest, request: Request,
+                    session: dict = Depends(require_me)) -> InfoTabDTO:
+    """タブ作成（admin/curator・kind=user のみ・予約語/同名検証・§N.5c）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.create_info_tab(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        is_admin=_is_admin(session), body=body)
+    return InfoTabDTO(**result)
+
+
+@router.patch("/info-tabs/{tab_id}", response_model=InfoTabDTO)
+def update_info_tab(tab_id: str, body: InfoTabUpdateRequest, request: Request,
+                    session: dict = Depends(require_me)) -> InfoTabDTO:
+    """タブ更新（名称/色/アイコン/説明/並べ替え/アーカイブ・admin/curator・§N.5c）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.update_info_tab(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        tab_id, is_admin=_is_admin(session), body=body)
+    return InfoTabDTO(**result)
 
 
 @router.get("/info-items", response_model=InfoListResponse)
@@ -71,6 +120,7 @@ def list_info_items(
     source: str | None = None,          # enum 多値（カンマ）
     impact_class: str | None = None,    # enum 多値（カンマ）
     roots_only: bool = False,           # 続報を束ねる＝根のみ（§12-1）
+    tab_id: str | None = None,          # タブ絞り（D4・「すべて」/未指定は全件）
     sort: str | None = None,            # created_at/title/status/priority/due_date/link_count（未知は 422）
     pin_ids: str | None = None,         # 固定行（ピン）ID＝ページ/絞込跨ぎで解決（§1.8.1④）
     page: int | None = Query(default=None, ge=1),
@@ -81,7 +131,7 @@ def list_info_items(
     result = info_service.get_info_items(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         q=q, status=status, priority=priority, source=source, impact_class=impact_class,
-        roots_only=roots_only, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page,
+        roots_only=roots_only, tab_id=tab_id, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page,
     )
     return InfoListResponse(**result)
 
@@ -129,6 +179,29 @@ def create_info_item(
     verify_csrf(request)
     result = info_service.create_info_item(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
+    return InfoDetailDTO(**result)
+
+
+@router.post("/info-items/move-tab", response_model=InfoItemsMoveTabResponse)
+def move_info_items_tab(body: InfoItemsMoveTabRequest, request: Request,
+                        session: dict = Depends(require_me)) -> InfoItemsMoveTabResponse:
+    """タブ一括移動（curator＋登録者・権限外混在は 403・§N.5c）。静的パス＝動的 `/info-items/{id}` より前に定義。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.move_info_items_tab(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        info_ids=body.info_ids, tab_id=body.tab_id)
+    return InfoItemsMoveTabResponse(**result)
+
+
+@router.patch("/info-items/{info_id}/tab", response_model=InfoDetailDTO)
+def move_info_item_tab(info_id: str, body: InfoItemMoveTabRequest, request: Request,
+                       session: dict = Depends(require_me)) -> InfoDetailDTO:
+    """タブ移動（1件・curator＋登録者・§N.5c）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.move_info_item_tab(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, tab_id=body.tab_id)
     return InfoDetailDTO(**result)
 
 

@@ -169,6 +169,7 @@ def _card_dto(item, *, creator, categories, link_count, follow_up_count, q=None)
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
+        "tab_id": str(item.tab_id) if getattr(item, "tab_id", None) else None,
         "title": item.title,
         "summary": item.summary,
         # 全文検索（q あり）時のみ＝一致箇所の抜粋（要約に無い語での一致も可視化・§1.11）。
@@ -199,6 +200,7 @@ def get_info_items(
     source: str | None = None,
     impact_class: str | None = None,
     roots_only: bool = False,
+    tab_id: str | None = None,
     sort: str | None = None,
     pin_ids: str | None = None,
     page: int | None = None,
@@ -214,6 +216,7 @@ def get_info_items(
     sources = lq.parse_enum(source, "source", SOURCE_VALUES)
     impact_classes = lq.parse_enum(impact_class, "impact_class", IMPACT_CLASS_VALUES)
     pins = lq.parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
+    tab_uuid = _parse_uuid(tab_id, field="tab_id") if tab_id else None
 
     company = _resolve_company(company_id)
     if company is None:
@@ -222,19 +225,22 @@ def get_info_items(
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             return _EMPTY_PAGE
+        # タブ絞りの解決（D4）＝「すべて」(system) 指定/未指定は None（フィルタを外し全件）。それ以外は tab_id 一致。
+        sys_tab = repo.get_system_tab(ts)
+        eff_tab = None if (tab_uuid is None or (sys_tab is not None and tab_uuid == sys_tab.id)) else tab_uuid
         # 固定行（ピン）は絞込/ページに関係なく ID で解決（pin 順を保持・未解決は除外・§1.8.1④）。
         pinned_map = repo.info_items_by_ids(ts, pins)
         pinned_rows = [pinned_map[i] for i in pins if i in pinned_map]
         rows_stmt, count_stmt = repo.build_info_list_query(
             q=q, statuses=statuses, priorities=priorities, sources=sources,
-            impact_classes=impact_classes, roots_only=roots_only,
+            impact_classes=impact_classes, roots_only=roots_only, tab_id=eff_tab,
             sort=sort,  # 未知 sort キーは 422（list_query）
             exclude_ids=pins,  # 固定行は非固定母集合から除外
         )
         total = ts.execute(count_stmt).scalar_one()
         facets = repo.status_counts(
             ts, q=q, priorities=priorities, sources=sources,
-            impact_classes=impact_classes, roots_only=roots_only,
+            impact_classes=impact_classes, roots_only=roots_only, tab_id=eff_tab,
         )
         if page is None and per_page is None:
             rows = list(ts.execute(rows_stmt).scalars().all())
@@ -404,16 +410,17 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
                            icon_url_map=icon_url_map)
 
 
-def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
-    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。"""
+def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID, *, is_admin: bool = False) -> dict:
+    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator か／タブ管理可（admin or curator・D4）。"""
     company = _resolve_company(company_id)
     if company is None:
-        return {"can_curate": False}
+        return {"can_curate": False, "manage_tabs": False}
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
-            return {"can_curate": False}
-        return {"can_curate": repo.is_curator(ts, user.id)}
+            return {"can_curate": False, "manage_tabs": False}
+        curator = repo.is_curator(ts, user.id)
+        return {"can_curate": curator, "manage_tabs": bool(is_admin) or curator}
 
 
 def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]], threshold: float = _AUTO_LINK_THRESHOLD) -> None:
@@ -425,8 +432,9 @@ def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]], thr
     方向は情報→成果物（逆方向＝成果物保存トリガは `recompute_auto_links_for_target`）。
     候補トークンは **entity_tokens の永続値を一括読取**（§5.36b）＝都度の janome 再抽出を撤廃。未永続の候補
     （移行前の既存成果物・未再保存）は**自己修復**＝一度だけ抽出して永続化し、以後は永続値を使う。
+    `auto_link_enabled=false`（外部連携取込等・D4）の情報は auto 生成の対象外（手動リンクは可）。
     """
-    if not info_tokens:
+    if not info_tokens or not getattr(info_item, "auto_link_enabled", True):
         return
     existing = {(l.target_type, l.target_id): l for l in repo.links_for_item(ts, info_item.id)}
     candidates = repo.list_candidate_targets(ts)  # [(target_type, target_id, text)]（有効候補＝門番済み）
@@ -515,6 +523,11 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
     if not derive.is_valid_source_url(body.source_url):
         raise AppError(422, "validation_error", detail="出典URLは http/https のみです", errors=[{"field": "source_url"}])
     parent_uuid = _parse_uuid(body.parent_info_id, field="parent_info_id") if body.parent_info_id else None
+    # 所属タブ（D4）＝明示指定（検証は ts 内で実在確認）／続報は親継承／省略は「すべて」。
+    tab_uuid = _parse_uuid(body.tab_id, field="tab_id") if getattr(body, "tab_id", None) else None
+    # 自動類似リンク対象（D4）＝既定 true（手動貼付）。外部連携取込は false。
+    _al = getattr(body, "auto_link_enabled", None)
+    auto_link_enabled = True if _al is None else bool(_al)
     # 由来テンプレート（§5.37b・任意・分析用）。不正な UUID 文字列は無視（NULL）＝由来記録は壊さない。
     tpl_uuid = None
     if getattr(body, "source_template_id", None):
@@ -548,15 +561,26 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         # 属性を付けるのは curator のみ（非curator が属性を送ったら 403・§85）。
         if has_curation and not repo.is_curator(ts, user.id):
             raise AppError(403, "forbidden", detail="属性の付与は情報判定権限（info_curator）が必要です")
-        if parent_uuid is not None and repo.get_info_item(ts, parent_uuid) is None:
+        parent_item = repo.get_info_item(ts, parent_uuid) if parent_uuid is not None else None
+        if parent_uuid is not None and parent_item is None:
             raise AppError(422, "validation_error", detail="親情報が見つかりません", errors=[{"field": "parent_info_id"}])
+        # 所属タブの解決（D4）＝明示＞続報は親継承＞「すべて」（system）。明示タブは実在必須。
+        if tab_uuid is not None:
+            if repo.get_tab(ts, tab_uuid) is None:
+                raise AppError(422, "validation_error", detail="タブが見つかりません", errors=[{"field": "tab_id"}])
+            resolved_tab_id = tab_uuid
+        elif parent_item is not None:
+            resolved_tab_id = parent_item.tab_id  # 続報は親のタブを既定継承（§5）
+        else:
+            sys_tab = repo.get_system_tab(ts)
+            resolved_tab_id = sys_tab.id if sys_tab else None  # None はトリガが「すべて」を補完
         # FK（info_templates）違反を避けつつ由来を記録＝実在（論理削除済みも行は残る）する id のみ採用・不在は NULL（§5.37b）。
         if tpl_uuid is not None and repo.get_template(ts, tpl_uuid, include_deleted=True) is None:
             tpl_uuid = None
         item = repo.create_info_item(
-            ts, created_by_id=user.id, title=title, body=pm, body_html=body_html or None,
+            ts, created_by_id=user.id, title=title, tab_id=resolved_tab_id, body=pm, body_html=body_html or None,
             body_text=body_text or None, summary=summary, source_url=(body.source_url or None),
-            parent_info_id=parent_uuid, source_template_id=tpl_uuid,
+            parent_info_id=parent_uuid, source_template_id=tpl_uuid, auto_link_enabled=auto_link_enabled,
         )
         ts.flush()
         repo.replace_tokens(ts, item.id, tokens)
@@ -1239,11 +1263,16 @@ def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,
     return {"candidates": cands, "next_cursor": str(offset + limit) if has_more else None}
 
 
-def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:
-    """ワードクラウド（SC-50・N.6・§5.36）＝保存済みトークンの頻度集計（archived 除外・count 降順）。"""
+def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40,
+                   tab_id: str | None = None) -> dict:
+    """ワードクラウド（SC-50・N.6・§5.36b）＝保存済みトークンの頻度集計（archived 除外・count 降順）。
+
+    `tab_id`＝タブ絞り（D4・「すべて」/未指定は全件）。
+    """
     if limit < 1:
         raise AppError(422, "validation_error", detail="limit が不正です", errors=[{"field": "limit"}])
     limit = min(limit, 200)
+    tab_uuid = _parse_uuid(tab_id, field="tab_id") if tab_id else None
     company = _resolve_company(company_id)
     if company is None:
         return {"tokens": []}
@@ -1251,8 +1280,196 @@ def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int =
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             return {"tokens": []}
-        tokens = repo.word_cloud(ts, limit=limit)
+        sys_tab = repo.get_system_tab(ts)
+        eff_tab = None if (tab_uuid is None or (sys_tab is not None and tab_uuid == sys_tab.id)) else tab_uuid
+        tokens = repo.word_cloud(ts, limit=limit, tab_id=eff_tab)
     return {"tokens": tokens}
+
+
+# ---- 動的タブ（/info-tabs・移動・N.5c・§5.37c・D4）--------------------------
+
+_RESERVED_TAB_NAMES = {"すべて", "カメリオ連携"}  # ユーザーはこの名前で作成/改名不可（§11-5）
+_MAX_TAB_NAME = 60
+
+
+def _tab_dto(tab, *, count: int) -> dict:
+    return {
+        "id": str(tab.id), "name": tab.name, "kind": tab.kind, "sort_order": tab.sort_order,
+        "status": tab.status, "color": tab.color, "icon_url": _image_url(tab.icon_image_path),
+        "description": tab.description, "connector_ref": tab.connector_ref,
+        "is_system": tab.kind == "system", "count": count,
+    }
+
+
+def list_info_tabs(account_id: uuid.UUID, company_id: uuid.UUID, *, is_admin: bool = False) -> dict:
+    """タブ一覧（sort_order 順・各タブ件数付き・§N.5c）。「すべて」(system) の件数は全件。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        return {"tabs": [], "can": {"manage_tabs": False}}
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return {"tabs": [], "can": {"manage_tabs": False}}
+        counts = repo.tab_item_counts(ts)           # {tab_id: 非archived件数}
+        total = sum(counts.values())
+        tabs = repo.list_tabs(ts)
+        dtos = [_tab_dto(t, count=(total if t.kind == "system" else counts.get(t.id, 0))) for t in tabs]
+        can = {"manage_tabs": bool(is_admin) or repo.is_curator(ts, user.id)}
+    return {"tabs": dtos, "can": can}
+
+
+def _require_manage_tabs(ts, user, is_admin: bool) -> None:
+    if not (is_admin or repo.is_curator(ts, user.id)):
+        raise AppError(403, "forbidden", detail="タブ管理には会社アカウント管理者または情報判定権限（info_curator）が必要です")
+
+
+def create_info_tab(account_id: uuid.UUID, company_id: uuid.UUID, *, is_admin: bool, body) -> dict:
+    """タブ作成（admin/curator・kind=user のみ・予約語/同名検証・§N.5c）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    name = (getattr(body, "name", "") or "").strip()
+    if not name:
+        raise AppError(422, "validation_error", detail="タブ名は必須です", errors=[{"field": "name"}])
+    if len(name) > _MAX_TAB_NAME:
+        raise AppError(422, "validation_error", detail="タブ名が長すぎます", errors=[{"field": "name"}])
+    if name in _RESERVED_TAB_NAMES:
+        raise AppError(422, "reserved_tab_name", detail="この名前は予約語のため使用できません", errors=[{"field": "name"}])
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _require_manage_tabs(ts, user, is_admin)
+        if repo.find_active_tab_by_name(ts, name) is not None:
+            raise AppError(409, "conflict", detail="同名のタブが既にあります", errors=[{"field": "name"}])
+        tab = repo.create_tab(
+            ts, name=name, created_by_id=user.id, kind="user",       # connector は API 作成不可（§N.5c）
+            color=getattr(body, "color", None), icon_image_path=getattr(body, "icon_image_path", None),
+            description=getattr(body, "description", None))
+        ts.flush()
+        dto = _tab_dto(tab, count=0)
+        ts.commit()
+    return dto
+
+
+def update_info_tab(account_id: uuid.UUID, company_id: uuid.UUID, tab_id: str, *, is_admin: bool, body) -> dict:
+    """タブ更新（名称/色/アイコン/説明/並べ替え/アーカイブ・admin/curator・§N.5c）。
+
+    system（すべて）は改名/アーカイブ不可。アーカイブは配下が空のときのみ（配下非空は 409 tab_not_empty）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(tab_id, field="id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _require_manage_tabs(ts, user, is_admin)
+        tab = repo.get_tab(ts, tid)
+        if tab is None:
+            raise AppError(404, "not_found", detail="タブが見つかりません")
+        is_system = tab.kind == "system"
+        # 名称変更。
+        if getattr(body, "name", None) is not None:
+            name = (body.name or "").strip()
+            if is_system:
+                raise AppError(403, "forbidden", detail="「すべて」タブは改名できません")
+            if not name:
+                raise AppError(422, "validation_error", detail="タブ名は必須です", errors=[{"field": "name"}])
+            if len(name) > _MAX_TAB_NAME:
+                raise AppError(422, "validation_error", detail="タブ名が長すぎます", errors=[{"field": "name"}])
+            if name in _RESERVED_TAB_NAMES:
+                raise AppError(422, "reserved_tab_name", detail="この名前は予約語のため使用できません", errors=[{"field": "name"}])
+            other = repo.find_active_tab_by_name(ts, name)
+            if other is not None and other.id != tab.id:
+                raise AppError(409, "conflict", detail="同名のタブが既にあります", errors=[{"field": "name"}])
+            tab.name = name
+        # 色/アイコン/説明/並べ替え。
+        for f in ("color", "icon_image_path", "description"):
+            if getattr(body, f, None) is not None:
+                setattr(tab, f, getattr(body, f))
+        if getattr(body, "sort_order", None) is not None:
+            tab.sort_order = int(body.sort_order)
+        # アーカイブ/復帰。
+        if getattr(body, "status", None) is not None:
+            new_status = body.status
+            if new_status not in ("active", "archived"):
+                raise AppError(422, "validation_error", detail="status が不正です", errors=[{"field": "status"}])
+            if is_system and new_status == "archived":
+                raise AppError(403, "forbidden", detail="「すべて」タブはアーカイブできません")
+            if new_status == "archived" and repo.count_items_in_tab(ts, tab.id) > 0:
+                raise AppError(409, "tab_not_empty", detail="配下に情報があるタブはアーカイブできません（先に別タブへ移動してください）")
+            tab.status = new_status
+        ts.flush()
+        counts = repo.tab_item_counts(ts)
+        total = sum(counts.values())
+        dto = _tab_dto(tab, count=(total if tab.kind == "system" else counts.get(tab.id, 0)))
+        ts.commit()
+    return dto
+
+
+def _can_move_item(item, user, is_curator: bool) -> bool:
+    """タブ移動の権限＝curator（任意）／登録者（自分の情報）。"""
+    return is_curator or item.created_by_id == user.id
+
+
+def _resolve_move_target(ts, tab_id: str) -> uuid.UUID:
+    tid = _parse_uuid(tab_id, field="tab_id")
+    tab = repo.get_tab(ts, tid)
+    if tab is None:
+        raise AppError(422, "validation_error", detail="移動先タブが見つかりません", errors=[{"field": "tab_id"}])
+    if tab.status != "active":
+        raise AppError(422, "validation_error", detail="アーカイブ済みのタブへは移動できません", errors=[{"field": "tab_id"}])
+    return tab.id
+
+
+def move_info_item_tab(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, *, tab_id: str) -> dict:
+    """情報のタブ移動（1件・curator＋登録者・§N.5c）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found", detail="情報が見つかりません")
+        if not _can_move_item(item, user, repo.is_curator(ts, user.id)):
+            raise AppError(403, "forbidden", detail="自分が登録した情報のみ移動できます（情報判定権限があれば任意）")
+        target = _resolve_move_target(ts, tab_id)
+        repo.move_item_tab(ts, iid, target)
+        ts.commit()
+    return get_info_detail(account_id, company_id, info_id)
+
+
+def move_info_items_tab(account_id: uuid.UUID, company_id: uuid.UUID, *, info_ids: list[str], tab_id: str) -> dict:
+    """情報のタブ一括移動（curator＋登録者・権限外混在は fail-closed 403・§N.5c）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if not info_ids:
+        raise AppError(422, "validation_error", detail="対象の情報を指定してください", errors=[{"field": "info_ids"}])
+    iids = [_parse_uuid(x, field="info_ids") for x in info_ids]
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        is_cur = repo.is_curator(ts, user.id)
+        items = repo.info_items_by_ids(ts, iids)
+        # 情報ごとに権限を再検証＝1件でも不可なら何も移動しない（fail-closed・§N.5c）。
+        for iid in iids:
+            item = items.get(iid)
+            if item is None:
+                raise AppError(404, "not_found", detail="情報が見つかりません")
+            if not _can_move_item(item, user, is_cur):
+                raise AppError(403, "forbidden", detail="権限のない情報が含まれています（自分の情報のみ・curator は任意）")
+        target = _resolve_move_target(ts, tab_id)
+        repo.move_items_tab(ts, iids, target)
+        ts.commit()
+    return {"moved": len(iids), "tab_id": str(target)}
 
 
 # ---- 内部情報テンプレート（/info-templates・N.5b・§5.37b）------------------

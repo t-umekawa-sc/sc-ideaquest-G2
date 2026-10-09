@@ -62,6 +62,7 @@ class InfoItemCardDTO(BaseModel):
 
     id: str
     parent_info_id: str | None = None
+    tab_id: str | None = None          # 所属タブ（D4・移動UI/表示用）
     title: str
     summary: str | None = None
     match_snippet: str | None = None  # 全文検索（q）時の一致箇所抜粋＝要約に無い語での一致も可視化（§1.11）
@@ -124,6 +125,8 @@ class InfoCreateRequest(BaseModel):
     body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # PM-JSON（保存時 sanitize_pm）
     source_url: str | None = None
     parent_info_id: str | None = None  # 続報＝親情報ID（§12-1）
+    tab_id: str | None = None          # 所属タブ（D4・省略時「すべて」・続報は親継承）
+    auto_link_enabled: bool | None = None  # 自動類似リンク対象（D4・既定 true）
     # 属性（curator のみ・任意）＝送られた時だけ付与。付与すると status=raw→curated。
     priority: str | None = None
     source: str | None = None
@@ -211,8 +214,64 @@ class InfoCanDTO(BaseModel):
 
 
 class InfoCapabilitiesResponse(BaseModel):
-    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。"""
+    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator か／タブ管理可（D4）。"""
     can_curate: bool
+    manage_tabs: bool = False
+
+
+# ---- 動的タブ（/info-tabs・N.5c・§5.37c・D4）--------------------------------
+class InfoTabDTO(BaseModel):
+    id: str
+    name: str
+    kind: str                       # system/user/connector
+    sort_order: int
+    status: str                     # active/archived
+    color: str | None = None
+    icon_url: str | None = None
+    description: str | None = None
+    connector_ref: str | None = None
+    is_system: bool
+    count: int
+
+
+class InfoTabsCanDTO(BaseModel):
+    manage_tabs: bool
+
+
+class InfoTabsResponse(BaseModel):
+    tabs: list[InfoTabDTO]
+    can: InfoTabsCanDTO
+
+
+class InfoTabCreateRequest(BaseModel):
+    name: str
+    color: str | None = None
+    icon_image_path: str | None = None
+    description: str | None = None
+
+
+class InfoTabUpdateRequest(BaseModel):
+    """部分更新（名称/色/アイコン/説明/並べ替え/アーカイブ）。送られた項目だけ適用。"""
+    name: str | None = None
+    color: str | None = None
+    icon_image_path: str | None = None
+    description: str | None = None
+    sort_order: int | None = None
+    status: str | None = None        # active/archived（アーカイブは配下が空のときのみ）
+
+
+class InfoItemMoveTabRequest(BaseModel):
+    tab_id: str
+
+
+class InfoItemsMoveTabRequest(BaseModel):
+    info_ids: list[str]
+    tab_id: str
+
+
+class InfoItemsMoveTabResponse(BaseModel):
+    moved: int
+    tab_id: str
 
 
 class InfoLinkDTO(BaseModel):

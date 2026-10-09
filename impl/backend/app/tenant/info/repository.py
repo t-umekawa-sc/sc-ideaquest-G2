@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core import list_query as lq
 from app.tenant.capabilities import repository as caps_repo
 from app.tenant.capabilities.orm import UserCapability
-from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoTemplate
+from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoTab, InfoTemplate
 
 # 情報判定権限（情報インプットの curator）は②会社レベル能力レジストリ `user_capabilities` に統合（FR-47・決定D）。
 # 旧 `info_curators` テーブルは migration 0056 で user_capabilities へ移行のうえ DROP（1能力1テーブルの増殖を止める・DRY）。
@@ -38,8 +38,13 @@ def _non_status_conds(
     sources: list[str] | None,
     impact_classes: list[str] | None,
     roots_only: bool,
+    tab_id: uuid.UUID | None = None,
 ) -> list:
-    """status/archived を除く共通 WHERE（一覧・status facet で共用）。"""
+    """status/archived を除く共通 WHERE（一覧・status facet で共用）。
+
+    `tab_id`＝所属タブ絞り（D4・§5.37c）。**「すべて」タブは呼び出し側で None に解決**＝フィルタを外し全件
+    （特殊ビュー）。それ以外のタブは `tab_id` 一致で絞る。
+    """
     conds: list = []
     if q:
         conds.append(text(_FTS_EXPR).bindparams(bindparam("q", value=q)))
@@ -49,6 +54,8 @@ def _non_status_conds(
         conds.append(InfoItem.source.in_(sources))
     if impact_classes:
         conds.append(InfoItem.impact_class.in_(impact_classes))
+    if tab_id is not None:
+        conds.append(InfoItem.tab_id == tab_id)
     if roots_only:
         conds.append(InfoItem.parent_info_id.is_(None))  # 続報を束ねる＝根のみ（§12-1）
     return conds
@@ -62,6 +69,7 @@ def build_info_list_query(
     sources: list[str] | None = None,
     impact_classes: list[str] | None = None,
     roots_only: bool = False,
+    tab_id: uuid.UUID | None = None,
     sort: str | None = None,
     exclude_ids: list[uuid.UUID] | None = None,
 ):
@@ -69,9 +77,10 @@ def build_info_list_query(
 
     既定は archived 除外。status を明示した場合はその集合のみ（archived 明示時のみ archived を含む）。
     未知ソートキーは list_query が 422（呼び出し前に検証）。`exclude_ids`＝固定行（ピン）は非固定母集合から除外（§1.8.1④）。
+    `tab_id`＝タブ絞り（「すべて」は呼び出し側で None に解決＝全件・D4）。
     """
     conds = _non_status_conds(q=q, priorities=priorities, sources=sources,
-                              impact_classes=impact_classes, roots_only=roots_only)
+                              impact_classes=impact_classes, roots_only=roots_only, tab_id=tab_id)
     if statuses:
         conds.append(InfoItem.status.in_(statuses))
     else:
@@ -111,14 +120,15 @@ def status_counts(
     sources: list[str] | None = None,
     impact_classes: list[str] | None = None,
     roots_only: bool = False,
+    tab_id: uuid.UUID | None = None,
 ) -> dict[str, int]:
     """状態タブの件数バッジ（facet・SC-50）＝archived 除外・status 以外の現行フィルタを反映。
 
     返り値＝`{all, raw, curated, archived}`（all=raw+curated＝非archived の総数／archived は別枠＝
-    アーカイブ タブ用）。status フィルタは含めない（タブを切り替えたときの各件数を表すため）。
+    アーカイブ タブ用）。status フィルタは含めない（タブを切り替えたときの各件数を表すため）。`tab_id`＝タブ絞り（D4）。
     """
     conds = _non_status_conds(q=q, priorities=priorities, sources=sources,
-                              impact_classes=impact_classes, roots_only=roots_only)
+                              impact_classes=impact_classes, roots_only=roots_only, tab_id=tab_id)
     rows = session.execute(
         select(InfoItem.status, func.count()).where(*conds).group_by(InfoItem.status)
     ).all()
@@ -229,6 +239,7 @@ def create_info_item(
     *,
     created_by_id: uuid.UUID,
     title: str,
+    tab_id: uuid.UUID | None = None,
     body: dict | None = None,
     body_html: str | None = None,
     body_text: str | None = None,
@@ -236,16 +247,22 @@ def create_info_item(
     source_url: str | None = None,
     parent_info_id: uuid.UUID | None = None,
     source_template_id: uuid.UUID | None = None,
+    auto_link_enabled: bool = True,
     info_id: uuid.UUID | None = None,
 ) -> InfoItem:
     """情報を1件作成（低摩擦登録＝status=raw・N.2）。`body`＝PM-JSON 正本（省略時は空 doc）。
-    派生（body_html/body_text/summary）は呼び出し側が算出して渡す。"""
+    派生（body_html/body_text/summary）は呼び出し側が算出して渡す。
+    `tab_id`＝所属タブ（D4）。**None の時は DB の BEFORE INSERT トリガが「すべて」(system) を補完**（migration 0066）
+    ＝タブ非関与の直登録（他ドメインテスト等）でも NOT NULL を満たす。アプリの登録経路は明示解決して渡す。"""
     item = InfoItem(
         id=info_id or uuid.uuid4(), created_by_id=created_by_id, title=title,
         body=body if body is not None else {"type": "doc", "content": []},
         body_html=body_html, body_text=body_text, summary=summary, source_url=source_url,
         parent_info_id=parent_info_id, source_template_id=source_template_id, status="raw",
+        auto_link_enabled=auto_link_enabled,
     )
+    if tab_id is not None:
+        item.tab_id = tab_id
     session.add(item)
     return item
 
@@ -403,11 +420,15 @@ def get_target_text(session: Session, target_type: str, target_id: uuid.UUID) ->
 
 
 def all_info_tokens(session: Session) -> dict[uuid.UUID, list[tuple[str, int]]]:
-    """非 archived 情報の保存済みトークンを一括取得＝`{info_id: [(token, count), …]}`（N.6 逆方向の類似度入力）。"""
+    """非 archived かつ **auto_link_enabled** の情報の保存済みトークンを一括取得（N.6 逆方向の類似度入力）。
+
+    `auto_link_enabled=false`（外部連携取込等・D4）は自動関連付けの対象外＝逆方向でも除外。
+    """
     rows = session.execute(
         select(EntityToken.owner_id, EntityToken.token, EntityToken.count)
         .join(InfoItem, InfoItem.id == EntityToken.owner_id)
-        .where(EntityToken.owner_type == "info", InfoItem.status != "archived")
+        .where(EntityToken.owner_type == "info", InfoItem.status != "archived",
+               InfoItem.auto_link_enabled.is_(True))
     ).all()
     out: dict[uuid.UUID, list[tuple[str, int]]] = {}
     for info_id, token, count in rows:
@@ -736,15 +757,19 @@ def delete_info_item(session: Session, info_id: uuid.UUID) -> list[str]:
     return keys
 
 
-def word_cloud(session: Session, *, limit: int) -> list[dict]:
-    """ワードクラウド＝保存済み info_tokens の頻度集計（archived 除外・count 降順・N.6/§5.36）。
+def word_cloud(session: Session, *, limit: int, tab_id: uuid.UUID | None = None) -> list[dict]:
+    """ワードクラウド＝保存済みトークン（entity_tokens・owner_type='info'）の頻度集計（archived 除外・count 降順・N.6/§5.36b）。
 
     weight は最頻値を 1.0 とした正規化（0..1）。同数は token 昇順で安定化。
+    `tab_id`＝タブ絞り（D4・「すべて」は呼び出し側で None に解決＝全件）。
     """
+    conds = [EntityToken.owner_type == "info", InfoItem.status != "archived"]
+    if tab_id is not None:
+        conds.append(InfoItem.tab_id == tab_id)
     stmt = (
         select(EntityToken.token, func.sum(EntityToken.count).label("cnt"))
         .join(InfoItem, InfoItem.id == EntityToken.owner_id)
-        .where(EntityToken.owner_type == "info", InfoItem.status != "archived")
+        .where(*conds)
         .group_by(EntityToken.token)
         .order_by(func.sum(EntityToken.count).desc(), EntityToken.token.asc())
         .limit(limit)
@@ -756,6 +781,73 @@ def word_cloud(session: Session, *, limit: int) -> list[dict]:
          "weight": round(int(cnt) / max_c, 4) if max_c else None}
         for tok, cnt in rows
     ]
+
+
+# ---- 動的タブ（info_tabs・N.5c・§5.37c・D4）--------------------------------
+
+def get_system_tab(session: Session) -> InfoTab | None:
+    """「すべて」（system・予約・既定の箱）。会社ごと seed で1行。"""
+    return session.execute(
+        select(InfoTab).where(InfoTab.kind == "system").limit(1)).scalar_one_or_none()
+
+
+def get_tab(session: Session, tab_id: uuid.UUID) -> InfoTab | None:
+    return session.get(InfoTab, tab_id)
+
+
+def find_active_tab_by_name(session: Session, name: str) -> InfoTab | None:
+    """active 範囲の同名タブ（同名エラー検出用）。"""
+    return session.execute(
+        select(InfoTab).where(InfoTab.name == name, InfoTab.status == "active").limit(1)
+    ).scalar_one_or_none()
+
+
+def list_tabs(session: Session, *, include_archived: bool = False) -> list[InfoTab]:
+    """タブ一覧（sort_order 順）。既定は active のみ（archived は配下に情報が残る connector 等のみ対象外）。"""
+    stmt = select(InfoTab)
+    if not include_archived:
+        stmt = stmt.where(InfoTab.status == "active")
+    return list(session.execute(stmt.order_by(InfoTab.sort_order.asc(), InfoTab.created_at.asc())).scalars())
+
+
+def tab_item_counts(session: Session) -> dict[uuid.UUID, int]:
+    """タブ別の情報件数（非 archived）。「すべて」は全件（呼び出し側で合算）。"""
+    rows = session.execute(
+        select(InfoItem.tab_id, func.count())
+        .where(InfoItem.status != "archived")
+        .group_by(InfoItem.tab_id)
+    ).all()
+    return {tid: int(c) for tid, c in rows}
+
+
+def count_items_in_tab(session: Session, tab_id: uuid.UUID) -> int:
+    """当該タブ所属の情報件数（status 不問＝アーカイブ可否判定に使う・1件でもあれば不可）。"""
+    return int(session.execute(
+        select(func.count()).select_from(InfoItem).where(InfoItem.tab_id == tab_id)
+    ).scalar_one())
+
+
+def max_tab_sort_order(session: Session) -> int:
+    return int(session.execute(select(func.coalesce(func.max(InfoTab.sort_order), 0))).scalar_one())
+
+
+def create_tab(session: Session, *, name: str, created_by_id: uuid.UUID, kind: str = "user",
+               color: str | None = None, icon_image_path: str | None = None,
+               description: str | None = None, connector_ref: str | None = None) -> InfoTab:
+    tab = InfoTab(name=name, kind=kind, color=color, icon_image_path=icon_image_path,
+                  description=description, connector_ref=connector_ref,
+                  created_by_id=created_by_id, sort_order=max_tab_sort_order(session) + 1)
+    session.add(tab)
+    return tab
+
+
+def move_item_tab(session: Session, info_id: uuid.UUID, tab_id: uuid.UUID) -> None:
+    session.execute(update(InfoItem).where(InfoItem.id == info_id).values(tab_id=tab_id))
+
+
+def move_items_tab(session: Session, info_ids: list[uuid.UUID], tab_id: uuid.UUID) -> None:
+    if info_ids:
+        session.execute(update(InfoItem).where(InfoItem.id.in_(info_ids)).values(tab_id=tab_id))
 
 
 # ---- 内部情報テンプレート（info_templates・N.5b・§5.37b）--------------------

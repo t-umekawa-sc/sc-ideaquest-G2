@@ -31,6 +31,10 @@ class InfoItem(CompanyBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # 続報（follow-up）＝続報元。NULL=根。登録時に親の info_links を origin=auto でスナップショット複製（§12-1）。
     parent_info_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("info_items.id"), nullable=True)
+    # 所属タブ（§5.37c・D4）＝1情報=1タブ。既定は「すべて」（system）。「すべて」選択時のみ表示が tab_id フィルタを外す。
+    tab_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("info_tabs.id"), nullable=False)
+    # 自動類似リンクの対象可否（§5.35/§5.36b・D4）。手動貼付は既定 true・外部連携取込は false。
+    auto_link_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     title: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{\"type\":\"doc\",\"content\":[]}'::jsonb"))  # PM-JSON 正本
     body_html: Mapped[str | None] = mapped_column(Text, nullable=True)   # pm_to_html(body) の派生（表示用・サニタイズ済）
@@ -58,6 +62,28 @@ class InfoItem(CompanyBase):
         UUID(as_uuid=True), ForeignKey("info_templates.id"), nullable=True)
     # 共通監査（§2.1）
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InfoTab(CompanyBase):
+    """情報の動的タブ＝会社が束ねる器（§5.37c・D4）。1情報=1タブ（`info_items.tab_id`）。
+
+    「すべて」＝system・予約・特殊（既定所属＝default 箱／表示だけ tab_id フィルタを外し全件）。
+    予約語「すべて」「カメリオ連携」は作成/改名で拒否。active 名は会社内一意（部分 UNIQUE）。
+    """
+    __tablename__ = "info_tabs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="user", server_default="user")  # system/user/connector
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")  # active/archived
+    icon_image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    connector_ref: Mapped[str | None] = mapped_column(Text, nullable=True)  # kind='connector' のときのみ（kamelio 等・ホワイトリスト）
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
