@@ -39,6 +39,8 @@
 .rt__area table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-2); }
 .rt__area th, .rt__area td { border: 1px solid var(--color-border-strong); padding: 4px 8px; text-align: left; }
 .rt__area th { background: var(--color-surface-alt); }
+/* メンション（編集中 TipTap ノードは class="mention"・表示 pm_to_html は [data-type="mention"]）＝強調（TT5・chat プリセット） */
+.rt__area .mention, .rt-view [data-type="mention"] { color: var(--color-primary); font-weight: 600; background: var(--color-primary-soft); border-radius: var(--radius-sm); padding: 0 3px; }
 /* TipTap Placeholder（空のとき data-placeholder を薄く表示） */
 .rt__area p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--color-text-subtle); float: left; height: 0; pointer-events: none; }
 /* 表示側も表/コードブロックを整える */

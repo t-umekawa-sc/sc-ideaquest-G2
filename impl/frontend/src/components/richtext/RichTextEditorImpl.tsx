@@ -11,6 +11,7 @@ import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import { Placeholder } from "@tiptap/extensions";
 
+import { chatMentionExtension, type MentionItem } from "./mention";
 import "./richtext.css";
 
 export type RichTextValue = JSONContent;
@@ -23,22 +24,25 @@ export type RichTextEditorProps = {
   placeholder?: string;
   ariaLabel?: string;
   uploadImage?: (file: File) => Promise<string>;  // 画像を自社ホストへ再ホストし署名URL を返す（渡された時だけ画像対応）
+  mentionItems?: MentionItem[];  // @メンション候補（chat プリセット・渡された時だけメンション有効・TT5）
+  onSubmit?: () => void;         // Enter 送信（Shift+Enter は改行）。メンション候補が開いている時は候補選択が優先。
 };
 
 // 共有リンク設定＝サニタイズと整合（http/https/mailto・rel で tabnabbing/referrer 防止・自動クリック無効）。
 const LINK_OPTS = { openOnClick: false, autolink: true, protocols: ["http", "https", "mailto"],
   HTMLAttributes: { rel: "noopener noreferrer nofollow" } };
 
-function extensionsFor(preset: "document" | "chat", withPlaceholder: string) {
+function extensionsFor(preset: "document" | "chat", withPlaceholder: string, mentionGetter?: () => MentionItem[]) {
   const common = [Placeholder.configure({ placeholder: withPlaceholder })];
   if (preset === "chat") {
-    // 軽量＝段落/強調/コード/リンクのみ（見出し/リスト/引用/コードブロック/画像/表は外す）。メンションは TT5。
+    // 軽量＝段落/強調/コード/リンク＋メンション（候補が渡された時のみ・TT5）。見出し/リスト/引用/コード/画像/表は外す。
     return [
       StarterKit.configure({
         underline: false, link: LINK_OPTS,
         heading: false, bulletList: false, orderedList: false, listItem: false,
         blockquote: false, codeBlock: false, horizontalRule: false,
       }),
+      ...(mentionGetter ? [chatMentionExtension(mentionGetter)] : []),
       ...common,
     ];
   }
@@ -53,18 +57,31 @@ function extensionsFor(preset: "document" | "chat", withPlaceholder: string) {
 
 type Btn = { label: string; title: string; run: () => void; active?: boolean };
 
-export function RichTextEditor({ value, onChange, preset = "document", placeholder, ariaLabel, uploadImage }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, preset = "document", placeholder, ariaLabel, uploadImage, mentionItems, onSubmit }: RichTextEditorProps) {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState<string | null>(null);
   const lastEmitted = useRef<string>("");
+  // 候補/送信ハンドラは再生成されても editor を作り直さないよう ref 経由で最新を読む（useEditor の extensions/props は初期化時固定）。
+  const mentionsRef = useRef<MentionItem[]>(mentionItems ?? []);
+  mentionsRef.current = mentionItems ?? [];
+  const submitRef = useRef<(() => void) | undefined>(onSubmit);
+  submitRef.current = onSubmit;
+  const mentionEnabled = mentionItems !== undefined;
 
   const editor = useEditor({
-    extensions: extensionsFor(preset, placeholder ?? "本文を入力…"),
+    extensions: extensionsFor(preset, placeholder ?? "本文を入力…", mentionEnabled ? () => mentionsRef.current : undefined),
     content: value ?? EMPTY_DOC,
     immediatelyRender: false,  // Next App Router の hydration mismatch 回避（§4-4）
     editorProps: {
       attributes: { class: "rt__area", role: "textbox", "aria-multiline": "true", "aria-label": ariaLabel ?? "本文" },
+      // Enter 送信（Shift+Enter は改行）。メンション候補が開いている間は Enter を送信に使わず候補選択へ譲る
+      // （editorProps.handleKeyDown は suggestion プラグインより先に走るため、候補ポップアップの有無で明示ガード）。
+      handleKeyDown: (_view, event) => {
+        if (submitRef.current && event.key === "Enter" && !event.shiftKey
+          && !document.querySelector(".mention-pop")) { event.preventDefault(); submitRef.current(); return true; }
+        return false;
+      },
     },
     onUpdate: ({ editor }) => {
       const json = editor.getJSON();

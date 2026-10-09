@@ -7,7 +7,7 @@
 // 送信/編集/削除/既読/リアクション/魔法はサーバー権威（403/409/422 は理由トースト）。引用返信は複数可（quoted_message_ids[]・§5.16b）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState, LoadingOverlay, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
 import { isCanvasEffect } from "@/features/spells/engines";
@@ -16,7 +16,8 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
-import { renderTextHtml, resolveMagic, resolveMentionIds, type Member } from "../render";
+import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
+import { ALL_MENTION_ID, pmText, resolveMagic, resolveMentionIds, type Member } from "../render";
 import { flashClassFor, scrollTopForTarget } from "../jump";
 import { getAttachmentDownloadUrl } from "@/features/ideas/api";
 import { ideaSource, type ChatSource, type ChatCtx } from "../source";
@@ -57,18 +58,21 @@ function fmtDay(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }
-function autoGrow(ta: HTMLTextAreaElement | null, max = 180) {
-  if (!ta) return;
-  ta.style.height = "auto";
-  ta.style.height = Math.min(ta.scrollHeight, max) + "px";
-}
 type Pos = { top: number; left: number };
 
-// 全員メンション候補（決定 2026-09-29・SC-24 §5）。nospace=`全員` なので選択で本文へ `@全員 ` が入り、
-// resolveMentionIds が全メンバーへ展開する（個別候補と同じ流儀で chooseMention に載る）。user_id は合成の番兵。
-const ALL_MENTION: Member = { user_id: "__all__", name: "全員（メンバー全員に通知）", nospace: "全員" };
-// 候補に「全員」を出すためのマッチ別名（部分一致・大小無視）。`@全員`/`@all` 両対応（表記の見せ方はユーザー決定）。
-const ALL_MENTION_ALIASES = ["全員", "ぜんいん", "zenin", "all", "everyone", "みんな"];
+// コンポーザー/編集中エディタへフォーカス（旧 textarea ref の置換＝contenteditable .rt__area を掴む）。
+function focusEditor(scope: ".composer__full" | ".msg__editwrap") {
+  requestAnimationFrame(() => (document.querySelector(`${scope} .rt__area`) as HTMLElement | null)?.focus());
+}
+// 本文末尾（最後の段落）へテキストを追記した PM-JSON を返す（絵文字挿入用・エディタは value 変更で同期）。
+function appendText(doc: RichTextValue, t: string): RichTextValue {
+  const d = (doc && typeof doc === "object" ? structuredClone(doc) : { type: "doc", content: [] }) as RichTextValue;
+  const content = (d.content ??= []);
+  let para = content[content.length - 1];
+  if (!para || para.type !== "paragraph") { para = { type: "paragraph", content: [] }; content.push(para); }
+  (para.content ??= []).push({ type: "text", text: t });
+  return d;
+}
 
 export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: string; source?: ChatSource; gameEnabled?: boolean }) {
   // source を明示指定（コンセプト等）／未指定なら ideaId からアイデア source を構築（後方互換・SC-24）。
@@ -100,7 +104,9 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
   const [editingId, setEditingId] = useState<string | null>(null);
   // 編集中メッセージの引用（新規コンポーザーの replyTargets とは別管理・保存で置換）。編集開始時に既存引用で初期化。
   const [editQuotes, setEditQuotes] = useState<{ id: string; name: string; text: string }[]>([]);
-  const [mention, setMention] = useState<{ pos: Pos; matches: Member[]; active: number } | null>(null);
+  // 本文は PM-JSON（TT5・共有 TipTap エディタ）。新規コンポーザー＝body／インライン編集＝editBody。
+  const [body, setBody] = useState<RichTextValue>(EMPTY_DOC);
+  const [editBody, setEditBody] = useState<RichTextValue>(EMPTY_DOC);
   const [picker, setPicker] = useState<{ pos: Pos; msgId: string } | null>(null);
   // #10: 魔法発動の瞬間演出（対象メッセージ矩形に one-shot・自分の発動のみ・reduce-motion 尊重）。
   const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
@@ -141,10 +147,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
     setTimeout(() => setPendingCanvas((p) => { const n = { ...p }; delete n[msgId]; return n; }), SUMMON_MS);
   };
 
-  const boxRef = useRef<HTMLTextAreaElement>(null);
-  const editRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const mentionTaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollNextRef = useRef(false);
   const initialScrollRef = useRef(false); // 画面遷移直後の初期スクロール（未読区切り or 最下部）を1回だけ実行
   const messagesRef = useRef<ChatMessage[]>([]); // 最新 messages（スクロール/可視ハンドラから参照＝再バインド不要）
@@ -221,7 +224,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
       // メンション候補・魔法カタログ（非致命）。
       void getPartyMembers(c.questId).then((r) =>
         // 応答は `{ user: {user_id, display_name} }`（ネスト）。以前フラット想定で name が undefined になり @ でクラッシュしていた。
-        setMembers((r?.data ?? []).map((m) => ({ user_id: m.user.user_id, name: m.user.display_name ?? "", nospace: (m.user.display_name || "").replace(/\s/g, "") }))),
+        setMembers((r?.data ?? []).map((m) => ({ user_id: m.user.user_id, name: m.user.display_name ?? "" }))),
       ).catch(() => {});
       void getSpells().then((r) => setSpells(r?.data ?? [])).catch(() => {});
       // 既読は「画面に見えたら既読」（markReadUpToVisible）で進める＝入室時に一律全既読にはしない（DFT-E-011・ユーザー選択）。
@@ -324,81 +327,27 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
     return () => { off(); realtime.unsubscribe(topic); };
   }, [threadId, refetch, markReadUpToVisible]);
 
-  const updateSendState = useCallback(() => {
-    setCanSend((boxRef.current?.value.trim().length ?? 0) > 0 || pendingFiles.length > 0);
-  }, [pendingFiles.length]);
-  useEffect(() => { updateSendState(); }, [updateSendState]);
+  // 送信可否＝本文（PM-JSON）に文字があるか、または添付がある（TT5）。
+  useEffect(() => { setCanSend(pmText(body).trim().length > 0 || pendingFiles.length > 0); }, [body, pendingFiles]);
+  // @メンション候補＝「全員」番兵（メンバーが居る時のみ）＋パーティメンバー（TipTap suggestion・TT5）。
+  const mentionItems = useMemo(
+    () => (members.length ? [{ id: ALL_MENTION_ID, label: "全員" }, ...members.map((m) => ({ id: m.user_id, label: m.name || "（名称未設定）" }))] : []),
+    [members],
+  );
 
-  // ---- @メンション候補 ----
-  const posAbove = (el: HTMLElement): Pos => {
-    const r = el.getBoundingClientRect();
-    return { left: window.scrollX + r.left, top: window.scrollY + r.top - 4 };
-  };
-  const updateMention = useCallback((ta: HTMLTextAreaElement) => {
-    mentionTaRef.current = ta;
-    const upto = ta.value.slice(0, ta.selectionStart);
-    const m = upto.match(/@([^\s@]*)$/);
-    if (!m) return setMention(null);
-    const q = m[1];
-    const ql = q.toLowerCase();
-    const memberMatches = members.filter((n) => n.nospace.includes(q));
-    // メンバーが居る時だけ「全員」候補を先頭に（@全員/@all 等の別名に部分一致で表示）。
-    const showAll = members.length > 0 && ALL_MENTION_ALIASES.some((a) => a.includes(ql));
-    const matches = showAll ? [ALL_MENTION, ...memberMatches] : memberMatches;
-    if (!matches.length) return setMention(null);
-    setMention({ pos: posAbove(ta), matches, active: 0 });
-  }, [members]);
-  const chooseMention = (mem: Member) => {
-    const ta = mentionTaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const replaced = ta.value.slice(0, start).replace(/@([^\s@]*)$/, "@" + mem.nospace + " ");
-    ta.value = replaced + ta.value.slice(start);
-    ta.focus();
-    ta.setSelectionRange(replaced.length, replaced.length);
-    setMention(null);
-    autoGrow(ta, ta === boxRef.current ? 180 : 200);
-    updateSendState();
-  };
-  // 書式ツールバー＝選択範囲を before/after で囲む（未選択はカーソル位置に挿入）。本文は renderTextHtml が
-  // **太字**/`コード`/[text](url)/@メンション を描画するのでそのまま反映される。
-  const insertFmt = (before: string, after = "") => {
-    const ta = boxRef.current;
-    if (!ta) return;
-    const s = ta.selectionStart, e = ta.selectionEnd;
-    const sel = ta.value.slice(s, e);
-    const inserted = before + sel + after;
-    ta.value = ta.value.slice(0, s) + inserted + ta.value.slice(e);
-    ta.focus();
-    // 選択があれば末尾、無ければ before の直後（囲みの中）にキャレット。
-    const caret = sel ? s + inserted.length : s + before.length;
-    ta.setSelectionRange(caret, caret);
-    autoGrow(ta, 180);
-    updateSendState();
-  };
-  const insertMentionAt = () => { insertFmt("@"); if (boxRef.current) updateMention(boxRef.current); };
-  const insertEmoji = (em: string) => { insertFmt(em); setEmojiOpen(false); };
-  const handleMentionKeys = (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (!mention || !mention.matches.length) return false;
-    if (e.key === "ArrowDown") { e.preventDefault(); setMention((s) => (s ? { ...s, active: (s.active + 1) % s.matches.length } : s)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setMention((s) => (s ? { ...s, active: (s.active - 1 + s.matches.length) % s.matches.length } : s)); }
-    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); chooseMention(mention.matches[mention.active]); return true; }
-    else if (e.key === "Escape") { setMention(null); return true; }
-    else return false;
-    return true;
-  };
-  // 本文の @token を members の user_id に解決（メンション送信用）。@全員/@all は全メンバーへ展開（render.ts の純ロジックに集約）。
-  const extractMentionIds = (body: string): string[] => resolveMentionIds(body, members);
+  // 本文（PM-JSON）の mention ノードを宛先 user_id 群へ解決（送信用）。番兵 __all__ は全メンバーへ展開（render.ts に集約）。
+  const extractMentionIds = (doc: RichTextValue): string[] => resolveMentionIds(doc, members);
+  // 絵文字＝本文末尾へテキスト挿入（エディタは value 変更で同期）。
+  const insertEmoji = (em: string) => { setBody((d) => appendText(d, em)); setEmojiOpen(false); focusEditor(".composer__full"); };
 
   // ---- 送信 ----
   const send = async () => {
-    const ta = boxRef.current;
-    const body = ta?.value.trim() ?? "";
-    if ((!body && pendingFiles.length === 0) || sending || !canPost) return;
+    const text = pmText(body).trim();
+    if ((!text && pendingFiles.length === 0) || sending || !canPost) return;
     setSending(true);
     try {
-      await src.post({ body, quotedMessageIds: replyTargets.map((r) => r.id), mentions: extractMentionIds(body), files: pendingFiles });
-      if (ta) { ta.value = ""; autoGrow(ta, 180); }
+      await src.post({ body: JSON.stringify(body), quotedMessageIds: replyTargets.map((r) => r.id), mentions: extractMentionIds(body), files: pendingFiles });
+      setBody(EMPTY_DOC);
       setPendingFiles([]);
       setReplyTargets([]);
       setCanSend(false);
@@ -414,20 +363,21 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
   };
 
   // ---- 編集 / 削除 ----
-  // 編集開始＝既存引用をチップに載せて編集を開く（他メッセージの💬で追加・×で除去できる）。
+  // 編集開始＝既存引用をチップに載せて編集を開く（他メッセージの💬で追加・×で除去できる）。本文は PM-JSON を復元。
   const startEdit = (m: ChatMessage) => {
     const quotes = (m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? [];
     setEditQuotes(quotes.map((q) => ({ id: q.id, name: q.author_name || "", text: q.excerpt || "" })));
+    setEditBody((m.body as RichTextValue) ?? EMPTY_DOC);
     setEditingId(m.id);
   };
-  const cancelEdit = () => { setEditingId(null); setEditQuotes([]); };
+  const cancelEdit = () => { setEditingId(null); setEditQuotes([]); setEditBody(EMPTY_DOC); };
   const saveEdit = async (m: ChatMessage) => {
-    const v = editRef.current?.value.trim() ?? "";
     try {
       // 引用は置換で送る（編集中に足した/外した集合）。省略ではなく常に現在の集合を送る＝全消しも反映。
-      await editMessage(m.id, { body: v, mentions: extractMentionIds(v), quotedMessageIds: editQuotes.map((q) => q.id) });
+      await editMessage(m.id, { body: JSON.stringify(editBody), mentions: extractMentionIds(editBody), quotedMessageIds: editQuotes.map((q) => q.id) });
       setEditingId(null);
       setEditQuotes([]);
+      setEditBody(EMPTY_DOC);
       await refetch();
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
@@ -516,11 +466,10 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
     function onDocClick(e: MouseEvent) {
       const t = e.target as HTMLElement;
       if (picker && !t.closest(".reaction-picker") && !t.closest(".reaction-add") && !t.closest('[data-act="react"]')) setPicker(null);
-      if (mention && !t.closest(".mention-pop") && t !== mentionTaRef.current) setMention(null);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [picker, mention]);
+  }, [picker]);
 
   // 戻るリンク（3箇所共通）＝履歴があれば router.back（来た画面へ）／無ければホスト詳細へ。ラベルは文脈ヒント。
   const backHref = ctx?.backHref ?? (ideaId ? `/ideas/${ideaId}` : "/");
@@ -677,10 +626,9 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                           ))}
                         </div>
                       )}
-                      <div className="composer__field" style={{ position: "relative" }}>
-                        <textarea ref={editRef} className="msg__editbox" defaultValue={m.body ?? ""} onInput={(e) => { autoGrow(e.currentTarget, 200); updateMention(e.currentTarget); }} onKeyDown={handleMentionKeys}
-                          // eslint-disable-next-line jsx-a11y/no-autofocus
-                          autoFocus />
+                      <div className="composer__field msg__editbox">
+                        <RichTextEditor preset="chat" value={editBody} onChange={setEditBody} mentionItems={mentionItems}
+                          onSubmit={() => void saveEdit(m)} placeholder="メッセージを編集…（@ でメンション）" ariaLabel="メッセージを編集" />
                       </div>
                       <div className="msg__editacts" style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <button className="btn btn-primary btn-sm" type="button" onClick={() => void saveEdit(m)}>保存</button>
@@ -690,7 +638,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                   ) : m.is_deleted ? (
                     <p className="msg__text">🗑 このメッセージは削除されました</p>
                   ) : (
-                    <p className="msg__text" dangerouslySetInnerHTML={{ __html: renderTextHtml(m.body ?? "", members) }} />
+                    <div className="msg__text rt-view" dangerouslySetInnerHTML={{ __html: m.body_html ?? "" }} />
                   )}
 
                   {(m.attachments ?? []).length > 0 && (
@@ -727,17 +675,17 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                   <div className="msg__actions">
                     <button className={"msg__act" + (hasMyReaction ? " is-active" : "")} type="button" data-act="react" aria-pressed={hasMyReaction} aria-label="リアクション" title={hasMyReaction ? "リアクション済み（絵文字・魔法を追加/変更）" : "リアクションを付ける（絵文字・魔法）"} onClick={(e) => { e.stopPropagation(); openPicker(m.id, e.currentTarget); }}>🙂</button>
                     <button className={"msg__act" + (quotedHere ? " is-active" : "")} type="button" aria-pressed={quotedHere} aria-label="引用返信" title={quotedHere ? "引用中（このメッセージを返信に引用しています）" : "このメッセージを引用して返信"} onClick={() => {
-                      const chip = { id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) };
+                      const chip = { id: m.id, name: m.author?.name || "", text: pmText(m.body).slice(0, 60) };
                       if (editingId) {
                         // 編集中＝編集対象メッセージの引用に追加（自分自身の引用は不可）。
                         if (m.id !== editingId) setEditQuotes((q) => (q.some((t) => t.id === m.id) ? q : [...q, chip]));
-                        editRef.current?.focus();
+                        focusEditor(".msg__editwrap");
                       } else {
                         setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, chip]));
-                        // 受入不具合 DFT-E-008＝最小化中は composer__full（reply-ctx/textarea）が非表示で
+                        // 受入不具合 DFT-E-008＝最小化中は composer__full（reply-ctx/エディタ）が非表示で
                         // 引用チップが見えず「何も起きない」ため、引用追加時は入力欄を展開してからフォーカスする。
                         setComposerMin(false);
-                        requestAnimationFrame(() => boxRef.current?.focus());
+                        focusEditor(".composer__full");
                       }
                     }}>💬</button>
                     {canPin && !m.is_deleted && (
@@ -762,7 +710,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
       <div className={`composer${composerMin && canPost ? " is-collapsed" : ""}`} aria-label="メッセージ入力">
         {/* 最小化時のスリムバー（クリックで展開）＝SC-24 モック */}
         {canPost && (
-          <button className="composer__mini" type="button" onClick={() => { setComposerMin(false); requestAnimationFrame(() => boxRef.current?.focus()); }}>＋ メッセージを入力…</button>
+          <button className="composer__mini" type="button" onClick={() => { setComposerMin(false); focusEditor(".composer__full"); }}>＋ メッセージを入力…</button>
         )}
         <div className="composer__full">
           {!canPost && (
@@ -798,11 +746,11 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                   ))}
                 </div>
               )}
-              <div className="composer__field">
-                <textarea ref={boxRef} className="composer__box" rows={1} placeholder="メッセージを入力…（@ でメンション、書式は下のツールバー）"
-                  onInput={(e) => { autoGrow(e.currentTarget, 180); updateMention(e.currentTarget); updateSendState(); }}
-                  onKeyDown={(e) => { if (handleMentionKeys(e)) return; if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
-                {/* コンポーザーの絵文字ピッカー（本文へ挿入） */}
+              {/* 本文＝共有 TipTap エディタ（chat プリセット＋@メンション・PM-JSON・TT5）。書式(B/I/S/</>/🔗)はエディタ内ツールバー。 */}
+              <div className="composer__field" style={{ position: "relative" }}>
+                <RichTextEditor preset="chat" value={body} onChange={setBody} mentionItems={mentionItems}
+                  onSubmit={() => void send()} placeholder="メッセージを入力…（@ でメンション・Enter で送信 / Shift+Enter で改行）" ariaLabel="メッセージ" />
+                {/* コンポーザーの絵文字ピッカー（本文末尾へ挿入） */}
                 {emojiOpen && (
                   <div className="emoji-pop" role="menu" aria-label="絵文字を挿入">
                     {EMOJIS.map((em) => (
@@ -811,7 +759,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                   </div>
                 )}
               </div>
-              {/* ツールバー: 左＝書式/アクション、右＝送信（SC-24 モック） */}
+              {/* ツールバー: 左＝添付/絵文字、右＝送信（書式はエディタ内ツールバーへ移管・SC-24 モック） */}
               <div className="composer__toolbar">
                 <div className="composer__tools">
                   <input ref={fileRef} type="file" multiple hidden onChange={(e) => {
@@ -820,22 +768,16 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
                     const picked = e.target.files ? Array.from(e.target.files) : [];
                     e.target.value = ""; // 同じファイルを再選択できるようクリア
                     if (picked.length) setPendingFiles((a) => [...a, ...picked]);
-                    updateSendState();
                   }} />
                   <button className="tbtn" type="button" aria-label="ファイルを添付" title="ファイルを添付" onClick={() => fileRef.current?.click()}>📎</button>
-                  <button className="tbtn" type="button" aria-label="メンション" title="メンション（@）" onClick={insertMentionAt}>@</button>
                   <button className={`tbtn${emojiOpen ? " is-on" : ""}`} type="button" aria-label="絵文字" title="絵文字" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((v) => !v)}>😀</button>
-                  <span className="tbar-sep" aria-hidden="true" />
-                  <button className="tbtn" type="button" aria-label="太字" title="太字（**）" onClick={() => insertFmt("**", "**")}><b>B</b></button>
-                  <button className="tbtn" type="button" aria-label="コード" title="コード（``）" onClick={() => insertFmt("`", "`")}>&lt;/&gt;</button>
-                  <button className="tbtn" type="button" aria-label="リンク" title="リンク（[text](url)）" onClick={() => insertFmt("[", "](https://)")}>🔗</button>
                 </div>
                 <button className="btn btn-primary" type="button" disabled={!canSend || sending} onClick={() => void send()}>{sending ? "送信中…" : "送信"}</button>
               </div>
               {hintOpen && (
                 <p className="composer__hint" id="composerHint">
                   <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティ全員が閲覧・投稿できます（コメント作成権限）。投稿で <span className="xp">+5 XP</span>（日次上限あり）。<br />
-                  ツールバー: 📎添付 ・ <code>@</code>メンション（<code>@全員</code>／<code>@all</code> でメンバー全員に通知）・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。
+                  入力欄: <code>@</code> で<strong>メンション候補</strong>（先頭に「全員」＝メンバー全員に通知）・ 📎添付 ・ 😀絵文字。書式（<strong>太字</strong>/斜体/打消/コード/🔗リンク）は入力欄上のツールバーから。空のメッセージは送信できません。
                 </p>
               )}
             </>
@@ -843,17 +785,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
         </div>
       </div>
 
-      {/* メンション候補 */}
-      {mention && (
-        <div className="mention-pop" role="listbox" aria-label="メンション候補" style={{ left: mention.pos.left, top: mention.pos.top }}>
-          {mention.matches.map((n, i) => (
-            <div key={n.user_id} className={"mention-opt" + (i === mention.active ? " is-active" : "")} role="option" aria-selected={i === mention.active} onMouseDown={(e) => { e.preventDefault(); chooseMention(n); }}>
-              <span className="avatar sm" style={{ ["--avatar-size" as string]: "22px" } as React.CSSProperties}><span className="avatar__img placeholder">{(n.name || "?").charAt(0)}</span></span>
-              <span className="mention-opt__name">{n.name || "（名称未設定）"}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* @メンション候補＝TipTap suggestion が body.appendChild する素の .mention-pop（components/richtext/mention.ts） */}
 
       {/* リアクションピッカー */}
       {picker && pickerTarget && (() => {

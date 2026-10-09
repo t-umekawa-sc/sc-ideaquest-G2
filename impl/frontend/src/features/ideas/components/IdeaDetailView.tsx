@@ -21,6 +21,7 @@ import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav"
 import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, regenerateAiEvaluation, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { EvaluationComments } from "@/features/evaluations/components/EvaluationComments";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
+import { pmText } from "@/features/chat/render";
 import { decideIdeaParticipation, getIdeaParticipation, requestIdeaParticipation, type IdeaParticipationContext } from "@/features/contests/api";
 import { RelatedInfoPanel } from "@/features/info-input";
 
@@ -659,7 +660,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                         <span className="chat-msg__name">{m.author?.name}</span>
                         <span className="chat-msg__time">{fmtDate(m.created_at)}</span>
                       </div>
-                      <p className="chat-msg__text">{m.body}</p>
+                      <p className="chat-msg__text">{pmText(m.body)}</p>
                     </div>
                   </div>
                 ))}

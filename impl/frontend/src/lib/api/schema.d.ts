@@ -5791,7 +5791,11 @@ export interface components {
             deleted_at?: string | null;
             author?: components["schemas"]["ChatAuthorDTO"] | null;
             /** Body */
-            body?: string | null;
+            body?: {
+                [key: string]: unknown;
+            } | null;
+            /** Body Html */
+            body_html?: string | null;
             /** Is Edited */
             is_edited?: boolean | null;
             /**

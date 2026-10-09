@@ -1,62 +1,48 @@
-// E-TC-211（unit）renderTextHtml のメンション強調＝members の nospace（display_name の空白除去トークン）に
-//   一致した @token だけを .mention 化する。空白入り「@テスト 太郎」を full name として強調しない
-//   ＝受入不具合 DFT-E-001（メンションが素テキスト表示）の再発防止。描画側と composer（extractMentionIds）の
-//   nospace トークン契約を固定する。HTML エスケープ（XSS 無害化）も併せて確認。
+// E-TC-230（unit）resolveMentionIds＝PM-JSON の mention ノードを走査して宛先 user_id 群へ展開（送信用）。
+//   番兵 `__all__`（全員）は全メンバーへ展開、個別ノードは attrs.id をそのまま、個別と全員の併記でも重複排除。
+//   TT5（2026-10-09）＝plain `@token` 正規表現抽出から PM-JSON ノード走査へ移行（旧 E-TC-211/229 の
+//   クライアント強調 renderTextHtml は廃止＝表示はサーバ body_html／W_リッチテキスト W-TC-006）。
+// W-TC（pmText）＝PM-JSON の平文化（空判定/引用チップ用）。mention は `@label` としてテキスト化。
 // E-TC-212（unit）resolveMagic＝魔法リアクションはゲーム層の演出＝gameEnabled=false（game_mode OFF）で null＝
-//   表示しない（§4.11）。true では保持・魔法なしは null。受入不具合 DFT-E-002（OFF でも既存魔法が描画/発動）の再発防止。
+//   表示しない（§4.11）。true では保持・魔法なしは null。受入不具合 DFT-E-002 の再発防止。
 // 正＝doc/テスト/E_チャット.md・doc/API設計/E_チャット・リアクション・魔法発動.md・デザイン標準 §4.11。
-// E-TC-229（unit）renderTextHtml の全員メンション強調＝`@全員`/`@all`（大小無視）を .mention 化する（members に
-//   居なくても all-token は特別扱い）。決定 2026-09-29・宛先が明確な一括通知の気づきを高める（FR-24／E.6）。
-// E-TC-230（unit）resolveMentionIds の全員展開＝`@全員`/`@all` を全メンバーの user_id へ展開・個別と併記でも重複排除。
 import { describe, expect, it } from "vitest";
-import { renderTextHtml, resolveMagic, resolveMentionIds, type Member } from "./render";
+import { ALL_MENTION_ID, pmText, resolveMagic, resolveMentionIds, type Member } from "./render";
 
-const members: Member[] = [{ user_id: "u1", name: "テスト 太郎", nospace: "テスト太郎" }];
 const party: Member[] = [
-  { user_id: "u1", name: "テスト 太郎", nospace: "テスト太郎" },
-  { user_id: "u2", name: "花子", nospace: "花子" },
+  { user_id: "u1", name: "テスト 太郎" },
+  { user_id: "u2", name: "花子" },
 ];
 
-describe("E-TC-211 renderTextHtml メンション強調", () => {
-  it("nospace トークンに一致する @token を .mention 化する", () => {
-    expect(renderTextHtml("@テスト太郎 おはよう", members)).toContain('<span class="mention">@テスト太郎</span>');
+// PM-JSON doc を組み立てる小ヘルパ（段落にテキスト/メンションノードを並べる）。
+function doc(...nodes: Array<Record<string, unknown>>) {
+  return { type: "doc", content: [{ type: "paragraph", content: nodes }] };
+}
+const text = (t: string) => ({ type: "text", text: t });
+const mention = (id: string, label = "") => ({ type: "mention", attrs: { id, label } });
+
+describe("E-TC-230 resolveMentionIds（PM-JSON ノード走査・全員展開）", () => {
+  it("番兵 __all__（全員）を全メンバーの user_id へ展開する", () => {
+    expect(resolveMentionIds(doc(mention(ALL_MENTION_ID, "全員"), text(" 集合")), party)).toEqual(["u1", "u2"]);
   });
-  it("空白入り「@テスト 太郎」は full name として強調しない（素テキストのまま）", () => {
-    const html = renderTextHtml("@テスト 太郎 です", members);
-    expect(html).not.toContain('class="mention">@テスト太郎');
-    // 「@テスト」は member（nospace=テスト太郎）に一致しないので強調ゼロ。
-    expect(html).not.toContain('<span class="mention">');
+  it("個別メンションと __all__ 併記でも重複排除する", () => {
+    expect(resolveMentionIds(doc(mention("u1", "太郎"), text(" "), mention(ALL_MENTION_ID, "全員")), party)).toEqual(["u1", "u2"]);
   });
-  it("メンバー不在の @token は強調しない", () => {
-    expect(renderTextHtml("@unknown こんにちは", members)).not.toContain('class="mention"');
+  it("個別メンションのみは attrs.id をそのまま返す", () => {
+    expect(resolveMentionIds(doc(mention("u1", "太郎"), text(" やあ")), party)).toEqual(["u1"]);
   });
-  it("HTML をエスケープする（XSS 無害化）", () => {
-    const html = renderTextHtml("<script>alert(1)</script>", members);
-    expect(html).not.toContain("<script>");
-    expect(html).toContain("&lt;script&gt;");
+  it("mention ノードが無ければ空（プレーン本文）", () => {
+    expect(resolveMentionIds(doc(text("メンション無し")), party)).toEqual([]);
   });
 });
 
-describe("E-TC-229 renderTextHtml 全員メンション強調", () => {
-  it("@全員 を .mention 化する（members に居なくても）", () => {
-    expect(renderTextHtml("@全員 集合", members)).toContain('<span class="mention">@全員</span>');
+describe("pmText（PM-JSON 平文化）", () => {
+  it("テキストと mention（@label）を連結し空白正規化する", () => {
+    expect(pmText(doc(text("やあ "), mention("u1", "太郎")))).toBe("やあ @太郎");
   });
-  it("@all / @ALL（大小無視）を .mention 化しトークン原文を保持する", () => {
-    expect(renderTextHtml("@all hi", members)).toContain('<span class="mention">@all</span>');
-    expect(renderTextHtml("@ALL hey", members)).toContain('<span class="mention">@ALL</span>');
-  });
-});
-
-describe("E-TC-230 resolveMentionIds 全員展開", () => {
-  it("@全員 / @all を全メンバーの user_id へ展開する", () => {
-    expect(resolveMentionIds("@全員 …", party)).toEqual(["u1", "u2"]);
-    expect(resolveMentionIds("@all …", party)).toEqual(["u1", "u2"]);
-  });
-  it("個別メンションと @全員 併記でも重複排除する", () => {
-    expect(resolveMentionIds("@テスト太郎 @全員 …", party)).toEqual(["u1", "u2"]);
-  });
-  it("member 不在の素 @token は無視する", () => {
-    expect(resolveMentionIds("@unknown …", party)).toEqual([]);
+  it("空 doc は空文字（空判定に使える）", () => {
+    expect(pmText({ type: "doc", content: [{ type: "paragraph", content: [] }] })).toBe("");
+    expect(pmText(null)).toBe("");
   });
 });
 

@@ -11,6 +11,7 @@ import { ActivitySpark, Avatar, Combobox, Field, FormFooterError, FormSummary, L
 import type { FieldErrors } from "@/lib/forms/validation";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
+import { pmText } from "@/features/chat/render";
 import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
 import { RelatedInfoPanel } from "@/features/info-input";
 import { votePercents } from "@/features/ideas/voting";
@@ -432,7 +433,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                         <span className="chat-msg__name">{m.author?.name}</span>
                         <span className="chat-msg__time">{fmtDate(m.created_at)}</span>
                       </div>
-                      <p className="chat-msg__text">{m.body}</p>
+                      <p className="chat-msg__text">{pmText(m.body)}</p>
                     </div>
                   </div>
                 ))}
