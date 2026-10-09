@@ -299,7 +299,7 @@
 .info-subtab-wrap .rowmenu { margin-left: 2px; display: inline-flex; align-items: center; }
 /* ⋮ トリガーは太めの青枠で目立たせる（ホバーで出現）。ボタン自体のホバー状態は btn-outline 既定のまま。 */
 .info-subtab-wrap .rowmenu__trigger { opacity: 0; pointer-events: none; transition: opacity .12s;
-  border: 2px solid var(--color-primary); color: var(--color-primary); }
+  border: 1px solid var(--color-primary); color: var(--color-primary); }
 .info-subtab-wrap:hover .rowmenu__trigger,
 .info-subtab-wrap:focus-within .rowmenu__trigger,
 .info-subtab-wrap .rowmenu__trigger[aria-expanded="true"] { opacity: 1; pointer-events: auto; }
