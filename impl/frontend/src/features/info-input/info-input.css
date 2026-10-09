@@ -294,9 +294,9 @@
 .info-tabmgr__add .input { flex: 1; }
 
 /* サブタブのタブ操作（D4）＝テーブルと同じ RowMenu（⋮）をホバーで出す。非予約タブのみ（render で制御）。 */
-.info-subtab-wrap { position: relative; display: inline-flex; align-items: center; padding-left: 2px; border-radius: var(--radius-sm); transition: background .12s; }
+.info-subtab-wrap { position: relative; display: inline-flex; align-items: center; padding-right: 2px; border-radius: var(--radius-sm); transition: background .12s; }
 .info-subtab-wrap:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }  /* ラベル＋⋮ を含む全体にホバー背景 */
-.info-subtab-wrap .rowmenu { margin-right: 2px; display: inline-flex; align-items: center; }  /* ⋮ はタブ名の左 */
+.info-subtab-wrap .rowmenu { margin-left: 2px; display: inline-flex; align-items: center; }  /* ⋮ はタブ名の右 */
 /* ⋮ トリガーは太めの青枠で目立たせる（ホバーで出現）。ボタン自体のホバー状態は btn-outline 既定のまま。 */
 .info-subtab-wrap .rowmenu__trigger { opacity: 0; pointer-events: none; transition: opacity .12s;
   border: none; background: transparent; color: var(--color-primary); }
