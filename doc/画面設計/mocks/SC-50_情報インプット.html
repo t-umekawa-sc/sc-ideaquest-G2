@@ -224,6 +224,13 @@
       <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
     </div>
     <div class="modal__body">
+      <!-- テンプレートピッカー（§6b・新規登録時のみ・会社共通マスタ SC-55 が供給）＝選ぶと本文ひな形＋属性既定がプリフィル（編集可）。 -->
+      <div class="field" id="imTplPicker" style="background:var(--color-primary-soft);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:var(--space-3)">
+        <label class="dialog-label" for="imTplSelect">🗂 テンプレートから作成（任意）</label>
+        <select class="select" id="imTplSelect"><option value="">テンプレートを使わない（白紙から入力）</option></select>
+        <div class="hint">選ぶと本文のひな形と分類の既定が入ります（すべて編集できます）。<code>{{today}}</code> は当日の日付に展開。管理＝<a href="SC-55_情報テンプレート管理.html">情報テンプレート管理</a>（会社管理者）。</div>
+      </div>
+
       <!-- 続報の文脈（parent_info_id 指定時＝親を prefill・親リンクを origin=auto でスナップショット複製）。
            元の情報（タイトル/内容/出典URL）を開閉パネルで参照できる。 -->
       <details class="disclosure disclosure--ref" id="imParentNote" hidden open style="margin-bottom:var(--space-3)">
@@ -827,6 +834,13 @@
       $('imParentUrl').innerHTML = parent.source_url ? `<a href="${parent.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${parent.source_url}）</span>` : '<span class="muted">出典URLなし</span>';
       pn.hidden = false; pn.open = true;
     } else pn.hidden = true;
+    // テンプレートピッカー＝新規登録（続報でない）時のみ表示。編集/続報は非表示＋選択リセット（§6b）。
+    const tplPick = $('imTplPicker');
+    if (tplPick) {
+      const showPicker = mode === 'new' && !parent;
+      tplPick.hidden = !showPicker;
+      const tplSel = $('imTplSelect'); if (tplSel) tplSel.value = '';
+    }
     // 続報（親パネルあり）はタイトル上に仕切り線／新規登録は先頭のため仕切り線なし。
     $('imTitleField').classList.toggle('dialog-section', !!parent);
     // 値のプリフィル（編集＝rec／続報＝親の属性を初期値・本文/URLは空）
@@ -852,6 +866,44 @@
     setTimeout(resetLinkMs, 0);   // モーダル表示後の focus 等で開くケースも閉じる
   }
   $('newInfo').addEventListener('click', () => openInfoForm('new', null, null));
+
+  // ---- テンプレートピッカー（§6b・SC-55 マスタが供給。本番＝GET /info-templates＋適用は GET /info-templates/{id}） ----
+  const TEMPLATES = [
+    { id: 't1', name: '電話対応履歴', description: '顧客からの電話対応を記録', title_template: '電話対応履歴 {{today}}（）',
+      body_html: '<h3>対応日時</h3><p>（記入）</p><h3>相手・会社</h3><p>（記入）</p><h3>用件</h3><p>（記入）</p><h3>対応内容</h3><p>（記入）</p><h3>次アクション / 期限</h3><p>（記入）</p>',
+      defaults: { scope: 'internal', source: 'customer', classification: 'information' }, cats: ['internal_customer'] },
+    { id: 't2', name: '作業報告書', description: '日次の作業内容を記録', title_template: '作業報告書 {{today}}',
+      body_html: '<h3>作業日</h3><p>（記入）</p><h3>作業内容</h3><p>（記入）</p><h3>所感・申し送り</h3><p>（記入）</p>',
+      defaults: { scope: 'internal', classification: 'knowledge' }, cats: ['internal_process'] },
+  ];
+  (function initTplPicker() {
+    const sel = $('imTplSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">テンプレートを使わない（白紙から入力）</option>'
+      + TEMPLATES.map(t => `<option value="${t.id}">${t.name}${t.description ? '（' + t.description + '）' : ''}</option>`).join('');
+    sel.addEventListener('change', async () => {
+      const t = TEMPLATES.find(x => x.id === sel.value);
+      if (!t) return;
+      // 本文/属性に入力済みなら上書き確認（空ならそのまま適用）。
+      const hasBody = $('imBody').textContent.trim().length > 0;
+      const hasTitle = $('imTitleInput').value.trim().length > 0;
+      if (hasBody || hasTitle) {
+        const ok = await iqConfirm({ title: 'テンプレートを適用', msg: '入力済みの内容がテンプレートで置き換わります。よろしいですか？', confirmLabel: '適用する' });
+        if (!ok) { sel.value = ''; return; }
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const expand = (s) => (s || '').replace(/\{\{today\}\}/g, today);
+      $('imTitleInput').value = expand(t.title_template || '');
+      $('imBody').innerHTML = t.body_html || '';
+      const d = t.defaults || {};
+      $('imPriority').value = d.priority || ''; $('imSource').value = d.source || ''; $('imClass').value = d.classification || '';
+      $('imScope').value = d.scope || ''; $('imBiz').value = d.target_business || '';
+      $('imImpact').value = d.impact_level || ''; $('imImpactClass').value = d.impact_class || ''; $('imTiming').value = d.impact_timing || '';
+      const cats = new Set(t.cats || []);
+      $('imCats').querySelectorAll('input').forEach(cb => cb.checked = cats.has(cb.value));
+      iqSnack({ type: 'success', msg: `テンプレート「${t.name}」を適用しました` });
+    });
+  })();
 
   // デモ視点の権限トグル＝能力フラグ切替→一覧の⋯メニュー・詳細の編集導線を出し分け（実装＝backend can.*）。
   $('demoCuratorToggle').addEventListener('change', (e) => {

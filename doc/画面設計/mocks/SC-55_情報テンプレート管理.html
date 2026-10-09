@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報テンプレート管理 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-55 情報テンプレート管理（内部情報テンプレートのマスタ・会社管理者）。
+     情報登録モーダル（SC-51 §6b ピッカー）に供給する会社共通テンプレート（本文ひな形＋属性既定）を
+     追加/編集/有効・無効/複製/削除（論理）する。DataTable＋URL付きモーダル（登録/編集）を踏襲。
+     正＝doc/画面設計/screens/SC-55_情報テンプレート管理.md・設計ドラフト/情報インプットテンプレート機能_設計.md
+     ・API N.5b・データモデル §5.37b・FR-41 ⑩。本文エディタは SC-50（情報インプット）の資産を共用。 */
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-3); }
+  .page-head h1 { font-size: var(--text-2xl); margin: 0; }
+  .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+
+  /* 本文ひな形エディタ（SC-50 の .rt と同一）。 */
+  .rt { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .rt__bar { display: flex; gap: 2px; flex-wrap: wrap; padding: 6px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
+  .rt__bar button { appearance: none; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 8px; cursor: pointer; font: inherit; font-size: var(--text-sm); color: var(--color-text); }
+  .rt__bar button:hover { background: var(--color-surface); border-color: var(--color-border); }
+  .rt__area { min-height: 180px; max-height: 360px; overflow: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; }
+  .rt__area:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .rt__area:empty::before { content: attr(data-placeholder); color: var(--color-text-subtle); }
+  .rt__area h2, .rt__area h3 { margin: .6em 0 .2em; }
+  .ph { color: var(--color-primary-active); background: var(--color-primary-soft); border-radius: 3px; padding: 0 3px; }
+
+  /* 属性既定グリッド（SC-50 の .attr-grid と同一）。 */
+  .attr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-5); }
+  @media (max-width: 560px) { .attr-grid { grid-template-columns: 1fr; } }
+  .dialog-label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 4px; }
+  .defaults-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .hint { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .cats-box { display: flex; gap: 6px 10px; flex-wrap: wrap; max-height: 148px; overflow: auto; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .cats-box label { font-size: var(--text-sm); display: inline-flex; gap: 4px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted" title="会社アカウント管理者">👥 会社アカウント管理者</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知">🔔</a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="管理 三郎"><span class="avatar__img placeholder">管</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="SC-03_プロフィール.html">プロフィール</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-93_会社アカウント管理.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← 管理メニューへ戻る</a>
+  <div class="page-head">
+    <h1>🗂 情報テンプレート管理</h1>
+    <button class="btn btn-primary" type="button" id="newTpl">＋ テンプレートを追加</button>
+  </div>
+  <p class="admin-sub">情報登録（SC-51）で選べる<strong>定型フォーマット</strong>（本文ひな形＋属性の既定値）を管理します。ここでの編集・削除は<strong>既存の情報には影響しません</strong>（登録後の情報はテンプレを参照しない疎結合）。管理＝<strong>会社管理者</strong>／適用＝会社内全員。</p>
+
+  <div id="tplTable"></div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    本文ひな形は<strong>保存時にサーバーでサニタイズ</strong>（情報本文と同じ許可リスト・管理者作成でも例外にしない）。属性既定は既知属性のみ・値は enum に実在（違反は 422）。<strong>削除は論理</strong>（監査保持・名前は再利用可）。変数差込は MVP は<strong>日付（<code>{{today}}</code>）のみ</strong>。
+  </p>
+</main>
+
+<!-- ===== 登録・編集モーダル（URL付きモーダル相当・§6） ===== -->
+<div class="modal modal--lg modal--draggable" id="tplModal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="tmTitle">テンプレートを追加</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="field">
+        <label class="dialog-label" for="tmName">名称 <span style="color:var(--color-danger)">*</span></label>
+        <input class="input" id="tmName" type="text" placeholder="例: 電話対応履歴" maxlength="120">
+        <div class="field-error" id="tmNameErr" hidden></div>
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label" for="tmDesc">説明（任意・ピッカーの副文）</label>
+        <input class="input" id="tmDesc" type="text" placeholder="例: 顧客からの電話対応を記録する">
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label" for="tmTitleTpl">タイトル雛形（任意・穴埋め可）</label>
+        <input class="input" id="tmTitleTpl" type="text" placeholder="例: 電話対応履歴 {{today}}（）">
+        <div class="hint"><code>{{today}}</code> は適用時に当日の日付へ置換されます。</div>
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label" for="tmBody">本文ひな形 <span style="color:var(--color-danger)">*</span>（見出し＋記入欄プレースホルダ）</label>
+        <div class="rt">
+          <div class="rt__bar" role="toolbar" aria-label="書式">
+            <button type="button" data-cmd="bold" title="太字"><b>B</b></button>
+            <button type="button" data-cmd="italic" title="斜体"><i>I</i></button>
+            <button type="button" data-cmd="insertUnorderedList" title="箇条書き">• リスト</button>
+            <button type="button" data-cmd="formatBlock" data-arg="h2" title="見出し">見出し</button>
+            <button type="button" id="tmPh" title="記入欄プレースホルダを挿入">（記入）を挿入</button>
+          </div>
+          <div class="rt__area" id="tmBody" contenteditable="true" data-placeholder="見出しと「（記入）」で穴埋めの型を作ります…"></div>
+        </div>
+        <div class="field-error" id="tmBodyErr" hidden></div>
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label">属性の既定値（任意・選択時にフォームへプリフィル。編集可）</label>
+        <div class="attr-grid">
+          <div><label class="dialog-label" for="tmPriority">優先度</label><select class="select" id="tmPriority"></select></div>
+          <div><label class="dialog-label" for="tmSource">情報ソース</label><select class="select" id="tmSource"></select></div>
+          <div><label class="dialog-label" for="tmClass">情報分類</label><select class="select" id="tmClass"></select></div>
+          <div><label class="dialog-label" for="tmScope">大分類</label><select class="select" id="tmScope"></select></div>
+          <div><label class="dialog-label" for="tmBiz">対象事業</label><select class="select" id="tmBiz"></select></div>
+          <div><label class="dialog-label" for="tmImpactClass">影響分類</label><select class="select" id="tmImpactClass"></select></div>
+          <div><label class="dialog-label" for="tmImpact">影響度</label><select class="select" id="tmImpact"></select></div>
+          <div><label class="dialog-label" for="tmTiming">影響発生時期</label><select class="select" id="tmTiming"></select></div>
+        </div>
+        <div style="margin-top:var(--space-3)">
+          <label class="dialog-label">情報カテゴリ（複数可）</label>
+          <div class="cats-box" id="tmCats"></div>
+        </div>
+      </div>
+      <div class="field dialog-section">
+        <div class="attr-grid">
+          <div><label class="dialog-label" for="tmSort">並び順</label><input class="input" id="tmSort" type="number" value="0" style="width:120px"></div>
+          <div style="align-self:end"><label class="checkbox"><input type="checkbox" id="tmActive" checked><span>情報登録で選べるようにする（有効）</span></label></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-ghost" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="tmSave">追加する</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastHost" class="snackbar-stack" aria-live="polite"></div>
+
+<script src="shared.js"></script>
+<script>
+(function () {
+  // ---- enum ラベル（データモデル §3 info_* enum・labels.ts と一致）----
+  const L = {
+    priority: { highest: '最高', high: '高い', normal: '普通', low: '低い', lowest: '最低' },
+    source: { public_data: '公的機関', market_research: '民間調査/企業データ', news: '新聞・ネットニュース', event: '展示会・セミナー', customer: '取引先・顧客', personal: '親族・友人', competitor: '競合', investor: '株主・投資家', org_decision: '組織の決定事項', employee: '従業員', legal: '弁護士・法律専門家', research: '研究機関・コミュニティ', other: 'その他' },
+    classification: { information: '情報', idea: 'アイデア', request: '要望・要求', knowledge: 'ナレッジ', proposal: '提案', other: 'その他' },
+    scope: { external: '外部', internal: '内部', other: 'その他' },
+    business: { innovation: 'イノベーション', bpo: 'BPO', generative_provider: 'ジェネレーティブ・プロバイダー', it_infra_network: 'ITインフラ・NW', software_dev: 'ソフトウェア開発', it_service_ops: 'ITサービス運用支援', other: 'その他' },
+    impact: { unknown: '判断できない', none: '影響なし', minor: '軽度', moderate: '中度', major: '重度', severe: '過大' },
+    impactClass: { opportunity: '機会', threat: '脅威', other: 'その他' },
+    timing: { unknown: '不明', within_3y: '3年以内', within_1y: '1年以内', within_6m: '6カ月以内', within_3m: '3カ月以内', already: 'すでに発生' },
+    category: { ext_economy: '外部｜経済', ext_politics_law: '外部｜政治法律', ext_society_culture: '外部｜社会文化', ext_industry: '外部｜業界', ext_competitor: '外部｜競合', ext_technology: '外部｜技術', ext_geography: '外部｜自然地理', ext_other: '外部｜その他', internal_tech: '内部｜技術', internal_capability: '内部｜能力', internal_process: '内部｜業務プロセス', internal_people: '内部｜従業員役員', internal_customer: '内部｜顧客', internal_partner: '内部｜取引先', internal_finance: '内部｜財務実績', internal_culture: '内部｜文化価値', internal_hr: '内部｜人事組織' },
+  };
+  const DEFAULT_KEYS = [
+    ['priority', 'priority', '優先度'], ['source', 'source', '情報ソース'], ['classification', 'classification', '情報分類'],
+    ['scope', 'scope', '大分類'], ['target_business', 'business', '対象事業'], ['impact_class', 'impactClass', '影響分類'],
+    ['impact_level', 'impact', '影響度'], ['impact_timing', 'timing', '影響発生時期'],
+  ];
+
+  // ---- デモデータ ----
+  let SEQ = 3;
+  const TPL = [
+    { id: 't1', name: '電話対応履歴', description: '顧客からの電話対応を記録', body_html: '<h2>対応日時</h2><p><span class="ph">（記入）</span></p><h2>相手・会社</h2><p><span class="ph">（記入）</span></p><h2>用件</h2><p><span class="ph">（記入）</span></p><h2>対応内容</h2><p><span class="ph">（記入）</span></p><h2>次アクション / 期限</h2><p><span class="ph">（記入）</span></p>', title_template: '電話対応履歴 {{today}}（）', defaults: { scope: 'internal', source: 'customer', classification: 'information' }, categories: ['internal_customer'], sort_order: 1, is_active: true, updated_by: '管理 三郎', updated_at: '2026-10-09' },
+    { id: 't2', name: '作業報告書', description: '日次の作業内容を記録', body_html: '<h2>作業日</h2><p><span class="ph">（記入）</span></p><h2>作業内容</h2><p><span class="ph">（記入）</span></p><h2>所感・申し送り</h2><p><span class="ph">（記入）</span></p>', title_template: '作業報告書 {{today}}', defaults: { scope: 'internal', classification: 'knowledge' }, categories: ['internal_process'], sort_order: 2, is_active: true, updated_by: '管理 三郎', updated_at: '2026-10-08' },
+    { id: 't3', name: '競合動向メモ（旧）', description: '競合の動きを記録（新テンプレに移行）', body_html: '<h2>競合名</h2><p><span class="ph">（記入）</span></p><h2>動き</h2><p><span class="ph">（記入）</span></p>', title_template: '', defaults: { scope: 'external', source: 'competitor', impact_class: 'threat' }, categories: ['ext_competitor'], sort_order: 3, is_active: false, updated_by: '管理 三郎', updated_at: '2026-09-30' },
+  ];
+
+  const esc = (s) => (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function defaultsChips(t) {
+    const chips = [];
+    for (const [key, lkey] of DEFAULT_KEYS) { if (t.defaults[key]) chips.push(L[lkey][t.defaults[key]]); }
+    (t.categories || []).forEach(c => chips.push(L.category[c]));
+    if (!chips.length) return '<span class="muted">—</span>';
+    return `<span class="defaults-chips">${chips.map(c => `<span class="badge badge-muted">${esc(c)}</span>`).join('')}</span>`;
+  }
+  function actionsCell(t) {
+    const toggle = t.is_active
+      ? `<li role="none"><button role="menuitem" type="button" data-deact="${t.id}">無効にする</button></li>`
+      : `<li role="none"><button role="menuitem" type="button" data-act="${t.id}">有効にする</button></li>`;
+    return `<div class="rowmenu">
+      <button class="rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+      <ul class="rowmenu__list" role="menu" hidden>
+        <li role="none"><button role="menuitem" type="button" data-edit="${t.id}">編集</button></li>
+        ${toggle}
+        <li role="none"><button role="menuitem" type="button" data-dup="${t.id}">複製</button></li>
+        <li role="none"><button role="menuitem" type="button" class="is-danger" data-del="${t.id}">削除</button></li>
+      </ul>
+    </div>`;
+  }
+
+  const tplTable = document.getElementById('tplTable');
+  const dt = window.DataTable.init(tplTable, {
+    storageKey: 'sc55-info-templates',
+    data: [], rowId: (r) => r.id, unit: '件', perPage: 10, perPageOptions: [10, 20, 50],
+    searchFields: '名称・説明', exportName: '情報テンプレート', emptyText: 'テンプレートがありません。「＋ テンプレートを追加」から登録してください。',
+    onRowClick: (r) => openEdit(r.id),
+    card: (r) => `<div class="dt-card__title">${esc(r.name)} ${r.is_active ? '<span class="badge badge-success">有効</span>' : '<span class="badge badge-muted">無効</span>'}</div>`
+      + `<div class="dt-card__meta">${defaultsChips(r)}</div>`
+      + `<div class="dt-card__stats"><span>並び順 ${r.sort_order}</span><span>${esc(r.updated_by)}</span><span>${r.updated_at}</span></div>`,
+    columns: [
+      { key: 'name', label: '名称', locked: true, width: 240, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name + ' ' + (r.description || ''), csvVal: (r) => r.name, render: (r) => `<strong>${esc(r.name)}</strong>` },
+      { key: 'description', label: '説明', width: 300, filter: { type: 'text' }, searchVal: (r) => r.description || '', csvVal: (r) => r.description || '', render: (r) => r.description ? `<span class="cell-clip" title="${esc(r.description)}">${esc(r.description)}</span>` : '<span class="muted">—</span>' },
+      { key: 'defaults', label: '既定属性', width: 280, csvVal: (r) => Object.values(r.defaults).map(v => v).join('、'), render: defaultsChips },
+      { key: 'is_active', label: '有効', width: 100, sortable: true, filter: { type: 'enum', options: [['1', '有効'], ['0', '無効']] }, sortVal: (r) => r.is_active ? 1 : 0, filterVal: (r) => r.is_active ? '1' : '0', csvVal: (r) => r.is_active ? '有効' : '無効', render: (r) => r.is_active ? '<span class="badge badge-success">有効</span>' : '<span class="badge badge-muted">無効</span>' },
+      { key: 'sort_order', label: '並び順', width: 90, sortable: true, sortVal: (r) => r.sort_order, csvVal: (r) => r.sort_order, render: (r) => `<span>${r.sort_order}</span>` },
+      { key: 'updated', label: '更新', width: 200, sortable: true, sortVal: (r) => r.updated_at, csvVal: (r) => `${r.updated_by} ${r.updated_at}`, render: (r) => `<span class="cell-clip" title="${esc(r.updated_by)} ${r.updated_at}">${esc(r.updated_by)} ・ ${r.updated_at}</span>` },
+      { key: '_actions', label: '', actions: true, locked: true, width: 72, render: actionsCell },
+    ],
+  });
+  function refresh() { dt.setData(TPL.slice().sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))); }
+  refresh();
+
+  // ---- モーダル（各モック共通の開閉パターン・SC-93 と同じ） ----
+  const modal = document.getElementById('tplModal');
+  function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
+  function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
+  let editingId = null;
+  function fillSelect(id, map) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = `<option value="">（既定にしない）</option>` + Object.entries(map).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  }
+  function fillCats() {
+    document.getElementById('tmCats').innerHTML = Object.entries(L.category)
+      .map(([v, l]) => `<label><input type="checkbox" value="${v}"><span>${l}</span></label>`).join('');
+  }
+  DEFAULT_KEYS.forEach(([key, lkey, , ]) => { });
+  fillSelect('tmPriority', L.priority); fillSelect('tmSource', L.source); fillSelect('tmClass', L.classification);
+  fillSelect('tmScope', L.scope); fillSelect('tmBiz', L.business); fillSelect('tmImpactClass', L.impactClass);
+  fillSelect('tmImpact', L.impact); fillSelect('tmTiming', L.timing); fillCats();
+  const selMap = { priority: 'tmPriority', source: 'tmSource', classification: 'tmClass', scope: 'tmScope', target_business: 'tmBiz', impact_class: 'tmImpactClass', impact_level: 'tmImpact', impact_timing: 'tmTiming' };
+
+  function openNew(seed) {
+    editingId = null;
+    document.getElementById('tmTitle').textContent = seed ? 'テンプレートを複製' : 'テンプレートを追加';
+    document.getElementById('tmSave').textContent = '追加する';
+    document.getElementById('tmName').value = seed ? (seed.name + ' のコピー') : '';
+    document.getElementById('tmDesc').value = seed ? seed.description : '';
+    document.getElementById('tmTitleTpl').value = seed ? (seed.title_template || '') : '';
+    document.getElementById('tmBody').innerHTML = seed ? seed.body_html : '';
+    document.getElementById('tmSort').value = seed ? seed.sort_order : 0;
+    document.getElementById('tmActive').checked = seed ? false : true;   // 複製は無効で起票
+    for (const k in selMap) document.getElementById(selMap[k]).value = seed && seed.defaults[k] ? seed.defaults[k] : '';
+    document.querySelectorAll('#tmCats input').forEach(c => { c.checked = !!(seed && (seed.categories || []).includes(c.value)); });
+    clearErr();
+    openModal('tplModal');
+  }
+  function openEdit(id) {
+    const t = TPL.find(x => x.id === id); if (!t) return;
+    editingId = id;
+    document.getElementById('tmTitle').textContent = 'テンプレートを編集';
+    document.getElementById('tmSave').textContent = '保存する';
+    document.getElementById('tmName').value = t.name;
+    document.getElementById('tmDesc').value = t.description;
+    document.getElementById('tmTitleTpl').value = t.title_template || '';
+    document.getElementById('tmBody').innerHTML = t.body_html;
+    document.getElementById('tmSort').value = t.sort_order;
+    document.getElementById('tmActive').checked = t.is_active;
+    for (const k in selMap) document.getElementById(selMap[k]).value = t.defaults[k] || '';
+    document.querySelectorAll('#tmCats input').forEach(c => { c.checked = (t.categories || []).includes(c.value); });
+    clearErr();
+    openModal('tplModal');
+  }
+  function clearErr() {
+    ['tmNameErr', 'tmBodyErr'].forEach(id => { const e = document.getElementById(id); e.hidden = true; e.textContent = ''; });
+  }
+  function showErr(id, msg) { const e = document.getElementById(id); e.textContent = msg; e.hidden = false; }
+
+  function collect() {
+    const defaults = {};
+    for (const k in selMap) { const v = document.getElementById(selMap[k]).value; if (v) defaults[k] = v; }
+    const cats = Array.from(document.querySelectorAll('#tmCats input:checked')).map(c => c.value);
+    return {
+      name: document.getElementById('tmName').value.trim(),
+      description: document.getElementById('tmDesc').value.trim(),
+      title_template: document.getElementById('tmTitleTpl').value.trim(),
+      body_html: document.getElementById('tmBody').innerHTML.trim(),
+      defaults, categories: cats,
+      sort_order: parseInt(document.getElementById('tmSort').value, 10) || 0,
+      is_active: document.getElementById('tmActive').checked,
+    };
+  }
+  document.getElementById('tmSave').addEventListener('click', () => {
+    clearErr();
+    const d = collect();
+    let bad = false;
+    if (!d.name) { showErr('tmNameErr', '名称を入力してください。'); bad = true; }
+    else if (TPL.some(t => t.id !== editingId && t.is_active !== undefined && t.name === d.name && !t._deleted)) { showErr('tmNameErr', '同名の有効なテンプレートがあります。'); bad = true; }
+    if (!document.getElementById('tmBody').textContent.trim()) { showErr('tmBodyErr', '本文ひな形を入力してください。'); bad = true; }
+    if (bad) return;
+    if (editingId) {
+      const t = TPL.find(x => x.id === editingId);
+      Object.assign(t, d, { updated_by: '管理 三郎', updated_at: '2026-10-09' });
+      window.iqSnack({type:'success',msg:'テンプレートを保存しました'});
+    } else {
+      TPL.push({ id: 't' + (++SEQ), ...d, updated_by: '管理 三郎', updated_at: '2026-10-09' });
+      window.iqSnack({type:'success',msg:'テンプレートを追加しました'});
+    }
+    closeModal(modal); refresh();
+  });
+
+  document.getElementById('newTpl').addEventListener('click', () => openNew(null));
+
+  // 本文エディタ ツールバー。
+  modal.querySelectorAll('.rt__bar [data-cmd]').forEach(b => b.addEventListener('click', () => {
+    document.getElementById('tmBody').focus();
+    document.execCommand(b.dataset.cmd, false, b.dataset.arg || null);
+  }));
+  document.getElementById('tmPh').addEventListener('click', () => {
+    document.getElementById('tmBody').focus();
+    document.execCommand('insertHTML', false, '<span class="ph">（記入）</span>&nbsp;');
+  });
+
+  // RowMenu アクション（イベント委譲）。
+  tplTable.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-edit],[data-act],[data-deact],[data-dup],[data-del]'); if (!btn) return;
+    if (btn.dataset.edit) return openEdit(btn.dataset.edit);
+    if (btn.dataset.dup) { const t = TPL.find(x => x.id === btn.dataset.dup); return openNew(t); }
+    if (btn.dataset.act || btn.dataset.deact) {
+      const id = btn.dataset.act || btn.dataset.deact; const t = TPL.find(x => x.id === id);
+      t.is_active = !!btn.dataset.act; t.updated_at = '2026-10-09';
+      window.iqSnack({type:'success',msg:t.is_active ? '有効にしました' : '無効にしました（新規登録で選べなくなります）'}); refresh();
+    }
+    if (btn.dataset.del) {
+      const t = TPL.find(x => x.id === btn.dataset.del);
+      window.iqConfirm({
+        title: 'テンプレートを削除', variant: 'danger', confirmLabel: '削除する',
+        msg: `「${t.name}」を削除しますか？ 今後の登録で選べなくなります（既存の情報は変わりません）。`,
+      }).then((ok) => {
+        if (!ok) return;
+        const i = TPL.indexOf(t); if (i >= 0) TPL.splice(i, 1);
+        window.iqSnack({ type: 'success', msg: '削除しました' }); refresh();
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
