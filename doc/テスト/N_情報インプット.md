@@ -229,3 +229,28 @@
 | N-TC-331 | unit | ピッカー適用＝本文ひな形流し込み＋属性既定プリフィル＋日付目印展開 | テンプレ詳細（`body_html`/`defaults`/`title_template` に `{{today}}`） | `applyTemplate(template, today)` | フォーム state の `body_html`/属性/`title` がテンプレ値になり `{{today}}` が当日日付に置換される | SC-50 §6b／§4 |
 | N-TC-332 | e2e | SC-55 管理＝テンプレを追加→一覧に出る→無効化で有効バッジが変わる | 管理者 `kanri@acme.example` が `/admin/info-templates` | 「＋テンプレートを追加」→名称/本文入力→保存→RowMenu「無効にする」 | 追加したテンプレが一覧に出る・無効化で「無効」バッジ＝DataTable 再クエリ（refreshToken）で反映。作成分は後始末で削除 | SC-55／N.5b |
 | N-TC-333 | e2e | SC-51 ピッカーで選ぶと本文/属性がプリフィルされる（新規登録時のみ表示） | `user@acme.example`・有効テンプレ1件を seed→`/info-items/new` | 「テンプレートから作成」で選択 | 本文欄にひな形が入る（編集時/続報登録時はピッカー非表示）／入力済みなら上書き確認が出る | SC-50 §6b／N.5b |
+
+## 5. 動的タブ（D4・§5.37c・N.5c・SC-50）
+
+> 対象＝`info_tabs` CRUD・予約語/同名検証・アーカイブ（配下非空不可）・一覧 `tab_id` フィルタ（「すべて」=全件）・タブ間移動（curator＋登録者・1件/一括）・`auto_link_enabled`。backend は red-green、frontend は build/vitest/e2e。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-335 | int | seed＝会社に「すべて」1行（system・sort_order=0）・既存情報は tab_id=すべて | 会社DB（migration＋seed） | `list_tabs` | 「すべて」が kind=system・sort_order=0 で1行・既存 info_items.tab_id が全て「すべて」 | §5.37c／§10-3 |
+| N-TC-336 | int | タブ作成＝kind=user・sort_order 採番・作成者記録 | curator | `create_tab(name="情報共有")` | status=active・kind=user・created_by 正・sort_order 付与 | N.5c |
+| N-TC-337 | int | 予約語は作成/改名不可 | curator | `create_tab("すべて")`／`create_tab("カメリオ連携")` | 422 `reserved_tab_name`（作成も改名も） | N.5c／§11-5 |
+| N-TC-338 | int | 同名（active）は不可 | 「情報共有」存在 | 同名で `create_tab` | 409 `conflict`（active 一意・archived は対象外） | N.5c／§2.1 |
+| N-TC-339 | int | アーカイブは配下が空のときのみ | 配下に情報があるタブ／空のタブ | `archive_tab` | 配下非空=409 `tab_not_empty`／空=archived 成功（物理削除なし・tab_id は NULL にしない） | §3／§11-6 |
+| N-TC-340 | int | system「すべて」は改名/アーカイブ不可 | すべて | `rename`/`archive` すべて | 403/422（予約・特殊） | §1／§11-2 |
+| N-TC-341 | int | 一覧 tab_id フィルタ＝指定タブで絞る／「すべて」は全件 | 複数タブに情報 | `list(tab_id=X)`／`list(tab_id=すべて)`／`list()` | X=X 所属のみ／すべて=全件（他タブ所属も含む）／未指定=全件 | §1-B／N.5c |
+| N-TC-342 | int | 登録先タブ＝指定で所属・省略で「すべて」・続報は親継承 | — | `create_info_item(tab_id=X)`／省略／`parent` 指定 | tab_id=X／省略=すべて／続報=親の tab_id をプリフィル | §5.33／§5-継承 |
+| N-TC-343 | int | タブ移動（1件）＝curator は任意・登録者は自分のみ | 他人の情報・自分の情報 | `move_tab` を curator／登録者で | curator=両方可／登録者=自分のみ可・他人は 403 | §3／N.5c |
+| N-TC-344 | int | 一括移動＝全件権限ありで成功・権限外混在は fail-closed | 自分2件＋他人1件 | 登録者で `move_tab(bulk)` | 権限外混在=403 `forbidden`（何も移動しない）／curator は全件成功 | N.5c |
+| N-TC-345 | int | `auto_link_enabled=false` の情報は auto リンク対象外（手動は可） | false の情報＋近い成果物 | 保存で auto 生成 | auto `info_links` を生成しない／手動 `POST /info-links` は可 | §5／N.6 |
+| N-TC-346 | int | ワードクラウドの tab_id 絞り | 複数タブに情報 | `word_cloud(tab_id=X)`／未指定 | X=X 所属のトークンのみ／未指定=全件 | §5／残論点1 |
+| N-TC-347 | api | `/info-tabs` 認可＝作成/改名/アーカイブは admin/curator のみ | 一般ユーザー | `POST /info-tabs` 等 | 403 `forbidden`（一般は読取のみ） | N.5c／N.0 |
+| N-TC-348 | api | テナント境界＝他社タブ id は 404 | 会社Aで会社Bの tab id | `PATCH /info-tabs/{B}` | 404 not_found | N.5c／§1.5 |
+| N-TC-349 | api | connector タブは API 作成不可 | curator | `POST /info-tabs{kind:connector}` | 422（連携設定側が生成） | N.5c／§1 |
+| N-TC-350 | e2e | SC-50 サブタブ＝「すべて」既定選択→タブ切替で一覧が絞られる | 複数タブ＋情報 | SC-50 で「情報共有」タブをクリック | 一覧が tab_id で絞られる・「すべて」で全件に戻る（DataTable refreshToken） | §4／SC-50 |
+| N-TC-351 | e2e | タブ移動（行アクション/一括）で所属が変わる | 自分の情報 | 行「タブを移動」→別タブ／複数選択→一括移動 | 移動後そのタブに出る・元タブから消える・「すべて」には常に出る | §4／N.5c |
+| N-TC-352 | e2e | タブ管理モーダル＝追加/改名/並べ替え/アーカイブ（権限者のみ） | curator/admin | 「＋タブ」→追加→改名→アーカイブ（空のみ） | 追加が帯に出る・改名反映・配下非空アーカイブはエラー表示（§4.7） | §4／N.5c |

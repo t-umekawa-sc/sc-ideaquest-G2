@@ -107,16 +107,37 @@
 - **適用はクライアント主体**＝`GET /info-templates/{id}` で取得した `body_html`/`defaults`/`title_template` をフォームへ流し込むだけ（専用「適用」EP は不要・登録は従来の `POST /info-items`）。由来を残す場合は `POST /info-items` のボディに任意 `source_template_id` を載せる（存在しない/論理削除済み id でも受理＝履歴記録・外部キーは NULL 許容）。**日付目印はクライアントで展開**（サーバ側テンプレエンジン無し・§4）。
 - 認可失敗＝**403 `forbidden`**（非管理者の書き込み/`admin=1`）／他テナントは **404**（存在秘匿）。
 
+## N.5c 動的タブ（情報の器・[情報インプット動的タブ](../設計ドラフト/情報インプット動的タブ_設計.md)・D4）
+
+> 会社が束ねる情報の第一級コンテナ（1情報=1タブ・`info_items.tab_id`）。「すべて」＝システム予約の特殊タブ（既定所属・表示は全件）。データモデル §5.37c。
+
+| メソッド / パス | 概要 | 認可 |
+| --- | --- | --- |
+| `GET /info-tabs` | タブ一覧（`sort_order` 順・各タブ件数付き・`can.manage_tabs`） | 会社内 active 全員（読取） |
+| `POST /info-tabs` | タブ作成（`kind='user'` のみ・`name`/`color`/`icon`/`description`） | admin / curator |
+| `PATCH /info-tabs/{id}` | 名称/色/アイコン/並べ替え(`sort_order`)/アーカイブ(`status`) | admin / curator |
+| `PATCH /info-items/{id}/tab` | 情報のタブ移動（1件・`{tab_id}`） | curator ＋ 登録者（自分の情報） |
+| `POST /info-items/move-tab` | 一括移動（`{info_ids[], tab_id}`） | curator ＋ 登録者（各情報を再検証） |
+
+- **一覧フィルタ拡張**＝`GET /info-items?tab_id=...`（既存 N.1 に追加）。**「すべて」タブの id 指定 or `tab_id` 未指定＝フィルタを外し全件**（特殊ビュー）。それ以外は `tab_id=そのタブ` で絞る（§1.8.1 の DataTable 契約は不変・`tab_id` は列 flags ホワイトリスト扱い）。
+- **登録先**＝`POST /info-items`（N.2）のボディに任意 `tab_id`（省略時＝「すべて」）。続報は親の `tab_id` を既定継承（プリフィル・編集可）。
+- **検証**＝`name` は active 内で会社一意（同名 409 `conflict`）／**予約語「すべて」「カメリオ連携」は作成/改名で 422** `reserved_tab_name`。`kind='connector'` は `POST /info-tabs` で作成不可（連携設定側が生成）＝422。アーカイブは**配下に情報があれば 409** `tab_not_empty`（先に移動して空に）。`system`（すべて）は改名/アーカイブ不可＝403/422。
+- **移動の権限**＝サーバーが**情報ごとに再検証**（curator=任意／登録者=自分の情報のみ）。一括で権限外が混在＝**403 `forbidden`**（fail-closed）。移動先に「すべて」可（＝既定の箱へ戻す＝タグ解除相当）。移動先が archived タブ＝422。
+- **`can`**＝`GET /info-capabilities`/`GET /info-tabs` に `manage_tabs`（admin/curator）をサーバー算出で返しフロントは表示出し分け・EP で必ず再検証。
+- **自動類似リンクの情報別 ON/OFF**＝`info_items.auto_link_enabled`（§5.33）を `POST`/`PATCH /info-items` のボディで受ける（既定 true・外部連携取込は false）。N.6 の auto リンク生成は本フラグ false の情報を対象外にする（手動リンクは可）。
+- `connector` タブ（カメリオ連携・将来 D3）＝受け口。ユーザーの手動登録/続報も可（制約は予約語名のみ）。本 D4 では**機構のみ**（`kind='connector'`/`connector_ref`/予約語検証）＝自動生成は D3。
+- 他テナント＝404（存在秘匿）・越権＝403（既存 N.0 準拠）。タブ名 XSS＝text・表示時エスケープ（リッチ不可）。
+
 ## N.6 類似度・ワードクラウド（派生・内部処理）
 
-- **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。**`body_text`（平文）**をストップワード除去→`info_tokens`（§5.36）。**保存時に同期**（単一情報は軽量＝バックグラウンド不要・§12-2）。一覧ワードクラウド＝保存済みトークンの集計／入力ダイアログのプレビュー＝`POST /info-items/word-cloud-preview`（草稿を同期トークン化・永続しない）。
+- **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。**`body_text`（平文）**をストップワード除去→`entity_tokens`（`owner_type='info'`・§5.36b）。**保存時に同期**（単一情報は軽量＝バックグラウンド不要・§12-2）。一覧ワードクラウド＝保存済みトークンの集計（`tab_id` フィルタ可＝選択タブに絞れる・「すべて」は全件）／入力ダイアログのプレビュー＝`POST /info-items/word-cloud-preview`（草稿を同期トークン化・永続しない）。
 - **要約＝抽出型 `summarize_text`（`app/tenant/quests/summarize.py`・janome・オフライン・無料・決定的）を再利用**（§12-3）。`body_text` から**保存時に同期生成**し `summary` へ。外部送信ゼロ＝内部情報でも privacy 問題なし。LLM 生成は将来 seam（`summarize_text` 差替え・要約用途は `claude-haiku-4-5` 適・内部データ外部送信ポリシーは Phase2）。
 - **一致度（類似度）**＝情報本文と アイデア/コンセプト本文の**キーワード重なり／TF-IDF**。**閾値＋上位 N**。**事前計算して `info_links.score` に保存**（都度計算しない・§5.35）。
 - **再計算トリガ**＝情報の追加/更新（`POST`/`PATCH /info-items`）／アイデア・コンセプトの保存（D/コンセプト段）。auto リンクは **upsert（既存行を尊重）**＝既定 `kind=related`・**人が変えた種別（`kind`）を保持**し、**棄却（`rejected_at`）も保持する**。すなわち **一度棄却した auto リンクは再計算で復活しない**（`(info_item_id, target_type, target_id)` UNIQUE の既存行に対し `score` だけ更新し、`rejected_at`/`kind` は上書きしない）。新規の (info,target) 組だけ新たに auto 生成する。
 - **実装状況（2026-09-28・N-TC-149〜155）＝双方向とも実装済み**。
   - **情報保存トリガ（`POST`/`PATCH /info-items`）**＝`derive.token_cosine`（トークン頻度 cosine）で候補成果物（published アイデア／非削除クエスト・コンセプト／前提＝`repository.list_candidate_targets`）との一致度を計算し、閾値（`_AUTO_LINK_THRESHOLD`）＋上位 N（`_AUTO_LINK_TOP_N`）で新規 (info,target) 組に `origin=auto`/`kind=related`/`score` を生成、既存 auto は `score` のみ更新（人の `kind`/`rejected_at`/`disposition` を保持）。
   - **成果物保存トリガ（逆方向）**＝`application.recompute_auto_links_for_target(ts, type, id)`＝アイデア**公開**/更新（`ideas.application`）・コンセプト**作成**/更新（`concepts.application`）でフック。当該成果物のテキストと**既存情報の保存済みトークン**（`repository.all_info_tokens`）で一致度を計算し同じ規則で upsert。候補外（下書きアイデア等＝`get_target_text` が None）は no-op。
-  - トークンは情報側は永続（`info_tokens`）・成果物側は都度抽出（`entity_tokens` 恒久化＝将来最適化）。MVP はキーワード cosine（埋め込み類似は Phase2）。
+  - トークンは情報・成果物とも `entity_tokens`（`owner_type` 別）に永続（旧 `info_tokens` は撤去済み＝migration 0065・§5.36）。MVP はキーワード cosine（埋め込み類似は Phase2）。
 - **反証の揺さぶり（実装済み・2026-09-21）**＝`info_links.kind=refuting` への遷移（`PATCH`）または `refuting` 起票（`POST`）で post-commit＝H 通知 **`info_refuting_raised`**（新設・catalog 追加済）を dispatch。宛先＝ideas なら作成者＋評価者（投票者）＋クエスト管理者（owner/quest_admin）／quests なら owner＋quest_admin／concepts・assumptions は未実装ドメイン＝宛先なし（no-op）。付けた本人は除外・棄却済みは揺さぶらない。ref は ideas→`ref_idea_id`／quests→`ref_quest_id`（通知から成果物へ遷移）。**要再評価は通知のみ（MVP）**＝成果物側の再評価フラグ/リセット（コンセプト機能 §3.5）は今後。1 情報の反証 → 1 前提 → 複数コンセプトへ波及。
 - **MVP＝キーワード/TF-IDF**／**Phase2＝埋め込みベクトル（意味的類似）・矛盾の自動検出（LLM 支援は別途コスト/データ保護判断）**。
 
