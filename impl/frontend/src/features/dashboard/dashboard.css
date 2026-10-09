@@ -45,6 +45,15 @@
 .dash-page .section-head h2 { font-size: var(--text-xl); margin: 0; }
 /* 主要セクション間の余白（直接の子セクションのみ＝dash-top 内の hero→rank 隣接には効かせない）。 */
 .dash-page > section + section { margin-top: var(--space-10); }
+/* トップレベルのゾーン境界を一律 space-10 に統一（パネル間の上下余白を揃える）。
+   Zone D/E/B は <section> なので上の section+section で space-10 が効くが、Zone C(row1/row2)=dash-discuss/
+   dash-actrow と Zone A=dash-top は <div> ラッパのため .stack（space-4）になり、B→C・C内・C→A の隙間だけ
+   小さくなって不揃いだった。これら div ゾーンにも同じ space-10 を与える（グリッド/ブロックとも sibling 余白は
+   相殺しないので実寸 space-10）。先頭の挨拶（.dash-greeting）→Zone D は .stack の tight な余白のまま（挨拶は
+   パネルではないため）。 */
+.dash-page > .dash-discuss,
+.dash-page > .dash-actrow,
+.dash-page > .dash-top { margin-top: var(--space-10); }
 
 /* 参加中クエスト（quest-card 系は design-system.css の共有クラス＝SC-01/SC-10/SC-12 一貫） */
 .dash-page .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
@@ -102,7 +111,7 @@
 .dash-page .follow-frozen-note { margin-top: var(--space-2); }
 
 /* C キャッチアップ row1＝議論タブカード（💬新着/🕒最近を1枚に集約）＋🔔最近の通知の2カラム（モック Zone C 一致）。
-   row2 のチームアクティビティは .dash-actrow（全幅・既定ブロック）で .stack の余白に従う。
+   row2 のチームアクティビティは .dash-actrow（全幅・既定ブロック）。ゾーン境界の上下余白は上の統一ルールで space-10。
    align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。
    align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。
    minmax(0,1fr)＝1fr の暗黙 min-width:auto が nowrap 子（.unread-item__title 等）で
