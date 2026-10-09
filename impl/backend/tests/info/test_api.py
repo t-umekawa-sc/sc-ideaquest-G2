@@ -100,12 +100,14 @@ def _csrf(client) -> dict:
 
 def _delete_info(db_identifier, info_id):
     """作成した情報の後始末（attachments/tokens/links/revisions/item を物理削除）。"""
-    from app.tenant.info.orm import InfoAttachment, InfoItem, InfoItemRevision, InfoLink, InfoToken
+    from app.tenant.info.orm import InfoAttachment, InfoItem, InfoItemRevision, InfoLink
+    from app.tenant.tokens.orm import EntityToken
     import uuid as _uuid
     iid = _uuid.UUID(info_id)
     with get_tenant_session(db_identifier) as ts:
         ts.execute(InfoAttachment.__table__.delete().where(InfoAttachment.info_item_id == iid))
-        ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
+        ts.execute(EntityToken.__table__.delete().where(
+            EntityToken.owner_type == "info", EntityToken.owner_id == iid))
         ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == iid))
         # 版1を作成時に必ず記録するようになった（N-TC-147）＝FK 順序で revisions を先に消す。
         ts.execute(InfoItemRevision.__table__.delete().where(InfoItemRevision.info_item_id == iid))

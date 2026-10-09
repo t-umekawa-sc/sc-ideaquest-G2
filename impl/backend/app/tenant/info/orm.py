@@ -5,7 +5,8 @@
   `body_text` は平文派生（検索/トークン化/要約）、`summary` は抽出型要約の派生。続報は `parent_info_id` 自己参照。
 - `info_item_categories`＝情報カテゴリ（#8・複数可 M:N・§5.34）。
 - `info_links`＝情報↔成果物（ideas/concepts/quests/assumptions）の動的リンク（多態・関連/裏付け/反証・§5.35）。
-- `info_tokens`＝本文トークン派生（janome・ワードクラウド/類似度・§5.36）。
+- 本文トークン派生（janome・ワードクラウド/類似度・§5.36b）＝owner 非依存の `entity_tokens`
+  （`app/tenant/tokens/orm.py EntityToken`・owner_type='info'）へ一本化。旧 `info_tokens` は撤去（migration 0065）。
 - `info_curators`＝情報判定権限（会社/テナント単位・§5.37）。
 
 enum（info_status/priority/... ）は §5.3 と同方針で会社DBでも String で持つ（DB enum 型は使わない）。
@@ -118,15 +119,8 @@ class InfoLink(CompanyBase):
     disposed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class InfoToken(CompanyBase):
-    __tablename__ = "info_tokens"
-    __table_args__ = (UniqueConstraint("info_item_id", "token", name="uq_info_tokens"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    info_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("info_items.id"), nullable=False)
-    token: Mapped[str] = mapped_column(Text, nullable=False)
-    weight: Mapped[Decimal | None] = mapped_column(Numeric(6, 4), nullable=True)
-    count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+# 旧 `info_tokens`（InfoToken）は撤去（migration 0065）＝トークンは owner 非依存の `entity_tokens`
+# （`app/tenant/tokens/orm.py EntityToken`・owner_type='info'）へ一本化（§5.36b）。保存/読取とも entity_tokens。
 
 
 class InfoItemRevision(CompanyBase):

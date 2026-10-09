@@ -114,7 +114,8 @@ def test_n_tc_009_roots_only(info_env):
 
 def test_n_tc_013_create_info_item(info_env):
     """N-TC-013: create_info_item＝status=raw・created_by 正・info_tokens 保存。"""
-    from app.tenant.info.orm import InfoItem, InfoToken
+    from app.tenant.info.orm import InfoItem
+    from app.tenant.tokens.orm import EntityToken
     with get_tenant_session(info_env.db_identifier) as ts:
         item = repo.create_info_item(ts, created_by_id=info_env.user_id, title="新規メモ",
                                      body_html="<p>本文</p>", body_text="本文", summary="本文")
@@ -129,7 +130,8 @@ def test_n_tc_013_create_info_item(info_env):
             assert {t["token"] for t in repo.tokens_top(ts, iid, limit=10)} == {"本文", "テスト"}
     finally:
         with get_tenant_session(info_env.db_identifier) as ts:
-            ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
+            ts.execute(EntityToken.__table__.delete().where(
+                EntityToken.owner_type == "info", EntityToken.owner_id == iid))
             ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
             ts.commit()
 
@@ -268,3 +270,31 @@ def test_n_tc_008_word_cloud(info_env):
     assert tokens[0]["weight"] == 1.0              # 最頻値を 1.0 に正規化
     assert "生成ai" in toks and "競合" in toks and "需要" in toks  # フィクスチャ token が集計に含まれる
     assert "アーカイブ語" not in toks               # archived の token は除外
+
+
+def test_n_tc_334_no_legacy_info_tokens(info_env):
+    """N-TC-334（DFT）: トークン保存先は entity_tokens 一本（旧 info_tokens/InfoToken 撤去）・保存語が word_cloud に反映。
+
+    回帰＝bootstrap seed が旧 `info_tokens` に書き、読取（word_cloud）は `entity_tokens` を見るため、
+    seed/デモ会社でワードクラウドが空になっていた不具合の再発防止（§5.36b・DFT）。
+    """
+    import app.tenant.info.orm as info_orm
+    assert not hasattr(info_orm, "InfoToken")  # dead legacy ORM は撤去済み（トークンは entity_tokens 一本）
+    from app.tenant.info.orm import InfoItem
+    from app.tenant.tokens.orm import EntityToken
+    with get_tenant_session(info_env.db_identifier) as ts:
+        item = repo.create_info_item(ts, created_by_id=info_env.user_id, title="雲メモ",
+                                     body_html="<p>x</p>", body_text="x", summary="x")
+        ts.flush()
+        repo.replace_tokens(ts, item.id, [("雲語クラウド", 4)])  # 正規の書込経路（entity_tokens）
+        ts.commit()
+        iid = item.id
+    try:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            assert any(t["token"] == "雲語クラウド" for t in repo.word_cloud(ts, limit=80))  # 読取=書込一致
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(EntityToken.__table__.delete().where(
+                EntityToken.owner_type == "info", EntityToken.owner_id == iid))
+            ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
+            ts.commit()

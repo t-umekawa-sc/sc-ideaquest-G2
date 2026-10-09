@@ -499,7 +499,8 @@ def seed_demo_info(db_identifier: str | None = None) -> None:
     from datetime import datetime, timezone
     from decimal import Decimal
 
-    from app.tenant.info.orm import InfoItem, InfoItemCategory, InfoLink, InfoToken
+    from app.tenant.info.orm import InfoItem, InfoItemCategory, InfoLink
+    from app.tenant.tokens.orm import EntityToken
 
     s = get_settings()
     if not _seed_demo_enabled(s.app_env):
@@ -596,7 +597,9 @@ def seed_demo_info(db_identifier: str | None = None) -> None:
         }
         for iid, toks in tokens.items():
             for tok, cnt in toks:
-                ts.add(InfoToken(info_item_id=iid, token=tok, count=cnt))
+                # トークンは entity_tokens（owner_type='info'）へ＝ライブ書込経路（repo.replace_tokens）と一致。
+                # 旧 info_tokens 直書きは読取（word_cloud/類似度=entity_tokens）とズレてワードクラウドが空になった（DFT・N-TC-334）。
+                ts.add(EntityToken(owner_type="info", owner_id=iid, token=tok, count=cnt))
         ts.commit()
         print(f"[bootstrap] seeded info-input demo in {db_identifier}")
 
@@ -615,7 +618,8 @@ def seed_demo_info_filler(db_identifier: str | None = None) -> None:
     """
     from datetime import datetime, timedelta, timezone
 
-    from app.tenant.info.orm import InfoItem, InfoToken
+    from app.tenant.info.orm import InfoItem
+    from app.tenant.tokens.orm import EntityToken
 
     s = get_settings()
     if not _seed_demo_enabled(s.app_env):
@@ -662,7 +666,7 @@ def seed_demo_info_filler(db_identifier: str | None = None) -> None:
                 scope="internal" if n % 2 else "external", impact_class=impacts[n % len(impacts)],
                 created_at=base - timedelta(days=n)))
             for tok in (vocab[n % len(vocab)], vocab[(n + 7) % len(vocab)]):
-                ts.add(InfoToken(info_item_id=fid, token=tok, count=1))
+                ts.add(EntityToken(owner_type="info", owner_id=fid, token=tok, count=1))
             added += 1
         ts.commit()
     if added:

@@ -29,6 +29,7 @@
 | N-TC-015 | int | 版スナップショット／カテゴリ置換 | 情報1件 | `add_revision` ×2／`replace_categories` ×2 | revision が 1→2 の連番／categories は後の集合で全置換（重複なし） | N.2／§5.34／§12 |
 | N-TC-016 | int | 手動リンク作成／重複検出 | 情報1件 | `create_link`／`find_link`（同一 (info,target,type)） | 作成＝origin=manual・既定 kind=related／同一組は既存を検出 | N.3／§5.35 |
 | N-TC-017 | int | リンク候補のタイトル検索 | quest/idea を seed | `search_link_candidates(target_type,q)` | 該当成果物を `{target_type,target_id,title}` で返す／未実装ドメイン(concepts)は空 | N.3 |
+| N-TC-334 | int | **回帰**＝トークン保存先は `entity_tokens` 一本（旧 `info_tokens`/`InfoToken` 撤去）・保存語がワードクラウドに反映 | 情報1件＋`replace_tokens` | `InfoToken` ORM 不在を確認＋`word_cloud` | `app.tenant.info.orm` に `InfoToken` が無い（dead legacy 撤去）／保存した語が `word_cloud` に出る（読取=書込=entity_tokens 一致） | N.6／§5.36b／DFT（seed が旧表に書き word_cloud が空になる不具合の再発防止） |
 
 ## 2. 一覧・ワードクラウド API（SC-50・N.1）
 
