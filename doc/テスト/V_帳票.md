@@ -28,6 +28,7 @@
 | V-TC-105 | api | 未対応 `format`＝422 | 会社管理者 | `?period=2026-09&format=docx` | 422・`unsupported_format`・field=format | V.1 |
 | V-TC-106 | api | 機能オフ＝`REPORT_RENDERER=none` で 503 | `REPORT_RENDERER=none` | 正常 GET | 503・`report_disabled`（フロントはボタン非活性） | V.1・設計 §12 |
 | V-TC-107 | api | バックエンド不達＝`jasper` 選択時に Jasper 到達不可で 502 | `REPORT_RENDERER=jasper`・Fake が `ReportUnavailable` | 正常 GET | 502・`report_backend_unavailable`（再試行可メッセージ） | V.1 |
+| V-TC-108 | api | 監査＝請求書 DL で `billing.invoice_download` が記録（誰が/会社/期間/形式・本文/金額は残さない） | 会社管理者・FakeRenderer | 正常 GET | system_audit に `billing.invoice_download` 1件・detail に company_id/period/format・明細/金額なし | 設計 §17.5 G3 |
 
 ## 3. フロント連携・受入（SC-92・設計 §13）
 

@@ -18,7 +18,7 @@ import { AccountSection, CapabilitiesSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
-import { deleteCompanyIcon, getCompany, provisionCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
+import { deleteCompanyIcon, getCompany, invoiceUrl, provisionCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
 import "../companies.css";
 
@@ -36,6 +36,11 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
   const [provisioning, setProvisioning] = useState(false);
   // 一致率しきい値の表示値（%・スライダー↔数値の共有 state）。会社ロード/保存で server 値に同期。
   const [thPct, setThPct] = useState(12);
+  // 使用料請求書の対象期間（YYYY-MM・ドメイン V.1）。既定は当月。
+  const [invoicePeriod, setInvoicePeriod] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const ctxRef = useRef<HTMLElement>(null);
@@ -259,6 +264,41 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
           <Button type="button" variant="primary" onClick={onProvision} loading={provisioning}>
             {provisioning ? "準備中…" : company.status === "active" ? "会社DBを再準備" : "会社DBを作成して有効化"}
           </Button>
+        </div>
+      </section>
+
+      {/* 使用料請求書（ドメイン V.1・JasperReports 疎結合連携）＝期間を選んで PDF をダウンロード。
+          REPORT_RENDERER=none のデプロイでは機能オフ＝ボタン非活性＋ツールチップ（設計 §13・「押せない方が親切」）。 */}
+      <div className="section-head"><h2>使用料請求書</h2></div>
+      <section className="card" aria-label="使用料請求書">
+        <p className="admin-sub" style={{ marginTop: 0 }}>
+          対象期間を選んで使用料請求書の PDF をダウンロードします。帳票はサーバー経由で生成され、同一オリジンの
+          ダウンロードとして保存されます。{!company.report_enabled && <strong>（現在この環境では帳票機能が無効です）</strong>}
+        </p>
+        <div className="row" style={{ alignItems: "center", gap: "var(--space-3)" }}>
+          <label htmlFor="invoice-period">対象期間</label>
+          <input
+            id="invoice-period"
+            type="month"
+            className="input"
+            value={invoicePeriod}
+            onChange={(e) => setInvoicePeriod(e.target.value)}
+            disabled={!company.report_enabled}
+          />
+          <span title={company.report_enabled ? undefined : "この環境では帳票機能が無効です"}>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!company.report_enabled || !invoicePeriod}
+              onClick={() => {
+                if (company.report_enabled && invoicePeriod) {
+                  window.location.href = invoiceUrl(companyId, invoicePeriod);
+                }
+              }}
+            >
+              請求書 PDF をダウンロード
+            </Button>
+          </span>
         </div>
       </section>
 

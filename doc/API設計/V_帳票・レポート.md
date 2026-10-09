@@ -2,7 +2,7 @@
 
 > 横断規約＝[API設計 README](README.md)（§1.4 認証/CSRF・§1.5 テナント分離・§1.10 画像/ファイル）。設計元＝[帳票連携(JasperReports) 設計](../設計ドラフト/帳票連携(JasperReports)_設計.md)。画面＝[SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md)（請求書ダウンロード）。
 >
-> **状態＝ドラフト（実装未着手・2026-10-08 方針確定）**。帳票は**レンダラ port（`infra/reports`）**を介した疎結合構成＝「帳票データの組み立て（自前ドメイン）」と「描画（Jasper／純 Python fallback）」を分離。`REPORT_RENDERER=jasper|fallback|none` で着脱（§V.4）。**バックエンドが唯一の窓口**で、Jasper はブラウザに露出しない（S2S・内部ネットワーク）。
+> **状態＝実装済み（2026-10-09）**。帳票は**レンダラ port（`infra/reports`）**を介した疎結合構成＝「帳票データの組み立て（自前ドメイン `control_plane/billing/domain/invoice.py`）」と「描画（Jasper／純 Python fallback）」を分離。`REPORT_RENDERER=jasper|fallback|none` で着脱（§V.4）。**バックエンドが唯一の窓口**で、Jasper はブラウザに露出しない（S2S・内部ネットワーク `jasper_net`・公開ポート無）。実 Jasper サービス＝`impl/jasper`（JSON データプッシュ・`POST /render`・`X-Report-Secret`）。dev 既定 `REPORT_RENDERER=jasper`＝実 Jasper 描画の PDF を返す（エンドツーエンド確認済み）。TC＝[テスト V_帳票](../テスト/V_帳票.md)（V-TC-101〜108・201〜204・210/211 green）。
 
 ## V.0 アクター・認可スコープ
 

@@ -184,6 +184,7 @@ class CompanyDetail(BaseModel):
     alignment_method: str  # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）
     access_mode: str  # 公開/非公開モード（FR-48 §8.0・private/public・system_admin のみ切替）
     account_count: int
+    report_enabled: bool = True  # 帳票機能の可否（REPORT_RENDERER!=none・SC-92 請求書ボタンの活性制御・設計 §13）
 
 
 class CompanyCreateRequest(BaseModel):

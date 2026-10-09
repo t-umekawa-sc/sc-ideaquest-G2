@@ -981,6 +981,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/companies/{company_id}/billing/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Invoice
+         * @description 使用料請求書 PDF を帳票レンダラで生成し attachment でストリーム返却（V.1・同期）。
+         *
+         *     `period`（`YYYY-MM`・必須）・`format`（`pdf` 既定）。他社 `{id}` は存在秘匿で 404。
+         */
+        get: operations["download_invoice_api_v1_admin_companies__company_id__billing_invoice_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests": {
         parameters: {
             query?: never;
@@ -5931,6 +5953,11 @@ export interface components {
             access_mode: string;
             /** Account Count */
             account_count: number;
+            /**
+             * Report Enabled
+             * @default true
+             */
+            report_enabled: boolean;
         };
         /**
          * CompanyListItem
@@ -13154,6 +13181,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailChangeConfirmedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_invoice_api_v1_admin_companies__company_id__billing_invoice_get: {
+        parameters: {
+            query: {
+                period: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

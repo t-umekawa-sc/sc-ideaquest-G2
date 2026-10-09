@@ -198,6 +198,15 @@ class Settings(BaseSettings):
     recommend_default_limit: int = 3              # パネル既定件数（Zone D 最大3）
     recommend_max_limit: int = 10                 # limit の上限（クランプ）
 
+    # 帳票・レポート（ドメインV・JasperReports 疎結合連携・API設計 V.4）。帳票基盤 infra/reports は
+    # LLM ゲートウェイ（infra/llm）と同作法＝「描画は差し替え可能な port」。`REPORT_RENDERER` で着脱し、
+    # Jasper は内部ネットワーク限定の純レンダラ（データ・プッシュ JSON・S2S 秘密）。設計 §10/§17.5。
+    report_renderer: str = "none"                  # jasper / fallback（純Python）/ none（機能オフ・ボタン非活性）
+    jasper_base_url: str = "http://jasper:8000"    # 内部エンドポイント（公開ポート無・専用 network）
+    jasper_timeout_seconds: float = 30.0           # Jasper 呼び出しのタイムアウト（同期ストリーム）
+    jasper_shared_secret: str = ""                 # S2S 認証ヘッダ X-Report-Secret（本番は compose secrets ファイル供給・§17.5 G1）
+    jasper_max_response_bytes: int = 25_000_000    # 受領 PDF の応答サイズ上限（SSRF/DoS 緩和・§17.5 軽微a）
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

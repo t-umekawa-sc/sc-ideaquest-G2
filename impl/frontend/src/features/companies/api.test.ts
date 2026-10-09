@@ -3,7 +3,7 @@
 // 正＝doc/API設計/README.md §1.8.1・backend GET /admin/companies のパラメータ名。
 import { describe, expect, it } from "vitest";
 import type { QueryState } from "@/components/ui";
-import { companiesCsvUrl, companiesQueryParams } from "./api";
+import { companiesCsvUrl, companiesQueryParams, invoiceUrl } from "./api";
 
 // 既定の QueryState（各テストで必要分だけ上書き）。
 function state(overrides: Partial<QueryState> = {}): QueryState {
@@ -83,6 +83,17 @@ describe("companiesQueryParams（B-TC-136）", () => {
     expect(companiesQueryParams(state({ pinIds: ["a", "b"] })).get("pin_ids")).toBe("a,b");
     const six = companiesQueryParams(state({ pinIds: ["1", "2", "3", "4", "5", "6"] }));
     expect(six.get("pin_ids")).toBe("1,2,3,4,5");
+  });
+});
+
+describe("invoiceUrl（V-TC-210・支援 unit）", () => {
+  it("同一オリジン /api/v1・period と format=pdf を付す（Jasper URL は出さない）", () => {
+    const url = invoiceUrl("c-123", "2026-09");
+    expect(url.startsWith("/api/v1/admin/companies/c-123/billing/invoice?")).toBe(true);
+    const qs = new URLSearchParams(url.split("?")[1]);
+    expect(qs.get("period")).toBe("2026-09");
+    expect(qs.get("format")).toBe("pdf");
+    expect(url.includes("jasper")).toBe(false);
   });
 });
 

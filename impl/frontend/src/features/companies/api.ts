@@ -103,6 +103,13 @@ export function companiesCsvUrl(state: QueryState, columns: string[]): string {
   return `/api/v1/admin/companies?${qs.toString()}`;
 }
 
+// 使用料請求書の PDF ダウンロード URL（ドメイン V.1・SC-92）。CSV エクスポートと同じ seam＝同一オリジンの
+// GET ナビゲーション（Cookie 認証・CSRF 不要）。Jasper の URL はフロントに出さない（backend が唯一の窓口）。
+export function invoiceUrl(companyId: string, period: string): string {
+  const qs = new URLSearchParams({ period, format: "pdf" });
+  return `/api/v1/admin/companies/${companyId}/billing/invoice?${qs.toString()}`;
+}
+
 // 会社を新規作成（B.1）。`status=suspended` で作成される。CSRF は apiFetch が付与。
 export function createCompany(input: CompanyCreateInput): Promise<CompanyDetail | null> {
   return apiFetch<CompanyDetail>("/admin/companies", {

@@ -1,0 +1,6 @@
+# Jasper レンダリングサービスの依存（版ピン＝再現性・§17.1 D4）。
+# 全角スペースやインラインコメントの混入はしない（サンプル requirements.txt の D2 を踏襲しない）。
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.10.4
+pyreportjasper==2.1.4

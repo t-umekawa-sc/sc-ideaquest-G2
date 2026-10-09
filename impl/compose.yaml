@@ -175,10 +175,20 @@ services:
       RECOMMEND_ACTIVE_WINDOW_DAYS: ${RECOMMEND_ACTIVE_WINDOW_DAYS:-30}
       RECOMMEND_DEFAULT_LIMIT: ${RECOMMEND_DEFAULT_LIMIT:-3}
       RECOMMEND_MAX_LIMIT: ${RECOMMEND_MAX_LIMIT:-10}
+      # 帳票・レポート（ドメインV・JasperReports 疎結合連携・API設計 V.4）。dev 既定は jasper（下の jasper
+      # サービスへ内部 network で到達）。Jasper 無しでも動かすなら fallback、機能オフは none。
+      # S2S 秘密は dev=env（既存の SMTP 等と同様）／本番は compose `secrets:` ファイルマウントへ（設計 §17.5 G1）。
+      REPORT_RENDERER: ${REPORT_RENDERER:-jasper}
+      JASPER_BASE_URL: ${JASPER_BASE_URL:-http://jasper:8000}
+      JASPER_TIMEOUT_SECONDS: ${JASPER_TIMEOUT_SECONDS:-30}
+      JASPER_SHARED_SECRET: ${JASPER_SHARED_SECRET:-dev-jasper-secret}
     volumes:
       - ./logs:/var/log/ideaquest   # ホスト impl/logs にログを出力（gitignore・解析用）。prod は永続先へ。
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - default       # db/redis/minio/frontend 等（既存の相互到達を維持）
+      - jasper_net     # 内部専用＝Jasper への到達はここだけ（G2・外部隔離）
     depends_on:
       db:
         condition: service_healthy
@@ -188,6 +198,7 @@ services:
         condition: service_started
       minio:
         condition: service_started
+      # jasper は depends_on に入れない＝疎結合（Jasper 停止でも backend は起動・該当機能のみ 502/非活性）。
 
   # account_sync_outbox 常駐ワーカ（管理DB→会社DB users ミラー・§4.6・両プレーンを跨ぐ唯一の実行主体）。
   # backend と同一イメージ。bootstrap/uvicorn は起動せず worker ループのみ実行（entrypoint を上書き）。
@@ -260,7 +271,25 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  # 帳票レンダリングサービス（ドメインV・JasperReports・設計 §10/§17）。内部 S2S 専用＝公開ポートを張らず
+  # `jasper_net`（internal）にのみ接続＝到達できるのは backend だけ（G2・外部隔離／SSRF 面の縮小）。
+  # Java(JasperReports)＋Python(FastAPI)。jrxml はイメージにベイク（volumes 無し＝backend と同方針）。
+  jasper:
+    build: ./jasper
+    environment:
+      # S2S 共有シークレット（backend と一致・dev は env／本番は secrets ファイルマウントへ・設計 §17.5 G1）。
+      JASPER_SHARED_SECRET: ${JASPER_SHARED_SECRET:-dev-jasper-secret}
+    networks:
+      - jasper_net   # internal のみ＝インターネット/他サービスへ到達不可（公開ポートも張らない）
+    # ヘルスチェックは Dockerfile の HEALTHCHECK を使用（/health を標準ライブラリで叩く）。
+
 volumes:
   db_data:
   minio_data:
   ollama_data:
+
+networks:
+  default:
+  # 内部専用ネットワーク（外部到達不可）＝backend ↔ jasper の S2S 経路を隔離する（設計 §17.5 G2）。
+  jasper_net:
+    internal: true
