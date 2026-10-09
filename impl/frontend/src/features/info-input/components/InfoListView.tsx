@@ -339,17 +339,17 @@ export function InfoListView() {
               const canOp = manageTabs && !t.is_system;
               return (
                 <span key={t.id} className="info-subtab-wrap">
-                  <button type="button" role="tab" aria-selected={active}
-                    className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
-                    {t.name}<span className="info-subtab__n">{t.count}</span>
-                  </button>
-                  {/* アクションメニュー（⋮）はタブ名の右側・テーブルと同じ RowMenu（ホバーで出現・CSS で非予約タブのみ）。 */}
+                  {/* アクションメニュー（⋮）はタブ名の左側・テーブルと同じ RowMenu（ホバーで出現・CSS で非予約タブのみ）。 */}
                   {canOp && (
                     <RowMenu label={`${t.name} の操作`} items={[
                       { label: "編集", onClick: () => setTabForm({ mode: "edit", tab: t }) },
                       { label: "アーカイブ", danger: true, onClick: () => archiveTab(t) },
                     ]} />
                   )}
+                  <button type="button" role="tab" aria-selected={active}
+                    className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
+                    {t.name}<span className="info-subtab__n">{t.count}</span>
+                  </button>
                 </span>
               );
             })}
