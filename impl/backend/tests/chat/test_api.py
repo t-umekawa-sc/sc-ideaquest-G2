@@ -5,11 +5,14 @@ seed 一般ユーザー ACME-01 でログインし、会社DB にクエスト＋
 """
 from __future__ import annotations
 
+import json
 import uuid
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
+
+from app.core.richtext import pm_to_text
 
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
@@ -40,10 +43,21 @@ def _login_seed(client) -> None:
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
 
 
+def _doc(text: str) -> dict:
+    """plain テキスト → PM-JSON の doc（TT5・チャット本文は PM-JSON 正本）。空文字は空段落。"""
+    content = [{"type": "text", "text": text}] if text else []
+    return {"type": "doc", "content": [{"type": "paragraph", "content": content}]}
+
+
+def _body_text(m: dict) -> str:
+    """メッセージ DTO の body（PM-JSON）を平文化（検証用）。"""
+    return pm_to_text(m.get("body"))
+
+
 def _post(client, idea_id, *, body=None, mentions=None, quotes=None, files=None):
     data = {"idea_id": str(idea_id)}
     if body is not None:
-        data["body"] = body
+        data["body"] = json.dumps(_doc(body))  # multipart は文字列＝PM-JSON を JSON 直列化して送る
     if quotes is not None:
         data["quoted_message_ids"] = [str(q) for q in quotes]
     if mentions is not None:
@@ -166,7 +180,7 @@ def test_e_tc_102_post_message_and_xp(client, env):
     mid = r.json()["id"]
     assert _activity_count(env, reason="chat", ref_id=uuid.UUID(mid)) == 1
     listed = client.get(CHAT(idea)).json()["data"]
-    assert [m["body"] for m in listed] == ["こんにちは"]
+    assert [_body_text(m) for m in listed] == ["こんにちは"]
 
 
 def test_e_tc_103_empty_message(client, env):
@@ -230,15 +244,15 @@ def test_e_tc_109_edit(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())
     mid = _post(client, idea, body="旧").json()["id"]
-    r = client.patch(f"{MSGS}/{mid}", data={"body": "新"}, headers=_csrf(client))
-    assert r.status_code == 200 and r.json()["is_edited"] is True and r.json()["body"] == "新"
+    r = client.patch(f"{MSGS}/{mid}", data={"body": json.dumps(_doc("新"))}, headers=_csrf(client))
+    assert r.status_code == 200 and r.json()["is_edited"] is True and _body_text(r.json()) == "新"
     # 他人のメッセージは編集不可（他ユーザーの投稿を seed）。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        other_msg = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="他")
+        other_msg = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body=_doc("他"))
         oid = other_msg.id
         ts.commit()
-    assert client.patch(f"{MSGS}/{oid}", data={"body": "z"}, headers=_csrf(client)).status_code == 403
+    assert client.patch(f"{MSGS}/{oid}", data={"body": json.dumps(_doc("z"))}, headers=_csrf(client)).status_code == 403
 
 
 def test_e_tc_109b_edit_replaces_quotes(client, env):
@@ -249,11 +263,11 @@ def test_e_tc_109b_edit_replaces_quotes(client, env):
     b = _post(client, idea, body="親B").json()["id"]
     mid = _post(client, idea, body="本文", quotes=[a]).json()["id"]  # 最初は A を引用
     # 引用を [A] → [A,B] に置換。
-    r = client.patch(f"{MSGS}/{mid}", data={"body": "本文2", "quoted_message_ids": [a, b]}, headers=_csrf(client))
+    r = client.patch(f"{MSGS}/{mid}", data={"body": json.dumps(_doc("本文2")), "quoted_message_ids": [a, b]}, headers=_csrf(client))
     assert r.status_code == 200, r.text
     assert {q["excerpt"] for q in r.json()["quotes"]} == {"親A", "親B"}
     # quoted_message_ids 省略の編集＝引用は不変（本文だけ更新）。
-    r2 = client.patch(f"{MSGS}/{mid}", data={"body": "本文3"}, headers=_csrf(client))
+    r2 = client.patch(f"{MSGS}/{mid}", data={"body": json.dumps(_doc("本文3"))}, headers=_csrf(client))
     assert r2.status_code == 200 and {q["excerpt"] for q in r2.json()["quotes"]} == {"親A", "親B"}
     # 別アイデアのメッセージを引用に足すと 422。
     other = env.make_idea(quest_id=env.make_quest())
@@ -282,7 +296,7 @@ def test_e_tc_223_quote_no_notify_mention_notifies(client, env):
     # other の発言（＝この後 user に引用される「他人のメッセージ」）を直接 seed。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        mx_id = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="other の発言").id
+        mx_id = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body=_doc("other の発言")).id
         ts.commit()
 
     def _types(recipient, ref_msg):
@@ -331,13 +345,13 @@ def test_e_tc_228_edit_notifies_only_added_mentions(client, env):
         assert mentions_of(u1, mid) == 1 and mentions_of(u2, mid) == 0
 
         # 編集で [U1, U2] へ差し替え → 追加 U2 に 1件・不変 U1 は再通知なし。
-        r = client.patch(f"{MSGS}/{mid}", data={"body": "編集1", "mentions": [str(u1), str(u2)]}, headers=_csrf(client))
+        r = client.patch(f"{MSGS}/{mid}", data={"body": json.dumps(_doc("編集1")), "mentions": [str(u1), str(u2)]}, headers=_csrf(client))
         assert r.status_code == 200, r.text
         assert mentions_of(u2, mid) == 1  # 追加分に通知
         assert mentions_of(u1, mid) == 1  # 不変は再通知しない（編集スパム防止）
 
         # 編集で [U2] のみ（U1 を外す）→ 外した U1 は通知増えず取消もされない・U2 は不変で増えない。
-        r2 = client.patch(f"{MSGS}/{mid}", data={"body": "編集2", "mentions": [str(u2)]}, headers=_csrf(client))
+        r2 = client.patch(f"{MSGS}/{mid}", data={"body": json.dumps(_doc("編集2")), "mentions": [str(u2)]}, headers=_csrf(client))
         assert r2.status_code == 200, r2.text
         assert mentions_of(u1, mid) == 1  # 外しても取消しない（決定A・1件のまま）
         assert mentions_of(u2, mid) == 1  # 不変は再通知しない
@@ -366,7 +380,7 @@ def test_e_tc_110_delete(client, env):
     # owner は他人の投稿も削除可。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        om = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="他人")
+        om = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body=_doc("他人"))
         oid = om.id
         ts.commit()
     assert client.delete(f"{MSGS}/{oid}", headers=_csrf(client)).status_code == 200
@@ -573,7 +587,7 @@ def test_e_tc_224_magic_reaction_notifies_author_not_self(client, env):
     _post(client, idea_a, body="口火")  # チャットグループ生成
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea_a)
-        m_other = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="other の発言").id
+        m_other = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body=_doc("other の発言")).id
         ts.commit()
     r = client.post(f"{MSGS}/{m_other}/reactions", json={"type": "magic", "spell_id": str(sid)}, headers=_csrf(client))
     assert r.status_code == 200, r.text

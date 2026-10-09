@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
+from app.core.richtext import pm_to_html, pm_to_text, sanitize_pm
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as repo
@@ -137,8 +138,8 @@ def _create_message_core(ts, thread, quest, user, *, body, quoted_message_ids, m
     """
     from app.infra.storage import MAX_ATTACHMENTS_PER_IDEA, get_storage, validate_attachment_upload
 
-    body = (body or "").strip()
-    if not body and not files:
+    body = sanitize_pm(body)  # PM-JSON を保存境界で無害化（TT5・str/JSON いずれも受容）
+    if not pm_to_text(body) and not files:
         raise AppError(422, "validation_error", detail="本文か添付が必要です", errors=[{"field": "body", "code": "empty_message"}])
     quote_ids = _validate_quotes(ts, thread.id, quoted_message_ids)
     mentions = _validate_mentions(ts, quest, mention_ids)
@@ -220,8 +221,8 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
             raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])
         if body is not None:
-            new_body = body.strip()
-            if not new_body and not repo.list_attachments_for_message(ts, msg.id) and not validated:
+            new_body = sanitize_pm(body)  # PM-JSON を保存境界で無害化（TT5）
+            if not pm_to_text(new_body) and not repo.list_attachments_for_message(ts, msg.id) and not validated:
                 raise AppError(422, "validation_error", detail="本文か添付が必要です", errors=[{"field": "body", "code": "empty_message"}])
             msg.body = new_body
         added_mentions: list[uuid.UUID] = []
@@ -642,12 +643,13 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
                 quotes.append({"id": str(src.id), "author_name": "", "excerpt": "このメッセージは削除されました"})
             else:
                 a = users.get(src.author_id)
-                quotes.append({"id": str(src.id), "author_name": (a.display_name if a else ""), "excerpt": src.body[:_EXCERPT]})
+                quotes.append({"id": str(src.id), "author_name": (a.display_name if a else ""), "excerpt": pm_to_text(src.body)[:_EXCERPT]})
         out.append({
             "id": str(m.id),
             "author": _author_dto(users.get(m.author_id), m.author_id),
             "is_mine": m.author_id == viewer_id,
-            "body": m.body,
+            "body": m.body,  # PM-JSON 正本（編集復元用）
+            "body_html": pm_to_html(m.body),  # 表示用（sanitize_pm 済み・多層防御）
             "created_at": m.created_at,
             "is_edited": m.is_edited,
             "is_pinned": bool(m.is_pinned),  # FR-39 (b) 重要メッセージ

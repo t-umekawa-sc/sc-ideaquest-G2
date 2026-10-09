@@ -27,6 +27,7 @@ from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission, QuestOutcome, QuestOutcomeRevision
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
+from tests.pm import pm_doc
 
 
 def _csrf(client) -> dict:
@@ -100,7 +101,7 @@ def env():
         mid = uuid.uuid4()
         with get_tenant_session(db_identifier) as ts:
             th = chat_repo.ensure_chat_thread(ts, "idea", chat_repo.ensure_chat_group(ts, idea_id).id)
-            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=body))
+            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=pm_doc(body)))
             ts.commit()
         return mid
 
@@ -111,7 +112,7 @@ def env():
         mid = uuid.uuid4()
         with get_tenant_session(db_identifier) as ts:
             th = chat_repo.ensure_chat_thread(ts, "idea", chat_repo.ensure_chat_group(ts, idea_id).id)
-            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=body, is_pinned=True))
+            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=pm_doc(body), is_pinned=True))
             ts.commit()
         return mid
 

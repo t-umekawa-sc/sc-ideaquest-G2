@@ -39,7 +39,8 @@ class ChatMessageDTO(BaseModel):
     created_at: datetime
     deleted_at: datetime | None = None
     author: ChatAuthorDTO | None = None
-    body: str | None = None
+    body: dict | None = None  # PM-JSON 正本（編集時にエディタへ復元・TT5）
+    body_html: str | None = None  # 表示用＝pm_to_html 派生（保存時 sanitize_pm 済み）
     is_edited: bool | None = None
     is_pinned: bool = False  # FR-39 (b) 重要メッセージ（最終結果の議論の要点に集約・owner/quest_admin がピン）
     quotes: list[dict] = []  # 引用返信（複数可）＝[{id, author_name, excerpt}]

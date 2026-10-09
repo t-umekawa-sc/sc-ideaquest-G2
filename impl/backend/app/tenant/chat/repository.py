@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.orm import Session, aliased
 
+from app.core.richtext import pm_to_text
 from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, ChatThread, Reaction, ReactionEmoji, Spell, UserSpell
 from app.tenant.ideas.orm import Attachment, Idea
 
@@ -53,6 +54,7 @@ def list_message_bodies_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]
     """指定アイデア群のチャット本文（非削除・created_at 昇順・最大 limit 件）＝FR-39 (c) 自動要約の入力。
 
     要約はオンデマンド同期処理のため入力を limit で上限。超過時は直近（新しい方）優先で拾い、時系列に戻す。
+    本文は PM-JSON 正本（TT5）のため `pm_to_text` で平文化して返す（要約 LLM の入力＝平文）。
     """
     if not idea_ids:
         return []
@@ -65,7 +67,7 @@ def list_message_bodies_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]
         .order_by(ChatMessage.created_at.desc())
         .limit(limit)
     ).all()
-    return [body for body, _at in reversed(rows) if body]
+    return [t for body, _at in reversed(rows) if (t := pm_to_text(body))]
 
 
 def list_pinned_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, ChatMessage]]:

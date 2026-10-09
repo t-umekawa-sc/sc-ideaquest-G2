@@ -10,6 +10,7 @@ from app.db.tenant import get_tenant_session
 from app.tenant.solutions.orm import Project
 
 from tests.solutions.test_api import _create_standalone, _csrf, _login_seed, env  # noqa: F401
+from tests.pm import pm_body, pm_text
 
 
 def _add_task(client, pid, **body) -> dict:
@@ -23,13 +24,13 @@ def test_q_tc_130_task_chat_post_and_list(env, client):
     p = _create_standalone(client).json()
     env.track_project(p["id"])
     task = _add_task(client, p["id"]).json()
-    r = client.post(f"/api/v1/tasks/{task['id']}/chat-messages", data={"body": "はじめまして"}, headers=_csrf(client))
+    r = client.post(f"/api/v1/tasks/{task['id']}/chat-messages", data={"body": pm_body("はじめまして")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     lst = client.get(f"/api/v1/tasks/{task['id']}/chat")
     assert lst.status_code == 200, lst.text
     body = lst.json()
     assert body["thread_id"].startswith("task-") or body["thread_id"]  # thread は task ホスト
-    assert any(m.get("body") == "はじめまして" for m in body["data"])
+    assert any(pm_text(m.get("body")) == "はじめまして" for m in body["data"])
 
 
 def test_q_tc_132_recent_task_chats(env, client):
@@ -41,8 +42,8 @@ def test_q_tc_132_recent_task_chats(env, client):
     t2 = _add_task(client, p["id"], title="タスク2").json()
     _add_task(client, p["id"], title="無投稿タスク").json()  # 投稿なし＝出ない
     # t1 → t2 の順に投稿（t2 が最新）。
-    client.post(f"/api/v1/tasks/{t1['id']}/chat-messages", data={"body": "t1-1"}, headers=_csrf(client))
-    client.post(f"/api/v1/tasks/{t2['id']}/chat-messages", data={"body": "t2-1"}, headers=_csrf(client))
+    client.post(f"/api/v1/tasks/{t1['id']}/chat-messages", data={"body": pm_body("t1-1")}, headers=_csrf(client))
+    client.post(f"/api/v1/tasks/{t2['id']}/chat-messages", data={"body": pm_body("t2-1")}, headers=_csrf(client))
     r = client.get(f"/api/v1/projects/{p['id']}/recent-chats")
     assert r.status_code == 200, r.text
     items = r.json()["items"]

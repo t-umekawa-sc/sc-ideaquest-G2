@@ -26,6 +26,7 @@ from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest, QuestGroupLink, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
+from tests.pm import pm_body, pm_text
 
 REALTIME = "/api/v1/realtime"
 MSGS = "/api/v1/chat-messages"
@@ -95,12 +96,12 @@ def test_l_tc_111_subscribe_gate_ok_and_message_delivery(chatenv):
         with client.websocket_connect(REALTIME) as ws:
             ws.send_json({"op": "subscribe", "topic": f"chat:{cg}"})
             assert ws.receive_json() == {"op": "subscribed", "topic": f"chat:{cg}"}
-            r = client.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": "やあ"},
+            r = client.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": pm_body("やあ")},
                             headers=_csrf(client))
             assert r.status_code == 201, r.text
             evt = ws.receive_json()
             assert evt["topic"] == f"chat:{cg}" and evt["type"] == "chat.message.created"
-            assert evt["data"]["body"] == "やあ"
+            assert pm_text(evt["data"]["body"]) == "やあ"
 
 
 def test_l_tc_112_subscribe_gate_denied_for_non_member(chatenv, factory):
@@ -120,7 +121,7 @@ def test_l_tc_113_reaction_and_delete_delivery(chatenv):
     cg = _cg_id(chatenv)
     with TestClient(app) as client:
         _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-        mid = client.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": "m"},
+        mid = client.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": pm_body("m")},
                           headers=_csrf(client)).json()["id"]
         with client.websocket_connect(REALTIME) as ws:
             ws.send_json({"op": "subscribe", "topic": f"chat:{cg}"})
@@ -156,15 +157,15 @@ def test_l_tc_121_revoke_on_member_removal(chatenv, factory):
             ws.send_json({"op": "subscribe", "topic": f"chat:{cg}"})
             assert ws.receive_json()["op"] == "subscribed"
             # 除去前＝新着が届く（購読が有効）
-            owner.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": "before"},
+            owner.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": pm_body("before")},
                        headers=_csrf(owner))
-            assert ws.receive_json()["data"]["body"] == "before"
+            assert pm_text(ws.receive_json()["data"]["body"]) == "before"
             # owner がメンバーを除去（C.3）→ 失効シグナル
             r = owner.delete(f"/api/v1/quests/{chatenv['quest_id']}/members/{muid}",
                              headers=_csrf(owner))
             assert r.status_code == 204, r.text
             # 除去後＝新着 publish → 届かない。直後の再購読は門番で拒否（＝次に届くのは error のみ）
-            owner.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": "after"},
+            owner.post(MSGS, data={"idea_id": str(chatenv["idea_id"]), "body": pm_body("after")},
                        headers=_csrf(owner))
             ws.send_json({"op": "subscribe", "topic": f"chat:{cg}"})
             resp = ws.receive_json()

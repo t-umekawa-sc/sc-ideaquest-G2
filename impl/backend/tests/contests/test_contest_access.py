@@ -30,6 +30,7 @@ from tests.contests.test_contests import (
     _seed_db,
     _user_id,
 )
+from tests.pm import pm_body
 
 
 def _seed_published_idea(qid: str, author_uid) -> uuid.UUID:
@@ -230,12 +231,12 @@ def test_t_tc_112_vote_tier1_open_chat_tier2_approval(client, factory):
         # --- チャット（Tier2）---
         _approve_tier2(iid, _user_id(chatter["id"]))
         _login(client, SEED_COMPANY_CODE, chatter["login_id"], chatter["password"])
-        rc = client.post("/api/v1/chat-messages", data={"idea_id": str(iid), "body": "議論します"},
+        rc = client.post("/api/v1/chat-messages", data={"idea_id": str(iid), "body": pm_body("議論します")},
                          headers=_csrf(client))
         assert rc.status_code == 201, rc.text  # Tier2 承認済み＝チャット可
         # Tier2 未承認（Tier1 の voter でも）はチャット 403。
         _login(client, SEED_COMPANY_CODE, voter["login_id"], voter["password"])
-        rc2 = client.post("/api/v1/chat-messages", data={"idea_id": str(iid), "body": "入れない"},
+        rc2 = client.post("/api/v1/chat-messages", data={"idea_id": str(iid), "body": pm_body("入れない")},
                           headers=_csrf(client))
         assert rc2.status_code == 403, rc2.text
     finally:

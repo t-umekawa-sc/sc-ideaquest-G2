@@ -31,6 +31,7 @@ from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
+from tests.pm import pm_body, pm_text
 
 
 def _csrf(client) -> dict:
@@ -211,10 +212,10 @@ def test_p_tc_510_rich_scope_chat_shape(env, client):
     _login_seed(client)
     cid = env.seed_active_concept(env.make_quest())
     sid = _overall_scope(client, cid)
-    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "こんにちは"}, headers=_csrf(client))
+    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": pm_body("こんにちは")}, headers=_csrf(client))
     body = client.get(f"/api/v1/concept-chat-scopes/{sid}/chat").json()
     assert body["thread_id"] and body["chat_group_id"] is None  # concept は chat_group を持たない
-    assert [m["body"] for m in body["data"]] == ["こんにちは"]
+    assert [pm_text(m["body"]) for m in body["data"]] == ["こんにちは"]
     assert "unread" in body and "page_info" in body
 
 
@@ -223,7 +224,7 @@ def test_p_tc_511_rich_scope_reaction_via_shared_ep(env, client):
     _login_seed(client)
     cid = env.seed_active_concept(env.make_quest())
     sid = _overall_scope(client, cid)
-    mid = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "x"}, headers=_csrf(client)).json()["id"]
+    mid = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": pm_body("x")}, headers=_csrf(client)).json()["id"]
     r = client.post(f"/api/v1/chat-messages/{mid}/reactions", json={"type": "normal", "emoji": "👍"}, headers=_csrf(client))
     assert r.status_code == 200
     normal = {n["emoji"] for n in r.json()["reactions"]["normal"]}
@@ -235,8 +236,8 @@ def test_p_tc_512_rich_scope_read_reduces_unread(env, client):
     _login_seed(client)
     cid = env.seed_active_concept(env.make_quest())
     sid = _overall_scope(client, cid)
-    m1 = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "a"}, headers=_csrf(client)).json()["id"]
-    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "b"}, headers=_csrf(client))
+    m1 = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": pm_body("a")}, headers=_csrf(client)).json()["id"]
+    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": pm_body("b")}, headers=_csrf(client))
     client.post(f"/api/v1/concept-chat-scopes/{sid}/chat/read", json={"last_read_message_id": m1}, headers=_csrf(client))
     body = client.get(f"/api/v1/concept-chat-scopes/{sid}/chat").json()
     assert body["unread"]["unread_count"] == 1  # m1 既読・残り b の1件

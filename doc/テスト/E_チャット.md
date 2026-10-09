@@ -7,6 +7,8 @@
 
 ## 1. コア会話 API（E.1/E.2/E.5・SC-24）
 
+> **TT5（2026-10-09・PM-JSON 移行）**: メッセージ本文は **PM-JSON 正本**（`chat_messages.body` jsonb・migration 0064・既存チャットデータは削除）。投稿/編集は multipart `body`＝PM-JSON 文字列を受け `sanitize_pm` で無害化（[W_リッチテキスト](W_リッチテキスト.md) 中核）。**空判定は `pm_to_text(body)` が空** かつ添付無しで 422 `empty_message`。DTO は `body`（PM-JSON）に加え **`body_html`（`pm_to_html` 派生・表示用）** を返す。引用抜粋は `pm_to_text(src.body)[:60]`、要約入力（`list_message_bodies_for_idea_ids`）も `pm_to_text` 平文化。**メンション処理は不変**＝クライアントが展開済 `mentions[]`（`@全員`＝全メンバー user_id 群）を送り `_validate_mentions` が受理（下記 E-TC-230 参照）。
+
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | E-TC-101 | api | チャット取得（0件・未読全件） | 公開アイデア・未投稿 | `GET /ideas/{id}/chat` | 200・`data=[]`・`unread.unread_count=0`・`chat_group_id` 返る（遅延生成） | E.1 |
@@ -30,9 +32,9 @@
 | E-TC-112 | api | 活発度集計（日次＋版マーカー） | メッセージ数件＋公開後編集（版2） | `GET /ideas/{id}/chat-activity` | `daily[]`（日次件数）・`revision_markers[]`（版日時）・`total_messages` | E.1／D.4 |
 | E-TC-113 | api | チャット添付→DL 署名URL | comment 権限・Fake storage | `POST`（files=png）→`GET /attachments/{aid}/download` | 201・メッセージ `attachments[]`（kind=image）・DL EP が `{url}`（チャット添付も共通 EP で解決） | E.3／§1.10 |
 | E-TC-114 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /chat-messages` | 403 csrf_failed／401 | A.0 |
-| E-TC-211 | unit | メンション強調は nospace トークン一致のみ（受入不具合 DFT-E-001 再発防止＝描画側と composer の nospace 契約固定） | `renderTextHtml`・members に nospace=`テスト太郎` | `("@テスト太郎 …")`／`("@テスト 太郎 …")`／`<script>` | 前者＝`<span class="mention">@テスト太郎</span>`／空白入りは full name 強調なし（素テキスト）／`<script>`→`&lt;script&gt;`（XSS 無害化） | E.2 |
-| E-TC-229 | unit | 全員メンションの表示強調＝`@全員`/`@all`（大小無視）を `.mention` 化（クライアント展開・決定 2026-09-29） | `renderTextHtml`・members に nospace=`テスト太郎` | `("@全員 集合")`／`("@all hi")`／`("@ALL hey")` | いずれも `<span class="mention">@…</span>`（トークンは原文保持）。members に居ない `@全員` でも強調（all-token は特別扱い） | E.6／FR-24 |
-| E-TC-230 | unit | 全員メンションの ID 展開＝`@全員`/`@all` を**全メンバーの user_id へ展開**（`resolveMentionIds`・宛先解決の正） | members=[u1,u2]・自分は含めず | `("@全員 …")`／`("@all …")`／`("@テスト太郎 @全員 …")`（重複） | 前2つ＝`[u1,u2]`（全展開）／最後＝`[u1,u2]`（個別と all の和・重複排除）／member 不在の素 `@x` は無視 | E.6／FR-24 |
+| E-TC-211 | unit | 〔廃止・TT5／2026-10-09〕メンション表示強調は**サーバ `pm_to_html` へ移管**（`renderTextHtml` 廃止）。mention ノードの直列化は [W_リッチテキスト](W_リッチテキスト.md) **W-TC-006**、表示は `body_html` 描画。plain `@token` の nospace 契約は構造化メンション（mention ノード `{id,label}`）化により不要（DFT-E-001 の再発面は消滅） | — | — | — | E.2／W-TC-006 |
+| E-TC-229 | unit | 〔廃止・TT5／2026-10-09〕全員メンション表示強調もサーバ `pm_to_html` へ移管（`@全員`＝mention ノード `{id:"__all__", label:"全員"}`→`<span data-type="mention" data-id="__all__">@全員</span>`・W-TC-006 と同経路）。クライアント強調は廃止 | — | — | — | E.6／FR-24／W-TC-006 |
+| E-TC-230 | unit | 全員メンションの ID 展開＝PM-JSON の **mention ノードを走査**して宛先 user_id 群へ（`resolveMentionIds(doc, members)`・送信用）。番兵 `id:"__all__"` は当該パーティの全メンバーへ展開、個別ノードは `node.attrs.id`（=user_id）をそのまま、重複排除（TT5＝plain `@token` 正規表現抽出から移行） | members=[u1,u2]・自分は含めず | doc=mentionノード`{id:"__all__"}`のみ／doc=`{id:u1}`＋`{id:"__all__"}`（重複）／doc=`{id:u1}`のみ | 1つ目＝`[u1,u2]`（全展開）／2つ目＝`[u1,u2]`（個別と all の和・重複排除）／3つ目＝`[u1]` | E.6／FR-24 |
 
 ## 2. リアクション（通常＋魔法・E.4）
 

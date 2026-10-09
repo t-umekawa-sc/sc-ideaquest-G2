@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import CompanyBase
@@ -44,7 +44,7 @@ class ChatMessage(CompanyBase):
     # チャット中核は thread_id ただ一つで所属を持つ（§5.45・ホスト非依存）。
     thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_thread.id"), nullable=False)
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[dict] = mapped_column(JSONB, nullable=False)  # PM-JSON 正本（TT5・migration 0064）。保存時 sanitize_pm 済み
     is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # FR-39 (b) 議論の要点＝重要メッセージのピン留め（owner/quest_admin がキュレーション・監査で pinned_by/at）。

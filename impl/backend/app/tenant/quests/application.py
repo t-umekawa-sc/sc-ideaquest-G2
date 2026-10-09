@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from app.control_plane.auth.orm import Company
 from app.core import list_query as lq
 from app.core.errors import AppError
+from app.core.richtext import pm_to_text
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
@@ -990,7 +991,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
                     "display_name": a.display_name if a else "",
                     "avatar_image_url": _image_url(a.avatar_image_path) if a else None,
                 },
-                "excerpt": (m.body or "")[:160],
+                "excerpt": pm_to_text(m.body)[:160],  # チャット本文は PM-JSON 正本（TT5）→平文抜粋
                 "created_at": m.created_at,
             })
         return {
