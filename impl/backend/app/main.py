@@ -42,7 +42,7 @@ from app.tenant.announcements.router import router as announcements_router
 from app.tenant.media.router import router as media_router
 from app.core.access_gate import access_mode_gate
 from app.core.audit_context import AuditContextMiddleware
-from app.core.config import get_settings
+from app.core.config import get_settings, insecure_prod_secrets
 from app.core.errors import install_error_handlers
 from app.core.idempotency import idempotency_middleware
 from app.core.log_context import reset_request_id, set_request_id
@@ -68,8 +68,24 @@ def _warn_untrusted_proxy_config() -> None:
         )
 
 
+def _enforce_prod_secret_guard() -> None:
+    """本番で dev 既定/空の秘密を検出したら起動を止める（fail-closed・D6 広ガード）。
+
+    `insecure_prod_secrets` が非空なら `RuntimeError`＝コンテナを unhealthy にして事故（dev 既定値の本番流入）を
+    物理的に防ぐ。値そのものはログに出さない（フィールド名のみ・§15）。非 prod は常に no-op。
+    """
+    bad = insecure_prod_secrets(get_settings())
+    if bad:
+        raise RuntimeError(
+            "本番(APP_ENV=prod)で安全でない秘密が検出されました（dev 既定値/空）: "
+            f"{', '.join(bad)}。compose secrets ファイルで強い値を供給してください"
+            "（設計=シークレット管理(SOPS) §5・本番デプロイ要件 §3）。"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN201
+    _enforce_prod_secret_guard()
     _warn_untrusted_proxy_config()
     await get_hub().start()  # 配信ハブ起動＝Redis 購読ループ（L・§1.12）
     try:

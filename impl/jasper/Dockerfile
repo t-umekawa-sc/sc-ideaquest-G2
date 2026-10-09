@@ -20,7 +20,7 @@ COPY requirements.txt .
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 # アプリ本体＋テンプレートをイメージにベイク（volumes マウントしない＝backend と同方針）。
-COPY app.py warmup.py ./
+COPY app.py warmup.py _secrets.py ./
 COPY reports ./reports
 
 # ビルド時ウォームアップ＝JasperStarter/JVM 資産のベイク＋jrxml コンパイル検証（壊れていれば build 失敗）。

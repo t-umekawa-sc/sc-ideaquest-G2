@@ -23,12 +23,15 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from pyreportjasper import PyReportJasper
 
+from _secrets import read_secret, secret_matches
+
 logger = logging.getLogger("jasper")
 logging.basicConfig(level=logging.INFO)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPORTS_DIR = os.path.join(BASE_DIR, "reports")
-SHARED_SECRET = os.environ.get("JASPER_SHARED_SECRET", "")
+# S2S 共有秘密＝env 優先・無ければ `/run/secrets/jasper_shared_secret`（本番はファイルマウント・設計 §5・F9）。
+SHARED_SECRET = read_secret("JASPER_SHARED_SECRET", "/run/secrets/jasper_shared_secret")
 
 app = FastAPI(title="IdeaQuest Jasper Renderer")
 
@@ -88,8 +91,8 @@ def health() -> dict:
 
 @app.post("/render")
 def render(req: RenderRequest, x_report_secret: str | None = Header(default=None)) -> Response:
-    # S2S 認証（R3）＝共有シークレット一致。未設定運用（空）は拒否（fail-closed）。
-    if not SHARED_SECRET or x_report_secret != SHARED_SECRET:
+    # S2S 認証（R3）＝共有シークレット一致（定数時間比較・§8/§13）。未設定運用（空）は拒否（fail-closed）。
+    if not secret_matches(x_report_secret, SHARED_SECRET):
         raise HTTPException(status_code=401, detail="unauthorized")
     # report_key ホワイトリスト（R5）＝未知キー/パス的入力はここで弾く（reports/ の外に出さない）。
     view = _REPORTS.get(req.report_key)

@@ -36,3 +36,12 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | V-TC-210 | e2e | SC-93 から会社管理者が自社の請求書 PDF をダウンロード（同一オリジン GET・Cookie 認証） | 会社管理者/OPS ログイン・`jasper`（実描画）or `fallback` | SC-93（/admin/accounts）で期間選択→ダウンロードボタン | ブラウザにファイルが保存される（download イベント・filename `invoice-{code}-{period}.pdf`）・Jasper URL はフロントに露出しない | 設計 §13・V.3 |
 | V-TC-211 | e2e | 機能可否＝`GET /me` の `company.report_enabled` とボタン活性が一致（none で非活性＋ツールチップ） | デプロイの `REPORT_RENDERER` | SC-93 表示 | report_enabled=false ならボタン disabled・ツールチップ／true なら活性 | 設計 §13 |
+
+## 4. S2S シークレットのファイル供給・定数時間比較（F9・設計 シークレット管理(SOPS) §5/§17.5 G1）
+
+> jasper サービスの S2S 共有秘密を env だけでなく **`/run/secrets/jasper_shared_secret` ファイルマウント**でも供給できるようにする（本番は env をやめ file へ＝T3 露出面縮小）。検体＝`impl/jasper/_secrets.py`（純 stdlib・Java 非依存）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| V-TC-212 | unit | 秘密読取＝`/run/secrets/<name>` 優先（file>env・末尾改行 strip）・file 無ければ env・両方無しは空 | `_secrets.read_secret(env_name, file_path)` | (1) file（末尾 `\n` 付き）＋ env 併存／(2) file 無し＋env／(3) 両方無し | (1) file 値（改行除去・env に勝つ）／(2) env 値／(3) `""`（空＝jasper は 401 fail-closed） | 設計 §5 |
+| V-TC-213 | unit | S2S 比較は定数時間（`hmac.compare_digest`）＝タイミング差で秘密を推測させない | `_secrets.secret_matches(given, expected)` | 一致／不一致／空 expected | 一致=True・不一致=False・空 expected=False（秘密未設定は常に拒否） | 設計 §8／§13 |

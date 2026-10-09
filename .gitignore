@@ -10,6 +10,11 @@
 # 環境変数（実値）
 .env
 
+# 秘密のファイルマウント実体（compose secrets・設計=シークレット管理(SOPS) §5・D6）。実鍵は追跡外。
+# *.sample（ダミー）のみ追跡＝使い方の雛形。実ファイルは compose.secrets.yaml が `file:` で参照。
+impl/secrets/*
+!impl/secrets/*.sample
+
 # スクショ作業ディレクトリ（Playwright アドホック検証の出力・コミット不要）。
 # 先頭スラッシュ無し＝どの階層の tmp_shots/ もマッチ（ルート・impl/frontend/ 双方）。
 tmp_shots/

@@ -1,6 +1,7 @@
 # シークレット管理（SOPS+age）機能 — 設計ドラフト（自己ホスト型・横断基盤）
 
-> 状態: **ドラフト第一版（2026-10-08）**。方針確定＝(1) **二層構造**（デプロイ秘密＝SOPS+age／実行時入力秘密＝DB に AES-GCM）・(2) **鍵は env でなく compose `secrets:` ファイルマウント供給**・(3) at-rest 強化に **SOPS+age（無料・商用可・サーバ不要）を採用、OpenBao 等のサーバ型は将来オプション**（§9）。実装未着手。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠。
+> 状態: **ドラフト（2026-10-08 起票／2026-10-09 一部実装）**。方針確定＝(1) **二層構造**（デプロイ秘密＝SOPS+age／実行時入力秘密＝DB に AES-GCM）・(2) **鍵は env でなく compose `secrets:` ファイルマウント供給**・(3) at-rest 強化に **SOPS+age（無料・商用可・サーバ不要）を採用、OpenBao 等のサーバ型は将来オプション**（§9）。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠。
+> **実装済み（2026-10-09・D6 の (A) ファイル供給基盤＋F9）**＝(A) の「ファイルマウント供給」部分＝backend `app/core/config.py`（`secrets_dir="/run/secrets"`＋`settings_customise_sources` で **file > env**）／jasper `_secrets.py`（同 `/run/secrets/<name>`・file>env・`hmac.compare_digest`）／`impl/compose.secrets.yaml`（本番オーバーレイ・`mode:0400`・最小権限）／**本番 fail-closed ガード**（§4-A' 新設・`insecure_prod_secrets`）。**未実装＝(A) の SOPS+age 本体（at-rest 暗号化・§4-A）・(B) AES-GCM DB 暗号（§4-B・消費者=カメリオ D3 未実装）・秘密の完全棚卸し（§12-3）**。
 > 関連正本＝[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)（§12 保存データ保護・§13 暗号化/乱数・§15 ログ監査）・[本番デプロイ要件](../本番デプロイ要件.md)（§3 秘匿のシークレットマネージャ供給・§6.5 バックアップ暗号化・§6.6 ログのキー名マスク）・[コーディング規約](../規約/コーディング規約.md)（§2 セキュリティ・§3.4 バックエンド4層）。
 > **本書は横断基盤＝全ての秘密の“守り方”の正本**。各機能（[カメリオAPI連携](カメリオAPI連携_設計.md)・[ローカルLLM連携](ローカルLLM連携_設計.md)・SMTP/Turnstile/HIBP 等）は本書の**消費者**であり、個別に秘密保護を再発明しない（DRY）。
 
@@ -76,6 +77,8 @@
 - **なぜ env でないか**＝env は **`docker inspect`／`/proc/<pid>/environ`／子プロセス継承**で覗ける（T3）。ファイルマウントはこれらに出ず、権限（0400）で読み手を限定できる。
 - **実値は Git・Dockerfile・compose に書かない**（§13・既存 `SMTP_PASSWORD`/`TURNSTILE_SECRET_KEY` と同方針）。compose には**参照（`file: ./secrets/age_key`）だけ**書き、実ファイルは Git 追跡外。
 - **注意（過信しない）**＝素の compose（非 Swarm）の `file:` は**ホスト上に平文ファイルが残る**＝「env の覗き見経路を塞ぐ」まで。保存時暗号化は SOPS（§4-A）が担う。
+- **実装済み（2026-10-09・D6 (A) ファイル供給基盤）**＝backend は pydantic `secrets_dir="/run/secrets"`＋`settings_customise_sources` で **file > env**（迷い込んだ/残留 env に file が負けない＝T3）。`/run/secrets` が無い dev は従来どおり env（警告も出さない）。jasper（素の環境変数読取）は `_secrets.read_secret` で同じ **file>env**・`hmac.compare_digest` で定数時間比較（§8/§13）。本番オーバーレイ `impl/compose.secrets.yaml`（`mode:0400`・jasper は非 root uid 10001 指定・**最小権限＝使う backend と検証する jasper だけに配布**）。使い方＝`docker compose -f compose.yaml -f compose.secrets.yaml up -d`。
+- **本番 fail-closed ガード（実装済み・(広)）**＝`app/core/config.py` の `insecure_prod_secrets(settings)` が、本番（`app_env=prod`）で **dev 既定値/プレースホルダのまま**（`postgres_password=ideaquest`・`minio_*`・`bootstrap_admin_password=Passw0rd!`・`jasper_shared_secret=dev-jasper-secret`）or **機能有効時に必須の秘密が空**（renderer=jasper の S2S 秘密）を検出し、`main.lifespan` で **`RuntimeError` 起動拒否**。**空が正当な秘密**（`bootstrap_admin_password=""`＝seed しない・`turnstile_secret_key=""`＝CAPTCHA 無効）は壊さない＝実際の footgun（dev 既定の本番流入）だけ塞ぐ。値はログに出さず**フィールド名のみ**（§15）。完全な秘密棚卸しによる精緻化は SOPS 本体で（§12-3）。
 
 ## 6. DB 暗号の実装方針（AES-GCM ラッパー）
 
@@ -137,9 +140,11 @@
 3. **SOPS 対象の棚卸し**（既存 `.env` のどこまでを SOPS 管理へ寄せるか・移行順）。
 4. **サーバ型への昇格条件の数値化**（秘密数・サービス数の閾値）。
 
-## 13. 次アクション（正式反映・実装は別セッション）
+## 13. 次アクション（残り・SOPS 本体スライス）
 
-1. [本番デプロイ要件](../本番デプロイ要件.md) §3 に本書を参照する「シークレット供給の具体化（SOPS+age＋ファイルマウント）」節を追記。
-2. [WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md) §12/§13 のチェック項目から本書へリンク（実装設計の所在明示）。
-3. backend に AES-GCM ラッパー（§6）＋ログマスク（§8）を実装（別セッション）。
-4. 消費側（[カメリオAPI連携](カメリオAPI連携_設計.md) §9）は本書を参照する形に整理済み。
+> **済み（2026-10-09・D6 (A) ファイル供給基盤＋F9）**＝本書 §5 の「env→ファイルマウント供給」＋本番 fail-closed ガード（§5 末尾）＋[本番デプロイ要件](../本番デプロイ要件.md) §3 具体化＋テスト（SEC-TC-050〜053・V-TC-212/213）。
+
+1. **SOPS+age 本体（§4-A・at-rest 暗号化）**＝`secrets.enc.yaml`（Git 暗号化コミット）＋起動時復号。現状の `compose.secrets.yaml` の `file:` 平文実体を SOPS 管理へ寄せる（§10 手順1〜3）。
+2. **AES-GCM DB 暗号ラッパー（§4-B/§6）＋ログマスク（§8）**＝消費者（[カメリオAPI連携](カメリオAPI連携_設計.md)・D3）実装時に併せて。
+3. **秘密の完全棚卸し（§12-3）＋本番ガードの対象拡張**＝`insecure_prod_secrets` の `_DEV_DEFAULT_SECRETS` を棚卸し結果で精緻化（現状は主要な dev 既定値のみ）。
+4. [WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md) §12/§13 のチェック項目から本書へリンク（実装設計の所在明示）。

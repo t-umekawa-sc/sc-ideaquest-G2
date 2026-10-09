@@ -1,14 +1,42 @@
-"""アプリ設定（環境変数から読む）。値の根拠は doc/ADR/ADR-0001。"""
+"""アプリ設定（環境変数から読む）。値の根拠は doc/ADR/ADR-0001。
+
+秘密の供給＝env に加え **`/run/secrets/<name>` ファイルマウント**に対応（設計=シークレット管理(SOPS) §5・D6）。
+優先順位は **file > env**（`settings_customise_sources` で反転）＝env は `docker inspect`/`/proc/<pid>/environ`/
+子プロセス継承で覗ける露出面（T3）なので、安全にマウントした file が迷い込んだ/残留 env に負けないようにする。
+dev は `/run/secrets` が無い＝従来どおり env。本番は env をやめ file をマウントする（compose.secrets.yaml）。
+"""
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+# ファイルマウントの既定ディレクトリ（compose `secrets:` → `/run/secrets/<name>`）。存在する時だけ有効化し、
+# dev（ディレクトリ無し）では pydantic の "directory does not exist" 警告を出さない。
+_SECRETS_DIR = "/run/secrets"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+        secrets_dir=_SECRETS_DIR if os.path.isdir(_SECRETS_DIR) else None,
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # file(/run/secrets/<name>) を env/dotenv より優先（T3: env 露出面に file が負けない・設計 §5）。
+        # 優先順＝明示 init > file secrets > env > dotenv > 既定値。
+        return (init_settings, file_secret_settings, env_settings, dotenv_settings)
 
     app_env: str = "dev"
 
@@ -217,6 +245,37 @@ class Settings(BaseSettings):
     @property
     def control_dsn(self) -> str:
         return self.server_dsn(self.control_db_name)
+
+
+# 本番で絶対に許してはいけない「dev 既定値/プレースホルダ」の秘密（値が一致したら起動拒否＝fail-closed）。
+# ※ 空を強制はしない＝`bootstrap_admin_password=""`（seed しない）・`turnstile_secret_key=""`（CAPTCHA 無効）
+#   など「空＝無効化」が正当な意味を持つ秘密の運用を壊さないため。実際の footgun（dev 既定の本番流入）だけ塞ぐ。
+#   （完全な秘密棚卸し＝SOPS 本体スライスで精緻化・設計 §12-3）
+_DEV_DEFAULT_SECRETS: dict[str, set[str]] = {
+    "postgres_password": {"ideaquest"},
+    "minio_access_key": {"ideaquest"},
+    "minio_secret_key": {"ideaquest-secret"},
+    "bootstrap_admin_password": {"Passw0rd!"},
+    "jasper_shared_secret": {"dev-jasper-secret"},
+}
+
+
+def insecure_prod_secrets(settings: Settings) -> list[str]:
+    """本番(`app_env=prod`)で安全でない秘密のフィールド名を返す（非 prod は常に `[]`）。
+
+    非空リスト＝起動拒否（fail-closed・main.lifespan）＝dev 既定値のまま本番へ出す事故を防ぐ（D6・広ガード）。
+    (1) dev 既定値/プレースホルダのまま／(2) 機能有効時に必須の秘密が空（renderer=jasper の S2S 秘密）を検出する。
+    """
+    if settings.app_env != "prod":
+        return []
+    bad: set[str] = set()
+    for name, dev_defaults in _DEV_DEFAULT_SECRETS.items():
+        if getattr(settings, name, "") in dev_defaults:
+            bad.add(name)
+    # renderer=jasper のとき S2S 秘密は空も不可（秘密無しで帳票描画を通さない＝jasper 側も 401 fail-closed）。
+    if settings.report_renderer == "jasper" and not settings.jasper_shared_secret:
+        bad.add("jasper_shared_secret")
+    return sorted(bad)
 
 
 @lru_cache
