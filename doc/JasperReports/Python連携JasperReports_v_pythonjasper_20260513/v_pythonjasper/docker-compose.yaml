@@ -1,0 +1,12 @@
+services:
+  jasper-api:
+    build: .
+    ports: ["8000:8000"]
+    volumes:
+      - .:/app
+  nextjs-ui:
+    image: node:23-alpine
+    ports: ["3000:3000"]
+    working_dir: /app
+    volumes: ["./next-app:/app"]
+    command: "npm run dev"

@@ -1,0 +1,4 @@
+fastapi　# python環境が既に構築されていて不要な場合は、削除
+uvicorn　# python環境が既に構築されていて不要な場合は、削除
+pyreportjasper
+python-dotenv # python環境が既に構築されていて不要な場合は、削除

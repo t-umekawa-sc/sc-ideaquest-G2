@@ -1,0 +1,25 @@
+# AlmaLinux 8をベース
+FROM almalinux:8
+
+# インストール（Python環境とJavaをセットアップ）
+RUN dnf -y update && \
+    dnf -y install python39 && \  ## 不要な場合は、削除
+    dnf -y install java-11-openjdk-devel && \
+    dnf clean all
+
+# 作業ディレクトリの設定 - 環境に合わせて修正、又は、不要なら削除
+WORKDIR /app
+
+# 依存ライブラリだけをコピーしてインストール
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# アプリケーション本体をコピー
+COPY . .
+
+# 環境変数の設定
+ENV JAVA_OPTS="-Djava.awt.headless=true"
+
+# 必要に応じて―FastAPIの起動　
+EXPOSE 8000
+CMD ["uvicorn", "jasper_python_main:app", "--host", "0.0.0.0", "--port", "8000"]
