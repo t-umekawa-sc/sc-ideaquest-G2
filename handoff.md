@@ -4,65 +4,66 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`、**残作業の正本は `doc/バックログ/未実装・ギャップ一覧.md`**。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-08（セッション末）。
+- 更新: 2026-10-09（セッション末）。
 - ブランチ: `main`（main 直 push が慣習・毎コミット push 済み）。
-- 最新コミット: `5f3668b8`（`.env.example` 再構成＋AI系を compose 経由で設定可能化）。working tree clean。
-- alembic heads: control=`0020_signup_challenges`／company=`0059_quests_recommended`（変更なし＝今セッションは migration 追加なし）。
+- 最新コミット: 本 handoff＋バックログ台帳更新（この直前＝`ef4511ab` モック／`6ed3fab0` テンプレ backend＋設計＋テスト）。working tree は push 後 clean の想定。
+- alembic heads: company=**`0060_info_templates`（今セッションで追加）**／control=`0020_signup_challenges`（変更なし）。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘の消化＋仕様確定済み未実装機能の処理。
 
-## 3. 今回やったこと（コミットと理由・新しい順）
-1. `5f3668b8` **`.env.example` 最新化＋compose に AI 系 env 追加**＝`.env.example` が stale（compose が渡す LOG_*/MINIO_*/ALIGNMENT_*/ALLOWED_ORIGINS/APP_BASE_URL/LOGIN_RATE_LIMIT_*/OLLAMA_PORT/E2E_WORKER_COMPANIES を未記載）だったため現行化。さらに config.py にあるが compose 未配線だった AI 設定（`LLM_*`/`EVAL_RAG_*`/`RECOMMEND_*`/`LLM_AUTO_EVALUATE_ON_PUBLISH`/`ALIGNMENT_EMBED_TIMEOUT_SECONDS`）を `compose.yaml` の `backend_env` アンカーに追加＝`impl/.env` で設定可能にした（llm-worker 等も `*backend_env` 共有）。
-2. `95ae170a` **選択中パーティ（右側）もログインIDで絞り込み**＝`QuestMemberDTO` に `login_id` 追加（`quests/application._member_dto`）・`QuestForm` の右フィルタを名前 OR login_id・メンバー行に login_id 表示（`.pmember__login`）。同名メンバー判別のため。
-3. `1fd04018` **空ゾーンも常時表示（B案）**＝ダッシュボードのゾーンがデータ更新で出入りして分かりにくい指摘に対応。`DashboardView` の D/E/B 可視条件を `data !== null` に統一（空は空状態メッセージ）。stale 化していた e2e I-TC-157/158 も現構造へ追従修正。
-4. `6197aade` **パーティ候補（左側）をログインIDで絞り込み**＝`QuestCandidateDTO` に login_id 追加・候補クエリ `list_cross_group_candidates`/`list_group_member_candidates` の q を名前 OR login_id に・候補チップに login_id 表示。
-5. `ca2e5805` **Zone E「参加中」を参加中/所有タブに集約**＝自作クエスト（is_owner）を「所有」タブに表示（旧設計 §6 で SC-10 へ移設していたのを一部差し戻し・ユーザー要望）。`DashboardView.ownedAll`。
-6. `42e9352a` **おすすめのクエストの飛び先を参加前ダイアログに**＝ダッシュボード Zone D のリンクが `/quests/{id}`（メンバー専用詳細）で未参加だと参照エラー→`/quest-catalog?quest=<id>` にして `QuestCatalogView` が参加前ダイアログを自動で開く。
-7. `4ce54238` **S-TC-119 e2e 追加**＝SC-04（AI処理状況）の進捗確認・行キャンセル・完了行遷移。機能は実装済み・テストだけ欠落していた。
-8. `17841991`/`7c043c52`/`8d4138ee`/`89689f08` **④おすすめクエスト選出 一式**＝ダッシュボード結線（Zone D スコアリング）＋管理者お勧め toggle（SC-13 発見カタログ・`PUT /quests/{id}/recommended`）。
-9. `e5cf09e5`/`ba5d4bb5` **残作業台帳の整備＋現状化**＝「発生時に記録・完了時に削除」をプロジェクトルール化（CLAUDE.md）。memory 由来で未実装扱いしていた**実装済み機能（コンセプト FR-42/ソリューション開発 FR-43/アイデアコンテスト/経営資料LLM生成/⑥AI評価/コンセプト#13推奨）を実コードで裏取りし台帳から削除**。
+## 3. 今回やったこと（新しい順・理由つき）
+1. **D5 情報インプット テンプレート機能の設計反映＋backend＋テスト＋モックを完了**（commit `6ed3fab0`＝backend/設計/テスト、`ef4511ab`＝モック）。
+   - 設計反映（正本）＝FR-41 に ⑩内部情報テンプレートを追記（`doc/要件定義/README.md`）／データモデル `§5.37b info_templates`＋`info_items.source_template_id`（`doc/データモデル.md`）／API `N.5b`（7 EP・`doc/API設計/N_情報インプット.md`）／画面 SC-51 `§6b` ピッカー＋**新規 SC-55 テンプレート管理**（`doc/画面設計/screens/SC-50_情報インプット.md`・新規 `SC-55_情報テンプレート管理.md`）＋画面遷移図／テスト md `N-TC-300〜326`（`doc/テスト/N_情報インプット.md`）。
+   - backend（既存 `impl/backend/app/tenant/info/` に4層追加）＝migration `migrations/company/versions/0060_info_templates.py`（`info_templates` 表＋`info_items.source_template_id`・部分一意 `UNIQUE(name) WHERE deleted_at IS NULL`）／`orm.py`（`InfoTemplate`＋`InfoItem.source_template_id`）／`schemas.py`（検証用 enum frozenset 群＋`TEMPLATE_DEFAULT_SCALARS`＋テンプレ DTO 群）／`repository.py`（`create_template`/`get_template`/`template_name_exists`/`list_active_templates`/`list_templates_admin`/`soft_delete_template`＋`create_info_item` に `source_template_id`）／`application.py`（`_validate_template_defaults`・`list_templates_for_picker`/`get_template_detail`/`list_templates_admin`/`create_template`/`update_template`/`set_template_active`/`delete_template`・nh3 サニタイズは `derive.sanitize_html`）／`router.py`（7 EP＝ピッカー/詳細=`require_me`・`admin=1`/書込=`require_company_account_admin`＋CSRF/Origin）。
+   - テスト＝`tests/info/test_templates.py` 19件（repository/application/API）。red-green 実測済（`_validate_template_defaults` を一時バイパスで N-TC-311/312/313 を赤→復元で緑）。
+   - モック（フロント実装フロー規約＝モック先行）＝`doc/画面設計/mocks/SC-55_情報テンプレート管理.html`（新規・DataTable＋登録/編集モーダル）／`SC-50_情報インプット.html`（§6b ピッカー追記＝新規時のみ表示・{{today}}展開・上書き確認）。headless Chromium で JSエラー0＋適用動作を確認済み。
+2. **セッション末にリッチテキスト統一（TipTap 移行）を確認し、D5 frontend の進め方を転換**（コードはまだ無し・**決定のみ**）。引継＝`doc/セッション調整/引継/2026-10-09_リッチテキスト2系統統一-tiptap移行.md`／設計＝`doc/設計ドラフト/リッチテキスト2系統統一(TipTap移行)_設計.md`。バックログ台帳に `1-b. TipTap 移行（TT0〜TT5）` を出典付きで起票し、D5 行を「設計+backend+テスト済／frontend は TipTap 待ち」へ更新。
 
 ## 4. 現在の状態（動作 / テスト）
-- **backend/frontend とも最新コードでベイク済み**（backend は login_id 等を含む image・最後に `up -d backend` で新 env 反映／frontend は右フィルタ等を含む `--build`）。コンテナ db/redis/minio/mailhog/backend/frontend すべて Up。
-- 今セッションで実際に実行し green を確認したテスト:
-  - backend `tests/quests`（`--build -v` マウント run で multigroup+sc11=61 passed／おすすめ関連 145 passed）・`tests/dashboard/test_cross_domain`（I-TC-170 等）。**フル `tests/` 全体は未実行＝未確認**。
-  - e2e `sc-01-dashboard*`（8+6 passed）・`sc-04-ai-jobs`（S-TC-119 含む 4 passed）・`sc-13-catalog`（C-TC-320 含む 4 passed）。
-  - **AI 評価（⑥）は実装をコードで確認**（`backend/app/tenant/evaluations/ai_eval.py`・`evaluations/router.py` の `POST /ideas/{id}/ai-evaluation/regenerate`・`ideas/application._enqueue_idea_ai_evaluation`・frontend `EvaluationComments.aiEvaluation`）。テスト `tests/evaluations/test_ai_eval.py` は存在するが**今セッションでは未実行＝未確認**。
-  - red-green 証跡＝各コミットメッセージに記載（C-TC-315/319/321/322・I-TC-170 等。永続化行の一時 revert で red 実測→復元で green）。
-  - TC トレーサビリティ **✅ 1063**（`python3 scripts/check_tc_traceability.py`・リポジトリルートで実行）。
-- `.env`/compose 検証＝`docker compose config` 妥当・新 AI env（`LLM_AUTO_EVALUATE_ON_PUBLISH` 等）が backend コンテナに `printenv` で到達することを確認・compose⇔.env.example 双方向 diff で過不足0（87/87）。
+- **backend テンプレ機能＝コード完了・テスト green**。ただし**稼働中 backend コンテナは未再ビルド＝新 EP は未提供**（image は旧コードをベイク／テストは `docker compose run --rm -v` のマウント実行で green を確認）。新 EP を実際に叩くには `docker compose up -d --build backend` が必要。
+- 今セッションで実行し green を確認＝`tests/info/test_templates.py` 19件／`tests/info` 全体 99件（`source_template_id` 追加の回帰なし）。**フル `tests/` 全体は未実行＝未確認**。
+- migration `0060` は company DB（acme）に**テスト起動時の bootstrap で適用済み**（run 実行の entrypoint）。他会社 DB への適用は未確認。
+- **TC トレーサビリティ ✅ 1082**（`python3 scripts/check_tc_traceability.py`・リポジトリルート）。
+- コンテナ＝今セッションで `db`/`redis`/`minio` のみ `up -d` した（`backend`/`frontend` は未起動・旧イメージ）。
+- **frontend production はまだ着手していない**（モックのみ）。SC-55 feature（`impl/frontend/src/features/info-templates`）は未作成。
 
 ## 5. 詰まっている点（試して失敗・回避策）
-- **`.env` が backend に届かない誤解の解明**＝`config.py` は `env_file=".env"` を持つが、backend コンテナに `/app/.env` は無く（Dockerfile は backend/ だけ COPY・impl/.env は対象外）、compose にも `env_file:` 無し。**唯一の経路は compose の明示マッピング `${VAR:-default}`**。→ 新しい設定を env 可変にするには **compose.yaml の backend_env に必ず追加**する（今回 AI 系を追加）。旧 handoff の「impl/.env に LLM_AUTO_EVALUATE_ON_PUBLISH」は今回の compose 追加で初めて実効化。
-- **memory を鵜呑みにしない**＝前回までの handoff/memory が完了済み機能を「未実装/次=実装」と記載していた。台帳整備で実コード裏取りし多数を削除。以後、残作業の起票/削除は**必ず実コードで裏取り**（CLAUDE.md の運用ルール3に明記）。
-- **共有 dev DB のノイズ**（継続）＝テストは自分の seed id の相対順序/包含で検証（絶対 top-N は避ける）。目視検証用のクエストは API で作って後始末（DELETE）する。
+- **`AppError` の属性は `.status`**（`.status_code` ではない）＝テストで一度踏んだ（`app/core/errors.py:71`）。
+- **テンプレテストの teardown FK 順序**＝`info_items` を消す前に `info_item_revisions`/`entity_tokens(owner_type='info')`/`info_links`/`info_item_categories` を消す（`create_info_item` が版/トークン/auto リンクを作るため）。さらに **factory 由来の管理者アカウント（`tpl_admin`）の会社DB users を消す前に、その管理者が作った `info_templates` を消す**必要があり、API テストは fixture 引数順を `(client, tpl_admin, tpl_ctx)` にして teardown 順（tpl_ctx が先）を担保した。
+- **`defaults` のカテゴリキー名**＝設計ドラフトは `category_ids[]` だが、実装は `info_items` と同じ `categories`（`info_category` enum コード配列）に統一。データモデル/API/テスト md も `categories` に修正済み（ドラフトのみ旧名が残置＝歴史）。
+- **共有 dev DB のノイズ**（継続）＝テンプレ名は毎回一意化（uuid 接尾）し、作成した template/info_item は teardown で物理削除。
 
 ## 6. 決定事項と根拠
-- **ダッシュボード空ゾーンは常時表示（B案・2026-10-08）**＝不採用＝旧「ゾーンごと空で非表示」（データ更新で出入りして分かりにくい）。レイアウト安定を優先。正本＝`doc/設計ドラフト/ダッシュボード再設計・お知らせ_設計.md` §3.1。
-- **自作クエストを Zone E「所有」タブに再掲**＝旧 §6「SC-10 一覧へ移設」の一部差し戻し。SC-10 のスイッチは維持（ダッシュボード=要約・一覧=全件の役割分担）。
-- **ログインIDで候補/メンバーを絞り込み＋表示**＝同名ユーザー（例「E2E 発行太郎」複数）の判別。login_id は tenant `users.login_id`（accounts ミラー）。
-- **AI 系 env を compose へ配線**＝不採用＝backend に impl/.env をマウント（config 機構を変える・既存は compose 明示マッピング方式で統一）。既存パターンに合わせ backend_env に追加。
-- **残作業台帳は未完のみ保持・完了で削除**（CLAUDE.md 設計の正本に明記）。完了記録は commit/README/handoff。
+- **SC-55 採番**＝情報ファミリ（SC-50/51/52）に隣接する空き番号。会社マスタだが情報機能の一部のため 5x 系。
+- **`info_templates` と `info_items` は疎結合**＝登録後の情報はテンプレを参照せず不変。由来のみ `source_template_id`（NULL 許容 FK）に記録。存在しない id は NULL 無視、論理削除済み id は行が残るので記録（`create_info_item` で `get_template(include_deleted=True)` で解決）。
+- **テンプレ管理＝会社管理者**（`require_company_account_admin`＝`company_account_admin`/`system_admin`）、**閲覧/適用＝会社内 active 全員**（`require_me`）。`admin=1` 一覧は1ルートでロール再検証。
+- **【重要・方針転換 2026-10-09】リッチテキストは TipTap に全面移行してから D5 frontend を実装**。
+  - 範囲＝**全部（TT1〜TT5）やり切る**（ユーザー決定）。
+  - **保存形式＝PM-JSON（設計 §4-2 の選択肢2）**。§4 既定案（HTML 据え置き）は**不採用**。理由＝richtext は死活要件で将来拡張（表/画像/協調 Yjs）・直列化の決定性・サニタイズ相性で PM-JSON が優位。最大の難点だった「既存 `body_html` のデータ移行コスト」は**既存データ全削除可（全てテストデータ・ユーザー言明）**で消えるため、PM-JSON が妥当。→ ユーザーの問い「より良い対応は2で良い？」への回答＝**Yes（2=PM-JSON を推奨・採用）**。
+  - document プリセットの拡張＝**基本（見出し/リスト/強調/リンク/引用）＋画像(MinIO 再ホスト)＋表＋コードブロック**。チャットは軽量プリセット。
+  - チャット（TT5）は最後＝当面 plain 据え置き、メンション契約 E-TC-211/229 を移植してからノード化。
+  - **未確定（実装時に要判断）**＝設計 §4-4 バンドル/SSR（Next App Router の client component 化・動的 import・初期バンドル許容ライン）。
 
-## 7. 次にやること（優先順）
-> 着手前に実コードで裏取り（memory を信用しすぎない）。残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`。
+## 7. 次にやること（優先順・ファイル/関数レベル）
+> 着手前に実コードで裏取り。残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`（`1-b` の TT0〜TT5＋D5 行）。
 
-1. **【ユーザー要望・次セッション冒頭】D5 情報インプット テンプレート機能に着手**＝正本 `doc/設計ドラフト/情報インプットテンプレート機能_設計.md`（新規 `info_templates`・会社DB／SC-51 登録編集モーダル拡張＋SC-5x テンプレート管理マスタ／API は `doc/API設計/N_情報インプット` に追記）。実装先＝`impl/backend/app/tenant/info/`（orm/repository/application/router/schemas 一式あり・テンプレート表/EP は未実装）。着手手順＝設計ドラフトを データモデル→API設計→画面設計→テスト TC に正式反映してから migration＋backend→frontend。
-2. **バックログの他 D 項目**（`doc/バックログ/未実装・ギャップ一覧.md`）＝D1 帳票V（TC 先出し済 `doc/テスト/V_帳票.md`・`reports`/`billing` ドメイン無し）／D2 AI駆動型アイデア生成（`idea_generate` task_type 無し）／D3 カメリオ／D4 情報動的タブ／D6 SOPS／D7 アイデアを探す。
-3. **ISO ギャップ G2 ポートフォリオ / G3 指標ダッシュボード（高）**・**X1 §2.1 監査6カラム未準拠（要討議）**・O1 ZAP DAST。
-4. **AI 機能のローカル実動作確認（任意）**＝`impl/.env` に `LLM_AUTO_EVALUATE_ON_PUBLISH=true`＋`docker compose --profile ai up -d ollama`＋`ollama pull bge-m3`/`qwen3:4b`＋`--profile workers,ai up -d --build llm-worker`＋会社でモデル ON → アイデア published で AI 評価が自動投入されるか。
+1. **TT1 TipTap 共有基盤（最優先・TC 先出し）**＝`impl/frontend/src/components/richtext/RichTextEditor.tsx`・`RichTextView.tsx`・`richtext.css` を TipTap(ProseMirror) ラッパへ置換。props＝`preset:"document"|"chat"`・`value`(PM-JSON)・`onChange`・`mentionSource?`・`uploadImage?`。document 拡張＝見出し/リスト/強調/リンク/引用/画像/表/コードブロック。TipTap 依存を `impl/frontend/package.json` に追加（`@tiptap/react`・`@tiptap/starter-kit`・table/image/codeblock 拡張）。**TC 先出し**＝サニタイズ（XSS）・直列化決定性（PM-JSON→許可タグ）を該当 md に `根拠` 列付きで追加（テスト規約 §5）。
+2. **TT0 保存形式 PM-JSON 化（backend）**＝`app/core/richtext.py` のサニタイズを「PM-JSON→直列化 HTML の許可リスト一致」に。document 系の `*_html` 列（`announcements`・`info_items.body_html`・`info_templates.body_html` 等）を **PM-JSON 列へ作り直す migration**（既存データ全削除可）。**D5 の `info_templates`/`info_items` もこの時に PM-JSON へ移行**（現状 HTML で実装済みのため列/サニタイズを合わせる）。
+3. **TT2 お知らせ差替**＝`features/announcements/components/AnnouncementAdminView.tsx`・`AnnouncementDetailView.tsx`（既に共有部品使用＝影響局所）。
+4. **TT3 情報インプット移行**＝`features/info-input/components/InfoFormPanel.tsx`・`InfoDetailView.tsx`・`growableResize.ts`・`info-input.css` の独自 contentEditable を撤去し共有部品へ。
+5. **TT4＝D5 frontend 本実装**＝新共有部品の上で `features/info-templates`（新規・SC-55）＝一覧（`GET /info-templates?admin=1` の DataTable サーバー委譲）＋URL 付きモーダル（登録/編集・本文ひな形は共有 RichTextEditor・属性既定セレクト＋カテゴリ）＋有効無効/複製/論理削除。SC-51 ピッカー結線＝`features/info-input/components/InfoFormPanel.tsx` に「テンプレートから作成」（`GET /info-templates`＋適用は `GET /info-templates/{id}`・{{today}} クライアント展開・上書き確認）。モック＝`doc/画面設計/mocks/SC-55_情報テンプレート管理.html`・`SC-50_情報インプット.html`。`cd impl/frontend && npm run codegen`（backend 再ビルド後）で型再生成。受入ゲート＝ユーザー動作確認。
+6. **TT5 チャット（最後・別EP）**＝`features/chat/components/IdeaChatView.tsx`・`features/chat/render.ts`＋`render.test.ts`（E-TC-211/229 契約移植）。ideas/concepts へ波及注意（memory `chat-thread-independence`）。
+7. 完了時＝`impl/README.md` 現況更新・バックログ台帳から完了行削除・handoff 全文更新。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ：`/home/t-umekawa/sc-ideaquest-G2`（実装 `impl/`・frontend `impl/frontend`・backend `impl/backend`）。compose は `impl/compose.yaml`。
 - 起動：`cd impl && docker compose up -d`。backend=`:8000`・frontend=`:3000`・openapi=`:8000/openapi.json`・MailHog=`:8025`・MinIO=`:9000`/コンソール`:9001`。
-- **反映（ソースベイク・volumes 無）**：`cd impl && docker compose up -d --build backend|frontend`。型再生成＝`cd impl/frontend && npm run codegen`（backend 再ビルド後）。env だけ変えた時は `docker compose up -d backend`（再ビルド不要）。
-- workers（必ず `--build`）：`cd impl && docker compose --profile workers up -d --build worker mail-worker`。AI は `--profile ai` で `ollama`＋`--profile workers` で `llm-worker`。確認後 `docker compose stop ...`。
+- **反映（ソースベイク・volumes 無）**：`cd impl && docker compose up -d --build backend|frontend`。env だけ変えた時は `docker compose up -d backend`（再ビルド不要）。型再生成＝`cd impl/frontend && npm run codegen`（backend 再ビルド後）。
 - テスト：
-  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット/新規テスト反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（entrypoint が bootstrap=migrate+seed→pytest）。
+  - backend（ベイク）`cd impl && docker compose exec -T backend pytest <path> -q`。**未コミット/新規テスト反映は** `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend pytest <path> -q`（entrypoint が bootstrap=migrate+seed→pytest）。今セッションのテンプレテストはこの方式で green。
   - frontend `cd impl/frontend && npm run build`（lint＋コンパイル必須ゲート）／`npx vitest run <path>`／e2e `npx playwright test <spec> -g "<TC>" --workers=1`。
   - TC トレーサビリティ：`cd /home/t-umekawa/sc-ideaquest-G2 && python3 scripts/check_tc_traceability.py`（リポジトリ**ルート**で実行）。
-- `.env`（`impl/.env`・gitignore 追跡外）＝`impl/.env.example` をコピーして使う。compose は明示マッピング方式＝`.env.example`/compose に無い変数は backend に届かない。
 - DB直接：`cd impl && docker compose exec -T db psql -U ideaquest -d ideaquest_control`（control）／`-d ideaquest_company_acme`（会社）。資格＝`ideaquest`/`ideaquest`。
-- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin・display_name=「ACME 管理者」）／OPS `admin@ops.example`（system_admin・会社`OPS`）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`。
-- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium・form ログインは `#company_code`/`#login_id`/`#password`・`page.request` は絶対URL＋CSRF ヘッダ `X-CSRF-Token`＝`iq_csrf` cookie）を作り**使い終わったら削除**。検証用に作ったクエスト等は API で DELETE して後始末。**必ず新コンテナ起動後に実行**。
+- ログイン（PW いずれも `Passw0rd!`）：一般 `ACME-01`/`user@acme.example`（MFA OFF）／管理 `ACME-01`/`kanri@acme.example`（company_account_admin）／OPS `admin@ops.example`（system_admin）／MFA `ACME-02`/`mfa@acme2.example`／DEMO `DEMO`/`admin@demo.example`。
+- 目視検証の型：`impl/frontend` に使い捨て `_*.mjs`（Playwright chromium）を作り**使い終わったら削除**。モックの目視は `file:///.../doc/画面設計/mocks/SC-xx_*.html` を chromium で開く（shared.js の DataTable/iqSnack/iqConfirm が動く）。
