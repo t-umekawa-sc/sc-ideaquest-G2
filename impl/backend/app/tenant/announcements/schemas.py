@@ -1,10 +1,19 @@
 """お知らせ（U・FR-49）の I/O スキーマ。body_text/published_at/created_by/監査はサーバー生成
-（クライアントから受け取らない＝マスアサインメント防止・§2.2）。body_html は保存時サニタイズ。"""
+（クライアントから受け取らない＝マスアサインメント防止・§2.2）。
+
+本文リッチテキスト＝**PM-JSON（TipTap）を `body` で授受**（正本）。保存時に `sanitize_pm` で無害化し、
+表示用 `body_html`（`pm_to_html`・サニタイズ済）を併せて返す。クライアントは編集に `body`、表示に
+`body_html`（dangerouslySetInnerHTML）を使う。"""
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+def _empty_doc() -> dict[str, Any]:
+    return {"type": "doc", "content": []}
 
 
 class AnnouncementListItem(BaseModel):
@@ -35,7 +44,8 @@ class AnnouncementAuthor(BaseModel):
 class AnnouncementDetail(BaseModel):
     id: str
     title: str
-    body_html: str                    # サニタイズ済（nh3）＝フロントは dangerouslySetInnerHTML で安全表示
+    body: dict[str, Any] = Field(default_factory=_empty_doc)  # PM-JSON 正本（エディタのプリフィル用）
+    body_html: str                    # pm_to_html の派生（サニタイズ済）＝フロントは dangerouslySetInnerHTML で安全表示
     pinned: bool = False
     published_at: datetime | None = None
     starts_at: datetime | None = None
@@ -68,7 +78,7 @@ class AdminAnnouncementListResponse(BaseModel):
 
 class AnnouncementCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    body_html: str = ""
+    body: dict[str, Any] = Field(default_factory=_empty_doc)  # PM-JSON（保存時 sanitize_pm）
     status: str = "draft"             # draft|published（archived は PATCH で遷移）
     pinned: bool = False
     starts_at: datetime | None = None
@@ -77,7 +87,7 @@ class AnnouncementCreateRequest(BaseModel):
 
 class AnnouncementUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=255)
-    body_html: str | None = None
+    body: dict[str, Any] | None = None  # PM-JSON（保存時 sanitize_pm）
     status: str | None = None         # draft|published|archived
     pinned: bool | None = None
     starts_at: datetime | None = None

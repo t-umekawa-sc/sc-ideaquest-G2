@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Button, Combobox, DataTable, Field, Modal, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
-import { RichTextEditor } from "@/components/richtext/RichTextEditor";
+import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import {
   createAnnouncement, deleteAnnouncement, getAnnouncement, listAdminAnnouncements,
   updateAnnouncement, uploadAnnouncementImageApi, type AdminAnnouncementItem,
@@ -32,7 +32,7 @@ export function AnnouncementAdminView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
-  const [bodyHtml, setBodyHtml] = useState("");
+  const [body, setBody] = useState<RichTextValue>(EMPTY_DOC);  // 本文＝PM-JSON（TipTap）
   const [status, setStatus] = useState("draft");
   const [pinned, setPinned] = useState(false);
   const [startsAt, setStartsAt] = useState("");
@@ -48,18 +48,18 @@ export function AnnouncementAdminView() {
   }, [reload]);
 
   function openCreate() {
-    setEditingId(null); setTitle(""); setBodyHtml(""); setStatus("draft"); setPinned(false);
+    setEditingId(null); setTitle(""); setBody(EMPTY_DOC); setStatus("draft"); setPinned(false);
     setStartsAt(""); setEndsAt(""); setTitleErr(null); setOpen(true);
   }
   async function openEdit(row: Row) {
     setEditingId(row.id); setTitleErr(null);
     setTitle(row.title); setStatus(row.status); setPinned(row.pinned);
     setStartsAt((row.starts_at ?? "").slice(0, 10)); setEndsAt((row.ends_at ?? "").slice(0, 10));
-    setBodyHtml("");
+    setBody(EMPTY_DOC);
     setOpen(true);
-    // 本文(body_html)は一覧DTOに無い＝詳細を取得してプリフィル（公開物のみ GET 可なので取れないときは空）。
+    // 本文(PM-JSON)は一覧DTOに無い＝詳細を取得してプリフィル（公開物のみ GET 可なので取れないときは空）。
     const d = await getAnnouncement(row.id).catch(() => null);
-    if (d) setBodyHtml(d.body_html ?? "");
+    if (d?.body) setBody(d.body as RichTextValue);
   }
 
   async function togglePin(row: Row) {
@@ -91,10 +91,10 @@ export function AnnouncementAdminView() {
     const period = { starts_at: toIso(startsAt), ends_at: toIso(endsAt) };
     try {
       if (editingId) {
-        await updateAnnouncement(editingId, { title: title.trim(), body_html: bodyHtml, status, pinned, ...period });
+        await updateAnnouncement(editingId, { title: title.trim(), body, status, pinned, ...period });
         snack({ type: "success", title: "お知らせを更新しました" });
       } else {
-        await createAnnouncement({ title: title.trim(), body_html: bodyHtml, status: status === "archived" ? "draft" : status, pinned, ...period });
+        await createAnnouncement({ title: title.trim(), body, status: status === "archived" ? "draft" : status, pinned, ...period });
         snack({ type: "success", title: "お知らせを作成しました" });
       }
       setOpen(false);
@@ -174,7 +174,7 @@ export function AnnouncementAdminView() {
               <input className="input" id="an-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）年末アイデアソン開催のお知らせ" />
             </Field>
             <Field id="an-body" label="本文">
-              <RichTextEditor value={bodyHtml} onChange={setBodyHtml} uploadImage={uploadAnnouncementImageApi} placeholder="お知らせ本文（見出し・強調・箇条書き・リンク・画像）…" ariaLabel="お知らせ本文" />
+              <RichTextEditor value={body} onChange={setBody} preset="document" uploadImage={uploadAnnouncementImageApi} placeholder="お知らせ本文（見出し・強調・箇条書き・リンク・画像）…" ariaLabel="お知らせ本文" />
             </Field>
             <div className="row-2">
               <Field id="an-status" label="状態">

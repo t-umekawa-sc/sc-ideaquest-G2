@@ -57,11 +57,11 @@ def list_admin_announcements(request: Request, session: dict = Depends(require_m
 
 @router.post("/admin/announcements", response_model=dict, status_code=201,
              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
-def create_announcement(body: AnnouncementCreateRequest, request: Request, session: dict = Depends(require_me)):
+def create_announcement(payload: AnnouncementCreateRequest, request: Request, session: dict = Depends(require_me)):
     return service.create_announcement(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-        title=body.title, body_html=body.body_html, status=body.status, pinned=body.pinned,
-        starts_at=body.starts_at, ends_at=body.ends_at)
+        title=payload.title, body=payload.body, status=payload.status, pinned=payload.pinned,
+        starts_at=payload.starts_at, ends_at=payload.ends_at)
 
 
 @router.post("/admin/announcements/images", response_model=AnnouncementImageUploadResponse, status_code=201,
@@ -85,11 +85,11 @@ async def rehost_announcement_image(
 
 @router.patch("/admin/announcements/{announcement_id}", response_model=dict,
               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
-def update_announcement(announcement_id: str, body: AnnouncementUpdateRequest, request: Request,
+def update_announcement(announcement_id: str, payload: AnnouncementUpdateRequest, request: Request,
                         session: dict = Depends(require_me)):
     return service.update_announcement(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), announcement_id,
-        body.model_dump(exclude_unset=True))
+        payload.model_dump(exclude_unset=True))
 
 
 @router.delete("/admin/announcements/{announcement_id}", status_code=204,

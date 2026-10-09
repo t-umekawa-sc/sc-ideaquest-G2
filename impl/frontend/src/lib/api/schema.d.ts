@@ -3879,6 +3879,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/info-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Info Templates
+         * @description テンプレート一覧（N.5b）＝既定はピッカー供給（有効のみ・軽量）／`admin=1` は管理一覧（会社管理者）。読取専用。
+         *
+         *     1ルートで2用途＝`admin=1` の時だけ会社管理者ロールをサーバーで再検証（非管理者は 403）。
+         */
+        get: operations["list_info_templates_api_v1_info_templates_get"];
+        put?: never;
+        /**
+         * Create Info Template
+         * @description テンプレート追加（SC-55・N.5b）＝会社管理者。body_html サニタイズ＋defaults 検証＋name 一意（409）。
+         */
+        post: operations["create_info_template_api_v1_info_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Info Template
+         * @description テンプレート詳細（適用用・N.5b）＝有効のみ。無効/論理削除/他テナントは 404。会社内 active 全員。読取専用。
+         */
+        get: operations["get_info_template_api_v1_info_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Info Template
+         * @description テンプレート削除（SC-55・N.5b・論理）＝会社管理者。既存 info_items（source_template_id）は不変。
+         */
+        delete: operations["delete_info_template_api_v1_info_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Info Template
+         * @description テンプレート編集（SC-55・N.5b・部分更新）＝会社管理者。
+         */
+        patch: operations["update_info_template_api_v1_info_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/info-templates/{template_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Info Template
+         * @description 有効化（SC-55・N.5b）＝会社管理者。
+         */
+        post: operations["activate_info_template_api_v1_info_templates__template_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-templates/{template_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Info Template
+         * @description 無効化（SC-55・N.5b＝新規ピッカーから除外・既存情報は不変）＝会社管理者。
+         */
+        post: operations["deactivate_info_template_api_v1_info_templates__template_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/strategy-documents": {
         parameters: {
             query?: never;
@@ -5218,11 +5312,10 @@ export interface components {
         AnnouncementCreateRequest: {
             /** Title */
             title: string;
-            /**
-             * Body Html
-             * @default
-             */
-            body_html: string;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /**
              * Status
              * @default draft
@@ -5244,6 +5337,10 @@ export interface components {
             id: string;
             /** Title */
             title: string;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /** Body Html */
             body_html: string;
             /**
@@ -5320,8 +5417,10 @@ export interface components {
         AnnouncementUpdateRequest: {
             /** Title */
             title?: string | null;
-            /** Body Html */
-            body_html?: string | null;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            } | null;
             /** Status */
             status?: string | null;
             /** Pinned */
@@ -7925,6 +8024,8 @@ export interface components {
             due_date?: string | null;
             /** Categories */
             categories?: string[] | null;
+            /** Source Template Id */
+            source_template_id?: string | null;
         };
         /** InfoCreatorDTO */
         InfoCreatorDTO: {
@@ -8299,6 +8400,83 @@ export interface components {
              * @default 0
              */
             archived: number;
+        };
+        /**
+         * InfoTemplateCreateRequest
+         * @description POST /info-templates（会社管理者）。body_html はサーバー sanitize・defaults はキー/値検証（N.5b）。
+         */
+        InfoTemplateCreateRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Title Template */
+            title_template?: string | null;
+            /** Body Html */
+            body_html: string;
+            /** Defaults */
+            defaults?: {
+                [key: string]: unknown;
+            } | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /**
+         * InfoTemplateDetailDTO
+         * @description 適用用の1件詳細（GET /info-templates/{id}）＝本文/既定/タイトル雛形を含む。
+         */
+        InfoTemplateDetailDTO: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Title Template */
+            title_template?: string | null;
+            /** Body Html */
+            body_html: string;
+            /**
+             * Defaults
+             * @default {}
+             */
+            defaults: {
+                [key: string]: unknown;
+            };
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /**
+         * InfoTemplateUpdateRequest
+         * @description PATCH /info-templates/{id}（部分更新・会社管理者）。送られたキーのみ更新（model_fields_set）。
+         */
+        InfoTemplateUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Title Template */
+            title_template?: string | null;
+            /** Body Html */
+            body_html?: string | null;
+            /** Defaults */
+            defaults?: {
+                [key: string]: unknown;
+            } | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
         };
         /** InfoThreadDTO */
         InfoThreadDTO: {
@@ -18842,6 +19020,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InfoLinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_info_templates_api_v1_info_templates_get: {
+        parameters: {
+            query?: {
+                admin?: number;
+                q?: string | null;
+                is_active?: string | null;
+                include_deleted?: boolean;
+                sort?: string | null;
+                page?: number | null;
+                per_page?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_info_template_api_v1_info_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoTemplateCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTemplateDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_info_template_api_v1_info_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTemplateDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_info_template_api_v1_info_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_info_template_api_v1_info_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoTemplateUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTemplateDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_info_template_api_v1_info_templates__template_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTemplateDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_info_template_api_v1_info_templates__template_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoTemplateDetailDTO"];
                 };
             };
             /** @description Validation Error */

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
-from app.core.richtext import sanitize_html, to_plain_text
+from app.core.richtext import pm_to_html, pm_to_text, sanitize_pm
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.announcements import repository as repo
@@ -115,7 +115,7 @@ def get_announcement(account_id: uuid.UUID, company_id: uuid.UUID, announcement_
             raise AppError(404, "not_found")
         is_read = bool(repo.read_ids_for(ts, user.id, [a.id]))
         author = quests_repo.get_users_by_ids(ts, {a.created_by_id}).get(a.created_by_id)
-        return {"id": str(a.id), "title": a.title, "body_html": a.body_html, "pinned": a.pinned,
+        return {"id": str(a.id), "title": a.title, "body": a.body, "body_html": a.body_html, "pinned": a.pinned,
                 "published_at": a.published_at, "starts_at": a.starts_at, "ends_at": a.ends_at,
                 "created_by": {"display_name": author.display_name if author else None}, "is_read": is_read}
 
@@ -181,7 +181,7 @@ def rehost_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, c
     return {"url": media_proxy_path(key)}
 
 
-def create_announcement(account_id: uuid.UUID, company_id: uuid.UUID, *, title: str, body_html: str,
+def create_announcement(account_id: uuid.UUID, company_id: uuid.UUID, *, title: str, body: dict,
                         status: str, pinned: bool, starts_at, ends_at) -> dict:
     _require_admin(account_id)
     if status not in ("draft", "published"):
@@ -189,12 +189,12 @@ def create_announcement(account_id: uuid.UUID, company_id: uuid.UUID, *, title: 
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
-    clean = sanitize_html(body_html)
+    pm = sanitize_pm(body)  # PM-JSON を許可リストで無害化（正本）→ 表示用/検索用を派生
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        a = repo.create(ts, title=title.strip(), body_html=clean, body_text=to_plain_text(clean),
+        a = repo.create(ts, title=title.strip(), body=pm, body_html=pm_to_html(pm), body_text=pm_to_text(pm),
                         status=status, pinned=pinned, starts_at=starts_at, ends_at=ends_at,
                         published_at=datetime.now(timezone.utc) if status == "published" else None,
                         created_by_id=user.id)
@@ -214,9 +214,11 @@ def update_announcement(account_id: uuid.UUID, company_id: uuid.UUID, announceme
             raise AppError(404, "not_found")
         if "title" in patch and patch["title"] is not None:
             a.title = patch["title"].strip()
-        if "body_html" in patch and patch["body_html"] is not None:
-            a.body_html = sanitize_html(patch["body_html"])
-            a.body_text = to_plain_text(a.body_html)
+        if "body" in patch and patch["body"] is not None:
+            pm = sanitize_pm(patch["body"])  # PM-JSON を無害化（正本）→ 表示用/検索用を派生
+            a.body = pm
+            a.body_html = pm_to_html(pm)
+            a.body_text = pm_to_text(pm)
         if "pinned" in patch and patch["pinned"] is not None:
             a.pinned = bool(patch["pinned"])
         for f in ("starts_at", "ends_at"):

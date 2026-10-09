@@ -16,8 +16,13 @@ BASE = "/api/v1/announcements"
 ADMIN = "/api/v1/admin/announcements"
 
 
+def _pm(text: str = "本文") -> dict:
+    """テスト用 PM-JSON（1段落）。本文リッチテキストは PM-JSON（TipTap）で授受（TT0）。"""
+    return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
+
+
 def _mk(client, **over) -> dict:
-    body = {"title": f"お知らせ_{uuid.uuid4().hex[:6]}", "body_html": "<p>本文</p>", "status": "published", "pinned": False}
+    body = {"title": f"お知らせ_{uuid.uuid4().hex[:6]}", "body": _pm(), "status": "published", "pinned": False}
     body.update(over)
     r = client.post(ADMIN, json=body, headers=_csrf(client))
     assert r.status_code == 201, r.text
@@ -81,7 +86,7 @@ def test_u_tc_103_detail_visibility(client, factory):
         part = factory.make_seed_company_account(display_name=f"詳細_{uuid.uuid4().hex[:6]}")
         _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
         d = client.get(f"{BASE}/{pub['id']}")
-        assert d.status_code == 200 and "body_html" in d.json()
+        assert d.status_code == 200 and "body_html" in d.json() and "body" in d.json()  # 表示用HTML＋編集用PM-JSON
         assert client.get(f"{BASE}/{draft['id']}").status_code == 404
         assert client.get(f"{BASE}/{uuid.uuid4()}").status_code == 404
     finally:
@@ -115,7 +120,7 @@ def test_u_tc_105_admin_only(client, factory):
     try:
         part = factory.make_seed_company_account(display_name=f"一般_{uuid.uuid4().hex[:6]}")
         _login(client, SEED_COMPANY_CODE, part["login_id"], part["password"])
-        assert client.post(ADMIN, json={"title": "x", "body_html": "<p>x</p>"}, headers=_csrf(client)).status_code == 403
+        assert client.post(ADMIN, json={"title": "x", "body": _pm("x")}, headers=_csrf(client)).status_code == 403
         assert client.patch(f"{ADMIN}/{a['id']}", json={"pinned": True}, headers=_csrf(client)).status_code == 403
         assert client.delete(f"{ADMIN}/{a['id']}", headers=_csrf(client)).status_code == 403
         # 管理者は 200/204。
@@ -126,20 +131,36 @@ def test_u_tc_105_admin_only(client, factory):
 
 
 def test_u_tc_106_sanitize_and_published_at(client, factory):
-    """U-TC-106: body_html サニタイズ（XSS 無害化）＋body_text 派生＋published_at 設定。"""
+    """U-TC-106: PM-JSON を保存境界で無害化（body 正本＋派生 body_html/body_text）＋published_at 設定。
+
+    悪性 PM-JSON（未知ノード/javascript: リンク/生タグ混入テキスト）を送っても、派生 body_html は
+    許可リストで直列化され XSS が残らないこと（W-TC 群の sanitize_pm/pm_to_html が書込経路で効くこと）。"""
     _admin(client, factory)
-    dirty = '<p>安全<strong>太字</strong></p><script>alert(1)</script><img src=x onerror=alert(1)><a href="javascript:alert(1)">x</a>'
-    a = _mk(client, title="SAN", body_html=dirty, status="published")
+    dirty_pm = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [
+            {"type": "text", "text": "安全"},
+            {"type": "text", "text": "太字", "marks": [{"type": "bold"}]},
+            {"type": "text", "text": "<script>alert(1)</script>"},
+            {"type": "text", "text": "x", "marks": [{"type": "link", "attrs": {"href": "javascript:alert(1)"}}]},
+        ]},
+        {"type": "iframe", "attrs": {"src": "https://evil.example"}},  # 未知ノード＝除去
+    ]}
+    a = _mk(client, title="SAN", body=dirty_pm, status="published")
     ids = [a["id"]]
     try:
         with get_tenant_session(_seed_db()) as ts:
-            row = ts.execute(_text("SELECT body_html, body_text, published_at FROM announcements WHERE id=:i"),
+            row = ts.execute(_text("SELECT body, body_html, body_text, published_at FROM announcements WHERE id=:i"),
                              {"i": a["id"]}).one()
-        html, text, pub = row
-        assert "<script>" not in html and "onerror" not in html and "javascript:" not in html  # 無害化
-        assert "<strong>" in html                                   # 許可タグは残る
-        assert "<" not in text and "太字" in text                    # body_text は平文
-        assert pub is not None                                      # published→published_at 設定
+        body, html, text, pub = row
+        assert "<script" not in html and "javascript:" not in html and "<iframe" not in html  # XSS/未知ノード除去
+        assert "&lt;script&gt;" in html                              # 生タグはエスケープ
+        assert "<strong>太字</strong>" in html and "<a " not in html  # 許可マークは残る・不正リンクは除去
+        # body_text は平文（検索/抜粋用）＝構造タグを含まない。ユーザーが文字入力した "<" は平文に残ってよい
+        # （抜粋は React が {excerpt} でエスケープ描画＝非 HTML・安全）。
+        assert "<strong>" not in text and "<p>" not in text and "太字" in text and "安全" in text
+        kinds = {n.get("type") for n in body.get("content", [])}     # body（正本）は canonical PM へ正規化
+        assert kinds == {"paragraph"}                                # 未知 iframe ノードは保存されない
+        assert pub is not None                                       # published→published_at 設定
     finally:
         _cleanup(ids)
 

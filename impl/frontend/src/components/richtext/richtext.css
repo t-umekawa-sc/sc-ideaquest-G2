@@ -1,5 +1,5 @@
-/* リッチテキスト共有スタイル（情報インプット N.7 の .rt* を中立化・FR-49 お知らせ等で共用）。
-   表示＝.rt-view／編集＝.rt(枠)＋.rt__bar(ツールバー)＋.rt__area(contentEditable)。 */
+/* リッチテキスト共有スタイル（TipTap/ProseMirror・FR-49 お知らせ等で共用）。
+   表示＝.rt-view／編集＝.rt(枠)＋.rt__bar(ツールバー)＋.rt__area(=.ProseMirror 本体)。 */
 .rt-view { font-size: var(--text-sm); line-height: 1.8; }
 .rt-view img { max-width: 100%; border-radius: 6px; }
 .rt-view h1, .rt-view h2, .rt-view h3 { margin: var(--space-3) 0 var(--space-2); line-height: 1.4; }
@@ -15,10 +15,30 @@
 .rt__bar { display: flex; gap: 2px; flex-wrap: wrap; padding: 6px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
 .rt__bar button { border: 1px solid transparent; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: var(--text-sm); color: var(--color-text); }
 .rt__bar button:hover { background: var(--color-surface); border-color: var(--color-border); }
+.rt__bar button.is-active { background: var(--color-primary-soft); border-color: var(--color-primary-border); color: var(--color-primary); }
 .rt__bar button:disabled { opacity: .55; cursor: default; }
 .rt__err { margin: 6px 12px 10px; color: var(--color-danger); font-size: var(--text-sm); }
-.rt__area { box-sizing: border-box; min-height: 140px; overflow: hidden; resize: vertical; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; transition: background-color .12s; }
+.rt__area { box-sizing: border-box; min-height: 140px; max-height: 60vh; overflow-y: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; }
 .rt__area:focus { outline: none; }
-@media (prefers-reduced-motion: reduce) { .rt { transition: none; } .rt:focus-within { animation: none; } .rt__area { transition: none; } }
+.rt--loading { min-height: 184px; display: flex; align-items: center; justify-content: center; color: var(--color-text-subtle); font-size: var(--text-sm); }
+@media (prefers-reduced-motion: reduce) { .rt { transition: none; } .rt:focus-within { animation: none; } }
+/* ProseMirror 本体（.rt__area）内の要素スタイル＝表示(.rt-view)と揃える */
+.rt__area :first-child { margin-top: 0; }
+.rt__area p { margin: 0 0 var(--space-2); }
+.rt__area h1, .rt__area h2, .rt__area h3 { margin: var(--space-3) 0 var(--space-2); line-height: 1.4; }
+.rt__area ul, .rt__area ol { margin: 0 0 var(--space-2) var(--space-5); }
+.rt__area a { color: var(--color-primary); text-decoration: underline; }
+.rt__area blockquote { margin: 0 0 var(--space-2); padding-left: var(--space-3); border-left: 3px solid var(--color-border-strong); color: var(--color-text-muted); }
 .rt__area img { max-width: 100%; border-radius: 6px; }
-.rt__area:empty::before { content: attr(data-placeholder); color: var(--color-text-subtle); }
+.rt__area pre { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 10px; overflow-x: auto; font-size: var(--text-xs); }
+.rt__area code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rt__area table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-2); }
+.rt__area th, .rt__area td { border: 1px solid var(--color-border-strong); padding: 4px 8px; text-align: left; }
+.rt__area th { background: var(--color-surface-alt); }
+/* TipTap Placeholder（空のとき data-placeholder を薄く表示） */
+.rt__area p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--color-text-subtle); float: left; height: 0; pointer-events: none; }
+/* 表示側も表/コードブロックを整える */
+.rt-view pre { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 10px; overflow-x: auto; font-size: var(--text-xs); }
+.rt-view table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-2); }
+.rt-view th, .rt-view td { border: 1px solid var(--color-border-strong); padding: 4px 8px; text-align: left; }
+.rt-view th { background: var(--color-surface-alt); }
