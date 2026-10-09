@@ -293,20 +293,9 @@
 .info-tabmgr__add { display: flex; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
 .info-tabmgr__add .input { flex: 1; }
 
-/* サブタブのタブ操作（D4・ホバー ⋮ → 編集/アーカイブ）。モック＝_サブタブ_タブ操作_検討.html。 */
-.info-subtab-wrap { position: relative; display: inline-flex; align-items: center; padding-right: 2px; border-radius: var(--radius-sm); transition: background .12s; }
-.info-subtab-wrap:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
-.info-subtab__kebab { opacity: 0; pointer-events: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; margin-left: 2px; border: none; background: transparent; border-radius: var(--radius-full);
-  color: var(--color-text-muted); cursor: pointer; transition: opacity .12s, background .12s; }
-.info-subtab-wrap:hover .info-subtab__kebab,
-.info-subtab-wrap:focus-within .info-subtab__kebab,
-.info-subtab-wrap.is-open .info-subtab__kebab { opacity: 1; pointer-events: auto; }
-.info-subtab__kebab:hover { background: color-mix(in srgb, var(--color-primary) 16%, transparent); color: var(--color-text); }
-.info-subtab__menu { position: absolute; top: 100%; right: 0; z-index: 20; min-width: 150px;
-  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
-  box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.12)); padding: 4px; display: flex; flex-direction: column; }
-.info-subtab__menu button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none;
-  background: none; font: inherit; font-size: var(--text-sm); color: var(--color-text); padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
-.info-subtab__menu button:hover { background: var(--color-primary-soft); }
-.info-subtab__menu button.is-danger { color: var(--color-danger); }
+/* サブタブのタブ操作（D4）＝テーブルと同じ RowMenu（⋮）をホバーで出す。非予約タブのみ（render で制御）。 */
+.info-subtab-wrap .rowmenu { margin-left: 2px; display: inline-flex; align-items: center; }
+.info-subtab-wrap .rowmenu__trigger { opacity: 0; pointer-events: none; transition: opacity .12s; }
+.info-subtab-wrap:hover .rowmenu__trigger,
+.info-subtab-wrap:focus-within .rowmenu__trigger,
+.info-subtab-wrap .rowmenu__trigger[aria-expanded="true"] { opacity: 1; pointer-events: auto; }

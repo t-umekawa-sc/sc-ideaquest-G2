@@ -80,7 +80,6 @@ export function InfoListView() {
   const [activeTabId, setActiveTabId] = useState<string>(""); // 空=未選択（＝すべて／全件）
   const [manageTabs, setManageTabs] = useState(false);
   const [tabForm, setTabForm] = useState<{ mode: "add" | "edit"; tab?: InfoTab } | null>(null); // タブ追加/編集ダイアログ
-  const [tabMenuId, setTabMenuId] = useState<string | null>(null); // ホバー ⋮ メニューを開いているタブ
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<InfoCard | null>(null); // タブ移動（1件）対象
 
@@ -127,21 +126,9 @@ export function InfoListView() {
     setActiveTabId(id);
     setRefreshToken((n) => n + 1); // DataTable 再クエリ（QueryState 外の外部コントロール＝refreshToken bump）
     setOverflowOpen(false);
-    setTabMenuId(null);
   }, []);
 
-  // ⋮ メニューの外側クリックで閉じる。
-  useEffect(() => {
-    if (!tabMenuId) return;
-    const onDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest(".info-subtab-wrap")) setTabMenuId(null);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [tabMenuId]);
-
   const archiveTab = useCallback(async (t: InfoTab) => {
-    setTabMenuId(null);
     const ok = await confirm({ title: "タブをアーカイブ", msg: `「${t.name}」をアーカイブしますか？（配下に情報があるときは先に移動が必要です）` });
     if (!ok) return;
     try {
@@ -351,22 +338,17 @@ export function InfoListView() {
               // 非予約タブは manage 権限時にホバー ⋮（編集/アーカイブ）。「すべて」(system) は操作不可。
               const canOp = manageTabs && !t.is_system;
               return (
-                <span key={t.id} className={`info-subtab-wrap${tabMenuId === t.id ? " is-open" : ""}`}>
+                <span key={t.id} className="info-subtab-wrap">
                   <button type="button" role="tab" aria-selected={active}
                     className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
                     {t.name}<span className="info-subtab__n">{t.count}</span>
                   </button>
+                  {/* アクションメニューはテーブルと同じ RowMenu（ホバーで出現・CSS で非予約タブのみ）。 */}
                   {canOp && (
-                    <>
-                      <button type="button" className="info-subtab__kebab" aria-label={`${t.name} の操作`} aria-haspopup="menu"
-                        onClick={(e) => { e.stopPropagation(); setTabMenuId((cur) => (cur === t.id ? null : t.id)); }}>⋮</button>
-                      {tabMenuId === t.id && (
-                        <span className="info-subtab__menu" role="menu">
-                          <button type="button" role="menuitem" onClick={() => { setTabMenuId(null); setTabForm({ mode: "edit", tab: t }); }}>✏️ 編集</button>
-                          <button type="button" role="menuitem" className="is-danger" onClick={() => archiveTab(t)}>🗃 アーカイブ</button>
-                        </span>
-                      )}
-                    </>
+                    <RowMenu label={`${t.name} の操作`} items={[
+                      { label: "編集", onClick: () => setTabForm({ mode: "edit", tab: t }) },
+                      { label: "アーカイブ", danger: true, onClick: () => archiveTab(t) },
+                    ]} />
                   )}
                 </span>
               );
