@@ -182,7 +182,9 @@ def test_k_tc_004_get_me(client, factory):
     body = r.json()
     # K.1 正準形＝account/profile/balance/game_mode/system_role/company のネスト（company＝FR-48 §8.0 の access_mode）
     assert set(body.keys()) == {"account", "profile", "balance", "game_mode", "system_role", "company"}
-    assert body["company"] == {"access_mode": "private"}  # シード会社は既定 private（公開モードは system_admin が切替）
+    # company＝access_mode（FR-48 §8.0・既定 private）＋report_enabled（帳票機能の可否・FR-51・REPORT_RENDERER 由来）。
+    assert body["company"]["access_mode"] == "private"
+    assert set(body["company"].keys()) == {"access_mode", "report_enabled"}
     assert body["account"]["login_id"] == acc["login_id"]
     assert set(body["account"].keys()) == {"login_id", "email", "locale", "reduce_motion", "mascot_follow"}
     assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "idea_icon_image_url", "background_image_url", "avatar_base"}

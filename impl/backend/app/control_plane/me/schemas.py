@@ -82,6 +82,7 @@ class MeGameModeDTO(BaseModel):
 class MeCompanyDTO(BaseModel):
     """会社の公開/非公開モード（FR-48 §8.0）＝frontend の着地/ナビ分岐の権威（403 の権威は backend 外周ゲート）。"""
     access_mode: str  # "private" | "public"
+    report_enabled: bool = True  # 帳票機能の可否（REPORT_RENDERER!=none）＝SC-93 の請求書 DL ボタンの活性制御（FR-51・設計 §13）
 
 
 class MeResponse(BaseModel):

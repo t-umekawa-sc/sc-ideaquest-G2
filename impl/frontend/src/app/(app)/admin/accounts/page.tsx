@@ -14,7 +14,7 @@ export default async function OwnAccountsPage() {
   // クエストグループ CRUD は会社アカ管理者へ委任（B.2.1・2026-09-06）＝自社スコープ（scope="own"）で同画面に配置。
   // 並び＝見出し/自社バナー → クエストグループ（children＝表の前）→ アカウント表 → 能力（capability）付与（after＝表の後・SC-92 と統一）。
   return (
-    <AccountSelfSection companyCode={session.company_code} after={<CapabilitiesSection />}>
+    <AccountSelfSection companyId={session.company_id} companyCode={session.company_code} after={<CapabilitiesSection />}>
       <QuestGroupSection scope="own" />
     </AccountSelfSection>
   );

@@ -93,7 +93,9 @@ def _me(account: Account, user: "User | None", company_default: bool = True,
         },
         "system_role": account.system_role,
         # 会社の公開/非公開モード（FR-48 §8.0）＝frontend の着地/ナビ分岐の権威（403 は backend 外周ゲート）。
-        "company": {"access_mode": access_mode},
+        # report_enabled＝帳票機能の可否（REPORT_RENDERER!=none・デプロイ全体）＝SC-93 請求書 DL ボタンの活性制御（FR-51）。
+        "company": {"access_mode": access_mode,
+                    "report_enabled": get_settings().report_renderer != "none"},
     }
 
 

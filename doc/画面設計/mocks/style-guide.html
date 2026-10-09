@@ -229,6 +229,124 @@
     <div class="sg-frozen-banner">⏸ このクエストは完了済みのため、投稿は締め切られています。</div>
   </div>
 
+  <!-- 3c. 帳票ダウンロードボタン & 帳票出力ダイアログ（提案） -->
+  <div class="section">
+    <h2>3c. 帳票ダウンロードボタン &amp; 帳票出力ダイアログ（提案・2026-10-09）<span class="badge">提案</span></h2>
+    <p class="muted text-sm">新規＝<strong>帳票（PDF 等）出力の標準</strong>。① <strong>帳票DLボタン</strong>（<strong>帳票アイコン🧾＋⬇</strong>・PDF 固定ではない＝将来 xlsx/csv でも同じ入口）を押すと、② <strong>帳票出力ダイアログ</strong>（印刷ダイアログ風＝左に書面プレビュー・右に出力オプション）が開き、対象期間/形式を選んで<strong>ダウンロード</strong>する。今後の帳票機能でも本ボタンとダイアログを再利用する。初出＝使用料請求書（SC-93・FR-51）。</p>
+
+    <style>
+      .btn-report { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font:inherit; font-weight:600;
+        background:var(--color-surface); color:var(--color-text); border:1.5px solid var(--color-border-strong);
+        border-radius:10px; cursor:pointer; transition:background .12s, border-color .12s, box-shadow .12s; }
+      .btn-report:hover { background:var(--color-surface-alt); border-color:var(--color-primary); box-shadow:var(--shadow); }
+      .btn-report:active { transform:translateY(1px); }
+      .btn-report:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
+      /* 帳票アイコン（PDF 固定ではない＝汎用の書類アイコン）。将来 xlsx/csv でも同じ入口で使う。 */
+      .btn-report__doc { font-size:1.1em; line-height:1; }
+      .btn-report__dl { color:var(--color-primary); font-size:1.05em; line-height:1; }
+
+      .report-dialog { display:grid; grid-template-columns:auto 1fr; gap:var(--space-6); align-items:start; }
+      .report-doc { width:132px; flex:0 0 auto; }
+      .report-doc__page { position:relative; aspect-ratio:1 / 1.414; background:#fff; border:1px solid var(--color-border);
+        border-radius:6px; box-shadow:var(--shadow); padding:14px 12px; overflow:hidden; }
+      .report-doc__h { height:9px; width:62%; background:#DBEAFE; border-radius:2px; margin-bottom:12px; }
+      .report-doc__l { height:5px; background:var(--color-border); border-radius:2px; margin:7px 0; }
+      .report-doc__l.s { width:50%; } .report-doc__l.m { width:78%; }
+      .report-doc__total { height:8px; width:42%; background:#94A3B8; border-radius:2px; margin-top:14px; margin-left:auto; }
+      .report-doc__badge { position:absolute; right:-6px; bottom:12px; background:var(--color-danger); color:#fff;
+        font-size:11px; font-weight:800; padding:3px 7px; border-radius:4px; box-shadow:var(--shadow); }
+      .report-fields .field { margin-bottom:var(--space-4); }
+      .report-fields .field:last-child { margin-bottom:0; }
+      .report-fmts { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+      .report-fmt { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:1.5px solid var(--color-border-strong);
+        border-radius:999px; cursor:pointer; font-size:var(--text-sm); }
+      .report-fmt.is-on { border-color:var(--color-primary); background:#EFF4FF; color:var(--color-primary); font-weight:700; }
+      .report-fmt input { accent-color:var(--color-primary); }
+      .report-note { display:flex; align-items:flex-start; gap:6px; margin:0 0 var(--space-4); padding:var(--space-2) var(--space-3);
+        font-size:var(--text-sm); color:var(--color-text); background:#FEF3C7; border:1px solid #FCD34D; border-radius:var(--radius); }
+      .report-note__icon { flex:0 0 auto; }
+      .sg-report-modalwrap { margin-top:var(--space-4); }
+      @media (max-width:560px){ .report-dialog { grid-template-columns:1fr; } .report-doc { width:108px; margin:0 auto; } }
+    </style>
+
+    <h3>① カード上の帳票DLボタン（<code>.btn-report</code>）</h3>
+    <div class="card" style="max-width:600px">
+      <h2 style="margin-top:0">使用料請求書</h2>
+      <p class="muted text-sm">対象期間を選んで自社の使用料請求書の PDF を出力します。帳票はサーバー経由で生成されます。</p>
+      <button class="btn-report" type="button">
+        <span class="btn-report__doc" aria-hidden="true">🧾</span>請求書を出力 <span class="btn-report__dl" aria-hidden="true">⬇</span>
+      </button>
+      <p class="hint" style="margin-top:var(--space-3)">緑の発進ボタン（ゲーム層）や青の primary（保存系）と区別＝<strong>ニュートラル枠＋帳票アイコン🧾＋⬇</strong>で「帳票の出力」だと一目でわかる（PDF 固定ではない）。機能オフ時は <code>disabled</code>（下記）。</p>
+      <p style="margin-top:var(--space-2)"><button class="btn-report" type="button" disabled title="この環境では帳票機能が無効です"><span class="btn-report__doc" aria-hidden="true">🧾</span>請求書を出力 <span class="btn-report__dl" aria-hidden="true">⬇</span></button></p>
+    </div>
+
+    <h3 style="margin-top:var(--space-6)">①' ボタンのみパターン（「AI・LLM設定」と同じ並び）<span class="badge">✅ 採用</span></h3>
+    <p class="muted text-sm">カード（見出し＋説明）を置かず、<strong>自社バナー直下の導線ボタン群</strong>に1つ足すだけの最小パターン。押すと②のダイアログが開く。<strong>採用＝AI・LLM設定と同じ <code>.btn-outline</code> ベース（統一感）＋ 帳票アイコン🧾＋⬇（「帳票出力」を明示・PDF 固定ではない）</strong>のハイブリッド。</p>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center">
+      <a class="btn btn-outline" href="#" onclick="return false">🤖 AI・LLM設定</a>
+      <button class="btn btn-outline btn-report-inline" type="button"><span class="btn-report__doc" aria-hidden="true">🧾</span>使用料請求書（サンプル） <span class="btn-report__dl" aria-hidden="true">⬇</span></button>
+      <span class="muted text-sm">← ✅ 採用＝<code>.btn-outline</code>＋帳票アイコン🧾＋⬇</span>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn btn-outline btn-report-inline" type="button" disabled title="この環境では帳票機能が無効です"><span class="btn-report__doc" aria-hidden="true">🧾</span>使用料請求書（サンプル） <span class="btn-report__dl" aria-hidden="true">⬇</span></button>
+      <span class="muted text-sm">← 機能オフ時（<code>REPORT_RENDERER=none</code>）＝disabled＋ツールチップ</span>
+    </div>
+    <p class="hint" style="margin-top:var(--space-3)">※ 押下で②の帳票出力ダイアログが開く。カードは作らず、AI・LLM設定の隣に1つ足すだけ。</p>
+    <style>
+      /* 採用＝.btn-outline に PDF チップ＋⬇ を内包（アイコンのみ案B・ベースは案A）。 */
+      .btn-report-inline { display:inline-flex; align-items:center; gap:8px; }
+    </style>
+
+    <h3 style="margin-top:var(--space-6)">② 帳票出力ダイアログ（印刷ダイアログ風）</h3>
+    <div class="sg-report-modalwrap" style="max-width:600px">
+      <div class="modal__panel sectioned">
+        <div class="modal__header">
+          <h2>使用料請求書の出力</h2>
+          <span style="display:inline-flex; gap:8px; align-items:center">
+            <button class="modal__maxbtn" type="button" aria-label="最大化" title="最大化" style="width:32px;height:32px;border-radius:var(--radius);border:1px solid var(--color-border);background:var(--color-surface);cursor:pointer">⤢</button>
+            <button class="modal__close" type="button" aria-label="閉じる">✕</button>
+          </span>
+        </div>
+        <div class="modal__body">
+          <p class="muted text-sm" style="margin-top:0">対象期間と形式を選んで出力します。他社の請求書は取得できません（自社のみ）。</p>
+          <p class="report-note" role="note"><span class="report-note__icon" aria-hidden="true">⚠️</span><span>現在はダミーデータ（固定のサンプル値）で生成されます。明細・金額は<strong>実際の請求内容ではありません</strong>。</span></p>
+          <div class="report-dialog">
+            <div class="report-doc" aria-hidden="true">
+              <div class="report-doc__page">
+                <div class="report-doc__h"></div>
+                <div class="report-doc__l m"></div>
+                <div class="report-doc__l"></div>
+                <div class="report-doc__l s"></div>
+                <div class="report-doc__l m"></div>
+                <div class="report-doc__l"></div>
+                <div class="report-doc__total"></div>
+                <span class="report-doc__badge">PDF</span>
+              </div>
+            </div>
+            <div class="report-fields">
+              <div class="field">
+                <label for="sg-rep-period">対象期間</label>
+                <input id="sg-rep-period" class="input" type="month" value="2026-10">
+              </div>
+              <div class="field">
+                <label>形式</label>
+                <div class="report-fmts">
+                  <label class="report-fmt is-on"><input type="radio" name="sg-rep-fmt" checked> PDF</label>
+                  <span class="muted text-sm">※ Excel / CSV は今後対応</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-outline dialog-close-left" type="button">キャンセル</button>
+          <button class="btn btn-primary" type="button"><span aria-hidden="true">⬇</span> ダウンロード</button>
+        </div>
+      </div>
+    </div>
+    <p class="hint">印刷ダイアログ風＝左に<strong>書面プレビュー</strong>（PDF バッジ付きの用紙モチーフ）、右に<strong>出力オプション</strong>（対象期間＝<strong>折返しのないフィールド</strong>／形式＝チップ選択）。フッター＝キャンセル→ダウンロード。実装は共通 <code>Modal</code>（ローカル state・印刷/出力の一過性アクション）で開く。</p>
+  </div>
+
   <!-- フォーム -->
   <div class="section">
     <h2>4. フォーム</h2>

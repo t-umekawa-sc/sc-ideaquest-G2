@@ -5953,11 +5953,6 @@ export interface components {
             access_mode: string;
             /** Account Count */
             account_count: number;
-            /**
-             * Report Enabled
-             * @default true
-             */
-            report_enabled: boolean;
         };
         /**
          * CompanyListItem
@@ -8893,6 +8888,11 @@ export interface components {
         MeCompanyDTO: {
             /** Access Mode */
             access_mode: string;
+            /**
+             * Report Enabled
+             * @default true
+             */
+            report_enabled: boolean;
         };
         /**
          * MeGameModeDTO

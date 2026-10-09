@@ -2,7 +2,7 @@
 
 > トレーサビリティ＝設計書→本 md（TC-ID・`根拠` 列）→テストコード（[テスト規約](../規約/テスト規約.md) §5）。TC-ID は `V-TC-1xx`（api/int）・`V-TC-2xx`（e2e/unit）で採番。設計元＝[帳票連携(JasperReports) 設計](../設計ドラフト/帳票連携(JasperReports)_設計.md)・[API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)。
 >
-> **状態＝TC 先出し（実装未着手・2026-10-08）**。各 Step 着手時に本 md へ TC 行（`根拠` 付き）を追加してからテストコードを書く（md 無しでコード書かない・CLAUDE.md）。**Jasper 呼び出しはテストを不安定化**＝レンダラは `FakeRenderer`（決定的スタブ・外部未接続）で差し替える（S ドメインの Fake ゲートウェイと同方針）。初版の縦1本＝`company_usage_invoice`（SC-92→API→レンダラ port→PDF バイト列ダウンロード）。
+> **状態＝実装済み（2026-10-09・V-TC-101〜108/201〜204/210/211 green）**。**Jasper 呼び出しはテストを不安定化**＝レンダラは `FakeRenderer`（決定的スタブ・外部未接続）で差し替える（S ドメインの Fake ゲートウェイと同方針）。初版の縦1本＝`company_usage_invoice`（SC-93 会社アカウント管理→API→レンダラ port→実 Jasper 描画→PDF バイト列ダウンロード）。
 
 ## 1. レンダラ port・切り離し（設計 §6/§12・V.4）
 
@@ -34,5 +34,5 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| V-TC-210 | e2e | SC-92 から請求書 PDF がダウンロードされる（同一オリジン GET・Cookie 認証） | 会社管理者ログイン・`fallback` or `jasper(Fake)` | SC-92 で期間選択→ダウンロードボタン | ブラウザにファイルが保存される（download イベント・filename 一致）・Jasper URL はフロントに露出しない | 設計 §13・V.3 |
-| V-TC-211 | e2e | 機能オフ時＝ボタン非活性＋ツールチップ | `REPORT_RENDERER=none` | SC-92 表示 | ボタン disabled・ツールチップ表示・押下不可 | 設計 §13 |
+| V-TC-210 | e2e | SC-93 から会社管理者が自社の請求書 PDF をダウンロード（同一オリジン GET・Cookie 認証） | 会社管理者/OPS ログイン・`jasper`（実描画）or `fallback` | SC-93（/admin/accounts）で期間選択→ダウンロードボタン | ブラウザにファイルが保存される（download イベント・filename `invoice-{code}-{period}.pdf`）・Jasper URL はフロントに露出しない | 設計 §13・V.3 |
+| V-TC-211 | e2e | 機能可否＝`GET /me` の `company.report_enabled` とボタン活性が一致（none で非活性＋ツールチップ） | デプロイの `REPORT_RENDERER` | SC-93 表示 | report_enabled=false ならボタン disabled・ツールチップ／true なら活性 | 設計 §13 |

@@ -108,3 +108,36 @@ test("B-TC-122 self issue with membership picker", { tag: "@serial" }, async ({ 
     await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible({ timeout: 1000 });
   }).toPass();
 });
+
+// V-TC-210: SC-93（会社アカウント管理・自社スコープ）の帳票DLボタン→帳票出力ダイアログ→ダウンロードで
+// 使用料請求書 PDF が落ちる（同一オリジン GET・Cookie 認証・Jasper URL 非露出・会社管理者の自社スコープ）。設計 §13・API設計 V.3。
+// e2e は OPS（system_admin・上位互換）でログイン＝自社=OPS の請求書を DL。dev 既定 REPORT_RENDERER=jasper＝実 Jasper 描画。
+test("V-TC-210 SC-93 downloads own usage invoice PDF", { tag: "@serial" }, async ({ page }) => {
+  await formLogin(page, OPS);
+  await page.goto("/admin/accounts");
+  // ①' 帳票DLボタン（AI・LLM設定の隣）→ ② 帳票出力ダイアログが開く。
+  await page.getByRole("button", { name: /使用料請求書/ }).click();
+  const dialog = page.getByRole("dialog", { name: "使用料請求書の出力" });
+  await expect(dialog).toBeVisible();
+  await dialog.locator("#invoice-period").fill("2026-09");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    dialog.getByRole("button", { name: /ダウンロード/ }).click(),
+  ]);
+  // ファイル名は invoice-{会社コード}-{期間}.pdf（Content-Disposition 由来・会社コードはセッション会社）。
+  expect(download.suggestedFilename()).toMatch(/^invoice-.+-2026-09\.pdf$/);
+});
+
+// V-TC-211: 帳票DLボタンの活性はデプロイの report_enabled（REPORT_RENDERER!=none・/me 由来）に一致＝none なら非活性+ツールチップ
+// （設計 §13）。env をテスト毎に切替えられないため、/me の report_enabled とボタンの disabled 状態の整合を検証する。
+test("V-TC-211 invoice button disabled state matches report_enabled", { tag: "@serial" }, async ({ page }) => {
+  await formLogin(page, OPS);
+  const me = await (await page.request.get(`/api/v1/me`)).json();
+  await page.goto("/admin/accounts");
+  const button = page.getByRole("button", { name: /使用料請求書/ });
+  if (me.company?.report_enabled) {
+    await expect(button).toBeEnabled();
+  } else {
+    await expect(button).toBeDisabled();
+  }
+});

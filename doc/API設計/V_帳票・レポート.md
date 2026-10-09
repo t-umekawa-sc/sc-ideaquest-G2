@@ -1,6 +1,6 @@
 # V. 帳票・レポート（JasperReports 疎結合連携・PDF 出力）
 
-> 横断規約＝[API設計 README](README.md)（§1.4 認証/CSRF・§1.5 テナント分離・§1.10 画像/ファイル）。設計元＝[帳票連携(JasperReports) 設計](../設計ドラフト/帳票連携(JasperReports)_設計.md)。画面＝[SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md)（請求書ダウンロード）。
+> 横断規約＝[API設計 README](README.md)（§1.4 認証/CSRF・§1.5 テナント分離・§1.10 画像/ファイル）。設計元＝[帳票連携(JasperReports) 設計](../設計ドラフト/帳票連携(JasperReports)_設計.md)。画面＝[SC-93 会社アカウント管理](../画面設計/screens/SC-93_会社アカウント管理.md)（会社管理者が**自社の**請求書をダウンロード・2026-10-09 決定＝SC-92 ではなく SC-93 に配置）。
 >
 > **状態＝実装済み（2026-10-09）**。帳票は**レンダラ port（`infra/reports`）**を介した疎結合構成＝「帳票データの組み立て（自前ドメイン `control_plane/billing/domain/invoice.py`）」と「描画（Jasper／純 Python fallback）」を分離。`REPORT_RENDERER=jasper|fallback|none` で着脱（§V.4）。**バックエンドが唯一の窓口**で、Jasper はブラウザに露出しない（S2S・内部ネットワーク `jasper_net`・公開ポート無）。実 Jasper サービス＝`impl/jasper`（JSON データプッシュ・`POST /render`・`X-Report-Secret`）。dev 既定 `REPORT_RENDERER=jasper`＝実 Jasper 描画の PDF を返す（エンドツーエンド確認済み）。TC＝[テスト V_帳票](../テスト/V_帳票.md)（V-TC-101〜108・201〜204・210/211 green）。
 
@@ -13,7 +13,7 @@
 - テナント/会社境界＝他社の `{company_id}` は存在秘匿で 404（README §1.5）。
 - ダウンロードは **GET（状態変更なし）** ゆえ CSRF 不要（README §1.4）。認証は Cookie セッション（同一オリジン）。
 
-## V.1 使用料請求書（会社詳細・同期ストリーム）
+## V.1 使用料請求書（会社アカウント管理 SC-93・同期ストリーム）
 
 | メソッド / パス | 説明 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
@@ -46,10 +46,11 @@
 - Jasper 側は jrxml を **JSON データアダプタ**で構成（SQL を除去）＝DB 資格情報不要（R4）。`report_key` はサービス内の `reports/{group}/{report_key}.jrxml` にマップ（ホワイトリスト・R5）。
 - 認証＝`X-Report-Secret` 一致（不一致は 401）。サンプルの未実装認証（R3）を埋める。
 
-## V.3 フロント連携（SC-92）
+## V.3 フロント連携（SC-93 会社アカウント管理）
 
+- **会社管理者が自社の請求書を自己サービスで取得**＝[SC-93](../画面設計/screens/SC-93_会社アカウント管理.md) に配置（`company_account_admin` 自社スコープ・2026-10-09 決定）。会社id はセッション会社を使う（`invoiceUrl(session.company_id, period)`）。
 - 既存 CSV エクスポートと同じ seam＝**同一オリジンの GET ナビゲーション**（`features/companies/api.ts` の `companiesCsvUrl()` に倣い `invoiceUrl(companyId, period)` を追加）。`window.open` で Jasper を直接叩かない。
-- `REPORT_RENDERER=none` 時はボタン非活性＋ツールチップ（設計 §13）。
+- `REPORT_RENDERER=none` 時はボタン非活性＋ツールチップ（設計 §13）。帳票機能の可否は `GET /me` の `company.report_enabled` で判定する。
 
 ## V.4 レンダラ選択・設定（env）
 

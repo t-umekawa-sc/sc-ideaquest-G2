@@ -1,8 +1,8 @@
 # 帳票連携（JasperReports）機能 — 設計ドラフト（疎結合な帳票出力基盤）
 
-> 状態: **実装済み（2026-10-09・フル＝実 JasperReports 連携まで）**。(1) データ・プッシュ(JSON)／(2) 同期ストリーム／(3) `fallback`(純 Python) に加え、**(4) 実 Jasper サービス**（`impl/jasper`・内部 network `jasper_net`・`POST /render`・S2S `X-Report-Secret`・jrxml ベイク）まで構築し、SC-92 からの請求書 PDF ダウンロードを**実 Jasper 描画でエンドツーエンド確認済み**。請求書データは固定サンプル値・jrxml は英字サンプルレイアウト（和文化は台帳 F8）。実体＝`app/infra/reports/*`・`app/control_plane/billing/*`・`impl/jasper/*`・SC-92 `CompanyDetailView`。残 follow-up＝台帳 F8〜F11。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠（文書間参照は文書名接頭辞）。
+> 状態: **実装済み（2026-10-09・フル＝実 JasperReports 連携まで）**。(1) データ・プッシュ(JSON)／(2) 同期ストリーム／(3) `fallback`(純 Python) に加え、**(4) 実 Jasper サービス**（`impl/jasper`・内部 network `jasper_net`・`POST /render`・S2S `X-Report-Secret`・jrxml ベイク）まで構築し、**[SC-93 会社アカウント管理](../画面設計/screens/SC-93_会社アカウント管理.md)** からの請求書 PDF ダウンロードを**実 Jasper 描画でエンドツーエンド確認済み**。請求書データは固定サンプル値・jrxml は英字サンプルレイアウト（和文化は台帳 F8）。実体＝`app/infra/reports/*`・`app/control_plane/billing/*`・`impl/jasper/*`・SC-93 `AccountSelfSection`。残 follow-up＝台帳 F8〜F11。**画面配置＝当初 SC-92（会社詳細・system_admin）想定から SC-93（会社アカウント管理・company_account_admin 自社スコープ）へ変更（2026-10-09 決定）＝会社自身が自社分を見る機能のため**（§13 参照）。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠。
 > 関連正本＝[コーディング規約](../規約/コーディング規約.md)（§2 セキュリティ・§2.3 DRY・§3.4 バックエンド4層）・[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)・[API設計 README](../API設計/README.md)（§1.x 横断規約）・[データモデル](../データモデル.md)・[本番デプロイ要件](../本番デプロイ要件.md)。
-> 実体化先＝[API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)・[テスト V_帳票](../テスト/V_帳票.md)。初回の縦1本＝**会社詳細（[SC-92](../画面設計/screens/SC-92_会社詳細.md)）から使用料請求書 PDF をダウンロード**。
+> 実体化先＝[API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md)・[テスト V_帳票](../テスト/V_帳票.md)。初回の縦1本＝**会社アカウント管理（[SC-93](../画面設計/screens/SC-93_会社アカウント管理.md)）から会社管理者が自社の使用料請求書 PDF をダウンロード**。
 > 提供参考資料＝JasperReports × Python 連携サンプル（`pyreportjasper` + FastAPI・`v_pythonjasper`・2026-05-13 納品）。本書はその統合設計。
 
 ## 0. 位置づけ・狙い
@@ -39,7 +39,7 @@
 ## 3. アーキテクチャ全体像
 
 ```
- ブラウザ(SC-92)
+ ブラウザ(SC-93)
     │  ① GET /api/v1/admin/companies/{id}/billing/invoice?period=YYYY-MM  (同一オリジン, Cookie認証)
     ▼
 ┌──────────────────────────── 自前 Backend (FastAPI) ─────────────────────────────┐
@@ -87,7 +87,7 @@ Jasper へのデータ供給は 2 通り。**(B) データ・プッシュを本�
 
 ## 6. バックエンド設計（4 層＋レンダラ port）
 
-[コーディング規約 §3.4](../規約/コーディング規約.md) の 4 層に準拠。帳票**基盤**は `infra`（LLM の `infra/llm` と同じ立ち位置）、請求書**機能**はコントロールプレーン（SC-92 は admin 画面）に置く。
+[コーディング規約 §3.4](../規約/コーディング規約.md) の 4 層に準拠。帳票**基盤**は `infra`（LLM の `infra/llm` と同じ立ち位置）、請求書**機能**はコントロールプレーン（SC-93 は会社管理者の admin 画面）に置く。
 
 ```
 app/infra/reports/            ← 帳票基盤
@@ -113,7 +113,7 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 
 | メソッド | パス | 認可 | 返却 |
 |---|---|---|---|
-| GET | `/api/v1/admin/companies/{id}/billing/invoice?period=YYYY-MM&format=pdf` | 会社管理者（既存 SC-92 認可を再利用） | `200` PDF バイト列 + `Content-Disposition: attachment; filename="invoice-{company}-{period}.pdf"` |
+| GET | `/api/v1/admin/companies/{id}/billing/invoice?period=YYYY-MM&format=pdf` | `company_account_admin`（自社限定・他社 404）／`system_admin`（全社） | `200` PDF バイト列 + `Content-Disposition: attachment; filename="invoice-{company}-{period}.pdf"` |
 
 - `format` は `pdf` 既定（将来 `xlsx`/`csv` は Jasper の `output_formats` で拡張）。`period` は `^\d{4}-\d{2}$` 検証。`report_key` は内部ホワイトリスト固定（外部から任意テンプレ指定をさせない＝R5）。
 - Jasper 停止時＝`fallback` なら純 Python 生成、`jasper` でダウン時は `502`（再試行可メッセージ）、`none` は `503`／ボタン非活性。
@@ -145,7 +145,7 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 ## 11. セキュリティ（[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md) 突合）
 
 - **Jasper 非公開**（内部ネットワークのみ・ブラウザ露出なし）。CORS `*` は不採用（R1/R2）。
-- **認可**＝自前エンドポイントで会社管理者のみ（既存 SC-92 認可再利用）。他社請求書は存在秘匿で 404（[API設計 README §1.5](../API設計/README.md)・テナント分離）。
+- **認可**＝自前エンドポイントで `company_account_admin`（自社限定）／`system_admin`（全社・上位互換）。会社管理者はセッション会社以外の `{id}` を存在秘匿で 404（[API設計 README §1.5](../API設計/README.md)・テナント分離）。
 - **S2S 認証**＝`JASPER_SHARED_SECRET` ヘッダ（将来 mTLS 可）。サンプルの TODO（R3）を埋める。
 - **パストラバーサル対策**（R5）＝`report_key` はレジストリのホワイトリスト解決。query から直接パスを組み立てない。
 - **DB 資格情報の排除**（R4）＝データ・プッシュ採用で Jasper 側 `config.ini` の DB 接続を廃止。
@@ -161,13 +161,16 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 
 帳票ロジック（`domain/invoice.py`）はレンダラ非依存なので、Jasper 撤去＝`jasper_http.py` を使わないだけ。ドメイン・API・フロントは無改修。
 
-## 13. フロントエンド設計（SC-92 への追加）
+## 13. フロントエンド設計（SC-93 会社アカウント管理への追加）
 
-- [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に「請求書」アクション（期間ピッカー＋ダウンロードボタン）を追加。
-- ダウンロードは**既存 CSV エクスポートと同じ seam**＝同一オリジンの GET ナビゲーション（Cookie 認証・CSRF 不要）。`features/companies/api.ts` の `companiesCsvUrl()` に倣い `invoiceUrl(companyId, period)` を追加。
-- サンプルの `window.open('http://localhost:8000/...')` は不採用（Jasper 露出）。
-- `REPORT_RENDERER=none` 時はボタン非活性＋ツールチップ（「押せない方が親切」＝完了クエスト凍結 UI と同原則）。
-- フロント実装は [フロントエンド実装フロー規約](../規約/フロントエンド実装フロー規約.md)（モック先行→接続）に従い、SC-92 既存ダウンロード導線を踏襲（新規 UI を作らない）。
+> **配置決定（2026-10-09）**＝使用料請求書は「会社が自社分を見る」機能のため **[SC-93 会社アカウント管理](../画面設計/screens/SC-93_会社アカウント管理.md)**（`company_account_admin` 自社スコープ）に配置する。当初案の SC-92（会社詳細・system_admin）は運営(OPS)の管理画面であり会社自身は入れないため不採用。会社id はセッション会社を使う。
+
+- **入口＝ボタンのみパターン**（style-guide §3c 採用）＝[SC-93](../画面設計/screens/SC-93_会社アカウント管理.md) の自社バナー直後の導線ボタン群（「AI・LLM設定」の隣）に**帳票DLボタン「🧾 使用料請求書（サンプル）⬇」**（`.btn-outline`＋帳票アイコン🧾＋⬇）を1つ足す（カードは作らない）。実体＝`AccountSelfSection`。
+- **押下で帳票出力ダイアログ（印刷ダイアログ風）を開く**（共通 `Modal`・ローカル state＝一過性の出力アクション・`InvoiceOutputModal`）。左に書面プレビュー／右に出力オプション（対象期間＝年月・形式＝PDF）／フッター＝キャンセル（左・`dialog-close-left`）→ ⬇ ダウンロード（右）。
+- **ダミーデータ注意書き**＝MVP の明細/金額は固定サンプルのため、ボタン名に「（サンプル）」、ダイアログ本文に `⚠️ 現在はダミーデータ…実際の請求内容ではありません`（`.report-note`）を明示（実請求との取り違え防止）。
+- ダウンロードは**既存 CSV エクスポートと同じ seam**＝同一オリジンの GET ナビゲーション（Cookie 認証・CSRF 不要）。`features/companies/api.ts` の `companiesCsvUrl()` に倣い `invoiceUrl(companyId, period)` を追加（`companyId`＝セッション会社）。サンプルの `window.open('http://localhost:8000/...')` は不採用（Jasper 露出）。
+- `REPORT_RENDERER=none` 時はボタン非活性＋ツールチップ（「押せない方が親切」）。帳票機能の可否は `GET /me` の `company.report_enabled` で判定する。
+- フロント実装は [フロントエンド実装フロー規約](../規約/フロントエンド実装フロー規約.md)（**モック先行→接続**）に従い、style-guide §3c にモックを先行作成・ユーザー承認後に SC-93 へ移植した。
 
 ## 14. テスト方針（[テスト規約](../規約/テスト規約.md)）
 
@@ -176,13 +179,13 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 - unit＝`domain/invoice.py` のデータ組み立て／`registry` のホワイトリスト（`../` 拒否＝R5 回帰）。
 - int＝`FakeRenderer` 注入で application がバイト列を返す／`none` で 503／`jasper` ダウンで 502。
 - api＝エンドポイントの認可（他社 404）・`Content-Disposition`・`period` 検証。
-- 受入＝SC-92 で実際に PDF が落ちること（目視検証）。
+- 受入＝SC-93 で実際に PDF が落ちること（目視検証）。
 
 ## 15. 段階的実装計画（MVP）
 
 1. `infra/reports` port＋`FallbackPdfRenderer`＋registry（**Jasper 無しで PDF が落ちる**所まで）。
 2. `control_plane/billing` ドメイン＋ API（同期ストリーム）。
-3. SC-92 にボタン＋`invoiceUrl()`。→ ここで受入（落ちれば OK）。
+3. SC-93 にボタン＋`invoiceUrl()`。→ ここで受入（落ちれば OK）。
 4. Jasper サービスを `/render`（JSON body）対応に小改修＋jrxml を JSON データソース化。compose に追加。`REPORT_RENDERER=jasper` へ切替。
 5. S2S 秘密・ネットワーク分離・本番要件追記。
 
@@ -193,7 +196,7 @@ app/control_plane/billing/    ← 請求書「機能」(4層)
 - [x] FR 採番（[要件定義 README](../要件定義/README.md) に「帳票出力基盤」＝FR-51 を追加）。
 - [x] [データモデル](../データモデル.md)＝MVP の同期では DB 追加なし（非同期化時のみ `report_jobs` 等＝台帳 F11）。
 - [x] [API設計 V_帳票・レポート](../API設計/V_帳票・レポート.md) の詳細確定（実装済みに更新）。
-- [x] [SC-92 会社詳細](../画面設計/screens/SC-92_会社詳細.md) に請求書アクションの節を追記。
+- [x] [SC-93 会社アカウント管理](../画面設計/screens/SC-93_会社アカウント管理.md) に請求書アクションの節を追記（配置を SC-92→SC-93 へ変更・SC-92 からは節を撤去）。
 - [x] [本番デプロイ要件](../本番デプロイ要件.md) に Jasper コンテナ（内部ネットワーク・ヘルスチェック）を追記。
 - [~] S2S 秘密＝dev は env で実装（既存 SMTP 等と同様）。**本番の compose `secrets:` ファイルマウント化は台帳 F9**（D6 と連動）。
 - [x] 請求書 DL の監査ログ（§17.5 G3）＝`billing.invoice_download`（誰が/会社/期間/形式・本文/金額は残さない）を実装＋ V-TC-108 追加。

@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from sqlalchemy import func, or_, select
 
 from app.core import list_query as lq
-from app.core.config import get_settings
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
@@ -67,8 +66,6 @@ def _detail(c: Company, account_count: int) -> dict:
         "auto_link_threshold": float(c.auto_link_threshold),  # 自動関連付けの一致率しきい値（N.6・§5.36b・0..1）
         "alignment_method": c.alignment_method,  # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）
         "access_mode": c.access_mode,  # 公開/非公開モード（FR-48 §8.0・private/public）
-        # 帳票機能の可否（デプロイ全体の REPORT_RENDERER 由来）＝SC-92 請求書ボタンの活性制御（設計 §13）。
-        "report_enabled": get_settings().report_renderer != "none",
     }
 
 

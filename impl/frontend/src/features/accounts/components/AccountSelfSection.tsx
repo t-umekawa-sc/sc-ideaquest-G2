@@ -8,12 +8,14 @@
 // データ供給は全件クライアント処理（useAllAccounts）。発行/編集の成功は別ルートで起き、
 // ACCOUNTS_CHANGED_EVENT（window）を購読して一覧を再取得する（跨ルート更新・handoff §5）。
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { ConfirmOptions, DataTableColumn, RowMenuItem } from "@/components/ui";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, apiFetch } from "@/lib/api/client";
+import type { MeProfile } from "@/features/profile/types";
+import { InvoiceOutputModal } from "./InvoiceOutputModal";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import {
   ACCOUNTS_CHANGED_EVENT,
@@ -46,12 +48,25 @@ function statusBadge(status: string) {
 
 // children＝見出し/自社バナーの直後・アカウント表の前に差し込むスロット（SC-93 のクエストグループ管理を配置する）。
 // after＝アカウント表の後に差し込むスロット（情報判定権限を配置＝SC-92 会社詳細と同じ「一覧の次」順）。
-export function AccountSelfSection({ companyCode, children, after }: { companyCode: string; children?: React.ReactNode; after?: React.ReactNode }) {
+export function AccountSelfSection({ companyId, companyCode, children, after }: { companyId: string; companyCode: string; children?: React.ReactNode; after?: React.ReactNode }) {
   const router = useRouter();
   const { accounts, loading, loadError, reload } = useAllAccounts(listOwnAccounts);
   const [actionError, setActionError] = useState<string | null>(null);
   const confirm = useConfirm();
   const snack = useSnackbar();
+
+  // 使用料請求書（帳票・FR-51・SC-93 自社スコープ）。AI・LLM設定の隣の帳票DLボタン→帳票出力ダイアログで
+  // 対象期間/形式を選んで出力する（style-guide §3c ①'＝採用）。帳票機能の可否は /me（company.report_enabled）。
+  // REPORT_RENDERER=none のデプロイではボタン非活性＋ツールチップ（設計 §13・「押せない方が親切」）。
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [reportEnabled, setReportEnabled] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    void apiFetch<MeProfile>("/me").then((me) => {
+      if (alive && me) setReportEnabled(me.company.report_enabled);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // 発行/編集は別ルート（URL モーダル）で行う＝成功時の ACCOUNTS_CHANGED_EVENT を購読して一覧を再取得。
   // 所属は outbox ワーカが非同期適用（B.5）＝即時＋数回の遅延再取得で追随（useAccountsChangedReload）。
@@ -274,10 +289,25 @@ export function AccountSelfSection({ companyCode, children, after }: { companyCo
         <span className="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
       </div>
 
-      {/* 会社アカウント管理者の領分＝AI・LLM設定（ON/OFF・予算・利用量＝SC-94・FR-45）への導線。 */}
+      {/* 会社アカウント管理者の領分への導線ボタン群＝AI・LLM設定（SC-94・FR-45）＋使用料請求書の出力（帳票・FR-51）。
+          請求書は「帳票DLボタン（帳票アイコン📄＋⬇）→ 帳票出力ダイアログ」で出力（style-guide §3c ①'＝採用）。
+          REPORT_RENDERER=none のデプロイではボタン非活性＋ツールチップ（設計 §13・「押せない方が親切」）。 */}
       <p className="admin-links">
         <Link className="btn btn-outline" href="/admin/ai-settings">🤖 AI・LLM設定</Link>
+        <span title={reportEnabled ? undefined : "この環境では帳票機能が無効です"}>
+          <button
+            type="button"
+            className="btn btn-outline btn-report-inline"
+            disabled={!reportEnabled}
+            onClick={() => setInvoiceOpen(true)}
+          >
+            <span className="btn-report__doc" aria-hidden="true">🧾</span>
+            使用料請求書（サンプル）
+            <span className="btn-report__dl" aria-hidden="true">⬇</span>
+          </button>
+        </span>
       </p>
+      <InvoiceOutputModal open={invoiceOpen} onClose={() => setInvoiceOpen(false)} companyId={companyId} />
 
       {/* 見出し/自社バナーの直後に差し込むスロット（クエストグループ管理→アカウントの順・SC-92 と統一）。 */}
       {children}
