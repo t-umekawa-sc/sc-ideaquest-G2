@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Button, Combobox, DataTable, Field, Modal, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Button, Combobox, DataTable, Field, Modal, Multiselect, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import {
@@ -121,7 +121,6 @@ export function InfoTemplateAdminView() {
     if (cats.length) d.categories = cats;
     return d;
   };
-  const toggleCat = (c: string) => setCats((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
 
   async function submit() {
     if (!name.trim()) { setNameErr("テンプレート名を入力してください。"); return; }
@@ -231,16 +230,11 @@ export function InfoTemplateAdminView() {
                       options={[{ value: "", label: "—" }, ...f.opts.map(([v, l]) => ({ value: v, label: l }))]} />
                   </Field>
                 ))}
-                <div className="field">
-                  <div className="dialog-label">情報カテゴリ（複数可）</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
-                      <label key={v} className="checkbox" style={{ fontSize: "var(--text-xs)" }}>
-                        <input type="checkbox" checked={cats.includes(v)} onChange={() => toggleCat(v)} /><span>{l}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <Field id="tm-categories" label="情報カテゴリ（複数可）">
+                  <Multiselect id="tm-categories" ariaLabel="情報カテゴリ" placeholder="カテゴリを選択…"
+                    value={cats} onChange={setCats}
+                    options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))} />
+                </Field>
               </div>
             </details>
 

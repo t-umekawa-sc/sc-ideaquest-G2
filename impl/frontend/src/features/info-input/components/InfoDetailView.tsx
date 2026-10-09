@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { QuestIcon } from "@/components/layout/QuestIcon";
-import { Combobox, useConfirm, useSnackbar } from "@/components/ui";
+import { Combobox, Multiselect, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
@@ -96,7 +96,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const [cats, setCats] = useState<string[]>([]);
   const [curationDirty, setCurationDirty] = useState(false);
   const setAttr = (k: string, v: string) => { setAttrs((a) => ({ ...a, [k]: v })); setCurationDirty(true); };
-  const toggleCat = (c: string) => { setCats((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c])); setCurationDirty(true); };
+  const onCatsChange = (next: string[]) => { setCats(next); setCurationDirty(true); };
   // 関連リンクのインライン編集（全員・即時コミット→詳細再取得）。対象選択は共通 TargetPicker。
   const [linkEditing, setLinkEditing] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
@@ -474,11 +474,9 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
               <AttrSelect label="対象事業" k="target_business" map={BUSINESS_LABEL} attrs={attrs} onSet={setAttr} />
               <div>
                 <div className="dialog-label">情報カテゴリ（複数可）</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
-                    <label key={v} className="checkbox" style={{ fontSize: "var(--text-xs)" }}><input type="checkbox" checked={cats.includes(v)} onChange={() => toggleCat(v)} /><span>{l}</span></label>
-                  ))}
-                </div>
+                <Multiselect ariaLabel="情報カテゴリ" placeholder="カテゴリを選択…"
+                  value={cats} onChange={onCatsChange}
+                  options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))} />
               </div>
               <AttrSelect label="影響度" k="impact_level" map={IMPACT_LABEL} attrs={attrs} onSet={setAttr} />
               <AttrSelect label="影響分類" k="impact_class" map={Object.fromEntries(Object.entries(IMPACT_CLASS_LABEL).map(([v, l]) => [v, l[0]]))} attrs={attrs} onSet={setAttr} />

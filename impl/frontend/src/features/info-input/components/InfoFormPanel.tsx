@@ -4,7 +4,7 @@
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Combobox, Field, FormFooterError, FormSummary, useConfirm, useFormErrorNotice } from "@/components/ui";
+import { Combobox, Field, FormFooterError, FormSummary, Multiselect, useConfirm, useFormErrorNotice } from "@/components/ui";
 import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -132,8 +132,6 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       setSummaryBusy(false);
     }, 700);
   }, [body]);
-
-  const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
 
   // 対象ピッカーで対象（複数可）と種別を選び「選択を確定」→ 選んだ種別のままステージ（保存で /info-links へ POST）。既存と重複は除外。
   const addPicked = (picked: InfoLinkCandidate[], kind: InfoLinkKind) => {
@@ -319,14 +317,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             <Field className="dialog-section is-quiet" id="im-class" label="情報分類"><Combobox id="im-class" ariaLabel="情報分類" value={classification} onChange={setClassification} options={[{ value: "", label: "—" }, ...OPT(CLASSIFICATION_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-scope" label="大分類"><Combobox id="im-scope" ariaLabel="大分類" value={scope} onChange={setScope} options={[{ value: "", label: "—" }, ...OPT(SCOPE_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-biz" label="対象事業"><Combobox id="im-biz" ariaLabel="対象事業" value={business} onChange={setBusiness} options={[{ value: "", label: "—" }, ...OPT(BUSINESS_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
-            <div className="field dialog-section is-quiet">
-              <div className="dialog-label">情報カテゴリ（複数可）</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
-                  <label key={v} className="checkbox" style={{ fontSize: "var(--text-xs)" }}><input type="checkbox" checked={categories.includes(v)} onChange={() => toggleCategory(v)} /><span>{l}</span></label>
-                ))}
-              </div>
-            </div>
+            <Field className="dialog-section is-quiet" id="im-categories" label="情報カテゴリ（複数可）">
+              <Multiselect id="im-categories" ariaLabel="情報カテゴリ" placeholder="カテゴリを選択…"
+                value={categories} onChange={setCategories}
+                options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))} />
+            </Field>
             <Field className="dialog-section is-quiet" id="im-impact" label="影響度"><Combobox id="im-impact" ariaLabel="影響度" value={impact} onChange={setImpact} options={[{ value: "", label: "—" }, ...OPT(IMPACT_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-impactclass" label="影響分類"><Combobox id="im-impactclass" ariaLabel="影響分類" value={impactClass} onChange={setImpactClass} options={[{ value: "", label: "—" }, ...OPT(Object.fromEntries(Object.entries(IMPACT_CLASS_LABEL).map(([v, l]) => [v, l[0]]))).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
             <Field className="dialog-section is-quiet" id="im-timing" label="影響発生時期"><Combobox id="im-timing" ariaLabel="影響発生時期" value={timing} onChange={setTiming} options={[{ value: "", label: "—" }, ...OPT(TIMING_LABEL).map(({ v, l }) => ({ value: v, label: l }))]} /></Field>
