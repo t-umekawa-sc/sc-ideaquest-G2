@@ -13,14 +13,14 @@ import { Avatar, DataTable, Modal, ModalBody, RowMenu, useConfirm, useSnackbar }
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import {
   archiveInfoItemApi, deleteInfoItemApi, fetchInfoItems, fetchInfoTabs, fetchWordCloud, INFO_CHANGED_EVENT,
-  moveInfoItemTabApi, searchInfoItems, unarchiveInfoItemApi,
+  moveInfoItemTabApi, searchInfoItems, unarchiveInfoItemApi, updateInfoTabApi,
 } from "../api";
 import {
   CATEGORY_LABEL, IMPACT_CLASS_LABEL, PRIORITY_LABEL, SOURCE_LABEL, STATUS_LABEL,
 } from "../labels";
 import type { InfoCard, InfoStatusFacets, InfoStatusFilter, InfoTab, WordCloudToken } from "../types";
-import { InfoTabsModal } from "./InfoTabsModal";
 import { MoveTabDialog } from "./MoveTabDialog";
+import { TabFormDialog } from "./TabFormDialog";
 import "../info-input.css";
 
 const summaryText = (r: InfoCard) => r.summary ?? "";
@@ -79,7 +79,8 @@ export function InfoListView() {
   const [tabs, setTabs] = useState<InfoTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>(""); // 空=未選択（＝すべて／全件）
   const [manageTabs, setManageTabs] = useState(false);
-  const [tabsModalOpen, setTabsModalOpen] = useState(false);
+  const [tabForm, setTabForm] = useState<{ mode: "add" | "edit"; tab?: InfoTab } | null>(null); // タブ追加/編集ダイアログ
+  const [tabMenuId, setTabMenuId] = useState<string | null>(null); // ホバー ⋮ メニューを開いているタブ
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<InfoCard | null>(null); // タブ移動（1件）対象
 
@@ -126,7 +127,31 @@ export function InfoListView() {
     setActiveTabId(id);
     setRefreshToken((n) => n + 1); // DataTable 再クエリ（QueryState 外の外部コントロール＝refreshToken bump）
     setOverflowOpen(false);
+    setTabMenuId(null);
   }, []);
+
+  // ⋮ メニューの外側クリックで閉じる。
+  useEffect(() => {
+    if (!tabMenuId) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".info-subtab-wrap")) setTabMenuId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [tabMenuId]);
+
+  const archiveTab = useCallback(async (t: InfoTab) => {
+    setTabMenuId(null);
+    const ok = await confirm({ title: "タブをアーカイブ", msg: `「${t.name}」をアーカイブしますか？（配下に情報があるときは先に移動が必要です）` });
+    if (!ok) return;
+    try {
+      await updateInfoTabApi(t.id, { status: "archived" });
+      snack({ type: "success", title: "アーカイブしました", msg: `「${t.name}」をアーカイブしました。` });
+    } catch {
+      snack({ type: "error", title: "アーカイブできませんでした", msg: "配下に情報があるタブはアーカイブできません。先に別タブへ移動してください。" });
+    }
+    setRefreshToken((n) => n + 1);
+  }, [confirm, snack]);
 
   // 全文検索タブ（サーバー q）。
   useEffect(() => {
@@ -323,11 +348,27 @@ export function InfoListView() {
           <div className="info-subtabs" role="tablist" aria-label="情報タブ">
             {(tabs.length > 6 ? tabs.slice(0, 6) : tabs).map((t) => {
               const active = (activeTabId || tabs.find((x) => x.is_system)?.id) === t.id;
+              // 非予約タブは manage 権限時にホバー ⋮（編集/アーカイブ）。「すべて」(system) は操作不可。
+              const canOp = manageTabs && !t.is_system;
               return (
-                <button key={t.id} type="button" role="tab" aria-selected={active}
-                  className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
-                  {t.name}<span className="info-subtab__n">{t.count}</span>
-                </button>
+                <span key={t.id} className={`info-subtab-wrap${tabMenuId === t.id ? " is-open" : ""}`}>
+                  <button type="button" role="tab" aria-selected={active}
+                    className={`info-subtab${active ? " is-active" : ""}`} onClick={() => selectTab(t.id)}>
+                    {t.name}<span className="info-subtab__n">{t.count}</span>
+                  </button>
+                  {canOp && (
+                    <>
+                      <button type="button" className="info-subtab__kebab" aria-label={`${t.name} の操作`} aria-haspopup="menu"
+                        onClick={(e) => { e.stopPropagation(); setTabMenuId((cur) => (cur === t.id ? null : t.id)); }}>⋮</button>
+                      {tabMenuId === t.id && (
+                        <span className="info-subtab__menu" role="menu">
+                          <button type="button" role="menuitem" onClick={() => { setTabMenuId(null); setTabForm({ mode: "edit", tab: t }); }}>✏️ 編集</button>
+                          <button type="button" role="menuitem" className="is-danger" onClick={() => archiveTab(t)}>🗃 アーカイブ</button>
+                        </span>
+                      )}
+                    </>
+                  )}
+                </span>
               );
             })}
             {tabs.length > 6 && (
@@ -336,7 +377,7 @@ export function InfoListView() {
               </button>
             )}
             {manageTabs && (
-              <button type="button" className="info-subtab info-subtab--add" onClick={() => setTabsModalOpen(true)}>
+              <button type="button" className="info-subtab info-subtab--add" onClick={() => setTabForm({ mode: "add" })}>
                 ＋ タブ
               </button>
             )}
@@ -425,9 +466,9 @@ export function InfoListView() {
         </section>
       )}
 
-      {tabsModalOpen && (
-        <InfoTabsModal tabs={tabs} onClose={() => setTabsModalOpen(false)}
-          onChanged={() => setRefreshToken((n) => n + 1)} />
+      {tabForm && (
+        <TabFormDialog mode={tabForm.mode} tab={tabForm.tab} onClose={() => setTabForm(null)}
+          onSaved={() => { setTabForm(null); setRefreshToken((n) => n + 1); }} />
       )}
       {moveTarget && (
         <MoveTabDialog item={moveTarget} tabs={tabs} onClose={() => setMoveTarget(null)}
