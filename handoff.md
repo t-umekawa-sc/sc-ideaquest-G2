@@ -4,9 +4,9 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`、**残作業の正本は `doc/バックログ/未実装・ギャップ一覧.md`**。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-09（**リッチテキスト TipTap 移行＝TT5 チャット完了＝移行完遂**セッション）。
+- 更新: 2026-10-09（**リッチテキスト TipTap 移行＝TT5 チャット完了＝移行完遂**セッション・session-end 時点）。
 - ブランチ: `main`（main 直 push が慣習・毎コミット push 済み）。
-- 最新コミット（新しい順）: `2dc40161` TT5 frontend（チャット TipTap＋@メンション・PM-JSON）／`e2295e8c` TT5 backend（`chat_messages.body` jsonb・migration 0064＋4層）／`c3a2cc06` 小改修（リッチテキスト・フォーカス枠の太さ統一＋情報カテゴリを multiselect 化）。working tree は push 後 clean。
+- 最新コミット（新しい順）: **本ファイル/台帳の session-end 同期コミットが HEAD**（ハッシュは `git log -1` で確認）／`3c7507b7` docs(TT5 移行完遂を台帳/README/handoff に反映)／`2dc40161` TT5 frontend（チャット TipTap＋@メンション・PM-JSON）／`e2295e8c` TT5 backend（`chat_messages.body` jsonb・migration 0064＋4層）／`c3a2cc06` 小改修（フォーカス枠の太さ統一＋情報カテゴリ multiselect 化）。いずれも push 済み・working tree clean。
 - alembic heads: company=**`0064_chat_messages_pm_json`**（今セッション追加＝チャット本文 PM-JSON／`0061`お知らせ・`0062`情報・`0063`テンプレ）／control=`0020_signup_challenges`（変更なし）。
 
 ## 2. プロジェクトのゴール
@@ -45,7 +45,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 7. 次にやること（優先順・ファイル/関数レベル）
 > 着手前に実コードで裏取り。**リッチテキスト移行は完遂＝残なし**。残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`。
 1. **（候補）D1 帳票連携（JasperReports・ドメイン V）**＝設計済・実装未着手。`reports`/`billing` ドメイン・router とも無し。縦1本＝SC-92 使用料請求書→API V.x→レンダラ port→PDF。TC 先出し済＝`doc/テスト/V_帳票.md`。設計＝`doc/設計ドラフト/帳票連携(JasperReports)_設計.md`＋`doc/JasperReports/`（参考資料）。
-2. **（候補・掃除）concepts 独自 scope messages（`/concept-chat-scopes/{id}/messages`・JSON）**＝frontend 未使用のレガシー。共有チャットに一本化するか、PM-JSON 化して整合させるか要判断（現状スカラー round-trip で緑だが、本文は PM-JSON 正本という一貫性からは外れる）。
+2. **（候補・掃除）concepts 独自 scope messages（`/concept-chat-scopes/{id}/messages`・JSON）＝台帳 F7**＝frontend 未使用のレガシー。共有チャットに一本化するか、PM-JSON 化して整合させるか要判断（現状スカラー round-trip で緑だが、本文は PM-JSON 正本という一貫性からは外れる）。詳細は `doc/バックログ/未実装・ギャップ一覧.md` F7。
 3. **（任意）フル `tests/` 全体実行**で TT5 の波及総点検（今回は chat 関連中心）。共有 dev DB は非冪等なので事前に acme/acme2 drop→bootstrap（memory `e2e-full-not-idempotent-shared-db`）。
 4. 完了時＝`impl/README.md` 現況更新・バックログ台帳から完了行削除・handoff 全文更新。
 
