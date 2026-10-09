@@ -229,6 +229,7 @@ def create_info_item(
     *,
     created_by_id: uuid.UUID,
     title: str,
+    body: dict | None = None,
     body_html: str | None = None,
     body_text: str | None = None,
     summary: str | None = None,
@@ -237,9 +238,11 @@ def create_info_item(
     source_template_id: uuid.UUID | None = None,
     info_id: uuid.UUID | None = None,
 ) -> InfoItem:
-    """情報を1件作成（低摩擦登録＝status=raw・N.2）。派生（body_text/summary）は呼び出し側が算出して渡す。"""
+    """情報を1件作成（低摩擦登録＝status=raw・N.2）。`body`＝PM-JSON 正本（省略時は空 doc）。
+    派生（body_html/body_text/summary）は呼び出し側が算出して渡す。"""
     item = InfoItem(
         id=info_id or uuid.uuid4(), created_by_id=created_by_id, title=title,
+        body=body if body is not None else {"type": "doc", "content": []},
         body_html=body_html, body_text=body_text, summary=summary, source_url=source_url,
         parent_info_id=parent_info_id, source_template_id=source_template_id, status="raw",
     )

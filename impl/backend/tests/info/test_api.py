@@ -10,6 +10,11 @@ from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
 INFO = "/api/v1/info-items"
+
+
+def _pm(text: str = "本文") -> dict:
+    """テスト用 PM-JSON（1段落）。情報本文は PM-JSON（TipTap）で授受（TT0b）。"""
+    return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
 WORD_CLOUD = "/api/v1/info-items/word-cloud"
 IMAGES = "/api/v1/info-items/images"
 LINKS = "/api/v1/info-links"
@@ -257,10 +262,15 @@ def test_n_tc_115_patch_content(client, info_env):
     """N-TC-115: 内容編集（作成者・再派生＋版履歴+1）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     # info_env.ids.a は seed 一般ユーザー（＝ログイン本人）が作成者＝内容編集可。
-    r = client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新後の<strong>本文</strong><script>x()</script></p>"}, headers=_csrf(client))
+    dirty_pm = {"type": "doc", "content": [{"type": "paragraph", "content": [
+        {"type": "text", "text": "更新後の"},
+        {"type": "text", "text": "本文", "marks": [{"type": "bold"}]},
+        {"type": "text", "text": "<script>x()</script>"},
+    ]}]}
+    r = client.patch(f"{INFO}/{info_env.ids.a}", json={"body": dirty_pm}, headers=_csrf(client))
     assert r.status_code == 200, r.text
     d = r.json()
-    assert "<script" not in (d["body_html"] or "") and "更新後" in (d["body_html"] or "")  # 再サニタイズ
+    assert "<script" not in (d["body_html"] or "") and "更新後" in (d["body_html"] or "")  # PM-JSON を再サニタイズ（生タグはエスケープ）
     assert d["summary"] and d["tokens_top"]  # 要約/トークン再生成
     from app.tenant.info import repository as repo
     with get_tenant_session(info_env.db_identifier) as ts:
@@ -467,8 +477,8 @@ def test_n_tc_144_content_revisions(client, info_env):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     # 作成者本人（ids.a）が内容を2回編集＝2版増える。
     before = len(client.get(f"{INFO}/{info_env.ids.a}").json()["content_revisions"])
-    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新履歴テスト1</p>"}, headers=_csrf(client)).status_code == 200
-    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新履歴テスト2</p>"}, headers=_csrf(client)).status_code == 200
+    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body": _pm("更新履歴テスト1")}, headers=_csrf(client)).status_code == 200
+    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body": _pm("更新履歴テスト2")}, headers=_csrf(client)).status_code == 200
     revs = client.get(f"{INFO}/{info_env.ids.a}").json()["content_revisions"]
     assert len(revs) == before + 2
     assert revs[0]["revision"] > revs[1]["revision"]  # 版降順（新しい版が先頭）
@@ -509,7 +519,7 @@ def test_n_tc_146_capabilities(client, info_env):
 def test_n_tc_147_create_records_initial_revision(client, info_env):
     """N-TC-147: 登録直後に初版（版1）が記録され更新履歴に出る（内容編集を待たない・§85/N.1）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-    r = client.post(INFO, json={"title": "初版記録テスト", "body_html": "<p>本文です。</p>"}, headers=_csrf(client))
+    r = client.post(INFO, json={"title": "初版記録テスト", "body": _pm("本文です。")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()
     try:
@@ -521,7 +531,7 @@ def test_n_tc_147_create_records_initial_revision(client, info_env):
 def test_n_tc_211_revision_changed_fields(client, info_env):
     """N-TC-211: 更新履歴 content_revisions に前版比の changed_fields が付く（初版は空・§85）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-    r = client.post(INFO, json={"title": "変更履歴X", "body_html": "<p>旧本文</p>"}, headers=_csrf(client))
+    r = client.post(INFO, json={"title": "変更履歴X", "body": _pm("旧本文")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()
     try:
@@ -529,7 +539,7 @@ def test_n_tc_211_revision_changed_fields(client, info_env):
         assert d["content_revisions"][0]["revision"] == 1
         assert d["content_revisions"][0]["changed_fields"] == []
         # 本文だけ変更 → 版2 の changed_fields=["body_html"]。
-        assert client.patch(f"{INFO}/{d['id']}", json={"body_html": "<p>新本文</p>"}, headers=_csrf(client)).status_code == 200
+        assert client.patch(f"{INFO}/{d['id']}", json={"body": _pm("新本文")}, headers=_csrf(client)).status_code == 200
         revs = client.get(f"{INFO}/{d['id']}").json()["content_revisions"]
         assert revs[0]["revision"] == 2
         assert revs[0]["changed_fields"] == ["body_html"]
@@ -540,7 +550,7 @@ def test_n_tc_211_revision_changed_fields(client, info_env):
 def test_n_tc_212_revision_diff(client, info_env):
     """N-TC-212: 版差分 EP＝テキスト差分（add/del/equal セグメント）を変わったフィールドのみ返す（§85）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-    r = client.post(INFO, json={"title": "差分タイトルA", "body_html": "<p>本文</p>"}, headers=_csrf(client))
+    r = client.post(INFO, json={"title": "差分タイトルA", "body": _pm("本文")}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()
     try:
@@ -573,8 +583,8 @@ def test_n_tc_214_search_match_snippet(client, info_env):
         "検索の対象はタイトルと本文（body_text）で要約ではないことを確かめます。",
         "したがって要約抜粋に出ない語で一致しても抜粋で該当箇所を見せる必要があります。",
     ])
-    body = f"<p>{filler}末尾の一文にだけ特徴語ゾルタンネスビットが登場します。</p>"
-    r = client.post(INFO, json={"title": "抜粋テスト", "body_html": body}, headers=_csrf(client))
+    body = _pm(f"{filler}末尾の一文にだけ特徴語ゾルタンネスビットが登場します。")
+    r = client.post(INFO, json={"title": "抜粋テスト", "body": body}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()
     try:
@@ -600,8 +610,8 @@ def test_n_tc_148_summary_capped(client, info_env):
         "競合他社の先行事例では現場の生産性が大幅に向上したとする調査結果も出てきています。",
         "今後は規制動向を注視しつつ段階的な展開を図ることが現実的な選択肢になるでしょう。",
     ]
-    body = "<p>" + "".join(sents) + "</p>"
-    r = client.post(INFO, json={"title": "要約長テスト", "body_html": body}, headers=_csrf(client))
+    body = _pm("".join(sents))
+    r = client.post(INFO, json={"title": "要約長テスト", "body": body}, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()
     try:
@@ -692,7 +702,11 @@ def test_n_tc_112_create(client, info_env):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     r = client.post(INFO, json={
         "title": "新規情報（テスト）",
-        "body_html": "<p>生成AIの<strong>導入</strong>が拡大している。<script>alert(1)</script></p>",
+        "body": {"type": "doc", "content": [{"type": "paragraph", "content": [
+            {"type": "text", "text": "生成AIの"},
+            {"type": "text", "text": "導入", "marks": [{"type": "bold"}]},
+            {"type": "text", "text": "が拡大している。<script>alert(1)</script>"},
+        ]}]},
     }, headers=_csrf(client))
     assert r.status_code == 201, r.text
     d = r.json()

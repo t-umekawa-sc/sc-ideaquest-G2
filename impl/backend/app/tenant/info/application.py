@@ -300,6 +300,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
         "title": item.title,
+        "body": item.body,
         "body_html": item.body_html,
         "summary": item.summary,
         "source_url": item.source_url,
@@ -533,9 +534,10 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
     cats = getattr(body, "categories", None)
     has_curation = bool(curation) or bool(cats)
 
-    # 派生（外部送信ゼロ・オフライン）。サニタイズ→平文→要約→トークン。
-    body_html = derive.sanitize_html(body.body_html)
-    body_text = derive.to_plain_text(body_html)
+    # 派生（外部送信ゼロ・オフライン）。PM-JSON を許可リストで無害化（正本）→ 表示用HTML/平文/要約/トークン。
+    pm = derive.sanitize_pm(body.body)
+    body_html = derive.pm_to_html(pm)
+    body_text = derive.pm_to_text(pm)
     summary = summarize_text(body_text, max_chars=_SUMMARY_MAX_CHARS) if body_text else None
     tokens = derive.extract_tokens(body_text)
 
@@ -552,7 +554,7 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         if tpl_uuid is not None and repo.get_template(ts, tpl_uuid, include_deleted=True) is None:
             tpl_uuid = None
         item = repo.create_info_item(
-            ts, created_by_id=user.id, title=title, body_html=body_html or None,
+            ts, created_by_id=user.id, title=title, body=pm, body_html=body_html or None,
             body_text=body_text or None, summary=summary, source_url=(body.source_url or None),
             parent_info_id=parent_uuid, source_template_id=tpl_uuid,
         )
@@ -718,7 +720,7 @@ INFO_REVISION_FIELDS = (
 )
 
 
-_CONTENT_FIELDS = {"title", "body_html", "source_url"}
+_CONTENT_FIELDS = {"title", "body", "source_url"}
 _CURATION_FIELDS = {
     "priority", "source", "classification", "scope", "target_business", "impact_level",
     "impact_class", "impact_timing", "triaged_on", "triage", "triage_reason", "due_date", "categories",
@@ -768,9 +770,11 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
         if content:
             if "title" in content:
                 item.title = body.title.strip()
-            if "body_html" in content:
-                item.body_html = derive.sanitize_html(body.body_html) or None
-                item.body_text = derive.to_plain_text(item.body_html) or None
+            if "body" in content:
+                pm = derive.sanitize_pm(body.body)  # PM-JSON を無害化（正本）→ 表示用HTML/平文を派生
+                item.body = pm
+                item.body_html = derive.pm_to_html(pm) or None
+                item.body_text = derive.pm_to_text(pm) or None
                 item.summary = summarize_text(item.body_text, max_chars=_SUMMARY_MAX_CHARS) if item.body_text else None
                 _new_tokens = derive.extract_tokens(item.body_text or "")
                 repo.replace_tokens(ts, item.id, _new_tokens)

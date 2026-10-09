@@ -31,3 +31,17 @@ export function demoSummary(text: string): string {
 }
 
 export const plainText = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+// PM-JSON（TipTap）から平文を抽出（client 版・backend pm_to_text と対＝word cloud/要約プレビュー用）。
+export function pmText(doc: unknown): string {
+  const parts: string[] = [];
+  const walk = (n: unknown) => {
+    if (!n || typeof n !== "object") return;
+    const node = n as { type?: string; text?: string; attrs?: { label?: string }; content?: unknown[] };
+    if (node.type === "text" && typeof node.text === "string") { parts.push(node.text); return; }
+    if (node.type === "mention" && node.attrs?.label) { parts.push("@" + node.attrs.label); return; }
+    if (Array.isArray(node.content)) node.content.forEach(walk);
+  };
+  walk(doc);
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}

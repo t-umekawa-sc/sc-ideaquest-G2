@@ -144,7 +144,8 @@ export interface InfoDetail {
   id: string;
   parent_info_id?: string | null;
   title: string;
-  body_html?: string | null;
+  body?: Record<string, unknown> | null;  // PM-JSON 正本（編集用）
+  body_html?: string | null;               // pm_to_html の派生（表示用・サニタイズ済）
   summary?: string | null;
   source_url?: string | null;
   due_date?: string | null;

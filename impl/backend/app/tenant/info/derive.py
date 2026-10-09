@@ -11,7 +11,10 @@ from __future__ import annotations
 import re
 
 # リッチ本文の無害化/平文化は中立モジュール（お知らせ U と共用・DRY §2.3）へ移設。info は再エクスポートで後方互換。
-from app.core.richtext import sanitize_html, strip_tags as _strip_tags, to_plain_text  # noqa: F401
+# PM-JSON（TipTap）系＝`sanitize_pm`（許可リスト検証→canonical）/`pm_to_html`（表示用直列化）/`pm_to_text`（平文）。
+from app.core.richtext import (  # noqa: F401
+    pm_to_html, pm_to_text, sanitize_html, sanitize_pm, strip_tags as _strip_tags, to_plain_text,
+)
 
 # トークン抽出の内容語 POS とストップワード（頻出の機能語・ノイズを除外）。
 _CONTENT_POS = ("名詞", "動詞", "形容詞")

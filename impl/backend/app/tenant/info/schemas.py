@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # フィルタ/入力検証のホワイトリスト（データモデル §3 info_* enum・labels.ts と一致）。
 STATUS_VALUES: frozenset[str] = frozenset({"raw", "curated", "archived"})
@@ -121,7 +121,7 @@ class InfoCreateRequest(BaseModel):
     属性（キュレーション）は **登録者が info_curator の時のみ** 付与可（非curator が送ると 403・§85）。"""
 
     title: str
-    body_html: str | None = None
+    body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # PM-JSON（保存時 sanitize_pm）
     source_url: str | None = None
     parent_info_id: str | None = None  # 続報＝親情報ID（§12-1）
     # 属性（curator のみ・任意）＝送られた時だけ付与。付与すると status=raw→curated。
@@ -148,7 +148,7 @@ class InfoUpdateRequest(BaseModel):
     """
     # 内容（作成者・status 非依存）
     title: str | None = None
-    body_html: str | None = None
+    body: dict[str, Any] | None = None  # PM-JSON（保存時 sanitize_pm）
     source_url: str | None = None
     # キュレーション（info_curator）
     priority: str | None = None
@@ -276,7 +276,8 @@ class InfoDetailDTO(BaseModel):
     id: str
     parent_info_id: str | None = None
     title: str
-    body_html: str | None = None
+    body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # PM-JSON（編集用）
+    body_html: str | None = None  # pm_to_html の派生（表示用・サニタイズ済）
     summary: str | None = None
     source_url: str | None = None
     due_date: date | None = None

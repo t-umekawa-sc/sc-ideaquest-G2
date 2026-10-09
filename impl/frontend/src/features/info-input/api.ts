@@ -70,7 +70,7 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
     method: "POST",
     body: JSON.stringify({
       title: input.title,
-      body_html: input.body_html || null,
+      body: input.body,  // PM-JSON（保存時 sanitize_pm）
       source_url: input.source_url || null,
       parent_info_id: input.parent_info_id ?? null,
       // 属性（curator が登録時に付与＝§85）。非curator は null のまま＝送っても付与されない。
@@ -154,7 +154,7 @@ export async function deleteAttachmentApi(infoId: string, attachmentId: string):
 // 部分更新（PATCH /info-items/{id}・Phase C slice5.2）＝内容=作成者／キュレーション=curator（越権はサーバーが403）。
 // 送るキーだけが更新対象（内容変更は再派生＋版履歴・キュレーションは raw→curated）。成功で一覧を再取得。
 export interface InfoPatch {
-  title?: string; body_html?: string; source_url?: string | null;
+  title?: string; body?: Record<string, unknown>; source_url?: string | null;  // body=PM-JSON
   priority?: string | null; source?: string | null; classification?: string | null; scope?: string | null;
   target_business?: string | null; impact_level?: string | null; impact_class?: string | null;
   impact_timing?: string | null; triaged_on?: string | null; triage?: string | null; triage_reason?: string | null;
@@ -231,7 +231,7 @@ function emit() {
 // （属性は curator の PATCH・関連リンクは /info-links 管轄）。summary/links 等は UI プレビュー用の任意項目。
 export interface InfoInput {
   title: string;
-  body_html: string;
+  body: Record<string, unknown>;  // PM-JSON（TipTap）
   summary?: string;
   source_url?: string | null;
   parent_info_id?: string | null;

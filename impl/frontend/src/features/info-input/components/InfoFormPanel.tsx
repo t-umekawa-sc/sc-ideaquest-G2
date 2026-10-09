@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Combobox, Field, FormFooterError, FormSummary, useFormErrorNotice } from "@/components/ui";
+import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import { ApiError } from "@/lib/api/client";
 import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import {
@@ -12,9 +13,8 @@ import {
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoInput } from "../api";
-import { attachGrowableResize } from "../growableResize";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
-import { cloudTokens, demoSummary, plainText } from "../wordcloud";
+import { cloudTokens, demoSummary, pmText } from "../wordcloud";
 import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
 
@@ -35,16 +35,8 @@ const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024
 export function InfoFormPanel({ parentId, onCancel, onDone }: {
   parentId?: string; onCancel: () => void; onDone: () => void;
 }) {
-  const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imgInputRef = useRef<HTMLInputElement>(null);
-  const [imgBusy, setImgBusy] = useState(false);
-  const [imgErr, setImgErr] = useState<string | null>(null);
-  // 内容欄の手動リサイズ（固定 height）を min-height に付け替え、自動伸長を保つ（DFT-N-004）。
-  useEffect(() => {
-    const el = bodyRef.current;
-    return el ? attachGrowableResize(el) : undefined;
-  }, []);
+  const [body, setBody] = useState<RichTextValue>(EMPTY_DOC);  // 本文＝PM-JSON（TipTap）
   // 続報の親は実 API から取得（プレビュー用・fixtures 不使用）。属性は create で保存されない（curator の PATCH 管轄）ため
   // 続報でも親属性は事前投入しない＝空から。親の関連リンクは backend が登録時に自動複製（§12-1）。編集は詳細のインライン編集に一本化。
   const [parent, setParent] = useState<InfoDetail | undefined>(undefined);
@@ -89,56 +81,22 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const [formError, setFormError] = useState<string | null>(null); // フィールドに紐づかない一般エラー（§4.7 上部サマリ）
   const { summaryRef, notify } = useFormErrorNotice(); // §4.7＝上部サマリへスクロール＋自動消滅エラースナックバー
 
-  const exec = useCallback((cmd: string, arg?: string) => {
-    bodyRef.current?.focus();
-    document.execCommand(cmd, false, arg);
-  }, []);
-
-  // 貼付画像の再ホスト（§12-4）＝blob を POST /info-items/images へ送り、返った自社ホスト URL で img を挿入する。
-  // 外部 img src は持ち込まない（トラッキング/referer 漏れ防止）。
-  const insertImageFiles = useCallback(async (fl: File[]) => {
-    const imgs = fl.filter((f) => f.type.startsWith("image/"));
-    if (!imgs.length) return;
-    setImgErr(null); setImgBusy(true);
-    try {
-      for (const f of imgs) {
-        const url = await uploadInfoImageApi(f);
-        bodyRef.current?.focus();
-        document.execCommand("insertHTML", false, `<img src="${url}" alt="貼付画像">`);
-      }
-    } catch (e) {
-      setImgErr(e instanceof ApiError ? "画像の再ホストに失敗しました（形式・サイズをご確認ください）。" : "画像のアップロードに失敗しました。");
-    } finally {
-      setImgBusy(false);
-    }
-  }, []);
-
-  // paste ハンドラ＝クリップボードに画像 blob があれば横取りして再ホスト（スクショ/コピー画像）。
-  // 画像が無ければ既定の貼付（リッチ HTML/テキスト＝保存時に nh3 サニタイズ）に委ねる。
-  const onPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
-    const files = Array.from(e.clipboardData.items)
-      .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
-      .map((it) => it.getAsFile())
-      .filter((f): f is File => f != null);
-    if (files.length) { e.preventDefault(); void insertImageFiles(files); }
-  }, [insertImageFiles]);
-
   const runCloud = useCallback(() => {
     setCloudBusy(true);
     setTimeout(() => {
-      const text = `${title} ${plainText(bodyRef.current?.innerHTML ?? "")}`.trim();
+      const text = `${title} ${pmText(body)}`.trim();
       setCloud(text ? cloudTokens(text) : []);
       setCloudBusy(false);
     }, 700);
-  }, [title]);
+  }, [title, body]);
   const runSummary = useCallback(() => {
     setSummaryBusy(true);
     setTimeout(() => {
-      const text = plainText(bodyRef.current?.innerHTML ?? "");
+      const text = pmText(body);
       setSummary(text ? demoSummary(text) : "");
       setSummaryBusy(false);
     }, 700);
-  }, []);
+  }, [body]);
 
   const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
 
@@ -170,9 +128,8 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     setTitleErr(tErr); setUrlErr(uErr);
     const clientErrs = [tErr, uErr].filter(Boolean) as string[];
     if (clientErrs.length) { notify(clientErrs); return; }
-    const bodyHtml = bodyRef.current?.innerHTML ?? "";
     const input: InfoInput = {
-      title: t, body_html: bodyHtml, summary: summary ?? demoSummary(plainText(bodyHtml)), source_url: url,
+      title: t, body, summary: summary ?? demoSummary(pmText(body)), source_url: url,
       parent_info_id: parentId ?? null,
       priority: priority || null, source: source || null, classification: classification || null, scope: scope || null,
       target_business: business || null, categories, impact_level: impact || null, impact_class: impactClass || null,
@@ -239,21 +196,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           <input className="input" id="im-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）" />
         </Field>
 
-        <Field className="dialog-section is-quiet" id="im-body" label="内容・説明（WEBページを書式・画像込みで貼付できます）">
-          <div className="rt">
-            <div className="rt__bar" role="toolbar" aria-label="書式">
-              <button type="button" onClick={() => exec("bold")} title="太字"><b>B</b></button>
-              <button type="button" onClick={() => exec("italic")} title="斜体"><i>I</i></button>
-              <button type="button" onClick={() => exec("insertUnorderedList")}>• リスト</button>
-              <button type="button" onClick={() => exec("formatBlock", "h3")}>見出し</button>
-              <button type="button" onClick={() => { const u = prompt("リンク先URL（http/https）"); if (u) exec("createLink", u); }}>🔗 リンク</button>
-              <button type="button" onClick={() => imgInputRef.current?.click()} disabled={imgBusy} title="画像を選んで自社ストレージへ再ホスト">🖼️ 画像{imgBusy ? "（再ホスト中…）" : ""}</button>
-            </div>
-            <input ref={imgInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void insertImageFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
-            <div className="rt__area" id="im-body" ref={bodyRef} contentEditable suppressContentEditableWarning onPaste={onPaste} data-placeholder="ここに記事本文を貼り付け（Ctrl+V）…" />
-          </div>
+        <Field className="dialog-section is-quiet" id="im-body" label="内容・説明（見出し・強調・箇条書き・リンク・画像・表を使えます）">
+          <RichTextEditor value={body} onChange={setBody} preset="document" uploadImage={uploadInfoImageApi}
+            placeholder="ここに記事本文を貼り付け（Ctrl+V）…" ariaLabel="内容・説明" />
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", marginTop: 6, flexWrap: "wrap" }}>
-            <div className="hint">{imgErr ? <span style={{ color: "var(--color-danger)" }}>{imgErr}</span> : "画像は貼付時に自社ストレージへ再ホストします（外部参照は持ち込みません）。"}</div>
+            <div className="hint">画像は貼付/挿入時に自社ストレージへ再ホストします（外部参照は持ち込みません）。</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
               <button className="btn btn-outline btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>

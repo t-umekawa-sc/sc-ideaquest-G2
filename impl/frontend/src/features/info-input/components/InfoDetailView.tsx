@@ -11,15 +11,16 @@ import { Combobox, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
-  fetchRelatedInfo, INFO_CHANGED_EVENT, rejectLinkApi, setLinkDispositionApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
+  fetchRelatedInfo, INFO_CHANGED_EVENT, rejectLinkApi, setLinkDispositionApi, unarchiveInfoItemApi, unrejectLinkApi,
+  updateInfoItemApi, uploadInfoImageApi,
 } from "../api";
-import { attachGrowableResize } from "../growableResize";
+import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, DISPOSITION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoThreadItem, RelatedInfoItem } from "../types";
-import { cloudTokens, demoSummary, plainText } from "../wordcloud";
+import { cloudTokens, demoSummary, pmText } from "../wordcloud";
 import { InfoRevisionHistory } from "./InfoRevisionHistory";
 import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
@@ -78,7 +79,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
   // 内容インライン編集（作成者・can.edit_content）。属性=curator インラインは後続（5.2b）。
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const [body, setBody] = useState<RichTextValue>(EMPTY_DOC);  // 本文＝PM-JSON（TipTap）
   const [title, setTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [contentDirty, setContentDirty] = useState(false);
@@ -134,7 +135,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     // 主要語/要約プレビューの初期値＝サーバー派生済みの値（tokens_top / summary）。
     setCloud(item.tokens_top.length ? item.tokens_top.map((t) => [t.token, t.count] as [string, number]) : null);
     setSummaryPrev(item.summary ?? null);
-    if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
+    setBody((item.body as RichTextValue) ?? EMPTY_DOC);  // 編集用 PM-JSON をプリフィル
   }, [item]);
 
   // 採否モード＝成果物の related-info からこの情報のリンク行を引き、現在の採否/メモ/can_dispose を得る。
@@ -170,24 +171,17 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     setDispBusy(false);
   };
 
-  // 内容欄の手動リサイズ（固定 height）を min-height に付け替え、自動伸長を保つ（DFT-N-004）。
-  // 編集可（作成者）時のみ .rt__area が描画されるため、その表示に合わせて attach する。
-  useEffect(() => {
-    const el = bodyRef.current;
-    return el && item?.can.edit_content ? attachGrowableResize(el) : undefined;
-  }, [item?.can.edit_content]);
-
   // 主要語を本文から再抽出（登録ダイアログと同じ＝クライアント派生・保存時はサーバーが再派生する）。
   const runCloud = () => {
     setCloudBusy(true);
-    const text = `${title} ${plainText(bodyRef.current?.innerHTML ?? "")}`.trim();
+    const text = `${title} ${pmText(body)}`.trim();
     setCloud(text ? cloudTokens(text) : []);
     setCloudBusy(false);
   };
   // 要約を本文から生成（同上・クライアント派生プレビュー）。
   const runSummary = () => {
     setSummaryBusy(true);
-    const text = plainText(bodyRef.current?.innerHTML ?? "");
+    const text = pmText(body);
     setSummaryPrev(text ? demoSummary(text) : "");
     setSummaryBusy(false);
   };
@@ -200,7 +194,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     if (contentDirty || attachmentsDirty) {
       const t = title.trim();
       if (!t) return;
-      patch.title = t; patch.body_html = bodyRef.current?.innerHTML ?? ""; patch.source_url = sourceUrl.trim() || null;
+      patch.title = t; patch.body = body; patch.source_url = sourceUrl.trim() || null;
     }
     if (curationDirty) {
       for (const k of Object.keys(EMPTY_ATTRS)) patch[k] = attrs[k] || null;
@@ -350,10 +344,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           {r.can.edit_content ? (
             <>
               {/* 内容は作成者のみ編集可（status 非依存）。保存時にサーバーがサニタイズ→再派生（body_text/要約/トークン）＋版記録。 */}
-              <div className="rt">
-                <div className="rt__area" ref={bodyRef} contentEditable suppressContentEditableWarning
-                  onInput={() => setContentDirty(true)} data-placeholder="内容・説明を編集…" />
-              </div>
+              <RichTextEditor value={body} onChange={(j) => { setBody(j); setContentDirty(true); }}
+                preset="document" uploadImage={uploadInfoImageApi} placeholder="内容・説明を編集…" ariaLabel="内容・説明" />
               {/* 抽出/生成ボタン＋主要語/要約プレビュー＝登録ダイアログ（InfoFormPanel）と同位置・同 UI。 */}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                 <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>

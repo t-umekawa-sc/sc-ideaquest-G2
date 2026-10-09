@@ -17,7 +17,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,8 +31,9 @@ class InfoItem(CompanyBase):
     # 続報（follow-up）＝続報元。NULL=根。登録時に親の info_links を origin=auto でスナップショット複製（§12-1）。
     parent_info_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("info_items.id"), nullable=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
-    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)   # サニタイズ済 HTML（nh3・§12-4）
-    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)   # 平文派生（検索/トークン/要約）
+    body: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{\"type\":\"doc\",\"content\":[]}'::jsonb"))  # PM-JSON 正本
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)   # pm_to_html(body) の派生（表示用・サニタイズ済）
+    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)   # pm_to_text(body) の派生（全文検索/トークン/要約）
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)     # 抽出型要約の派生（janome・§12-3）
     summary_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # http/https のみ（§7・#4）

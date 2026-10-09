@@ -18,6 +18,11 @@ from app.db.tenant import get_tenant_session
 from app.tenant.ideas.orm import Idea
 from app.tenant.info import application as app_info
 from app.tenant.info import derive
+
+
+def _pm(text: str) -> dict:
+    """テスト用 PM-JSON（1段落）。情報本文は PM-JSON（TipTap）で授受（TT0b）。"""
+    return {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
 from app.tenant.info import repository as repo
 from app.tenant.info.orm import InfoItem, InfoItemRevision, InfoLink
 from app.tenant.tokens import repository as tokens_repo
@@ -91,7 +96,7 @@ def test_n_tc_150_auto_link_created_for_similar_idea():
     try:
         created = app_info.create_info_item(
             account_id, company_id,
-            body=InfoCreateRequest(title="自動リンク検証", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+            body=InfoCreateRequest(title="自動リンク検証", body=_pm(f"{_UNIQUE_TEXT}")))
         info_ids.append(uuid.UUID(created["id"]))
         with get_tenant_session(db_identifier) as ts:
             links = {(l.target_type, l.target_id): l for l in repo.links_for_item(ts, info_ids[0])}
@@ -114,7 +119,7 @@ def test_n_tc_151_recompute_preserves_human_decisions():
     try:
         created = app_info.create_info_item(
             account_id, company_id,
-            body=InfoCreateRequest(title="再計算検証", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+            body=InfoCreateRequest(title="再計算検証", body=_pm(f"{_UNIQUE_TEXT}")))
         iid = uuid.UUID(created["id"]); info_ids.append(iid)
         # 人の操作を模す＝human 組の kind を supporting に・rejected 組を棄却。
         from datetime import datetime, timezone
@@ -126,7 +131,7 @@ def test_n_tc_151_recompute_preserves_human_decisions():
             ts.commit()
         # 本文を変えて再計算（distinctive トークンは維持）。
         app_info.update_info_item(account_id, company_id, str(iid),
-                                  body=InfoUpdateRequest(body_html=f"<p>{_UNIQUE_TEXT}を再度検討する</p>"))
+                                  body=InfoUpdateRequest(body=_pm(f"{_UNIQUE_TEXT}を再度検討する")))
         with get_tenant_session(db_identifier) as ts:
             rows = repo.links_for_item(ts, iid)
             by = {(l.target_type, l.target_id): l for l in rows}
@@ -150,7 +155,7 @@ def test_n_tc_152_threshold_and_top_n():
     try:
         created = app_info.create_info_item(
             account_id, company_id,
-            body=InfoCreateRequest(title="上限検証", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+            body=InfoCreateRequest(title="上限検証", body=_pm(f"{_UNIQUE_TEXT}")))
         info_ids.append(uuid.UUID(created["id"]))
         with get_tenant_session(db_identifier) as ts:
             links = repo.links_for_item(ts, info_ids[0])
@@ -164,8 +169,8 @@ def test_n_tc_152_threshold_and_top_n():
 def test_n_tc_153_reverse_trigger_creates_link():
     """N-TC-153: 成果物保存トリガ（逆方向）＝成果物側から既存情報へ auto リンク生成（無関係情報は除外）。"""
     company_id, db_identifier, account_id = _ctx()
-    hit = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向hit", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
-    miss = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向miss", body_html=f"<p>{_UNRELATED_TEXT}</p>"))
+    hit = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向hit", body=_pm(f"{_UNIQUE_TEXT}")))
+    miss = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向miss", body=_pm(f"{_UNRELATED_TEXT}")))
     hit_id, miss_id = uuid.UUID(hit["id"]), uuid.UUID(miss["id"])
     idea = uuid.uuid4()
     owner, qid = _seed_ideas(db_identifier, [(idea, _UNIQUE_TEXT)])  # 情報作成後に seed＝forward では張られない
@@ -185,9 +190,9 @@ def test_n_tc_154_reverse_preserves_human_decisions():
     """N-TC-154: 逆方向の再計算も score のみ更新・手動 kind/棄却は保持（重複行なし）。"""
     from datetime import datetime, timezone
     company_id, db_identifier, account_id = _ctx()
-    keep = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆keep", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
-    human = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆human", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
-    rej = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆rej", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    keep = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆keep", body=_pm(f"{_UNIQUE_TEXT}")))
+    human = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆human", body=_pm(f"{_UNIQUE_TEXT}")))
+    rej = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆rej", body=_pm(f"{_UNIQUE_TEXT}")))
     ids = {k: uuid.UUID(v["id"]) for k, v in {"keep": keep, "human": human, "rej": rej}.items()}
     idea = uuid.uuid4()
     owner, qid = _seed_ideas(db_identifier, [(idea, _UNIQUE_TEXT)])
@@ -218,7 +223,7 @@ def test_n_tc_154_reverse_preserves_human_decisions():
 def test_n_tc_155_reverse_noop_for_non_candidate():
     """N-TC-155: 候補外（下書きアイデア）は get_target_text=None＝リンクを作らない。"""
     company_id, db_identifier, account_id = _ctx()
-    info = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="下書き対象", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    info = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="下書き対象", body=_pm(f"{_UNIQUE_TEXT}")))
     info_id = uuid.UUID(info["id"])
     draft = uuid.uuid4()
     owner, qid = _seed_ideas(db_identifier, [(draft, _UNIQUE_TEXT)], status="draft")
@@ -253,7 +258,7 @@ def test_n_tc_156_company_threshold_controls_auto_link():
     try:
         _set_company_threshold(company_id, "1.500")  # 全遮断
         c1 = app_info.create_info_item(account_id, company_id,
-                                       body=InfoCreateRequest(title="厳しめ", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+                                       body=InfoCreateRequest(title="厳しめ", body=_pm(f"{_UNIQUE_TEXT}")))
         info_ids.append(uuid.UUID(c1["id"]))
         with get_tenant_session(db_identifier) as ts:
             keys = {(l.target_type, l.target_id) for l in repo.links_for_item(ts, info_ids[0])}
@@ -261,7 +266,7 @@ def test_n_tc_156_company_threshold_controls_auto_link():
 
         _set_company_threshold(company_id, "0.000")  # 全許容
         c2 = app_info.create_info_item(account_id, company_id,
-                                       body=InfoCreateRequest(title="緩め", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+                                       body=InfoCreateRequest(title="緩め", body=_pm(f"{_UNIQUE_TEXT}")))
         info_ids.append(uuid.UUID(c2["id"]))
         with get_tenant_session(db_identifier) as ts:
             keys = {(l.target_type, l.target_id) for l in repo.links_for_item(ts, info_ids[1])}
@@ -281,7 +286,7 @@ def test_n_tc_157_forward_self_heal_persists_candidate_tokens():
         with get_tenant_session(db_identifier) as ts:
             assert tokens_repo.tokens_for(ts, "idea", hit) == [], "初期は候補アイデアのトークン未永続"
         created = app_info.create_info_item(account_id, company_id,
-                                            body=InfoCreateRequest(title="自己修復", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+                                            body=InfoCreateRequest(title="自己修復", body=_pm(f"{_UNIQUE_TEXT}")))
         info_ids.append(uuid.UUID(created["id"]))
         with get_tenant_session(db_identifier) as ts:
             assert tokens_repo.tokens_for(ts, "idea", hit), "前向きが候補アイデアのトークンを自己修復で永続化する"

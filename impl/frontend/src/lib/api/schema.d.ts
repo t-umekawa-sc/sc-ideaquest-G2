@@ -7992,8 +7992,10 @@ export interface components {
         InfoCreateRequest: {
             /** Title */
             title: string;
-            /** Body Html */
-            body_html?: string | null;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /** Source Url */
             source_url?: string | null;
             /** Parent Info Id */
@@ -8080,6 +8082,10 @@ export interface components {
             parent_info_id?: string | null;
             /** Title */
             title: string;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            };
             /** Body Html */
             body_html?: string | null;
             /** Summary */
@@ -8510,8 +8516,10 @@ export interface components {
         InfoUpdateRequest: {
             /** Title */
             title?: string | null;
-            /** Body Html */
-            body_html?: string | null;
+            /** Body */
+            body?: {
+                [key: string]: unknown;
+            } | null;
             /** Source Url */
             source_url?: string | null;
             /** Priority */
