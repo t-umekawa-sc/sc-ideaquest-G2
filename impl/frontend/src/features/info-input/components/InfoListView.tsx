@@ -288,11 +288,12 @@ export function InfoListView() {
       <div className="page-head"><h1>情報インプット</h1></div>
       <p className="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
-      {/* ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰（GET /info-items/word-cloud）。語クリックで全文検索へ。 */}
-      {wordCloud.length > 0 && (
-        <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
-          <div className="wordcloud__title">☁️ よく出る語</div>
-          {wordCloud.map(({ token, count }) => {
+      {/* ワードクラウド（常時表示・GET /info-items/word-cloud・選択タブに絞る）。語クリックで全文検索へ。
+          空（該当語なし/空タブ）でも同じ高さのパネルを出す＝タブ切替で上下にずれない（ユーザー指摘・D4）。 */}
+      <div className={`wordcloud${wordCloud.length === 0 ? " is-empty" : ""}`} aria-label="ワードクラウド（語で絞り込み）">
+        <div className="wordcloud__title">☁️ よく出る語</div>
+        {wordCloud.length > 0 ? (
+          wordCloud.map(({ token, count }) => {
             const max = Math.max(...wordCloud.map((x) => x.count));
             return (
               <button key={token} type="button" className="wc-word"
@@ -300,9 +301,11 @@ export function InfoListView() {
                 title={`${token}（${count}）で全文検索`}
                 onClick={() => { setTab("search"); setFts(token); }}>{token}</button>
             );
-          })}
-        </div>
-      )}
+          })
+        ) : (
+          <span className="wordcloud__empty">この範囲に主要語はまだありません。</span>
+        )}
+      </div>
 
       {/* タブ＝クエスト SC-12 と同じ体裁（情報インプット＝一覧／全文検索）。 */}
       <div className="tabs" role="tablist" aria-label="情報インプットのセクション">

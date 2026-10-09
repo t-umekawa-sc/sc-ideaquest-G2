@@ -16,6 +16,10 @@
 .info-page .tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
 .info-page .tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
 .info-page .tab.is-active:hover { background: var(--color-primary-soft); }
+/* サブタブ帯があるとき（一覧タブ）＝トップタブ行の全幅下線・隙間・アクティブ下線を消して帯と地続きにする（D4・モック準拠）。
+   全文検索タブ時は後続が section で .info-subtabs が無い＝従来の下線タブ体裁を維持。 */
+.info-page .tabs:has(+ .info-subtabs) { border-bottom: none; margin-bottom: 0; }
+.info-page .tabs:has(+ .info-subtabs) .tab.is-active { border-bottom-color: transparent; margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
 .info-page .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
 .info-page .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
 
@@ -32,9 +36,14 @@
 .info-page .ft-result mark { background: #FEF08A; color: inherit; padding: 0 1px; border-radius: 2px; }
 
 /* ワードクラウド（一覧上部・語頻度の可視化） */
-.info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
+/* min-height＝語の有無/タブ切替で上下にずれないよう常に同じ高さのパネルを確保（ユーザー指摘・D4）。
+   空の時は見出し下にプレースホルダを中央寄せで出す。 */
+.info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; align-content: flex-start;
+  min-height: 12rem; box-sizing: border-box;   /* 満杯（すべて＝約3行）を収める高さに固定＝空タブでも同じ高さ */
   padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
 .info-page .wordcloud__title { width: 100%; font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
+.info-page .wordcloud.is-empty { align-content: center; }
+.info-page .wordcloud__empty { width: 100%; text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
 .wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); cursor: pointer; }
 
 /* 状態・影響のバッジ色 */
@@ -243,18 +252,17 @@
 /* 動的タブ（サブメニュー型サブタブ・D4・SC-50 §3b）＝トップタブ直下に地続きの帯（primary-soft）。
    見本＝doc/画面設計/mocks/_サブタブ_検討.html／_サブタブ溢れ_検討.html。 */
 .info-subtabs {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
-  border: 1px solid var(--color-border); border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
-  padding: var(--space-2) var(--space-3); margin-bottom: var(--space-4);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  background: var(--color-primary-soft);     /* トップタブのアクティブ背景と同色＝地続き（モック準拠） */
+  border: none; border-radius: 0 0 var(--radius) var(--radius);
+  padding: var(--space-2) var(--space-4); margin-bottom: var(--space-5);
 }
 .info-subtab {
   display: inline-flex; align-items: center; gap: 6px;
   border: none; background: transparent; cursor: pointer;
-  padding: 6px 10px; border-radius: var(--radius-sm);
+  padding: 8px 6px; border-radius: 0;
   font-size: var(--text-sm); color: var(--color-text);
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;       /* アクティブは太め下線（モック準拠） */
 }
 .info-subtab:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .info-subtab.is-active { font-weight: 700; color: var(--color-primary); border-bottom-color: var(--color-primary); }
