@@ -1,0 +1,14 @@
+# SOPS 設定（D6・設計=シークレット管理(SOPS) §4-A/§10）。
+# 役割＝「どのファイルを・誰（age 公開鍵）宛てに暗号化するか」。本ファイルは公開鍵しか持たないので Git 追跡可。
+#
+# 暗号化（authoring 時・公開鍵のみで可）: cd impl && sops secrets/secrets.enc.yaml
+#   （初回は `sops --encrypt secrets/secrets.template.yaml > secrets/secrets.enc.yaml`）
+# 復号（本番 up 直前・age 秘密鍵が必要・案2=鍵は投入のみ常駐させない）: scripts/decrypt-secrets.sh
+#
+# ★本番では下の age 公開鍵を「その環境で生成した公開鍵」に必ず置換する（環境別鍵＝dev 流出で prod が死なない）。
+#   下の鍵は雛形用の EXAMPLE（対応する秘密鍵は Git に無い）。
+creation_rules:
+  - path_regex: secrets/secrets\.enc\.ya?ml$
+    # encrypted_regex＝値だけ暗号化しキー名は平文のまま（変更差分が Git で意味を持つ・§4-A）。
+    age: >-
+      age12c6jdzqf5t3mnahs6rpv887uvzt9k7sl4kj5ej5g4y3gufwaz97qxxu22l

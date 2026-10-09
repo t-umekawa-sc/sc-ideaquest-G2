@@ -4,10 +4,11 @@
 > 規約の正本＝リポジトリ直下 `CLAUDE.md`（毎セッション自動読込）。設計の正本は `doc/` 配下、実装現況は `impl/README.md`、**残作業の正本は `doc/バックログ/未実装・ギャップ一覧.md`**。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 更新: 2026-10-09（深夜・**シークレット管理 D6 の (A) ファイル供給基盤＋本番 fail-closed ガード＋F9（Jasper S2S 秘密のファイル供給）**セッション）。
+- 更新: 2026-10-09（深夜・**シークレット管理 D6 の (A) 一式**＝ファイル供給基盤＋本番 fail-closed ガード＋F9＋**SOPS+age 本体（at-rest）**セッション）。
 - ブランチ: `main`（main 直 push が慣習）。
-- **未コミット**＝本セッションの変更は**まだコミットしていない**（ユーザーの指示待ち）。`git status` で差分一覧を確認し、合意後にコミット＆push する。主な変更ファイルは §3 と下記。
-- alembic heads: company=`0064_chat_messages_pm_json`／control=`0020_signup_challenges`（**本セッションは DB 変更なし＝migration 追加せず**）。
+- コミット済み＝**`9200a89c` feat(secrets/D6): 秘密のファイル供給基盤(file>env)＋本番fail-closedガード＋F9**（push 済み）。
+- **未コミット**＝本セッション後半の **SOPS+age 本体（at-rest）** 分はまだコミットしていない（ユーザー確認後に push）。変更＝`impl/.sops.yaml`（新）／`impl/secrets/secrets.template.yaml`（新）／`impl/scripts/decrypt-secrets.sh`（新）／`impl/compose.secrets.yaml`（権限方針修正）／`.gitignore`（template 追跡）／docs（設計ドラフト・本番デプロイ要件 §3.1・台帳 D6・impl/README）。**コミットしない＝実鍵 `secrets/age_example.key`・暗号化実体 `secrets/secrets.enc.yaml`（いずれも gitignore）**。
+- alembic heads: company=`0064_chat_messages_pm_json`／control=`0020_signup_challenges`（**DB 変更なし**）。
 
 ## 2. プロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘の消化＋仕様確定済み未実装機能の処理。本セッションは**横断セキュリティ基盤（秘密のファイル供給）を、セキュリティ優先の方針で実装**した。
@@ -27,6 +28,14 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 5. **.gitignore**＝`impl/secrets/*`（実鍵追跡外）＋`!impl/secrets/*.sample`。サンプル `impl/secrets/jasper_shared_secret.sample`（ダミー文字列）を追加。
 6. **テスト（テスト規約 §5・md 先行・red-green）**＝`doc/テスト/セキュリティ横断.md` §7（SEC-TC-050〜053）＋`doc/テスト/V_帳票.md` §4（V-TC-212/213）を**先に追記**。backend `tests/core/test_secret_supply.py`（4本）／jasper `tests/test_secrets.py`（2本）を実装。※`SEC-TC-` はトレーサビリティ正規表現（`\b[A-Z]-TC-`）に不一致＝md で追跡（既存 SEC-TC-045/046 と同扱い）。`V-TC-` は検査対象。
 7. **ドキュメント**＝設計ドラフト §0/§5/§13 更新（実装済みの明示）／`doc/本番デプロイ要件.md` §3.1 新設＋§7.5 G1 の F9 表記更新／台帳（**F9 削除**・D6 を「部分実装」に更新・最終更新行）／`impl/README.md`（D6 節追加・F9 完了表記）。
+
+### 3b. SOPS+age 本体（at-rest・案1 デプロイ時復号・案2 鍵非常駐）＝本セッション後半・未コミット
+> ユーザーとの設計対話で確定した方針（**セキュリティ優先**）: **案1 デプロイ時復号**（イメージビルド時ではない＝本番サーバで `up` 直前）／**案2 age 鍵は本番に常駐させずデプロイ時だけ投入**（無人再起動では人の再投入まで復帰しないのを受容）／**平文は tmpfs**（ディスクに残さない）／**環境別鍵**／暗号化は authoring 時に**公開鍵**で（秘密鍵不要）・Git にコミットするのは暗号文だが**本リポジトリには `secrets.enc.yaml` を置かない**（defense-in-depth＝harvest-now-decrypt-later 回避）。
+1. **`impl/.sops.yaml`**（新・公開鍵 recipient＝EXAMPLE、本番は置換）／**`impl/secrets/secrets.template.yaml`**（新・鍵名＋プレースホルダの構造テンプレ・代表9件）／**`impl/scripts/decrypt-secrets.sh`**（新・`SOPS_AGE_KEY_FILE` 投入必須〔fail-closed〕→`sops -d`→各キーを OUT_DIR に materialize）。
+2. **権限の要点（ハマりどころ）**＝**非 Swarm の docker compose は secret の `uid/gid/mode` を無視**しホスト権限のまま bind-mount する（以前の D6(A) overlay が通ったのは偶然 0644 だったから）。→ `decrypt-secrets.sh` は **dir 0700＋file 0444**（コンテナ uid を問わず読める・平文は親 dir 0700＋tmpfs で守る「protect-by-directory」）。root 実行なら `STRICT_CHOWN_UID` で 0400＋消費 uid 所有。`compose.secrets.yaml` の `uid:/mode:` は削除（効かないため誤解防止）。
+3. **検証ツール**＝sops/age はこの環境に無いので GitHub の静的バイナリを `/tmp/sopsbin`（age v1.2.1・sops v3.9.4）に落として検証（コミット対象外）。本番/CI は apt の `age`＋sops バイナリが前提（イメージには同梱しない）。
+4. **ハマり2点**＝(a) `python3 - <<EOF` は heredoc が stdin を奪い JSON が届かない→`python3 -c` に。(b) `sops -e -i` は `.sops.yaml` の creation_rule に path が一致する必要（`secrets/secrets.enc.yaml$`）。
+5. **検証（green）**＝テンプレ→`sops -e -i`（公開鍵で暗号化・値が `ENC[AES256_GCM...]`）→`decrypt-secrets.sh`（鍵投入）で tmpfs へ 9件 materialize→overlay 起動で **jasper が復号値を読み S2S 200**／誤り 401／**鍵なしは fail-closed（exit1）**。※jasper は `up` で再作成されないと旧秘密を保持＝検証時は `--force-recreate jasper` が要る。
 
 ## 4. 現在の状態（動作 / テスト）＝すべてグリーン・エンドツーエンド確認済み
 - **backend/jasper を再ビルド済み**（`docker compose up -d --build backend jasper`）。現在は **base（dev）スタックで稼働中**（guard は dev で no-op）。
@@ -53,13 +62,13 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **セキュリティ優先で file > env**（env 露出面 T3 に file が負けない）＝設計 §5 の芯の実装。
 - **本番 fail-closed ガードは「dev 既定値拒否」型**（全秘密強制 non-empty ではない）＝空が正当な秘密の意味論を壊さない（ユーザー合意）。
 - **(広) を今セッションで実装**＝素通りの恐れを無くすため（ユーザー指示）。SOPS 本体へ回すのは**完全な秘密棚卸しによる対象拡張のみ**（台帳 D6 に明記）。
-- **最小権限**＝S2S 秘密は backend/jasper だけに配布（workers 除外）。`mode:0400`・jasper は非 root uid 指定。
-- **本オーバーレイは env 露出面の縮小まで**＝ホスト上のファイル実体は平文。**at-rest 暗号化は SOPS+age（D6 の (A) 本体）が担う**（守れる/守れないを正直に・設計 §7）。
+- **最小権限**＝S2S 秘密は backend/jasper だけに配布（workers 除外）。※当初 compose に書いた `mode:0400`/`uid:10001` は**非 Swarm では無視される**ことが判明（後半で修正）＝権限は復号ファイル側（dir0700/file0444）で制御。
+- **env 露出面の縮小（ファイルマウント）＋ at-rest 暗号化（SOPS+age）の両方を本セッションで実装**（守れる/守れないは設計 §7）。平文は tmpfs で非永続・age 鍵は非常駐（案2）。
 
 ## 7. 次にやること（優先順・ファイル/関数レベル）
 > 着手前に実コードで裏取り。**残作業の正本＝`doc/バックログ/未実装・ギャップ一覧.md`**。
-1. **（本セッションの締め）コミット＆push**＝ユーザー合意後。working tree の変更（config.py/main.py/jasper/compose.secrets.yaml/.gitignore/secrets サンプル/docs/テスト/台帳/README/handoff）をまとめる。`impl/secrets/jasper_shared_secret`（実鍵）は .gitignore 済＝コミットされない（残しておくと overlay 検証に使える）。
-2. **D6 の残（SOPS 本体スライス）**＝(A) **SOPS+age 本体（at-rest 暗号化）**＝`secrets.enc.yaml` を Git 暗号化コミット＋起動時復号（設計 §4-A/§10）／(B) **AES-GCM DB 暗号ラッパー**＝消費者 D3 カメリオ実装時に併せて（§4-B/§6）／**秘密の完全棚卸し＋`_DEV_DEFAULT_SECRETS` の対象拡張**（§12-3）。
+1. **（本セッションの締め）SOPS 本体分のコミット＆push**＝ユーザー合意後。§3b の未コミット分（.sops.yaml/secrets.template.yaml/decrypt-secrets.sh/compose.secrets.yaml/.gitignore/docs）をまとめる。**`secrets/age_example.key`・`secrets/secrets.enc.yaml` は gitignore＝コミットされない**（残すと検証に再利用可）。
+2. **D6 の残（(B)＋運用）**＝(B) **AES-GCM DB 暗号ラッパー**＝消費者 D3 カメリオ実装時に併せて（§4-B/§6・現状ブロック）／**秘密の完全棚卸し＋`_DEV_DEFAULT_SECRETS`／file 結線の対象拡張**（§12-3・DB 等は消費者トポロジ注意）／**鍵ローテ runbook**。**SOPS+age 本体（at-rest）は本セッションで完了**（案1 デプロイ時復号・案2 鍵非常駐・平文 tmpfs）。
 3. **（候補・ユーザー判断待ち）F6 AI 評価・再評価ボタンの表示条件**＝台帳 F6（出典＝`doc/セッション調整/引継/2026-10-09_ai評価-有効化と再評価ボタン.md`）。`IdeaDetailView.tsx:825` 付近。変更はユーザー意図確認後。
 4. **（候補・掃除）F7 concepts 独自スコープチャットのレガシー掃除**＝台帳 F7（出典＝`doc/セッション調整/引継/2026-10-09_リッチテキスト2系統統一-tiptap移行.md`）。
 5. **（候補）帳票 follow-up F8（和文）/F10（実請求データ）/F11（非同期）**／**D2 AI 駆動型アイデア生成**。

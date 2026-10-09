@@ -1,7 +1,7 @@
 # シークレット管理（SOPS+age）機能 — 設計ドラフト（自己ホスト型・横断基盤）
 
 > 状態: **ドラフト（2026-10-08 起票／2026-10-09 一部実装）**。方針確定＝(1) **二層構造**（デプロイ秘密＝SOPS+age／実行時入力秘密＝DB に AES-GCM）・(2) **鍵は env でなく compose `secrets:` ファイルマウント供給**・(3) at-rest 強化に **SOPS+age（無料・商用可・サーバ不要）を採用、OpenBao 等のサーバ型は将来オプション**（§9）。参照表記は [ドキュメント作成規約](../規約/ドキュメント作成規約.md) 準拠。
-> **実装済み（2026-10-09・D6 の (A) ファイル供給基盤＋F9）**＝(A) の「ファイルマウント供給」部分＝backend `app/core/config.py`（`secrets_dir="/run/secrets"`＋`settings_customise_sources` で **file > env**）／jasper `_secrets.py`（同 `/run/secrets/<name>`・file>env・`hmac.compare_digest`）／`impl/compose.secrets.yaml`（本番オーバーレイ・`mode:0400`・最小権限）／**本番 fail-closed ガード**（§4-A' 新設・`insecure_prod_secrets`）。**未実装＝(A) の SOPS+age 本体（at-rest 暗号化・§4-A）・(B) AES-GCM DB 暗号（§4-B・消費者=カメリオ D3 未実装）・秘密の完全棚卸し（§12-3）**。
+> **実装済み（2026-10-09・D6 の (A) 一式）**＝(1) **ファイル供給基盤**＝backend `app/core/config.py`（`secrets_dir="/run/secrets"`＋`settings_customise_sources` で **file > env**）／jasper `_secrets.py`（同 `/run/secrets/<name>`・file>env・`hmac.compare_digest`）／`impl/compose.secrets.yaml`（本番オーバーレイ・最小権限）／**本番 fail-closed ガード**（`insecure_prod_secrets`）。(2) **SOPS+age 本体（at-rest）**＝`impl/.sops.yaml`（公開鍵・置換前提）／`secrets/secrets.template.yaml`（構造テンプレ）／`scripts/decrypt-secrets.sh`（**デプロイ時復号〔案1〕・age 鍵は投入のみ常駐させない〔案2〕・平文は tmpfs・dir 0700/file 0444**）。暗号化=authoring 時に公開鍵／復号=本番 up 直前に秘密鍵投入。**本番の `secrets.enc.yaml` はリポジトリにコミットしない**（環境側で管理）。**未実装＝(B) AES-GCM DB 暗号（§4-B・消費者=カメリオ D3 未実装）・秘密の完全棚卸し（§12-3）**。
 > 関連正本＝[WEBアプリ開発時のセキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)（§12 保存データ保護・§13 暗号化/乱数・§15 ログ監査）・[本番デプロイ要件](../本番デプロイ要件.md)（§3 秘匿のシークレットマネージャ供給・§6.5 バックアップ暗号化・§6.6 ログのキー名マスク）・[コーディング規約](../規約/コーディング規約.md)（§2 セキュリティ・§3.4 バックエンド4層）。
 > **本書は横断基盤＝全ての秘密の“守り方”の正本**。各機能（[カメリオAPI連携](カメリオAPI連携_設計.md)・[ローカルLLM連携](ローカルLLM連携_設計.md)・SMTP/Turnstile/HIBP 等）は本書の**消費者**であり、個別に秘密保護を再発明しない（DRY）。
 
@@ -135,14 +135,15 @@
 
 ## 12. 残論点
 
-1. **age 鍵のホスト保管**（ファイルマウント平文ファイルの権限/配置・将来 TPM/`systemd-creds` 併用の是非）。
-2. **AES-GCM マスター鍵のローテーション運用**（`key_version` 設計は §6・自動化の範囲）。
-3. **SOPS 対象の棚卸し**（既存 `.env` のどこまでを SOPS 管理へ寄せるか・移行順）。
+1. **age 鍵のホスト保管** → **決定（2026-10-09・案2）**＝**本番サーバに常駐させない**。デプロイ時だけ `SOPS_AGE_KEY_FILE` で投入し、復号後に破棄する（`decrypt-secrets.sh` は鍵を保存しない）。トレードオフ＝**無人再起動では人が鍵を再投入して復号し直すまでサービスが復帰しない**（可用性より鍵非常駐を優先・ユーザー決定）。将来 TPM/`systemd-creds`/KMS での封印は上位オプション（§9）。環境別鍵（dev/prod 別）＋鍵をバックアップ対象外にする。
+2. **AES-GCM マスター鍵のローテーション運用**（`key_version` 設計は §6・自動化の範囲）＝(B) 実装時。
+3. **SOPS 対象の棚卸し**（どのデプロイ秘密まで SOPS 管理へ寄せ・どれを file マウント結線するか）。現状テンプレは代表9件、file 結線は `jasper_shared_secret` のみ（消費者トポロジ注意＝DB は db サービスと同値が要る等）。
 4. **サーバ型への昇格条件の数値化**（秘密数・サービス数の閾値）。
+5. **age 鍵ローテ方針**＝毎デプロイではなく定期/インシデント時、かつ**秘密値ローテとセット**（鍵ローテだけでは漏洩済み平文は無効化できない・Git 履歴に旧暗号文が残る）。
 
-## 13. 次アクション（残り・SOPS 本体スライス）
+## 13. 次アクション（残り）
 
-> **済み（2026-10-09・D6 (A) ファイル供給基盤＋F9）**＝本書 §5 の「env→ファイルマウント供給」＋本番 fail-closed ガード（§5 末尾）＋[本番デプロイ要件](../本番デプロイ要件.md) §3 具体化＋テスト（SEC-TC-050〜053・V-TC-212/213）。
+> **済み（2026-10-09）**＝**(A) ファイル供給基盤＋F9**（§5「env→ファイルマウント供給」・file>env・本番 fail-closed ガード・SEC-TC-050〜053／V-TC-212/213）／**(A) SOPS+age 本体**（§4-A・デプロイ時復号〔案1〕・鍵非常駐〔案2〕・平文 tmpfs＝`impl/.sops.yaml`＋`secrets/secrets.template.yaml`＋`scripts/decrypt-secrets.sh`＋[本番デプロイ要件](../本番デプロイ要件.md) §3.1）。暗号化=authoring 時に公開鍵／復号=本番 up 直前に秘密鍵投入。**本番の暗号化実体 `secrets.enc.yaml` は本リポジトリにはコミットしない**（defense-in-depth＝harvest-now-decrypt-later を避ける・環境側で管理）。リポジトリは仕組み＋テンプレートのみ。
 
 1. **SOPS+age 本体（§4-A・at-rest 暗号化）**＝`secrets.enc.yaml`（Git 暗号化コミット）＋起動時復号。現状の `compose.secrets.yaml` の `file:` 平文実体を SOPS 管理へ寄せる（§10 手順1〜3）。
 2. **AES-GCM DB 暗号ラッパー（§4-B/§6）＋ログマスク（§8）**＝消費者（[カメリオAPI連携](カメリオAPI連携_設計.md)・D3）実装時に併せて。
