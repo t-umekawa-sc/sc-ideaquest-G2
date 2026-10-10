@@ -131,6 +131,7 @@ class EvaluationAggregateDTO(BaseModel):
     evaluator_count: int = 0          # 人間の提出済み人数（AI は数えない・F.1）
     evaluators: list[EvaluationEvaluatorDTO] = []  # 人間の評価者のみ
     ai_evaluation: AiEvaluationDTO | None = None   # AI 評価の別枠ブロック（FR-50・F.7.4）
+    ai_evaluation_available: bool = False  # 会社で AI 評価モデルが有効か＝手動実行ボタンの表示判定（F.7.3）
     coin: EvaluationCoinDTO = EvaluationCoinDTO()
     my_evaluation: EvaluationMeDTO | None = None
     my_permissions: list[str] = []  # UX 出し分け（evaluate/select）

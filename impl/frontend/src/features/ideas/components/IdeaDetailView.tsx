@@ -867,6 +867,24 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </section>
           )}
 
+          {/* AI 評価が未生成（自動評価 OFF 等）でも、評価者は手動で実行できる（F.7.3・ai_evaluation_available で出し分け）。 */}
+          {!evalAgg?.ai_evaluation && evalAgg?.ai_evaluation_available && canEvaluate && (
+            <section className="card ai-eval" aria-label="AI評価">
+              <div className="eval-head"><span className="ai-badge">🤖 AI評価</span></div>
+              <p className="ai-meta">このアイデアにはまだ AI 評価がありません。{questCompleted ? "完了したクエストでは実行できません。" : "評価者は AI 評価を手動で実行できます（独立した評価者として採点し、集計・コインに算入されます）。"}</p>
+              <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
+                {questCompleted ? (
+                  <button className="btn btn-outline is-frozen" type="button" disabled title="完了したクエストでは実行できません">AI評価を実行</button>
+                ) : (
+                  <button className="btn btn-outline" type="button" onClick={() => void handleRegenerate()} disabled={regenerating}>
+                    {regenerating ? "実行中…" : "AI評価を実行"}
+                  </button>
+                )}
+              </div>
+              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>▲ 実行は<strong>評価者権限</strong>を持つ人のみ。</p>
+            </section>
+          )}
+
           {/* 情報（メタ） */}
           <section className="card" aria-label="情報">
             <h2 className="card-title">情報</h2>

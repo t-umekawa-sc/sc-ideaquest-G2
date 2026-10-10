@@ -31,7 +31,7 @@
 | メソッド/パス | 概要 | リクエスト（パス） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `GET /ideas/{idea_id}/evaluation/me` | 自分の評価/下書きを取得（SC-25 の読み込み） | パス: `idea_id` | 自分の評価（`status`・`scores`〔`{aspect:score}`〕・`comments`〔`{aspect:comment}`〕・`overall_comment`・`visibility`・`submitted_at`）。未作成なら `null`/空 |
-| `GET /ideas/{idea_id}/evaluation` | 評価結果の集計を取得（SC-22 §4.6 右レール） | パス: `idea_id` | `aspects`〔観点別平均 `{aspect: avg}`〕・`overall_avg`・`evaluator_count`〔提出済み**人間**評価者数〕・`evaluators[]`〔各**人間**評価者の氏名/**観点別スコア** `{aspect:score}`/**観点別コメント** `{aspect:comment}`/総評/`visibility`/`submitted_at`〕・**`ai_evaluation`**〔AI 評価の別枠ブロック・F.7.4〕・`coin`〔`{projected, finalized?, finalized_at?}`〕・`my_evaluation`（`me` の要約） |
+| `GET /ideas/{idea_id}/evaluation` | 評価結果の集計を取得（SC-22 §4.6 右レール） | パス: `idea_id` | `aspects`〔観点別平均 `{aspect: avg}`〕・`overall_avg`・`evaluator_count`〔提出済み**人間**評価者数〕・`evaluators[]`〔各**人間**評価者の氏名/**観点別スコア** `{aspect:score}`/**観点別コメント** `{aspect:comment}`/総評/`visibility`/`submitted_at`〕・**`ai_evaluation`**〔AI 評価の別枠ブロック・F.7.4〕・**`ai_evaluation_available`**〔会社で `idea_evaluate` 既定モデルが有効か＝AI 評価未生成時の手動実行ボタンの表示判定・F.7.3〕・`coin`〔`{projected, finalized?, finalized_at?}`〕・`my_evaluation`（`me` の要約） |
 
 - **`visibility` の適用（表示制御）**: 各評価（`evaluations.visibility`）ごとに閲覧範囲を判定する。
   - `party` の評価＝パーティー全員に表示。
@@ -144,12 +144,13 @@
 
 - **F.4 との整合（重要）**＝確定トリガ (a)「`evaluator` 権限保持者が全員 submitted」の**判定集合は人間の評価者のみ**（AI は権限保持者ではないので人数に数えない）。一方、**コイン金額は `visibility` 無視で全 submitted 評価（AI 含む）の均等平均×10**（F.4）。**AI 単独（人間の提出 0 件）**の場合は (a) では確定せず **(b) quest completed** で確定（AI の点だけで算定）。
 
-### F.7.3 再生成（評価者権限保有者のみ）
+### F.7.3 再生成／手動実行（評価者権限保有者のみ）
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `POST /ideas/{idea_id}/ai-evaluation/regenerate` | AI 評価を再生成（再 enqueue） | パス: `idea_id`／`Idempotency-Key`（任意） | 202＋`{job_id, status:'queued'}` |
+| `POST /ideas/{idea_id}/ai-evaluation/regenerate` | AI 評価を**生成/再生成**（enqueue） | パス: `idea_id`／`Idempotency-Key`（任意） | 202＋`{job_id, status:'queued'}` |
 
+- **本 EP は AI 評価が未生成でも使える＝手動実行の口も兼ねる**（2026-10-10）。会社の**自動評価が OFF**（§5.67 `company_ai_settings.auto_evaluate_on_publish`・S.5b）だと公開時に AI 評価が付かないため、評価者が本 EP で**初回 AI 評価を手動起動**できる（未生成/既存を問わず同じ enqueue）。UI の出し分けは F.1 の **`ai_evaluation_available`**（会社で `idea_evaluate` 既定モデルが有効か）で行う＝AI 無効の会社では手動ボタンを出さない。
 - **権限＝`evaluator`（FR-27・当該クエストの評価者権限保持者）のみ**＝**owner/quest_admin でも評価者権限が無ければ 403**（2026-10-08 ユーザー決定・コスト制御）。
 - ジョブ完了時に F.7.2 の保存が走り、**旧 AI 評価は版へスナップして上書き**（`editor_id`＝本 EP を呼んだ評価者）。
 - **完了凍結**＝`quest_status=completed` で **409 `invalid_state`**（他の書き込みと同様・C.5）。会社モデル未有効/タスク無効は **422**（§S.2 ガードレール）。

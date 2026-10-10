@@ -86,6 +86,10 @@ def get_aggregate(account_id, company_id, idea_id) -> dict:
         agg["coin"] = _coin_status(ts, idea, submitted, scores_by_eval)
         agg["my_evaluation"] = _me_payload(ts, repo.get_evaluation(ts, idea.id, user.id)) if _is_evaluator(ts, quest, user) else None
         agg["my_permissions"] = _my_permissions(ts, quest, user)
+        # AI 評価が会社で使えるか（手動実行ボタンの表示判定・F.7.3）。自動評価 OFF でも評価者が手動起動できるよう、
+        # AI 評価未生成でもこのフラグで「AI評価を実行」ボタンを出す（モデル無効の会社では出さない）。
+        from app.tenant.ai_jobs import application as ai_app
+        agg["ai_evaluation_available"] = ai_app.task_has_enabled_model(ts, "idea_evaluate")
         return agg
 
 

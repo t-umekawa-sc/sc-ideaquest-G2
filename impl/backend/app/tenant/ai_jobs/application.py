@@ -69,6 +69,19 @@ def _effective_enabled_keys(ts) -> set[str]:
     return result
 
 
+def task_has_enabled_model(ts, task_type: str) -> bool:
+    """会社でその `task_type` の既定モデルが有効か（手動 AI 実行ボタンの表示判定等・§4.2）。
+
+    自動評価 OFF でも手動実行ボタンを出す前提の「AI が使えるか」判定に使う。既定モデルキーを registry で
+    解決し、会社の実効有効集合（free 既定 ON + 明示設定）に含まれるかで判定する。
+    """
+    try:
+        key = registry.resolve_key(task_type, None)
+    except Exception:  # noqa: BLE001 — 未知 task は「使えない」扱い
+        return False
+    return key in _effective_enabled_keys(ts)
+
+
 def _detail(job: AiJob) -> dict:
     return {
         "id": str(job.id), "task_type": job.task_type, "status": job.status, "execution": job.execution,

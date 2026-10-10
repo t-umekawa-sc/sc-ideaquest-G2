@@ -46,6 +46,7 @@
 | F-TC-222 | int | **RAG 経営資料の top-k 追補**＝クエスト未選択でも成果物に意味的に近い資料が入る（A-2・selected 優先） | アイデア（idea 埋め込み）＋意味的に近い非選択の経営資料＋無関係な非選択資料（fake 埋め込み） | `ai_eval.build_messages(ts, idea_id)` | user に意味的に近い非選択資料のタイトルが入り、無関係資料（min_cosine 未満）は入らない（graceful＝埋め込み不可なら選択分のみ） | 設計§3／FR-44／A-2 |
 | F-TC-218 | api | **再生成は評価者権限保持者が可**（202＋queued・regenerated_by 入り） | ACME-01=evaluator メンバー・published アイデア | `POST /ideas/{id}/ai-evaluation/regenerate` | 202・`{job_id, status:'queued'}`・`ai_jobs` に idea_evaluate（`input.regenerated_by`＝実行者） | F.7.3／FR-50 |
 | F-TC-219 | api | **評価者権限が無い再生成は 403**（owner/quest_admin でも評価者権限無ければ不可） | ACME-01=vote のみのパーティー員 | 同上 | 403 | F.7.3／F.0 |
+| F-TC-223 | api | **集計に `ai_evaluation_available`**＝会社で idea_evaluate 既定モデルが有効か（手動実行ボタンの表示判定・自動評価 OFF でも評価者が手動起動できる根拠） | 既定（free ON）／既定キーを会社で OFF | `GET /ideas/{id}/evaluation` | 既定=true／既定モデル OFF 時=false | F.7.3／S.5／FR-50 |
 
 ## 3. 選定・投稿者コイン確定 API（F.3/F.4）
 

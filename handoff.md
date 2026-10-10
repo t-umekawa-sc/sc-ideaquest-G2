@@ -21,6 +21,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **実装（完了・未コミット→このセッションで push 予定）**＝新テーブル `company_ai_settings`（会社DB シングルトン・§5.67・migration `0067`・`auto_evaluate_on_publish` NULL=env 継承）／EP `GET/PATCH /admin/ai-policy`（S.5b・`require_company_account_admin`）／`ideas/application._enqueue_idea_ai_evaluation` を **会社値 coalesce env** に差し替え（会社 OFF なら env ON でも投入しない＝会社値優先）／frontend `features/ai-settings`（`AiSettingsView` に「AI 動作ポリシー」セクション＝SC-94 に集約・ユーザー指示「ON/OFF 画面に寄せて」）。
 - **解決順＝会社設定 > env フォールバック**（ユーザー決定）。置き場は per-model の §5.58 ではなく会社横断シングルトン（将来の会社横断 AI ポリシーの受け皿）。
 - **テスト**＝S-TC-215〜219（api/int・**red→green 実証済**＝実装 stash で ImportError 赤→復帰で緑）。backend `tests/ai_jobs`+`tests/ideas` 117 passed／`npm run build` ✓／TC トレーサビリティ ✅ 1131／**実UI目視済**（kanri@acme＝トグル表示・ON/OFF 永続）。設計＝`doc/設計ドラフト/会社別AI動作ポリシー_設計.md`。正本反映＝データモデル §5.67／API S.5b／SC-94 §4.0。残＝F13（e2e・任意低）。
+- **自動評価 OFF 時の手動実行（F6 完了・2026-10-10）**＝AI 評価が未生成でも評価者が手動起動できるよう、SC-22 の AI 評価ブロックに**空状態＋「AI評価を実行」ボタン**を追加（`regenerate` EP は未生成でも enqueue する＝backend 無改修で流用・バグでなく仕様）。表示判定＝集計 DTO に **`ai_evaluation_available`**（会社で `idea_evaluate` 既定モデル有効か＝`ai_jobs.application.task_has_enabled_model`）を追加し、`!ai_evaluation && ai_evaluation_available && canEvaluate && !questCompleted` で出す（AI 無効の会社では出さない）。テスト F-TC-223（red-green）・正本＝API F.1/F.7.3・SC-22 §4.6a。**実UI目視済**（kanri evaluator・未生成アイデアでボタン表示）。**F6 を台帳から削除・引継 `2026-10-09_ai評価-有効化と再評価ボタン.md` も消化済で削除**。
 
 ### 3a. 情報インプット動的タブ D4（大部分実装・コミット多数）
 > 以降は前セッション（D6 → info 不具合修正 → D4 を main に積んだ）。
@@ -83,4 +84,4 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - 残作業の正本＝**`doc/バックログ/未実装・ギャップ一覧.md`**（本セッションで D4 を「大部分実装」に更新・summary 行更新）。次回確認＝**D4 残 follow-up・D6(B)・ISO G2/G3・D2/D3・F6/F7** 等。
 - 並行開発＝`doc/セッション調整/並行開発の取り決め.md`（main 統合順・ブランチ/worktree・Docker/DB 分離）。※記載のブランチ名（`e2e/*`・`feature/*`）が現在も有効かは実行時に確認。
 - **引継（別セッション由来・2026-10-10 に裏取り→台帳起票済み。未消化のため引継ファイルは保持）**＝`doc/セッション調整/引継/2026-10-09_プロジェクト管理機能拡張.md`（設計＋引継・コミット `6dcbc4c7`→台帳 `D8`＋`F4`）／`2026-10-09_ワードクラウド-クエスト議論の主題がseedで空.md`（調査引継・コミット `ee2598ac`→台帳 `F12`）。**実装が完了し当該引継由来の全行が台帳から消えたら引継ファイルを削除**する。
-- その他の既存引継＝`2026-10-09_ai評価-有効化と再評価ボタン.md`（F6 出典）／`2026-10-09_リッチテキスト2系統統一-tiptap移行.md`（F7 出典）。
+- その他の既存引継＝`2026-10-09_リッチテキスト2系統統一-tiptap移行.md`（F7 出典）。※`2026-10-09_ai評価-有効化と再評価ボタン.md` は F6 完了（自動評価 OFF 時の手動実行を実装）につき削除済み。

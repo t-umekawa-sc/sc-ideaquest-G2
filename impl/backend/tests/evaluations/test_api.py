@@ -225,6 +225,34 @@ def test_f_tc_219_regenerate_ai_evaluation_requires_evaluator(client, env):
     assert r.status_code == 403, r.text
 
 
+def test_f_tc_223_aggregate_ai_available_flag(client, env):
+    """F-TC-223: 集計に ai_evaluation_available＝会社で idea_evaluate 既定モデルが有効か（手動実行ボタンの表示判定）。
+
+    既定は free モデル ON で true。idea_evaluate の既定キーを会社で OFF にすると false（AI 無効の会社で手動
+    ボタンを出さない根拠）。これにより自動評価 OFF でも AI 評価未生成の段階で評価者が手動起動できる。
+    """
+    from app.infra.llm import registry
+    from app.tenant.ai_jobs.orm import CompanyAiModelSetting
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    key = registry.resolve_key("idea_evaluate", None)
+    try:
+        # 既定＝free モデル ON ＝ available true。
+        r = client.get(EVAL(idea))
+        assert r.status_code == 200, r.text
+        assert r.json()["ai_evaluation_available"] is True
+        # 既定モデルを会社で OFF にすると false。
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.add(CompanyAiModelSetting(model_key=key, enabled=False))
+            ts.commit()
+        assert client.get(EVAL(idea)).json()["ai_evaluation_available"] is False
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(CompanyAiModelSetting.__table__.delete().where(CompanyAiModelSetting.model_key == key))
+            ts.commit()
+
+
 # ---- F.2 登録/更新 ----
 
 def test_f_tc_102_draft_partial_no_grant(client, env):

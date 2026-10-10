@@ -7300,6 +7300,11 @@ export interface components {
              */
             evaluators: components["schemas"]["EvaluationEvaluatorDTO"][];
             ai_evaluation?: components["schemas"]["AiEvaluationDTO"] | null;
+            /**
+             * Ai Evaluation Available
+             * @default false
+             */
+            ai_evaluation_available: boolean;
             /** @default {
              *       "projected": 0
              *     } */
