@@ -276,8 +276,8 @@ export function InfoFormPanel({ parentId, initialTabId, onCancel, onDone }: {
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", marginTop: 6, flexWrap: "wrap" }}>
             <div className="hint">画像は貼付/挿入時に自社ストレージへ再ホストします（外部参照は持ち込みません）。</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
-              <button className="btn btn-outline btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>
             </div>
           </div>
           <div className={`wc-preview${cloudBusy ? " iq-block" : ""}`}>
@@ -346,7 +346,7 @@ export function InfoFormPanel({ parentId, initialTabId, onCancel, onDone }: {
             </ul>
           ) : <div className="hint">関連リンクはまだありません。下から追加できます（保存すると類似度で<strong>自動リンク</strong>も生成されます）。</div>}
           <div className="link-add">
-            <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
           </div>
           <div className="hint">「対象を選ぶ」で対象と<strong>種別</strong>を選び「選択を確定」でステージします（保存で確定）。種別を<strong>「反証」</strong>にすると、対象の作成者＋評価者へ<strong>通知＋要再評価</strong>が発火します。</div>
           <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} existing={links} />

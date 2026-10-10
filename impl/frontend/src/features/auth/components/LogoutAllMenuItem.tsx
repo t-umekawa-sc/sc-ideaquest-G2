@@ -21,7 +21,7 @@ export function LogoutAllMenuItem() {
     }
   }
   return (
-    <button type="button" onClick={onClick} disabled={pending} role="menuitem">
+    <button type="button" onClick={onClick} disabled={pending} role="menuitem" className="is-danger">
       全端末からログアウト
     </button>
   );

@@ -341,7 +341,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
             <span className="place-zone__label">🗂 配置（タブ）</span>
             <span className="place-chip"><span className="place-chip__dot" />{curTabLabel}</span>
             {canMoveTab ? (
-              <button className="btn btn-outline btn-sm" type="button" onClick={() => setMoveOpen(true)}>タブを移動…</button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={() => setMoveOpen(true)}>タブを移動…</button>
             ) : null}
           </div>
           <p className="place-zone__note">この情報は上記タブに配置され、一覧ではそのタブに表示されます{canMoveTab ? "（「タブを移動」で変更＝内容の編集とは別操作）" : ""}。</p>
@@ -377,8 +377,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                 preset="document" uploadImage={uploadInfoImageApi} placeholder="内容・説明を編集…" ariaLabel="内容・説明" />
               {/* 抽出/生成ボタン＋主要語/要約プレビュー＝登録ダイアログ（InfoFormPanel）と同位置・同 UI。 */}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
-                <button className="btn btn-outline btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>
+                <button className="btn btn-primary btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
+                <button className="btn btn-primary btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>
               </div>
               <div className={`wc-preview${cloudBusy ? " iq-block" : ""}`}>
                 <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
@@ -549,12 +549,12 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
             <div className="dialog-label">アーカイブ（情報判定権限）</div>
             {r.status === "archived" ? (
               <>
-                <button className="btn btn-outline" type="button" onClick={doUnarchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "↩ アーカイブを解除する"}</button>
+                <button className="btn btn-primary btn-sm" type="button" onClick={doUnarchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "↩ アーカイブを解除する"}</button>
                 <div className="hint" style={{ marginTop: 6 }}>解除すると一覧（既定表示）に戻ります（属性があれば判定済み、無ければ未判定へ）。</div>
               </>
             ) : (
               <>
-                <button className="btn btn-outline btn-danger" type="button" onClick={doArchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "🗄 アーカイブする"}</button>
+                <button className="btn btn-danger btn-sm" type="button" onClick={doArchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "🗄 アーカイブする"}</button>
                 <div className="hint" style={{ marginTop: 6 }}>論理削除です（監査のため保持・物理削除はしません）。既定の一覧から外れ、「アーカイブ」タブから解除できます。</div>
               </>
             )}
@@ -583,7 +583,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                 </ul>
               ) : <p className="muted">関連リンクはまだありません。</p>}
               {r.can.add_link ? (
-                <div style={{ marginTop: 8 }}><button className="btn btn-outline" type="button" onClick={() => setLinkEditing(true)}>🔗 リンクを編集（追加・種別変更・棄却）</button></div>
+                <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" type="button" onClick={() => setLinkEditing(true)}>🔗 リンクを編集（追加・種別変更・棄却）</button></div>
               ) : null}
               <div className="hint" style={{ marginTop: 6 }}>情報側のリンク編集は会社内の全員が可能。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
             </>
@@ -597,7 +597,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                     {(l.target_type === "ideas" || l.target_type === "quests") && <QuestIcon name={l.target_title || l.target_id} imageUrl={l.target_icon_image_url} size="xs" />}
                     <span className="link-item__title" style={{ textDecoration: "line-through", color: "var(--color-text-subtle)" }}>{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">棄却済み・再リンクされません</span>
-                    <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id), "関連リンクを戻しました（保存前に反映済み）")}>戻す</button>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id), "関連リンクを戻しました（保存前に反映済み）")}>戻す</button>
                   </li>
                 ) : (
                   <li key={l.id} className={`link-item${l.disposition && l.disposition !== "pending" ? " is-locked" : ""}`}>
@@ -625,7 +625,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                 ))}
               </ul>
               <div className="link-add">
-                <button className="btn btn-outline" type="button" disabled={linkBusy} onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
+                <button className="btn btn-primary btn-sm" type="button" disabled={linkBusy} onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
               </div>
               <div className="hint" style={{ marginTop: 6 }}>「対象を選ぶ」で対象と<strong>種別</strong>を選び「選択を確定」で即追加します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
               <div style={{ marginTop: 8 }}><button className="btn btn-outline btn-sm" type="button" onClick={() => setLinkEditing(false)}>編集を終える</button></div>
@@ -657,7 +657,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
             ) : <p className="muted">続報はまだありません。</p>}
             <div style={{ marginTop: 8 }}>
               {/* 続報は常にスレッドの根に紐づける（§12-1・フラットなスレッド）。登録時に親の未棄却リンクを自動複製。 */}
-              <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${threadRoot.id}`)}>＋ 続報を登録</button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${threadRoot.id}`)}>＋ 続報を登録</button>
             </div>
           </div>
         )}

@@ -19,7 +19,7 @@ export function LogoutMenuItem() {
     }
   }
   return (
-    <button type="button" onClick={onClick} disabled={pending} role="menuitem">
+    <button type="button" onClick={onClick} disabled={pending} role="menuitem" className="is-danger">
       ログアウト
     </button>
   );
