@@ -431,6 +431,40 @@ def seed_demo_quest_group() -> None:
         _seed_quest_group_for(cdef["company_code"])
 
 
+# 発見デモ公開アイデアの「議論の主題」ワードクラウド用トークン（タイトル由来・共有語「効率化」で集約を演出）。
+DEMO_DISCOVERY_IDEA_TOKENS = {
+    DEMO_DISCOVERY_IDEA_IDS[0]: [("情報共有", 5), ("自動化", 4), ("部署連携", 3), ("効率化", 2)],
+    DEMO_DISCOVERY_IDEA_IDS[1]: [("オンボーディング", 5), ("新人研修", 3), ("効率化", 3), ("定着", 2)],
+}
+
+
+def _seed_idea_tokens(ts, token_map) -> int:
+    """アイデアの `entity_tokens(owner_type='idea')` を冪等 seed（追加した行数を返す）。
+
+    当該 idea に**既存の idea トークンがあれば触らない**（ライブ `persist_entity_tokens` 経路と二重化しない）。
+    読取（`quests.word_cloud`・類似度）は entity_tokens 一本（§5.36b）。
+    """
+    from app.tenant.tokens.orm import EntityToken
+    added = 0
+    for iid, toks in token_map.items():
+        if ts.query(EntityToken.id).filter_by(owner_type="idea", owner_id=iid).first() is not None:
+            continue  # 既に idea トークンあり（冪等）
+        for tok, cnt in toks:
+            ts.add(EntityToken(owner_type="idea", owner_id=iid, token=tok, count=cnt))
+            added += 1
+    return added
+
+
+def _ensure_discovery_idea_tokens(ts) -> None:
+    """発見デモの公開アイデアに idea トークンを冪等 seed（SC-12「議論の主題」ワードクラウド用・DFT）。
+
+    過去の seed は idea トークンを一切書いていなかったため **fresh な demo 会社ではクエストの語像が常に空**
+    だった（info の N-TC-334 の兄弟・§5.36b）。既存 demo DB にも後追いで補えるよう、クエスト生成の有無に
+    依らず冪等に補完する。
+    """
+    _seed_idea_tokens(ts, DEMO_DISCOVERY_IDEA_TOKENS)
+
+
 def seed_demo_discovery(db_identifier: str | None = None) -> None:
     """発見デモの discoverable クエスト（全社公開）＋活発度用の公開アイデア/チャットを seed（冪等・非prod）。
 
@@ -455,7 +489,10 @@ def seed_demo_discovery(db_identifier: str | None = None) -> None:
         return
     with get_tenant_session(db_identifier) as ts:
         if ts.get(Quest, DEMO_DISCOVERY_QUEST_ID) is not None:
-            return  # 冪等＝既に seed 済み
+            # 既存 demo にも idea トークンを後追い補完（過去の seed は未投入＝語像が空だった DFT の自己修復）。
+            _ensure_discovery_idea_tokens(ts)
+            ts.commit()
+            return  # 冪等＝クエスト本体は seed 済み
         if ts.query(User).filter_by(id=DEMO_DISCOVERY_OWNER_ID).one_or_none() is None:
             ts.add(User(id=DEMO_DISCOVERY_OWNER_ID, account_id=uuid.uuid4(),
                         display_name="発見 デモ太郎", locale="ja", status="active"))
@@ -484,6 +521,8 @@ def seed_demo_discovery(db_identifier: str | None = None) -> None:
                 ts.add(ChatMessage(id=uuid.uuid4(), thread_id=groups[(off + k) % len(groups)],
                                    author_id=DEMO_DISCOVERY_OWNER_ID, body="（発見デモ・議論サンプル）",
                                    created_at=now - timedelta(days=off, hours=k)))
+        # 「議論の主題」ワードクラウド用に公開アイデアの idea トークンを seed（読取＝entity_tokens 一本・DFT）。
+        _ensure_discovery_idea_tokens(ts)
         ts.commit()
         print(f"[bootstrap] seeded discovery demo quest in {db_identifier}")
 

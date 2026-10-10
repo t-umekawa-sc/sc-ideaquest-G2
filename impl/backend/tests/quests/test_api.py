@@ -577,3 +577,33 @@ def test_c_tc_305_quest_word_cloud_visibility(client, env):
     assert client.get(f"{QUESTS}/{other_pub}/word-cloud").status_code == 404
     other_draft = env.make_quest(status="draft", owner=env.other_user_id, party=True)
     assert client.get(f"{QUESTS}/{other_draft}/word-cloud").status_code == 404
+
+
+def test_c_tc_323_demo_discovery_seeds_idea_tokens(env):
+    """C-TC-323（DFT）: 発見デモ seed が公開アイデアに idea トークンを入れる＝SC-12「議論の主題」WC が空にならない。
+
+    回帰＝過去の bootstrap は公開アイデアの idea トークンを一切 seed せず（読取は `entity_tokens(owner_type='idea')`）、
+    fresh な demo 会社でクエストの語像が常に空だった（info の N-TC-334 兄弟・DFT）。本テストは seeder を**空の状態**
+    （使い捨て idea id）で検証＝実際に挿入されること＋冪等（2回目は 0 件）を確かめる。
+    """
+    from app.tenant.tokens import repository as tokens_repo
+    from app.tenant.tokens.orm import EntityToken
+    from scripts.bootstrap import DEMO_DISCOVERY_IDEA_IDS, DEMO_DISCOVERY_IDEA_TOKENS, _seed_idea_tokens
+    # 発見デモの2公開アイデアがトークン対象に含まれる（配線の確認）。
+    assert set(DEMO_DISCOVERY_IDEA_TOKENS.keys()) == set(DEMO_DISCOVERY_IDEA_IDS)
+    assert all(toks for toks in DEMO_DISCOVERY_IDEA_TOKENS.values())
+    scratch = uuid.uuid4()  # 空の状態を保証する使い捨て owner_id
+    token_map = {scratch: [("語雲テスト甲", 3), ("語雲テスト乙", 2)]}
+    try:
+        with get_tenant_session(env.db_identifier) as ts:
+            n1 = _seed_idea_tokens(ts, token_map)   # 空→挿入
+            n2 = _seed_idea_tokens(ts, token_map)   # 既存→0（冪等）
+            ts.commit()
+            got = tokens_repo.tokens_for_owners(ts, "idea", [scratch])
+        assert n1 == 2 and n2 == 0, (n1, n2)
+        assert got.get(scratch) and len(got[scratch]) == 2
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(EntityToken.__table__.delete().where(
+                EntityToken.owner_type == "idea", EntityToken.owner_id == scratch))
+            ts.commit()

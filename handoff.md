@@ -22,6 +22,7 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 - **解決順＝会社設定 > env フォールバック**（ユーザー決定）。置き場は per-model の §5.58 ではなく会社横断シングルトン（将来の会社横断 AI ポリシーの受け皿）。
 - **テスト**＝S-TC-215〜219（api/int・**red→green 実証済**＝実装 stash で ImportError 赤→復帰で緑）。backend `tests/ai_jobs`+`tests/ideas` 117 passed／`npm run build` ✓／TC トレーサビリティ ✅ 1131／**実UI目視済**（kanri@acme＝トグル表示・ON/OFF 永続）。設計＝`doc/設計ドラフト/会社別AI動作ポリシー_設計.md`。正本反映＝データモデル §5.67／API S.5b／SC-94 §4.0。残＝F13（e2e・任意低）。
 - **自動評価 OFF 時の手動実行（F6 完了・2026-10-10）**＝AI 評価が未生成でも評価者が手動起動できるよう、SC-22 の AI 評価ブロックに**空状態＋「AI評価を実行」ボタン**を追加（`regenerate` EP は未生成でも enqueue する＝backend 無改修で流用・バグでなく仕様）。表示判定＝集計 DTO に **`ai_evaluation_available`**（会社で `idea_evaluate` 既定モデル有効か＝`ai_jobs.application.task_has_enabled_model`）を追加し、`!ai_evaluation && ai_evaluation_available && canEvaluate && !questCompleted` で出す（AI 無効の会社では出さない）。テスト F-TC-223（red-green）・正本＝API F.1/F.7.3・SC-22 §4.6a。**実UI目視済**（kanri evaluator・未生成アイデアでボタン表示）。**F6 を台帳から削除・引継 `2026-10-09_ai評価-有効化と再評価ボタン.md` も消化済で削除**。
+- **クエスト「議論の主題」WC が seed で空（F12 完了・2026-10-10）**＝`scripts/bootstrap.py` の発見デモが公開アイデアを直接 INSERT するだけで `entity_tokens(owner_type='idea')` を seed せず、**fresh な demo 会社で SC-12 の語像が常に空**だった（info N-TC-334 の兄弟 DFT・読取は entity_tokens 一本）。修正＝`_seed_idea_tokens`/`_ensure_discovery_idea_tokens`（冪等・既存トークンがあれば触らない）を `seed_demo_discovery` の両分岐（新規＋既存 demo の自己修復）に配線。**migration は不要**（demo-only seed・既存は次回 bootstrap で自己修復／現行共有 DB の acme はライブ活動で既にトークンあり＝WC 稼働確認済）。テスト C-TC-323（DFT・使い捨て id で挿入+冪等を red-green）・end-to-end で demo quest word_cloud 非空を確認。**残＝R.4b（経営資料の語像で idea/concept トークン欠落）の対称修正は任意**（info トークンで完全な空にはならない＝未着手・要判断）。
 
 ### 3a. 情報インプット動的タブ D4（大部分実装・コミット多数）
 > 以降は前セッション（D6 → info 不具合修正 → D4 を main に積んだ）。
@@ -83,5 +84,5 @@ ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテ�
 ## 9. 残作業・並行開発への参照
 - 残作業の正本＝**`doc/バックログ/未実装・ギャップ一覧.md`**（本セッションで D4 を「大部分実装」に更新・summary 行更新）。次回確認＝**D4 残 follow-up・D6(B)・ISO G2/G3・D2/D3・F6/F7** 等。
 - 並行開発＝`doc/セッション調整/並行開発の取り決め.md`（main 統合順・ブランチ/worktree・Docker/DB 分離）。※記載のブランチ名（`e2e/*`・`feature/*`）が現在も有効かは実行時に確認。
-- **引継（別セッション由来・2026-10-10 に裏取り→台帳起票済み。未消化のため引継ファイルは保持）**＝`doc/セッション調整/引継/2026-10-09_プロジェクト管理機能拡張.md`（設計＋引継・コミット `6dcbc4c7`→台帳 `D8`＋`F4`）／`2026-10-09_ワードクラウド-クエスト議論の主題がseedで空.md`（調査引継・コミット `ee2598ac`→台帳 `F12`）。**実装が完了し当該引継由来の全行が台帳から消えたら引継ファイルを削除**する。
+- **引継（別セッション由来）**＝`doc/セッション調整/引継/2026-10-09_プロジェクト管理機能拡張.md`（設計＋引継・コミット `6dcbc4c7`→台帳 `D8`＋`F4`・**未消化のため保持**）。※`2026-10-09_ワードクラウド-クエスト議論の主題がseedで空.md`（→台帳 `F12`）は **2026-10-10 に実装完了で F12 削除・引継も消化削除**。
 - その他の既存引継＝`2026-10-09_リッチテキスト2系統統一-tiptap移行.md`（F7 出典）。※`2026-10-09_ai評価-有効化と再評価ボタン.md` は F6 完了（自動評価 OFF 時の手動実行を実装）につき削除済み。
