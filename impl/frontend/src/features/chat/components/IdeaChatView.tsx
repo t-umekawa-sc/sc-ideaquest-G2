@@ -513,7 +513,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
       <section className={`card chat-context chat-context--float${ctxOpen ? "" : " is-collapsed"}`} aria-label="対象アイデア">
         <div className="chat-context__nav">
           <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
-          {ctxOpen && <Link className="btn btn-outline btn-sm" href={backHref}>詳細を開く</Link>}
+          {ctxOpen && <Link className="btn btn-primary btn-sm" href={backHref}>詳細を開く</Link>}
         </div>
         <div className="chat-context__main">
           {ctxOpen ? (

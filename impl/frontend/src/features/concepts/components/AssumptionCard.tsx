@@ -56,7 +56,7 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
         {threadHref
           ? <Link className="btn btn-outline btn-sm" href={threadHref}>💬 前提スレッド →</Link>
           : <span className="muted text-xs">スレッド準備中…</span>}
-        {canManage && <button type="button" className="btn btn-outline btn-sm" onClick={onValidate}>📝 実績を入力</button>}
+        {canManage && <button type="button" className="btn btn-primary btn-sm" onClick={onValidate}>📝 実績を入力</button>}
       </div>
       {/* 前提（検証プール）に関連づいた情報＝反証で「根底を揺さぶる」シグナル（FR-42 §7・双方向）。 */}
       <RelatedInfoPanel targetType="assumptions" targetId={a.assumption_id} variant="strip" />
@@ -80,9 +80,9 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
                       <span className="validation-meta muted text-xs">{v.validated_on}{v.scale ? `・規模: ${v.scale}` : ""}</span>
                       {canManage && (
                         <span className="validation-tools">
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => onEditValidation(v)}>編集</button>
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDuplicateValidation(v)}>複製</button>
-                          <button type="button" className="btn btn-outline btn-danger btn-sm" onClick={() => onDeleteValidation(v)}>削除</button>
+                          <button type="button" className="btn btn-primary btn-sm" onClick={() => onEditValidation(v)}>編集</button>
+                          <button type="button" className="btn btn-primary btn-sm" onClick={() => onDuplicateValidation(v)}>複製</button>
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => onDeleteValidation(v)}>削除</button>
                         </span>
                       )}
                     </div>

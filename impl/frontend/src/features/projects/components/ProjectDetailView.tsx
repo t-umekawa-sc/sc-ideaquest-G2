@@ -171,7 +171,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           {/* 操作エリア統一（§4.14）＝編集(権限時)→⋮(削除danger)。インライン marginLeft は共通クラスへ。 */}
           {project.my_permissions.can_edit && (
             <div className="detail-head__actions">
-              <button type="button" className="btn btn-outline" onClick={() => router.push(`/projects/${projectId}/edit`)}>編集</button>
+              <button type="button" className="btn btn-primary" onClick={() => router.push(`/projects/${projectId}/edit`)}>編集</button>
               <RowMenu items={[{ label: "プロジェクトを削除", danger: true, onClick: () => void onDeleteProject() }]} />
             </div>
           )}
@@ -312,7 +312,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section className="card proj-section" aria-label="導入・価値実現">
           <div className="proj-section__head">
             <h2 style={{ margin: 0 }}>導入・価値実現</h2>
-            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" onClick={() => router.push(`/projects/${projectId}/deployment`)}>編集</button>}
+            {project.my_permissions.can_edit && <button type="button" className="btn btn-primary" onClick={() => router.push(`/projects/${projectId}/deployment`)}>編集</button>}
           </div>
           {(() => { const dep = (project.deployment ?? {}) as DeploymentMeta; return (
           <dl className="proj-deploy">

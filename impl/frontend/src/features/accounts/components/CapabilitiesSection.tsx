@@ -403,7 +403,7 @@ export function CapabilitiesSection() {
                         {a.display_name}（{a.login_id}）
                         {heldSel.map((c) => <span key={c} className="badge badge-muted" style={{ marginLeft: 6 }}>{CAPS.find((x) => x.key === c)?.label}</span>)}
                       </span>
-                      <Button type="button" variant="outline" disabled={busy} onClick={() => void revokeMany(a.account_id, a.display_name)}>剥奪</Button>
+                      <Button type="button" variant="danger" disabled={busy} onClick={() => void revokeMany(a.account_id, a.display_name)}>剥奪</Button>
                     </div>
                   );
                 })

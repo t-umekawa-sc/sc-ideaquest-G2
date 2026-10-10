@@ -141,7 +141,7 @@ export function ContestJoinRequestDialog({
         ) : (
           <>
             <button type="button" className="btn btn-outline dialog-close-left" disabled={busy} onClick={onClose}>閉じる</button>
-            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => decide("reject")}>却下</button>
+            <button type="button" className="btn btn-danger" disabled={busy} onClick={() => decide("reject")}>却下</button>
             <button type="button" className="btn btn-primary" disabled={busy} onClick={() => decide("approve")}>承認</button>
           </>
         )}

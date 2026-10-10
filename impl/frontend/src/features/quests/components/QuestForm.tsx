@@ -849,7 +849,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   aria-label="候補を名前・ログインIDで絞り込み"
                 />
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
-                  <button type="button" className="btn btn-sm btn-outline" disabled={displayedCandidates.length === 0} onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
+                  <button type="button" className="btn btn-sm btn-primary" disabled={displayedCandidates.length === 0} onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
                 </div>
                 <div className="party__candmeta">候補（表示中）{displayedCandidates.length} 名{candHasNext ? "・さらに候補あり" : ""}</div>
                 <div className="candlist">

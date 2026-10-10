@@ -89,7 +89,7 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
           <div className="party__add">
             <input className="input" placeholder="名前で絞り込み…" value={candQuery} onChange={(e) => setCandQuery(e.target.value)} aria-label="候補を名前で絞り込み" />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
-              <button type="button" className="btn btn-sm btn-outline" disabled={candidates.length === 0} onClick={addAllShown}>表示中を全員追加（{candidates.length}）</button>
+              <button type="button" className="btn btn-sm btn-primary" disabled={candidates.length === 0} onClick={addAllShown}>表示中を全員追加（{candidates.length}）</button>
             </div>
             <div className="party__candmeta">候補（表示中）{loadingCands ? "…" : candidates.length} 名{candidates.length >= PAGE ? "（先頭のみ・グループ/名前で絞込）" : ""}</div>
             <div className="candlist">

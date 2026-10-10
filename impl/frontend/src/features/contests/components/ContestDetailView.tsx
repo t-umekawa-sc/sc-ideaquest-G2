@@ -531,7 +531,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
               <Button variant="primary" onClick={join} disabled={busy}>参加する</Button>
             ) : null}
             {/* 編集＝運営のみ（従来は一覧の⋮のみ＝詳細に導線なしだった。共有 ContestFormModal で詳細からも編集可に）。 */}
-            {contest.can_manage && <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>編集</button>}
+            {contest.can_manage && <button type="button" className="btn btn-primary" onClick={() => setEditOpen(true)}>編集</button>}
             {contest.can_manage && (() => {
               const idx = STATUS_ORDER.indexOf(contest.status);
               const next = idx >= 0 && idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : undefined;
@@ -851,7 +851,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                                        onChange={(e) => void toggleEvaluator(p.user_id, e.target.checked)} />
                                 審査員
                               </label>
-                              <button className="btn btn-outline btn-sm" type="button"
+                              <button className="btn btn-danger btn-sm" type="button"
                                       onClick={() => void removeMember(p.user_id, p.display_name ?? "（不明）")} disabled={busy}>退出</button>
                             </span>
                           </li>
@@ -872,7 +872,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
                             <span className="member-name">{p.display_name ?? "（不明）"}</span>
                             <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                               <span className="badge badge-muted">退出</span>
-                              <button className="btn btn-outline btn-sm" type="button"
+                              <button className="btn btn-primary btn-sm" type="button"
                                       onClick={() => void decideParticipation(p.user_id, "approved")} disabled={busy}>再承認</button>
                             </span>
                           </li>

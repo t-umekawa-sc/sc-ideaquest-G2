@@ -180,7 +180,7 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
         )}
         {st === "pending" && <button type="button" className="btn btn-outline btn-sm" onClick={() => void withdraw(r)}>申請を取り消す</button>}
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
-        {st === "member" && <Link className="btn btn-sm" href={`/quests/${r.id}`} onClick={(e) => e.stopPropagation()}>クエストへ</Link>}
+        {st === "member" && <Link className="btn btn-primary btn-sm" href={`/quests/${r.id}`} onClick={(e) => e.stopPropagation()}>クエストへ</Link>}
       </div>
     );
   }

@@ -293,7 +293,7 @@ export function AccountSelfSection({ companyId, companyCode, children, after }: 
           請求書は「帳票DLボタン（帳票アイコン📄＋⬇）→ 帳票出力ダイアログ」で出力（style-guide §3c ①'＝採用）。
           REPORT_RENDERER=none のデプロイではボタン非活性＋ツールチップ（設計 §13・「押せない方が親切」）。 */}
       <p className="admin-links">
-        <Link className="btn btn-outline" href="/admin/ai-settings">🤖 AI・LLM設定</Link>
+        <Link className="btn btn-primary" href="/admin/ai-settings">🤖 AI・LLM設定</Link>
         <span title={reportEnabled ? undefined : "この環境では帳票機能が無効です"}>
           <button
             type="button"

@@ -868,7 +868,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                     <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
                     {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
                     {r.draft ? (
-                      <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
+                      <div className="vote-actions"><Link className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
                     ) : r.mystate === "unvoted" ? (
                       <div className="vote-actions">
                         {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}

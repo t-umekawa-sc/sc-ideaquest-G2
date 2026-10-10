@@ -100,7 +100,7 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
         <div className="hint">紐づくクエストはまだありません。下から追加できます（このクエストの配下アイデアに整合率が付きます）。</div>
       )}
       <div className="link-add">
-        <button className="btn btn-outline" type="button" onClick={openPicker}>🔍 クエストを選ぶ…</button>
+        <button className="btn btn-primary" type="button" onClick={openPicker}>🔍 クエストを選ぶ…</button>
       </div>
       <div className="hint">この経営資料を適用するクエストを選びます。配下アイデアの「方針との関連度」を算出する対象になります（変更はクエストの版履歴に記録）。</div>
 

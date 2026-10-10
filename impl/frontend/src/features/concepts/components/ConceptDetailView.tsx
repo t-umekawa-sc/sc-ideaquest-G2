@@ -332,7 +332,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           </div>
           {/* 操作エリア統一（デザイン標準 §4.14）＝編集(権限時)→⋮(コンセプトを削除danger)。 */}
           <div className="idea-actions detail-head__actions">
-            {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
+            {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-primary">編集</Link>}
             {perms.includes("edit") && <RowMenu items={[{ label: "コンセプトを削除", danger: true, onClick: () => void onDeleteConcept() }]} />}
           </div>
         </div>
@@ -385,7 +385,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               <h2 style={{ margin: 0 }}>前提と検証</h2>
               <ScreenPurpose summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
               {/* 検証プールの前提をこのコンセプトに紐づける（P.4・owner/quest_admin）。 */}
-              {canManage && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => void openLinkDialog()}>＋ 前提をリンク</button>}
+              {canManage && <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: "auto" }} onClick={() => void openLinkDialog()}>＋ 前提をリンク</button>}
             </div>
             {concept.assumptions.length === 0 ? (
               <div className="muted text-sm">まだ前提はありません。{canManage && "「＋ 前提をリンク」で検証プールから紐づけます。"}</div>
@@ -561,7 +561,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               )}
               {perms.includes("evaluate") && (
                 <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
-                  <button className="btn btn-outline" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
+                  <button className="btn btn-primary" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
                     {regeneratingAi ? "生成中…" : "AI評価を生成 / 再生成"}
                   </button>
                 </div>
@@ -575,7 +575,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               <div className="eval-head"><span className="ai-badge">🤖 AI評価</span></div>
               <p className="role-note" style={{ marginTop: "var(--space-2)" }}>AI による評価（8観点＋Go/Pivot/Kill）はまだありません。生成すると独立した評価者として集計に加わります。</p>
               <div className="modal__foot" style={{ marginTop: "var(--space-3)" }}>
-                <button className="btn btn-outline" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
+                <button className="btn btn-primary" type="button" onClick={() => void handleRegenerateAi()} disabled={regeneratingAi}>
                   {regeneratingAi ? "生成中…" : "AI評価を生成"}
                 </button>
               </div>

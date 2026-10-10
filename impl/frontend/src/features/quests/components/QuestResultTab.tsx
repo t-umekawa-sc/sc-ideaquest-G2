@@ -314,7 +314,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           <div className="section-head">
             <h3 style={{ margin: 0 }}>📌 議論の要点</h3>
             {result.can_edit && (
-              <Button type="button" variant="outline" onClick={() => void runSummary()} loading={summarizing}>
+              <Button type="button" variant="primary" onClick={() => void runSummary()} loading={summarizing}>
                 {result.outcome.chat_summary ? "自動要約を再生成" : "チャットを自動要約"}
               </Button>
             )}
@@ -352,7 +352,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
       <section className="card" aria-label="振り返り・次アクション">
         <div className="section-head">
           <h3 style={{ margin: 0 }}>📝 振り返り・学び / 次アクション</h3>
-          {result.can_edit && <Button type="button" variant="outline" onClick={() => setEditing(true)}>編集</Button>}
+          {result.can_edit && <Button type="button" variant="primary" onClick={() => setEditing(true)}>編集</Button>}
         </div>
         <div className="qresult__outcome">
           <div className="qresult__label">成果（総括）</div>
@@ -366,7 +366,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           <div className="qresult__label">次アクション</div>
           <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.next_actions || "—"}</p>
           <div style={{ marginTop: "var(--space-3)" }}>
-            <Link className="btn btn-outline btn-sm" href={dupHref}>このクエストを複製して次を起票 →</Link>
+            <Link className="btn btn-primary btn-sm" href={dupHref}>このクエストを複製して次を起票 →</Link>
           </div>
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>

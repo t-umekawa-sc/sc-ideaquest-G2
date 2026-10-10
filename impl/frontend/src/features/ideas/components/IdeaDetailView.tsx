@@ -533,7 +533,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                 ⋮（削除danger）を最右に保つため編集/⋮ブロックより前に置く（操作統一§4.14）。 */}
             {idea.can_promote && (
               <button
-                className="btn btn-outline"
+                className="btn btn-primary"
                 type="button"
                 disabled={promoteBusy}
                 title="このアイデアを種に新しいクエストを作成します"
@@ -545,7 +545,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             {idea.is_mine && (
               <>
                 <button
-                  className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`}
+                  className={`btn btn-primary${questCompleted ? " is-frozen" : ""}`}
                   type="button"
                   disabled={questCompleted}
                   title={questCompleted ? "完了したクエストでは編集できません" : undefined}
@@ -855,9 +855,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               {canEvaluate && (
                 <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
                   {questCompleted ? (
-                    <button className="btn btn-outline is-frozen" type="button" disabled title="完了したクエストでは再生成できません">AI評価を再生成</button>
+                    <button className="btn btn-primary is-frozen" type="button" disabled title="完了したクエストでは再生成できません">AI評価を再生成</button>
                   ) : (
-                    <button className="btn btn-outline" type="button" onClick={() => void handleRegenerate()} disabled={regenerating}>
+                    <button className="btn btn-primary" type="button" onClick={() => void handleRegenerate()} disabled={regenerating}>
                       {regenerating ? "再生成中…" : "AI評価を再生成"}
                     </button>
                   )}
@@ -874,9 +874,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <p className="ai-meta">このアイデアにはまだ AI 評価がありません。{questCompleted ? "完了したクエストでは実行できません。" : "評価者は AI 評価を手動で実行できます（独立した評価者として採点し、集計・コインに算入されます）。"}</p>
               <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
                 {questCompleted ? (
-                  <button className="btn btn-outline is-frozen" type="button" disabled title="完了したクエストでは実行できません">AI評価を実行</button>
+                  <button className="btn btn-primary is-frozen" type="button" disabled title="完了したクエストでは実行できません">AI評価を実行</button>
                 ) : (
-                  <button className="btn btn-outline" type="button" onClick={() => void handleRegenerate()} disabled={regenerating}>
+                  <button className="btn btn-primary" type="button" onClick={() => void handleRegenerate()} disabled={regenerating}>
                     {regenerating ? "実行中…" : "AI評価を実行"}
                   </button>
                 )}
