@@ -255,10 +255,6 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             hint="この情報を束ねるタブ。未選択は「すべて」。タブは分類であり閲覧制限ではありません。">
             <Combobox id="im-tab" ariaLabel="登録先タブ" value={tabId} onChange={setTabId}
               options={tabs.filter((t) => t.status === "active").map((t) => ({ value: t.id, label: t.is_system ? `${t.name}（既定）` : t.name }))} />
-            <label className="checkbox" style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-              <input type="checkbox" checked={autoLink} onChange={(e) => setAutoLink(e.target.checked)} />
-              <span>自動で類似のアイデア/クエストに関連づける（外部連携の大量取り込み等はオフを推奨）</span>
-            </label>
           </Field>
         ) : null}
 
@@ -311,6 +307,17 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             ))}
           </div>
           <div className="hint">本文とは別に、PDF・画像・資料ファイルを添付できます（出典の裏付け・引用元の保全）。</div>
+        </div>
+
+        <div className="field dialog-section is-quiet">
+          <div className="dialog-label">自動関連付け</div>
+          <label className="switch">
+            <input type="checkbox" checked={autoLink} onChange={(e) => setAutoLink(e.target.checked)} />
+            <span className="switch__track"><span className="switch__thumb" /></span>
+            <span className="switch__text">自動で類似のアイデア/クエストに関連づける</span>
+            <span className="switch__state">{autoLink ? "ON" : "OFF"}</span>
+          </label>
+          <div className="hint">保存時に本文の類似度から関連リンクを自動生成します。外部連携の大量取り込み等はオフを推奨します。</div>
         </div>
 
         <div className="field dialog-section is-quiet">
