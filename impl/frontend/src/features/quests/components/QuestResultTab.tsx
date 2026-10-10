@@ -201,7 +201,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
       <section className="card" aria-label="コンセプトの結果">
         <div className="section-head">
           <h3 style={{ margin: 0 }}>🧩 コンセプトの結果（{concepts.length}）</h3>
-          <Link className="btn btn-outline btn-sm" href={`/quests/${questId}?tab=concept`}>コンセプトタブへ →</Link>
+          <Link className="btn btn-primary btn-sm" href={`/quests/${questId}?tab=concept`}>コンセプトタブへ →</Link>
         </div>
         <p className="role-note" style={{ marginTop: 0 }}>
           選定アイデアを統合し前提を検証した<strong>コンセプト</strong>が、このクエストの最終的な成果です（推進＝次段へ・ISO 56001 §8.3 ②③段）。

@@ -93,8 +93,8 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
           {declined.length > 0 && <span className="ri-head__declined" title="不採用（全画面で一覧）">🚫 不採用 {declined.length}</span>}
         </span>
         <span className="ri-head__spacer" />
-        <button type="button" className="ri-head__btn ri-head__btn--add" onClick={() => setAddOpen(true)}>＋ 関連情報を追加</button>
-        {sorted.length > 0 && <button type="button" className="ri-head__btn" onClick={() => setMaxi(true)}>⤢ 全画面で一覧</button>}
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>＋ 関連情報を追加</button>
+        {sorted.length > 0 && <button type="button" className="btn btn-outline btn-sm" onClick={() => setMaxi(true)}>⤢ 全画面で一覧</button>}
       </div>
 
       {sorted.length === 0 ? (

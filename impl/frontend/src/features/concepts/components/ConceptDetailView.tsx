@@ -732,7 +732,7 @@ function SchemaGroup({ title, guide, onDiscuss, children }: { title: string; gui
       {children}
       {onDiscuss && (
         <div className="schema-group__discuss">
-          <button type="button" className="btn btn-outline btn-sm" onClick={onDiscuss}>💬 このグループを議論 →</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onDiscuss}>💬 このグループを議論 →</button>
         </div>
       )}
     </section>

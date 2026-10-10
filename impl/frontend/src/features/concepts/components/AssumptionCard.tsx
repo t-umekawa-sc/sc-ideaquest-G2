@@ -49,12 +49,12 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
         <span className="badge badge-muted">{CRITICALITY_LABEL[a.criticality] ?? a.criticality}</span>
         <span className={vc}>{vl}</span>
         {a.is_stale && <span className="badge badge-danger">⚠ 要再評価</span>}
-        {canManage && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={onUnlink}>リンク解除</button>}
+        {canManage && <button type="button" className="btn btn-danger btn-sm" style={{ marginLeft: "auto" }} onClick={onUnlink}>リンク解除</button>}
       </div>
       <div className="assumption-statement">{a.statement}</div>
       <div className="assumption-actions">
         {threadHref
-          ? <Link className="btn btn-outline btn-sm" href={threadHref}>💬 前提スレッド →</Link>
+          ? <Link className="btn btn-primary btn-sm" href={threadHref}>💬 前提スレッド →</Link>
           : <span className="muted text-xs">スレッド準備中…</span>}
         {canManage && <button type="button" className="btn btn-primary btn-sm" onClick={onValidate}>📝 実績を入力</button>}
       </div>
