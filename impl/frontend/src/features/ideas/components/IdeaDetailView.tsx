@@ -679,7 +679,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                       <span style={{ fontWeight: 500 }}>{r.display_name ?? "（不明）"}</span>
                       <span style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
                         <button className="btn btn-primary btn-sm" type="button" onClick={() => void decidePart(r.user_id, "approved")} disabled={partBusy}>承認</button>
-                        <button className="btn btn-outline btn-sm" type="button" onClick={() => void decidePart(r.user_id, "rejected")} disabled={partBusy}>却下</button>
+                        <button className="btn btn-danger btn-sm" type="button" onClick={() => void decidePart(r.user_id, "rejected")} disabled={partBusy}>却下</button>
                       </span>
                     </li>
                   ))}

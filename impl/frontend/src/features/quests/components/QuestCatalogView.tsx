@@ -178,7 +178,7 @@ export function QuestCatalogView({ isAdmin = false }: { isAdmin?: boolean }) {
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void request(r)}>参加をリクエスト</button>
         )}
-        {st === "pending" && <button type="button" className="btn btn-sm" onClick={() => void withdraw(r)}>申請を取り消す</button>}
+        {st === "pending" && <button type="button" className="btn btn-outline btn-sm" onClick={() => void withdraw(r)}>申請を取り消す</button>}
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "member" && <Link className="btn btn-sm" href={`/quests/${r.id}`} onClick={(e) => e.stopPropagation()}>クエストへ</Link>}
       </div>
@@ -364,7 +364,7 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
           </button>
         )}
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
-        {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
+        {st === "pending" && <button type="button" className="btn btn-outline" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary" onClick={() => { onRequest(row); }}>参加をリクエスト</button>
         )}

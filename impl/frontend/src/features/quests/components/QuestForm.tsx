@@ -897,7 +897,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 <input className="input" placeholder="選択中を絞り込み（名前・ログインID）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前・ログインIDで絞り込み" />
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-danger" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>グループ外・失効中のみ</button>
+                  <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-primary" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>グループ外・失効中のみ</button>
                   <button type="button" className="btn btn-sm btn-danger" disabled={filteredMembers.length === 0} onClick={bulkRemoveMembers}>
                     {selQuery.trim() || selOutOnly ? `絞り込み対象をまとめて外す（${filteredMembers.length}）` : `すべて外す（${filteredMembers.length}）`}
                   </button>
