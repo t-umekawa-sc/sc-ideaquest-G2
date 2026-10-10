@@ -371,7 +371,7 @@ export function InfoListView() {
               <label className="checkbox" style={{ fontSize: "var(--text-sm)" }}>
                 <input type="checkbox" checked={rootsOnly} onChange={(e) => { setRootsOnly(e.target.checked); setRefreshToken((n) => n + 1); }} /><span>続報を束ねる</span>
               </label>
-              <Link className="btn btn-primary" href="/info-items/new">＋ 情報を登録</Link>
+              <Link className="btn btn-primary" href={activeTabId ? `/info-items/new?tab=${encodeURIComponent(activeTabId)}` : "/info-items/new"}>＋ 情報を登録</Link>
             </div>
           </div>
 

@@ -414,6 +414,10 @@ body.iq-nav-lock { overflow: hidden; }
 .dialog-section { padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
 .dialog-section:first-child { padding-top: 0; border-top: none; }
 .field.dialog-section { margin-bottom: 0; }
+/* 末尾のヒント/エラー（<p>＝p の既定 margin-bottom を持つ）が section の下 padding に上乗せされ、
+   入力で終わる項目より項目間が広く見えるのを防ぐ（最後の補足テキストの下マージンだけ 0 に＝rhythm を揃える）。 */
+.field.dialog-section > .hint:last-child,
+.field.dialog-section > .field__error:last-child { margin-bottom: 0; }
 /* 入力用項目＝仕切り線の"間隔"（rhythm）は保ちつつ、線だけ消す（入力欄と線の二重感を避ける）。 */
 .dialog-section.is-quiet { border-top: none; }
 /* display:block を明示＝<label class="dialog-label"> のようにインライン要素で使われても margin-bottom(見出し→中身の余白)が効くようにする（<div> と揃う・全ダイアログで見出し下余白を一定に）。 */

@@ -35,8 +35,8 @@ const iconFor = (name: string) => {
 };
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
 
-export function InfoFormPanel({ parentId, onCancel, onDone }: {
-  parentId?: string; onCancel: () => void; onDone: () => void;
+export function InfoFormPanel({ parentId, initialTabId, onCancel, onDone }: {
+  parentId?: string; initialTabId?: string; onCancel: () => void; onDone: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState<RichTextValue>(EMPTY_DOC);  // 本文＝PM-JSON（TipTap）
@@ -50,15 +50,19 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     return () => ac.abort();
   }, [parentId]);
 
-  // 登録先タブ（D4）＝既定「すべて」(system)／続報は親のタブを継承（selector 非表示）。自動類似リンクは既定 ON。
+  // 登録先タブ（D4）＝既定は**開いていたサブタブ**（initialTabId・一覧から引き継ぎ）／無ければ「すべて」(system)。
+  // 続報は親のタブを継承（selector 非表示）。自動類似リンクは既定 ON。
   const [tabs, setTabs] = useState<InfoTab[]>([]);
-  const [tabId, setTabId] = useState<string>("");
+  const [tabId, setTabId] = useState<string>(initialTabId ?? "");
   const [autoLink, setAutoLink] = useState(true);
   useEffect(() => {
     const ac = new AbortController();
     fetchInfoTabs(ac.signal).then((res) => {
       setTabs(res.tabs);
-      setTabId((cur) => cur || res.tabs.find((t) => t.is_system)?.id || "");
+      // 引き継いだタブ（initialTabId）が有効ならそれを初期選択。無効/未指定は「すべて」(system)。
+      setTabId((cur) => (cur && res.tabs.some((t) => t.id === cur && t.status === "active"))
+        ? cur
+        : (res.tabs.find((t) => t.is_system)?.id ?? ""));
     }).catch(() => {});
     return () => ac.abort();
   }, []);

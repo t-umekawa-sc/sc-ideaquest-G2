@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { Modal, RouteModal } from "@/components/ui";
 import { InfoFormPanel } from "./InfoFormPanel";
 
-export function InfoFormModal({ parentId, standalone }: { parentId?: string; standalone?: boolean }) {
+export function InfoFormModal({ parentId, initialTabId, standalone }: { parentId?: string; initialTabId?: string; standalone?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   useEffect(() => { if (standalone) setOpen(true); }, [standalone]);
@@ -19,13 +19,13 @@ export function InfoFormModal({ parentId, standalone }: { parentId?: string; sta
   if (standalone) {
     return (
       <Modal open={open} title={title} size="xl" onClose={() => setOpen(false)} onClosed={back}>
-        <InfoFormPanel parentId={parentId} onCancel={() => setOpen(false)} onDone={() => setOpen(false)} />
+        <InfoFormPanel parentId={parentId} initialTabId={initialTabId} onCancel={() => setOpen(false)} onDone={() => setOpen(false)} />
       </Modal>
     );
   }
   return (
     <RouteModal title={title} size="xl">
-      {(close) => <InfoFormPanel parentId={parentId} onCancel={close} onDone={close} />}
+      {(close) => <InfoFormPanel parentId={parentId} initialTabId={initialTabId} onCancel={close} onDone={close} />}
     </RouteModal>
   );
 }

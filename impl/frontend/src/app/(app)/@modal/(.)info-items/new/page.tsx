@@ -6,9 +6,9 @@ import { redirect } from "next/navigation";
 import { InfoFormModal } from "@/features/info-input";
 import { getServerSession } from "@/lib/session";
 
-export default async function InfoNewInterceptModal({ searchParams }: { searchParams: Promise<{ parent?: string }> }) {
+export default async function InfoNewInterceptModal({ searchParams }: { searchParams: Promise<{ parent?: string; tab?: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  const { parent } = await searchParams;
-  return <InfoFormModal parentId={parent} />;
+  const { parent, tab } = await searchParams;
+  return <InfoFormModal parentId={parent} initialTabId={tab} />;
 }
