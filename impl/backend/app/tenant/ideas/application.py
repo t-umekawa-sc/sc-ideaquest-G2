@@ -365,12 +365,14 @@ def _enqueue_idea_ai_evaluation(db_identifier: str, idea_id, user_id) -> None:
 
     **graceful**＝会社でモデル未有効/タスク無効・enqueue 失敗でも公開は止めない（AI 評価は付かず人間評価のみで進行）。
     入力は参照のみ（`{idea_id}`）＝文脈はワーカーが実行直前に収集（F.7.2）。
-    自動起動はデプロイ単位の opt-in（`llm_auto_evaluate_on_publish`・既定 OFF＝LLM 基盤を伴わない環境では投入しない）。
+    自動起動は**会社単位の opt-in**（`company_ai_settings.auto_evaluate_on_publish`・§5.67・S.5b）＝
+    会社設定 > env `llm_auto_evaluate_on_publish` フォールバック。会社 OFF なら env ON でも投入しない（会社値優先）。
     """
-    if not get_settings().llm_auto_evaluate_on_publish:
-        return
+    from app.tenant.ai_jobs import application as ai_app
+    with get_tenant_session(db_identifier) as _ts:
+        if not ai_app.effective_auto_evaluate(_ts):
+            return
     try:
-        from app.tenant.ai_jobs import application as ai_app
         ai_app.enqueue_ai_job(
             db_identifier, task_type="idea_evaluate", requested_by_id=user_id,
             input={"idea_id": str(idea_id)}, ref_idea_id=idea_id,

@@ -148,3 +148,17 @@ class AiUsageRow(BaseModel):
 
 class AiUsageResponse(BaseModel):
     data: list[AiUsageRow]
+
+
+class AiPolicyResponse(BaseModel):
+    """会社の AI 動作ポリシー（S.5b・§5.67）。"""
+
+    auto_evaluate_on_publish: bool | None   # 会社の生値（null=デプロイ既定を継承）
+    effective: bool                          # coalesce(会社値, deploy_default)
+    deploy_default: bool                     # env `llm_auto_evaluate_on_publish`（UI 注記用）
+
+
+class AiPolicyPatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    auto_evaluate_on_publish: bool | None = Field(...)  # null=継承リセット（必須＝省略は 422）

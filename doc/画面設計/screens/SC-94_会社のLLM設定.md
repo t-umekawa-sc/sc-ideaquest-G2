@@ -26,10 +26,19 @@
 ## 3. レイアウト構成（決定・業務層）
 
 - 上部＝当月の会社サマリ（総コスト・予算消化率・実行件数）。
+- **AI 動作ポリシー**セクション（モデル一覧の直前）＝会社横断（モデル非依存）の挙動トグル。初版は「公開時 自動評価」のみ。
 - 本体＝モデル一覧テーブル（カタログ×自社設定）。行＝モデルごとに ON/OFF トグル・課金区分バッジ・月次予算・当月利用。
 - 下部/別タブ＝利用量明細（会社×モデル×月＝`GET /admin/ai-usage`）。
 
 ## 4. 表示・入力項目
+
+### 4.0 AI 動作ポリシー（会社横断・§5.67 company_ai_settings）
+
+| 項目 | 内容 |
+| --- | --- |
+| 公開時 自動評価 | **ON/OFF トグル**「アイデア公開時に AI が自動評価する」。会社単位（モデル非依存）。`effective`（＝会社値 or デプロイ既定）を表示。トグル操作で明示 bool を `PATCH /admin/ai-policy` へ送る。注記「未設定時はシステム既定（{deploy_default}）に従います」。 |
+
+- 自動評価 ON の会社では、アイデア公開時に AI 評価が付き、SC-22 の AI 評価ブロック＋再評価ボタンが表示される（デプロイ単位 env だった挙動を会社別へ・設計 §2・バックログ F6 と連動）。
 
 ### 4.1 モデル一覧テーブル
 
@@ -57,8 +66,9 @@
 ## 6. データ・API（正＝`S_AIジョブ・LLM連携.md` S.5）
 
 - 一覧＝`GET /admin/ai-models`（registry＋`enabled`/`billing`/`monthly_budget_micros`/当月利用）。
-- 変更＝`PATCH /admin/ai-models/{key}`（`enabled?`/`monthly_budget_micros?`）。
+- 変更＝`PATCH /admin/ai-models/{key}`（`enabled?`/`monthly_budget_micros?`/`max_output_tokens?`）。
 - 利用量＝`GET /admin/ai-usage`（`ai_usage_events` の read 集計・§5.59）。
+- **AI 動作ポリシー**＝`GET`/`PATCH /admin/ai-policy`（`auto_evaluate_on_publish`・正＝S.5b・§5.67 company_ai_settings）。
 
 ## 7. アクセシビリティ / 表示配慮
 

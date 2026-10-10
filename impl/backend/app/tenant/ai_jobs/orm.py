@@ -71,6 +71,22 @@ class CompanyAiModelSetting(CompanyBase):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
+class CompanyAiSettings(CompanyBase):
+    """会社横断（モデル非依存）の AI 動作ポリシー（会社DB シングルトン・§5.67）。
+
+    初版は「公開時 自動評価」のみ。`auto_evaluate_on_publish` は nullable＝NULL はデプロイ既定
+    （env `llm_auto_evaluate_on_publish`）を継承し、true/false は会社の明示上書き（解決順＝会社 > env）。
+    """
+
+    __tablename__ = "company_ai_settings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    auto_evaluate_on_publish: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # NULL=env 既定継承（§5.67）
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
 class AiUsageEvent(CompanyBase):
     """追記専用の課金基礎台帳（更新/論理削除しない・ジョブ削除後も残す・§5.59/§6.3）。"""
 

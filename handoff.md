@@ -8,15 +8,22 @@
 - ブランチ: `main`（worktree 無し＝通常のクローン直下 `/home/t-umekawa/sc-ideaquest-G2`）。**main 直コミット/push が本プロジェクトの慣習**（複数セッションが main に直接積む運用＝下記 §9 の並行開発注意）。
 - 更新開始時点の最新コミット: **`4ab71881`** fix(info/D4): サブタブ ⋮ をタブ名の左側へ。その直前が D4 UI 調整群（`6c457a64`/`6a141b08`/`930c3f1a`/`29719fba`/`8d09ef4a`/`3329a304`/`4fc6316c`/`b0a64676`/`54ad1580`/`11c9c40a`）。
 - 未コミット変更: **本ファイル（handoff.md）と `doc/バックログ/未実装・ギャップ一覧.md` の session-end 更新のみ**（このコミットで push 予定）。ソースは全て push 済み・working tree はそれ以外クリーン。
-- alembic heads: company=**`0066_info_tabs`**（本セッションで 0065〔info_tokens 撤去〕・0066〔info_tabs〕を追加）／control=`0020_signup_challenges`（変更なし）。
+- alembic heads: company=**`0067_company_ai_settings`**（2026-10-10 追加＝会社の AI 動作ポリシー）／control=`0020_signup_challenges`（変更なし）。
 
 ## 2. このプロジェクトのゴール
 ISO56001 準拠のアイデア/イノベーション管理 SaaS（マルチテナント＝control DB＋会社別DB・ゲーミフィケーション）。直近フェーズ＝ユーザー指摘の消化＋仕様確定済み未実装機能の処理。本セッションは横断基盤（秘密管理 D6）・情報インプットの不具合修正・情報インプット動的タブ（D4）を実装した。
 
 ## 3. 今回やったこと（新しい順・理由つき・コミット）
-> 本セッションは1つの長い流れで D6 → info 不具合修正 → D4 を main に積んだ。
+> 2026-10-10 追加セッション＝(1) 並行引継2件の裏取り→起票（D8/F12・F4集約）、(2) AI 挙動の env 棚卸し→会社別化。以降は前セッション（D6→info修正→D4）。
+
+### 3-0. AI 設定の会社別化（公開時自動評価・2026-10-10）
+- **棚卸し結論**＝AI 挙動設定は3層（①基盤配線=env 据え置き／②既に会社別＝`alignment_method`・`company_ai_model_settings`〔ON/OFF・予算・`max_output_tokens`〕／③env だが会社ポリシー）。③のうち `llm_max_tokens` は **②の `max_output_tokens`（会社別・company>env フォールバック）で実装済**と判明＝追加不要。残る `llm_auto_evaluate_on_publish`（公開時自動評価）のみ会社別化。
+- **実装（完了・未コミット→このセッションで push 予定）**＝新テーブル `company_ai_settings`（会社DB シングルトン・§5.67・migration `0067`・`auto_evaluate_on_publish` NULL=env 継承）／EP `GET/PATCH /admin/ai-policy`（S.5b・`require_company_account_admin`）／`ideas/application._enqueue_idea_ai_evaluation` を **会社値 coalesce env** に差し替え（会社 OFF なら env ON でも投入しない＝会社値優先）／frontend `features/ai-settings`（`AiSettingsView` に「AI 動作ポリシー」セクション＝SC-94 に集約・ユーザー指示「ON/OFF 画面に寄せて」）。
+- **解決順＝会社設定 > env フォールバック**（ユーザー決定）。置き場は per-model の §5.58 ではなく会社横断シングルトン（将来の会社横断 AI ポリシーの受け皿）。
+- **テスト**＝S-TC-215〜219（api/int・**red→green 実証済**＝実装 stash で ImportError 赤→復帰で緑）。backend `tests/ai_jobs`+`tests/ideas` 117 passed／`npm run build` ✓／TC トレーサビリティ ✅ 1131／**実UI目視済**（kanri@acme＝トグル表示・ON/OFF 永続）。設計＝`doc/設計ドラフト/会社別AI動作ポリシー_設計.md`。正本反映＝データモデル §5.67／API S.5b／SC-94 §4.0。残＝F13（e2e・任意低）。
 
 ### 3a. 情報インプット動的タブ D4（大部分実装・コミット多数）
+> 以降は前セッション（D6 → info 不具合修正 → D4 を main に積んだ）。
 - **設計改訂（変更A/B/C・ユーザー合意）**＝`f451ef04`。予約既定タブ「全般」→「**すべて**」に改名（A）／「すべて」を**特殊タブ化**＝一覧表示時に `tab_id` フィルタを外し**全件表示**（B・1情報=1タブは維持・NULL 化仮想ビュー案は §9-D で不採用）／**タブ間移動を明示機能化**（C・権限＝`info_curator`＋**登録者**・1件＋一括）。設計ドラフト＝`doc/設計ドラフト/情報インプット動的タブ_設計.md`。
 - **フェーズA 正本反映**＝`25c30159`。データモデル §5.37c `info_tabs`＋§5.33 `tab_id`/`auto_link_enabled`＋enum／API設計 N.5c／テスト N（N-TC-335〜352）／画面 SC-50 §3b／要件 FR-41 ⑪／画面遷移図。
 - **フェーズB backend**＝`00f5b3ce`。migration `0066_info_tabs`（`info_tabs` 作成＋「すべて」system seed＋`info_items.tab_id`(NOT NULL)/`auto_link_enabled` 追加＋既存 backfill＋**tab_id 未指定 INSERT を「すべて」で補完する BEFORE INSERT トリガ**＝他ドメインの incidental な info 作成・既存テストを壊さない安全網）。`app/tenant/info/{orm,repository,application,schemas,router}.py` にタブ CRUD・一覧/word_cloud/facet の tab_id フィルタ・移動1件/一括 EP（`PATCH /info-items/{id}/tab`・`POST /info-items/move-tab`）・予約語/同名/配下非空アーカイブ検証・`manage_tabs`（admin or curator）。テスト `tests/info/test_tabs.py`（**N-TC-335〜349**・15本）。

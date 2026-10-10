@@ -69,6 +69,18 @@
 | S-TC-210 | e2e | SC-94 アクセス制御＝一般ユーザーは会社のLLM設定に入れない（/ へ差し戻し） | 一般ユーザー（general） | `/admin/ai-settings` を開く | ダッシュボード（/）へリダイレクト（サーバーガード） | SC-94 §2／S.0 |
 | S-TC-211 | e2e | SC-94 表示＝会社アカウント管理者でモデル一覧（ON/OFFトグル・無料バッジ・特徴/用途）＋SC-93 導線 | company_account_admin（kanri） | `/admin/accounts`→導線→`/admin/ai-settings` | 「AI・LLM設定」リンクが見える／会社のLLM設定にモデル2件（switch・無料バッジ）が出る | SC-94 §3/§4／S.5 |
 
+## 4b. 会社の AI 動作ポリシー（S.5b・§5.67 company_ai_settings・公開時自動評価の会社別 ON/OFF）
+
+> 会社横断（モデル非依存）のシングルトン。解決順＝会社設定 > env フォールバック（`llm_auto_evaluate_on_publish`）。null＝デプロイ既定継承。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| S-TC-215 | api | 既定取得＝会社未設定（seed NULL）なら effective==deploy_default | company_account_admin・会社設定 NULL・env=False | `GET /admin/ai-policy` | `auto_evaluate_on_publish=null`／`effective=false`／`deploy_default=false` | S.5b／§5.67 |
+| S-TC-216 | api | 明示 ON/OFF＝会社値と effective が変わり updated_by を記録 | company_account_admin | `PATCH /admin/ai-policy{auto_evaluate_on_publish:true}`→`{…:false}` | true: 生値 true・effective true／false: 生値 false・effective false／`updated_by_id` 記録 | S.5b／§5.67 |
+| S-TC-217 | api | 継承リセット＝null で deploy_default に戻る | 会社値=true・env=False | `PATCH /admin/ai-policy{auto_evaluate_on_publish:null}` | 生値 null・effective=false（=deploy_default） | S.5b／§5.67 |
+| S-TC-218 | api | 認可＝一般ユーザーは取得/変更とも 403 | 一般ユーザー | `GET`/`PATCH /admin/ai-policy` | 403（サーバーガード・company_account_admin 限定） | S.5b／S.0 |
+| S-TC-219 | int | 公開時自動評価が会社値優先＝会社 OFF なら env ON でも enqueue しない／会社 ON なら enqueue | Fake（env=True）・会社設定を OFF/ON 切替 | アイデアを published に遷移 | 会社 OFF: `idea_evaluate` が enqueue されない／会社 ON: enqueue される（会社値 > env） | S.5b／F.7.1／§5.67 |
+
 ## 5. 通知・遷移（S.6・§8・データモデル §5.24）
 
 > 完了通知＝既存 notifications 再利用（ai_task_done/ai_task_failed・ref_* 遷移）。ライブ＝WS ai_jobs:{user_id}。

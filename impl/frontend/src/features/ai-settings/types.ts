@@ -6,6 +6,8 @@ export type AdminModelItem = components["schemas"]["AdminModelItem"];
 export type AdminModelListResponse = components["schemas"]["AdminModelListResponse"];
 export type AdminModelPatchRequest = components["schemas"]["AdminModelPatchRequest"];
 export type AiUsageRow = components["schemas"]["AiUsageRow"];
+// 会社の AI 動作ポリシー（S.5b・§5.67＝公開時自動評価の会社別 ON/OFF）。
+export type AiPolicy = components["schemas"]["AiPolicyResponse"];
 
 // 論理キー → 「特徴」1行（SC-94 管理画面だけの補足説明＝ピッカーには出さないため backend は持たない）。
 // 表示名(label)と用途(description)は backend 由来を使う（上記 DRY）。

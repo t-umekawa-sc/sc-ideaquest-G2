@@ -4423,6 +4423,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Get Ai Policy */
+        get: operations["admin_get_ai_policy_api_v1_admin_ai_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Admin Patch Ai Policy */
+        patch: operations["admin_patch_ai_policy_api_v1_admin_ai_policy_patch"];
+        trace?: never;
+    };
     "/api/v1/admin/capabilities/{capability}/holders": {
         parameters: {
             query?: never;
@@ -5388,6 +5406,23 @@ export interface components {
         AiModelListResponse: {
             /** Data */
             data: components["schemas"]["AiModelItem"][];
+        };
+        /** AiPolicyPatchRequest */
+        AiPolicyPatchRequest: {
+            /** Auto Evaluate On Publish */
+            auto_evaluate_on_publish: boolean | null;
+        };
+        /**
+         * AiPolicyResponse
+         * @description 会社の AI 動作ポリシー（S.5b・§5.67）。
+         */
+        AiPolicyResponse: {
+            /** Auto Evaluate On Publish */
+            auto_evaluate_on_publish: boolean | null;
+            /** Effective */
+            effective: boolean;
+            /** Deploy Default */
+            deploy_default: boolean;
         };
         /** AiUsageResponse */
         AiUsageResponse: {
@@ -20413,6 +20448,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiUsageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_get_ai_policy_api_v1_admin_ai_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPolicyResponse"];
+                };
+            };
+        };
+    };
+    admin_patch_ai_policy_api_v1_admin_ai_policy_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiPolicyPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPolicyResponse"];
                 };
             };
             /** @description Validation Error */

@@ -23,6 +23,8 @@ from app.tenant.ai_jobs.schemas import (
     AiJobListResponse,
     AiJobSummary,
     AiModelListResponse,
+    AiPolicyPatchRequest,
+    AiPolicyResponse,
     AiUsageResponse,
     RunningListResponse,
 )
@@ -103,3 +105,16 @@ def admin_ai_usage(request: Request, period_ym: int | None = None, model_key: st
                    session: dict = Depends(require_company_account_admin)):
     return service.admin_usage(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
                                period_ym=period_ym, model_key=model_key)
+
+
+@router.get("/admin/ai-policy", response_model=AiPolicyResponse)
+def admin_get_ai_policy(request: Request, session: dict = Depends(require_company_account_admin)):
+    return service.admin_get_ai_policy(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.patch("/admin/ai-policy", response_model=AiPolicyResponse,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def admin_patch_ai_policy(body: AiPolicyPatchRequest, request: Request,
+                          session: dict = Depends(require_company_account_admin)):
+    return service.admin_patch_ai_policy(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                                         auto_evaluate_on_publish=body.auto_evaluate_on_publish)

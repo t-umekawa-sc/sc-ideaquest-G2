@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.tenant.ai_jobs.orm import AiJob, AiUsageEvent, CompanyAiModelSetting
+from app.tenant.ai_jobs.orm import AiJob, AiUsageEvent, CompanyAiModelSetting, CompanyAiSettings
 
 # 一覧ソートのホワイトリスト（未知は 422・DataTable §1.8.1）。
 _SORTS = {
@@ -156,6 +156,26 @@ def model_settings(session: Session) -> dict[str, bool]:
         select(CompanyAiModelSetting.model_key, CompanyAiModelSetting.enabled)
     ).all()
     return {k: bool(v) for k, v in rows}
+
+
+# ---- 会社の AI 動作ポリシー（会社横断シングルトン・§5.67） ----
+
+def get_ai_settings(session: Session) -> CompanyAiSettings | None:
+    """会社の AI 動作ポリシー（シングルトン1行）を返す（無ければ None）。"""
+    return session.execute(select(CompanyAiSettings).limit(1)).scalar_one_or_none()
+
+
+def upsert_ai_settings(session: Session, *, auto_evaluate_on_publish: bool | None,
+                       actor_id: uuid.UUID | None) -> CompanyAiSettings:
+    """会社の AI 動作ポリシーを更新（無ければ作成）。`auto_evaluate_on_publish=None`＝env 既定継承。"""
+    row = get_ai_settings(session)
+    if row is None:
+        row = CompanyAiSettings()
+        session.add(row)
+    row.auto_evaluate_on_publish = auto_evaluate_on_publish
+    row.updated_by_id = actor_id
+    session.flush()
+    return row
 
 
 def list_jobs(

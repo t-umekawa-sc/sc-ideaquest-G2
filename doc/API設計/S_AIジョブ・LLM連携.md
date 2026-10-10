@@ -70,6 +70,18 @@
 - **課金方式＝A（内部メータリングのみ・実請求/決済なし）**＝利用量・コストの記録＋会社別可視化＋予算上限。**B/C 算出根拠の使用量は恒久保持**（`ai_usage_events`＝生トークン＋単価スナップショット・追記専用・§5.59）＝方式変更は後からアプリ改修だけで過去分も遡及可。
 - **予算上限**＝当月 `SUM(cost_micros)`（`ai_usage_events` の `period_ym`）が `monthly_budget_micros` 到達で `paid` の enqueue を**保留/拒否**（§S.2 ガードレール）。無料ローカルキーは対象外（止めない）。
 
+## S.5b 会社の AI 動作ポリシー（管理・company_account_admin）
+
+会社横断（モデル非依存）の AI 動作ポリシー。初版は**公開時 自動評価**の会社別 ON/OFF のみ。格納＝[§5.67 company_ai_settings](../データモデル.md)（会社 DB シングルトン）。画面＝SC-94（§AI 動作ポリシー）。設計＝[会社別AI動作ポリシー 設計](../設計ドラフト/会社別AI動作ポリシー_設計.md)。
+
+| メソッド / パス | 説明 | リクエスト | レスポンス |
+| --- | --- | --- | --- |
+| `GET /admin/ai-policy` | 会社の AI 動作ポリシー取得 | — | `{auto_evaluate_on_publish: bool\|null, effective: bool, deploy_default: bool}`（`auto_evaluate_on_publish`＝会社の生値〔null=継承〕／`effective`＝`coalesce(会社値, deploy_default)`／`deploy_default`＝env `llm_auto_evaluate_on_publish`・UI 注記用） |
+| `PATCH /admin/ai-policy` | 同 変更 | `{auto_evaluate_on_publish: bool\|null}` | 200・同上。**null＝デプロイ既定への継承リセット**。`updated_by` を記録 |
+
+- 認可＝`company_account_admin`／`system_admin`（サーバー強制・SC-94 と同じ）。変更系は Origin/CSRF 必須（A.0）。テナント分離＝会社 DB 内（§1.5・クロステナントは 404）。
+- **解決順＝会社設定 > env フォールバック**（§5.67）。`auto_evaluate_on_publish=true/false` は会社の明示上書き、`null` は env `llm_auto_evaluate_on_publish` 継承。ドメイン F の**公開時 自動評価起動（F.7.1）**が `effective` を参照する（会社 OFF なら env ON でも自動 enqueue しない＝会社値優先）。
+
 ## S.6 通知・リアルタイム（既存を再利用・§H/§L）
 
 - **完了通知**＝既存 `notifications` に `type='ai_task_done'`（失敗は `ai_task_failed`）を1件作り、`ref_*` に遷移先（idea/quest/strategy_document/info_item）を入れる＝SC-02 通知一覧・既読/未読・ベル未読数は**無改修で流用**（§H・データモデル §3 `notification_type`）。本文は既存カタログに文言追加（受信者 locale でレンダリング）。

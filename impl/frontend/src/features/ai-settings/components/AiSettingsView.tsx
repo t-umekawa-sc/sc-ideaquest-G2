@@ -8,9 +8,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useConfirm, useSnackbar } from "@/components/ui";
 
-import { fetchAdminModels, fetchAiUsage, patchAdminModel } from "../api";
+import { fetchAdminModels, fetchAiPolicy, fetchAiUsage, patchAdminModel, patchAiPolicy } from "../api";
 import { modelFeature } from "../types";
-import type { AdminModelItem, AiUsageRow } from "../types";
+import type { AdminModelItem, AiPolicy, AiUsageRow } from "../types";
 import "../ai-settings.css";
 
 const yen = (micros: number) => `¥${Math.round(micros / 1_000_000).toLocaleString()}`;
@@ -21,14 +21,27 @@ export function AiSettingsView() {
   const snack = useSnackbar();
   const [models, setModels] = useState<AdminModelItem[] | null>(null);
   const [usage, setUsage] = useState<AiUsageRow[]>([]);
+  const [policy, setPolicy] = useState<AiPolicy | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
     fetchAdminModels(ac.signal).then(setModels).catch(() => setErr("モデル一覧の取得に失敗しました。"));
     fetchAiUsage(undefined, ac.signal).then(setUsage).catch(() => {});
+    fetchAiPolicy(ac.signal).then(setPolicy).catch(() => {});
     return () => ac.abort();
   }, []);
+
+  async function setAutoEvaluate(next: boolean) {
+    try {
+      // トグル操作は明示 bool を送る（会社値 > env フォールバック・S.5b）。
+      const updated = await patchAiPolicy(next);
+      if (updated) setPolicy(updated);
+      snack({ type: "success", title: next ? "公開時の自動評価を有効にしました" : "公開時の自動評価を無効にしました" });
+    } catch {
+      snack({ type: "error", title: "更新に失敗しました" });
+    }
+  }
 
   const totalCost = useMemo(() => (models ?? []).reduce((s, m) => s + (m.current_month?.cost_micros ?? 0), 0), [models]);
   const totalCount = useMemo(() => usage.reduce((s, u) => s + u.count, 0), [usage]);
@@ -110,6 +123,32 @@ export function AiSettingsView() {
           <span className="ai-settings__sum-value">{totalCount.toLocaleString()} 件</span>
         </div>
       </div>
+
+      <div className="section-head"><h2>AI 動作ポリシー</h2></div>
+      <section className="card settings-card" aria-label="AI 動作ポリシー">
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">アイデア公開時に AI が自動評価する</div>
+            <div className="setting-row__desc">
+              ON にすると、アイデアを公開したとき AI 評価が自動で実行され、評価結果と再評価ボタンがアイデア詳細に表示されます（会社単位の設定）。
+              {policy && policy.auto_evaluate_on_publish == null && (
+                <><br />現在は未設定のためシステム既定（{policy.deploy_default ? "有効" : "無効"}）に従っています。</>
+              )}
+            </div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              aria-label="アイデア公開時に AI が自動評価する"
+              checked={policy?.effective ?? false}
+              disabled={!policy}
+              onChange={(e) => setAutoEvaluate(e.target.checked)}
+            />
+            <span className="switch__track"><span className="switch__thumb" /></span>
+            <span className="switch__state">{policy?.effective ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+      </section>
 
       <div className="section-head"><h2>モデル</h2></div>
       <section className="card settings-card" aria-label="モデル一覧">

@@ -317,6 +317,55 @@ def admin_usage(account_id: uuid.UUID, company_id: uuid.UUID, *, period_ym: int 
     return {"data": rows}
 
 
+# ---- 会社の AI 動作ポリシー（S.5b・§5.67・公開時自動評価の会社別 ON/OFF） ----
+
+def effective_auto_evaluate(ts) -> bool:
+    """公開時自動評価の実効値＝coalesce(会社設定, env `llm_auto_evaluate_on_publish`)。
+
+    会社 DB セッション `ts` から `company_ai_settings`（シングルトン）を読み、NULL なら env 既定へ
+    フォールバック（解決順＝会社 > env・§5.67）。ドメイン F の公開時自動起動（F.7.1）が参照する。
+    """
+    row = repo.get_ai_settings(ts)
+    if row is not None and row.auto_evaluate_on_publish is not None:
+        return bool(row.auto_evaluate_on_publish)
+    return bool(get_settings().llm_auto_evaluate_on_publish)
+
+
+def _ai_policy_payload(ts) -> dict:
+    row = repo.get_ai_settings(ts)
+    raw = row.auto_evaluate_on_publish if row is not None else None
+    deploy_default = bool(get_settings().llm_auto_evaluate_on_publish)
+    return {
+        "auto_evaluate_on_publish": raw,
+        "effective": raw if raw is not None else deploy_default,
+        "deploy_default": deploy_default,
+    }
+
+
+def admin_get_ai_policy(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """会社の AI 動作ポリシー取得（GET /admin/ai-policy・S.5b）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        return _ai_policy_payload(ts)
+
+
+def admin_patch_ai_policy(account_id: uuid.UUID, company_id: uuid.UUID, *,
+                          auto_evaluate_on_publish: bool | None) -> dict:
+    """会社の AI 動作ポリシー変更（PATCH /admin/ai-policy・S.5b）。None=デプロイ既定へ継承リセット。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        repo.upsert_ai_settings(ts, auto_evaluate_on_publish=auto_evaluate_on_publish, actor_id=user.id)
+        ts.commit()
+        return _ai_policy_payload(ts)
+
+
 def enqueue_ai_job(
     db_identifier: str,
     *,
