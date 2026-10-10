@@ -334,6 +334,7 @@ class InfoThreadDTO(BaseModel):
 class InfoDetailDTO(BaseModel):
     id: str
     parent_info_id: str | None = None
+    tab_id: str | None = None          # 所属タブ（D4・詳細の「配置」ゾーン表示/移動導線用）
     title: str
     body: dict[str, Any] = Field(default_factory=lambda: {"type": "doc", "content": []})  # PM-JSON（編集用）
     body_html: str | None = None  # pm_to_html の派生（表示用・サニタイズ済）

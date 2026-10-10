@@ -11,17 +11,18 @@ import { Combobox, Multiselect, useConfirm, useSnackbar } from "@/components/ui"
 import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
-  fetchRelatedInfo, INFO_CHANGED_EVENT, rejectLinkApi, setLinkDispositionApi, unarchiveInfoItemApi, unrejectLinkApi,
-  updateInfoItemApi, uploadInfoImageApi,
+  fetchInfoTabs, fetchRelatedInfo, INFO_CHANGED_EVENT, rejectLinkApi, setLinkDispositionApi, unarchiveInfoItemApi,
+  unrejectLinkApi, updateInfoItemApi, uploadInfoImageApi,
 } from "../api";
 import { RichTextEditor, EMPTY_DOC, type RichTextValue } from "@/components/richtext/RichTextEditor";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, DISPOSITION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoDetail, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoThreadItem, RelatedInfoItem } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoTab, InfoThreadItem, RelatedInfoItem } from "../types";
 import { cloudTokens, demoSummary, pmText } from "../wordcloud";
 import { InfoRevisionHistory } from "./InfoRevisionHistory";
+import { MoveTabDialog } from "./MoveTabDialog";
 import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
 
@@ -108,6 +109,10 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const [newFiles, setNewFiles] = useState<File[]>([]); // 追加予定（未アップロード）
   const [removedAttIds, setRemovedAttIds] = useState<string[]>([]); // 削除予定にマークした既存添付
 
+  // 配置（タブ）＝詳細の「配置」ゾーン表示＋移動。タブ一覧で tab_id→名前を解決し、移動は既存 MoveTabDialog を再利用。
+  const [tabs, setTabs] = useState<InfoTab[]>([]);
+  const [moveOpen, setMoveOpen] = useState(false);
+
   useEffect(() => {
     const ac = new AbortController();
     setState("loading");
@@ -116,6 +121,14 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
       .catch(() => setState("notfound"));
     return () => ac.abort();
   }, [infoId]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchInfoTabs(ac.signal).then((res) => setTabs(res.tabs)).catch(() => {});
+    return () => ac.abort();
+  }, []);
+
+  const reloadDetail = () => { fetchInfoDetail(infoId).then((d) => { if (d) setItem(d); }).catch(() => {}); };
 
   // 取得/保存のたびに編集初期値を同期（内容編集可のとき本文 contenteditable も初期化）。
   useEffect(() => {
@@ -301,6 +314,10 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   // 参照モードは全面参照＝編集能力を一律 false に上書き（編集導線・保存ボタン・アーカイブが消える）。
   const r = refContext ? { ...item, can: { ...item.can, edit_content: false, curate: false, add_link: false, follow_up: false } } : item;
   const activeLinks = r.links.filter((l) => !l.rejected);
+  // 配置（タブ）＝tab_id→表示名を解決（未解決/未指定は「すべて」）。移動は curator か登録者（＝edit_content）のみ。
+  const curTab = tabs.find((t) => t.id === r.tab_id);
+  const curTabLabel = curTab ? (curTab.is_system ? `${curTab.name}（既定）` : curTab.name) : "すべて（既定）";
+  const canMoveTab = r.can.edit_content || r.can.curate;
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
   // 項目区切り＝デザイン標準 §4.1: 全セクションで仕切り線の"間隔"を統一。参照/操作は線あり（dialog-section）、
   // 入力用（タイトル/内容の編集）は線を消して間隔だけ維持（is-quiet）＝入力欄と線の二重感を避ける。
@@ -317,6 +334,18 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   return (
     <>
       <div className="modal__body info-dlg">
+        {/* 配置（タブ・D4）＝最上部の独立ゾーン＝「どのタブに置くか」を内容メンテ項目と区別。現在タブのチップ＋
+            「タブを移動」ボタン（既存 MoveTabDialog を開く＝誤移動防止・権限付き移動フロー再利用）。 */}
+        <div className="place-zone">
+          <div className="place-zone__main">
+            <span className="place-zone__label">🗂 配置（タブ）</span>
+            <span className="place-chip"><span className="place-chip__dot" />{curTabLabel}</span>
+            {canMoveTab ? (
+              <button className="btn btn-outline btn-sm" type="button" onClick={() => setMoveOpen(true)}>タブを移動…</button>
+            ) : null}
+          </div>
+          <p className="place-zone__note">この情報は上記タブに配置され、一覧ではそのタブに表示されます{canMoveTab ? "（「タブを移動」で変更＝内容の編集とは別操作）" : ""}。</p>
+        </div>
         {/* 元情報（続報元）＝下部の「続報スレッド」タイムラインに根として統合表示（SC-50 §80）＝ここには別掲しない。 */}
         <div className={contentCls}>
           <div className="dialog-label">タイトル</div>
@@ -677,6 +706,10 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
       </div>
       <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked}
         existing={item?.links ?? []} />
+      {moveOpen && item ? (
+        <MoveTabDialog item={{ id: item.id, title: item.title, tab_id: item.tab_id }} tabs={tabs}
+          onClose={() => setMoveOpen(false)} onMoved={() => { setMoveOpen(false); reloadDetail(); }} />
+      ) : null}
     </>
   );
 }

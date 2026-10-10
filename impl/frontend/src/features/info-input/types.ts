@@ -159,6 +159,7 @@ export interface InfoCan {
 export interface InfoDetail {
   id: string;
   parent_info_id?: string | null;
+  tab_id?: string | null;  // 所属タブ（D4・詳細の「配置」ゾーン表示/移動導線）
   title: string;
   body?: Record<string, unknown> | null;  // PM-JSON 正本（編集用）
   body_html?: string | null;               // pm_to_html の派生（表示用・サニタイズ済）

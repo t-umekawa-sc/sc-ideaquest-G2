@@ -6,10 +6,13 @@ import { useState } from "react";
 
 import { Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { moveInfoItemTabApi } from "../api";
-import type { InfoCard, InfoTab } from "../types";
+import type { InfoTab } from "../types";
+
+// 一覧（InfoCard）からも詳細（InfoDetail）からも開けるよう、使うフィールドだけを要求する最小型。
+type MoveTarget = { id: string; title: string; tab_id?: string | null };
 
 export function MoveTabDialog({ item, tabs, onClose, onMoved }: {
-  item: InfoCard; tabs: InfoTab[]; onClose: () => void; onMoved: () => void;
+  item: MoveTarget; tabs: InfoTab[]; onClose: () => void; onMoved: () => void;
 }) {
   const snack = useSnackbar();
   const [tabId, setTabId] = useState<string>(item.tab_id ?? "");

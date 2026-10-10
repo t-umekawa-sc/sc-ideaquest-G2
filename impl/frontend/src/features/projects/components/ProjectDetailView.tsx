@@ -268,7 +268,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section aria-label="開発メンバー">
           <div className="list-toolbar">
             <div className="muted text-sm">開発メンバーとイノベーション担当（所有者/管理権限者が編集可）</div>
-            {project.my_permissions.can_manage_members && <button type="button" className="btn btn-outline btn-sm" onClick={() => router.push(`/projects/${projectId}/members`)}>開発メンバーを管理</button>}
+            {project.my_permissions.can_manage_members && <button type="button" className="btn btn-primary" onClick={() => router.push(`/projects/${projectId}/members`)}>開発メンバーを管理</button>}
           </div>
 
           <h3 className="proj-members-group">開発メンバー</h3>

@@ -305,6 +305,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
+        "tab_id": str(item.tab_id) if getattr(item, "tab_id", None) else None,  # D4 詳細の「配置」ゾーン表示/移動導線
         "title": item.title,
         "body": item.body,
         "body_html": item.body_html,

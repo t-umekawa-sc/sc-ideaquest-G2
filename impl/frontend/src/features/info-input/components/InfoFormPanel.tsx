@@ -253,13 +253,17 @@ export function InfoFormPanel({ parentId, initialTabId, onCancel, onDone }: {
           </details>
         ) : null}
 
-        {/* 登録先タブ（D4）＝新規のみ（続報は親のタブを継承）。既定「すべて」。「カメリオ連携」も手動登録先に選べる。 */}
+        {/* 配置（タブ・D4）＝「どのタブに置くか」＝内容メンテ項目と区別した独立ゾーン（最上部）。新規のみ
+            （続報は親のタブを継承）。既定「すべて」。「カメリオ連携」も手動登録先に選べる。 */}
         {!parentId && tabs.length > 0 ? (
-          <Field className="dialog-section is-quiet" id="im-tab" label="登録先タブ"
-            hint="この情報を束ねるタブ。未選択は「すべて」。タブは分類であり閲覧制限ではありません。">
-            <Combobox id="im-tab" ariaLabel="登録先タブ" value={tabId} onChange={setTabId}
-              options={tabs.filter((t) => t.status === "active").map((t) => ({ value: t.id, label: t.is_system ? `${t.name}（既定）` : t.name }))} />
-          </Field>
+          <div className="place-zone">
+            <div className="place-zone__main">
+              <span className="place-zone__label" id="im-tab-label">🗂 配置（タブ）</span>
+              <Combobox id="im-tab" ariaLabel="登録先タブ" value={tabId} onChange={setTabId}
+                options={tabs.filter((t) => t.status === "active").map((t) => ({ value: t.id, label: t.is_system ? `${t.name}（既定）` : t.name }))} />
+            </div>
+            <p className="place-zone__note">選んだタブに配置され、一覧ではそのタブに表示されます（変えると表示先が変わります）。タブは分類であり閲覧制限ではありません。</p>
+          </div>
         ) : null}
 
         <Field className="dialog-section is-quiet" id="im-title" label="タイトル" required error={titleErr}>

@@ -8239,6 +8239,8 @@ export interface components {
             id: string;
             /** Parent Info Id */
             parent_info_id?: string | null;
+            /** Tab Id */
+            tab_id?: string | null;
             /** Title */
             title: string;
             /** Body */
