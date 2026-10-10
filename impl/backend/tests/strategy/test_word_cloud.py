@@ -125,3 +125,24 @@ def test_r_tc_115_word_cloud_empty_when_no_related():
             ts.execute(StrategyDocument.__table__.delete().where(StrategyDocument.id == did))
             ts.execute(User.__table__.delete().where(User.id == owner))
             ts.commit()
+
+
+def test_r_tc_209_demo_strategy_word_cloud_populated():
+    """R-TC-209（DFT）: 発見デモの経営資料 R.4b 語像が info＋idea＋concept で非空（demo seed 配線の回帰）。
+
+    `seed_demo_strategy` が経営資料1件＋コンセプト2件を発見デモクエストに適用し recompute→idea_alignment を作る
+    ことで、R.4b の語像が「関連情報＋関連アイデア＋関連コンセプト」で充実することを検証（過去はデモに経営資料/
+    コンセプトが無く語像が出なかった＝F12 の兄弟・任意対応分）。seed は冪等。
+    """
+    from scripts.bootstrap import DEMO_STRATEGY_DOC_ID, seed_demo_strategy
+    company = _seed_company()
+    db = company.db_identifier
+    seed_demo_strategy(db)  # 冪等（通常は bootstrap 済み）
+    with get_tenant_session(db) as ts:
+        doc = ts.get(StrategyDocument, DEMO_STRATEGY_DOC_ID)
+        assert doc is not None, "デモ経営資料が seed されていない"
+        wc = strategy_app._word_cloud(ts, doc, company)
+    assert wc["related_count"] > 0 and wc["tokens"], wc  # 関連エンティティ（info/idea/concept）あり・語像非空
+    toks = {t["token"] for t in wc["tokens"]}
+    # アイデア由来（idea_alignment 経由）の語が語像に入る＝idea 配線の確認。
+    assert toks & {"オンボーディング", "情報", "共有", "自動", "部署"}, toks

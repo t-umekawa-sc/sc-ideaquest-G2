@@ -359,6 +359,13 @@ DEMO_DISCOVERY_IDEA_IDS = (
     uuid.UUID("d15c0000-0000-4000-a000-000000000101"),
     uuid.UUID("d15c0000-0000-4000-a000-000000000102"),
 )
+# 経営資料整合デモ（R.4b「方針まわりの語像」用）＝経営資料1件＋コンセプト2件。発見デモクエストに適用し
+# recompute で idea_alignment を作る＝語像が info＋idea＋concept で充実する（§7②・FR-44）。
+DEMO_STRATEGY_DOC_ID = uuid.UUID("d15c0000-0000-4000-a000-000000000201")
+DEMO_CONCEPT_IDS = (
+    uuid.UUID("d15c0000-0000-4000-a000-000000000301"),
+    uuid.UUID("d15c0000-0000-4000-a000-000000000302"),
+)
 
 # 情報インプット（ドメイン N・SC-50）デモ。frontend fixtures（i1〜i5）相当。
 DEMO_INFO_AUTHOR_IDS = {
@@ -431,28 +438,19 @@ def seed_demo_quest_group() -> None:
         _seed_quest_group_for(cdef["company_code"])
 
 
-# 発見デモ公開アイデアの「議論の主題」ワードクラウド用トークン（タイトル由来・共有語「効率化」で集約を演出）。
-DEMO_DISCOVERY_IDEA_TOKENS = {
-    DEMO_DISCOVERY_IDEA_IDS[0]: [("情報共有", 5), ("自動化", 4), ("部署連携", 3), ("効率化", 2)],
-    DEMO_DISCOVERY_IDEA_IDS[1]: [("オンボーディング", 5), ("新人研修", 3), ("効率化", 3), ("定着", 2)],
-}
+def _ensure_idea_tokens_from_text(ts, iid, text) -> bool:
+    """idea に idea トークンが無ければ `text` をトークン化して永続（冪等・追加したら True）。
 
-
-def _seed_idea_tokens(ts, token_map) -> int:
-    """アイデアの `entity_tokens(owner_type='idea')` を冪等 seed（追加した行数を返す）。
-
-    当該 idea に**既存の idea トークンがあれば触らない**（ライブ `persist_entity_tokens` 経路と二重化しない）。
-    読取（`quests.word_cloud`・類似度）は entity_tokens 一本（§5.36b）。
+    **ライブ `persist_entity_tokens` と同一トークナイザ**（`info.derive`）で抽出＝経営資料/コンセプトの
+    トークンと素性が揃い、整合率 recompute（R.4b 語像の idea 由来）でも一致判定が効く（§5.36b）。既存の idea
+    トークン（ライブ書込 or 既 seed）があれば触らない＝全置換（`replace_tokens`）でライブ分を潰さない。
     """
+    from app.tenant.info import application as info_app
     from app.tenant.tokens.orm import EntityToken
-    added = 0
-    for iid, toks in token_map.items():
-        if ts.query(EntityToken.id).filter_by(owner_type="idea", owner_id=iid).first() is not None:
-            continue  # 既に idea トークンあり（冪等）
-        for tok, cnt in toks:
-            ts.add(EntityToken(owner_type="idea", owner_id=iid, token=tok, count=cnt))
-            added += 1
-    return added
+    if ts.query(EntityToken.id).filter_by(owner_type="idea", owner_id=iid).first() is not None:
+        return False
+    info_app.persist_entity_tokens(ts, "idea", iid, text)
+    return True
 
 
 def _ensure_discovery_idea_tokens(ts) -> None:
@@ -460,9 +458,13 @@ def _ensure_discovery_idea_tokens(ts) -> None:
 
     過去の seed は idea トークンを一切書いていなかったため **fresh な demo 会社ではクエストの語像が常に空**
     だった（info の N-TC-334 の兄弟・§5.36b）。既存 demo DB にも後追いで補えるよう、クエスト生成の有無に
-    依らず冪等に補完する。
+    依らず冪等に補完する（トークンはアイデア本文＝title+value+body から抽出）。
     """
-    _seed_idea_tokens(ts, DEMO_DISCOVERY_IDEA_TOKENS)
+    from app.tenant.ideas.orm import Idea
+    for iid in DEMO_DISCOVERY_IDEA_IDS:
+        idea = ts.get(Idea, iid)
+        if idea is not None:
+            _ensure_idea_tokens_from_text(ts, iid, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
 
 
 def seed_demo_discovery(db_identifier: str | None = None) -> None:
@@ -712,6 +714,90 @@ def seed_demo_info_filler(db_identifier: str | None = None) -> None:
         print(f"[bootstrap] seeded {added} info-input filler items in {db_identifier}")
 
 
+def seed_demo_strategy(db_identifier: str | None = None) -> None:
+    """経営資料整合デモ（冪等・非prod）＝経営資料1件＋コンセプト2件を発見デモクエストに適用し、R.4b「方針まわりの
+    語像」が info＋idea＋concept で充実するようにする（FR-44・設計§7②）。
+
+    - トークンは全てライブと同一トークナイザ（`persist_entity_tokens`）で付与＝経営資料⇔情報/アイデア/コンセプト
+      の一致判定（整合率 recompute・関連コンセプト・関連情報）が素性の揃った状態で効く。
+    - 発見デモクエスト（`seed_demo_discovery`）とそのアイデア（idea トークン）が前提＝main() で後に呼ぶこと。
+    """
+    from app.tenant.concepts import application as concepts_app
+    from app.tenant.concepts import repository as concepts_repo
+    from app.tenant.concepts.orm import Concept
+    from app.tenant.info import application as info_app
+    from app.tenant.quests.orm import Quest
+    from app.tenant.strategy import alignment as strat_align
+    from app.tenant.strategy import application as strat_app
+    from app.tenant.strategy import repository as strat_repo
+    from app.tenant.strategy.orm import StrategyDocument
+
+    s = get_settings()
+    if not _seed_demo_enabled(s.app_env):
+        return
+    with control_session() as session:
+        if db_identifier is None:
+            company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+            db_identifier = company.db_identifier if company else None
+            company_obj = company
+        else:
+            company_obj = session.query(Company).filter_by(db_identifier=db_identifier).one_or_none()
+    if db_identifier is None or company_obj is None:
+        return
+
+    with get_tenant_session(db_identifier) as ts:
+        if ts.get(Quest, DEMO_DISCOVERY_QUEST_ID) is None:
+            return  # 発見デモが無い会社はスキップ（前提の公開アイデアが無い）
+        if strat_repo.get_document(ts, DEMO_STRATEGY_DOC_ID) is not None:
+            return  # 冪等＝既に seed 済み
+        # (1) 経営資料（ISO 構造化項目・本文は発見デモのアイデア/情報と語彙を重ねて関連付けが効くようにする）。
+        #     固定ID で冪等にするため ORM を直接構築（repo.create_document は id をランダム採番するため使わない）。
+        doc = StrategyDocument(
+            id=DEMO_STRATEGY_DOC_ID, created_by_id=DEMO_DISCOVERY_OWNER_ID,
+            title="【デモ】全社DX中期経営方針 2026–2028", doc_kind="midterm_plan",
+            intent="部署を越えた情報共有と業務の自動化を進め、顧客への価値提供を加速する。",
+            policy_commitment="現場主導の業務改善を支援し、オンボーディングと新人の人材育成に継続投資する。",
+            strategy="市場動向と競合の価格戦略を踏まえ、ノーコードと生成AIの導入で業務効率を高める。",
+            objectives="情報共有の自動化率を引き上げ、新人の立ち上がり期間を短縮する。",
+            focus_areas=["業務効率化", "顧客価値", "人材・組織"],
+            body_md="部署横断の情報共有基盤を整備し、業務プロセスの自動化と顧客対応の効率化を全社で推進する。",
+            status="active",
+        )
+        ts.add(doc)
+        ts.flush()
+        doc.body_text = strat_app._compose_body_text(doc)
+        ts.flush()
+        info_app.persist_entity_tokens(ts, "strategy_doc", doc.id, doc.body_text)  # ライブと同一（_persist_tokens 相当）
+
+        # (2) コンセプト2件（発見デモクエスト配下・本文は経営資料/アイデアと語彙を重ねる）。総合ルーム＋版＋トークン。
+        concept_defs = [
+            dict(id=DEMO_CONCEPT_IDS[0], title="部署横断の情報共有プラットフォーム",
+                 problem="部署間で情報が分断し業務が重複している",
+                 value_proposition="情報共有を自動化し業務効率を高める", target="全社員",
+                 differentiation="既存の業務ツールと連携", solution_form="ノーコードで構築"),
+            dict(id=DEMO_CONCEPT_IDS[1], title="オンボーディング自動化で新人定着",
+                 problem="新人の立ち上がりに時間がかかり負担が大きい",
+                 value_proposition="オンボーディングを自動化し新人の定着率を高める", target="新入社員と受入部署",
+                 differentiation="動画と対話で現場に適応", solution_form="生成AIを活用"),
+        ]
+        for cdef in concept_defs:
+            if concepts_repo.get_concept(ts, cdef["id"]) is not None:
+                continue
+            concept = Concept(quest_id=DEMO_DISCOVERY_QUEST_ID, author_id=DEMO_DISCOVERY_OWNER_ID,
+                              viability={}, **cdef)  # 固定ID（冪等）＝ORM 直接構築
+            ts.add(concept)
+            ts.flush()
+            concepts_repo.create_chat_scope(ts, concept_id=concept.id, kind="overall", position=0)  # 総合ルーム
+            concepts_app._snapshot_revision(ts, concept, DEMO_DISCOVERY_OWNER_ID, 1)  # 初版
+            info_app.persist_entity_tokens(ts, "concept", concept.id, concepts_app._concept_text(concept))
+
+        # (3) 経営資料を発見デモクエストに適用＋整合率 recompute（idea_alignment を作る＝R.4b の idea 由来）。
+        strat_repo.reconcile_quest_docs(ts, DEMO_DISCOVERY_QUEST_ID, [DEMO_STRATEGY_DOC_ID])
+        strat_align.recompute_for_quest(ts, DEMO_DISCOVERY_QUEST_ID, company=company_obj, award=False)
+        ts.commit()
+        print(f"[bootstrap] seeded strategy/concept demo in {db_identifier}")
+
+
 def main() -> None:
     s = get_settings()
     # 1. 管理DB
@@ -733,6 +819,7 @@ def main() -> None:
         seed_demo_discovery(db_identifier)
         seed_demo_info(db_identifier)
         seed_demo_info_filler(db_identifier)
+        seed_demo_strategy(db_identifier)  # 経営資料＋コンセプト（R.4b 語像）＝discovery/info の後（アイデア/情報が前提）
     print("[bootstrap] done")
 
 

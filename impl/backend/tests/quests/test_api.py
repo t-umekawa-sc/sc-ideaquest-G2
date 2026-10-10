@@ -588,20 +588,17 @@ def test_c_tc_323_demo_discovery_seeds_idea_tokens(env):
     """
     from app.tenant.tokens import repository as tokens_repo
     from app.tenant.tokens.orm import EntityToken
-    from scripts.bootstrap import DEMO_DISCOVERY_IDEA_IDS, DEMO_DISCOVERY_IDEA_TOKENS, _seed_idea_tokens
-    # 発見デモの2公開アイデアがトークン対象に含まれる（配線の確認）。
-    assert set(DEMO_DISCOVERY_IDEA_TOKENS.keys()) == set(DEMO_DISCOVERY_IDEA_IDS)
-    assert all(toks for toks in DEMO_DISCOVERY_IDEA_TOKENS.values())
+    from scripts.bootstrap import _ensure_idea_tokens_from_text
     scratch = uuid.uuid4()  # 空の状態を保証する使い捨て owner_id
-    token_map = {scratch: [("語雲テスト甲", 3), ("語雲テスト乙", 2)]}
+    text = "部署間の情報共有を自動化する"  # ライブと同一トークナイザで 部署/情報/共有/自動 等を抽出
     try:
         with get_tenant_session(env.db_identifier) as ts:
-            n1 = _seed_idea_tokens(ts, token_map)   # 空→挿入
-            n2 = _seed_idea_tokens(ts, token_map)   # 既存→0（冪等）
+            n1 = _ensure_idea_tokens_from_text(ts, scratch, text)   # 空→挿入
+            n2 = _ensure_idea_tokens_from_text(ts, scratch, text)   # 既存→触らない（冪等）
             ts.commit()
             got = tokens_repo.tokens_for_owners(ts, "idea", [scratch])
-        assert n1 == 2 and n2 == 0, (n1, n2)
-        assert got.get(scratch) and len(got[scratch]) == 2
+        assert n1 is True and n2 is False, (n1, n2)
+        assert got.get(scratch) and len(got[scratch]) >= 1  # トークナイザが語を抽出している
     finally:
         with get_tenant_session(env.db_identifier) as ts:
             ts.execute(EntityToken.__table__.delete().where(

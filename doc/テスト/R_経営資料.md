@@ -47,6 +47,7 @@
 | R-TC-111 | int | 集計の端（資料トークン空／母集団0）はゼロ除算せず率0を返す（例外なし） | 資料1件（tokens を永続しない） | `application._impact_rates(ts, doc, company)` | `related_count=0・impact_rate=0.0・opportunity_rate=0.0・threat_rate=0.0`（例外なし・`info_total`は全 curated 件数） | R.4／設計§4.2 |
 | R-TC-114 | api | この方針まわりの語像（R.4b・§7＝集約UI）＝関連情報＋関連アイデア＋関連コンセプトの語を頻度集約・weight 正規化／認可 | 資料（ユニーク語 tokens）＋関連 判定済情報／関連アイデア(idea_alignment)／関連コンセプト（いずれも同ユニーク語＋各固有語 tokens）をシード | admin `GET /{id}/word-cloud`／一般 `GET`／不明 ID | 200・共有語は weight=1.0（3owner で最頻）・各固有語も tokens に出る・`related_count=3`／一般=403／不明=404 | R.4b／設計§7 |
 | R-TC-115 | int | 語像の端（関連 0）は空 tokens・related_count=0（例外なし） | 資料1件（ユニーク語 tokens・関連なし） | `application._word_cloud(ts, doc, company)` | `tokens=[]・related_count=0`（例外なし） | R.4b／設計§7 |
+| R-TC-209 | int | **（DFT）発見デモの経営資料 R.4b 語像が info＋idea＋concept で非空**（過去はデモに経営資料/コンセプトが無く語像が出なかった＝F12 の兄弟・任意対応）。`seed_demo_strategy` が経営資料1件＋コンセプト2件を発見デモクエストに適用し recompute→idea_alignment を作る。冪等 | 発見デモ会社DB（bootstrap 済み） | `seed_demo_strategy(db)`→`application._word_cloud(ts, demo_doc, company)` | `related_count>0`・`tokens` 非空・アイデア由来語（情報/共有/自動/部署/オンボーディング 等）を含む | R.4b／設計§7②／DFT |
 
 ## 4. Markdown エクスポート（R.5・Step5）
 

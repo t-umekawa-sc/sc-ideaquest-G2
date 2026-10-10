@@ -86,7 +86,7 @@
 | C-TC-252 | api | クエストカードに discoverable（発見カタログ掲載）を含む＝一覧の列/ソート/絞込・複製プリフィルに使う | discoverable=ON／OFF の2クエスト | `GET /quests` | ON カード `discoverable=true`／OFF カード `discoverable=false` | C.1／C.9.0／FR-40 |
 | C-TC-304 | api | 議論の主題＝配下の公開アイデア横断の語像（設計§7②）＝公開アイデアの entity_tokens を頻度集約・weight 正規化／下書き・削除は除外 | recruiting（自分 owner）＋公開アイデア2件（共有語＋各固有語 tokens）＋自分の下書き1件（固有語）＋削除済み公開1件 | `GET /quests/{id}/word-cloud` | 200・共有語 weight=1.0・各公開固有語も出る・`idea_count=2`・下書き/削除の語は出ない | C.1／設計§7②／SC-12 |
 | C-TC-305 | api | 語像の可視性＝詳細と同じ門番（非パーティーは404／下書き他人は404） | 他人 owner の recruiting（自分は非メンバー）／他人の下書き | 非メンバーで `GET /{id}/word-cloud`／他人下書きで同 | いずれも 404（存在秘匿） | C.1 可視性／設計§7② |
-| C-TC-323 | unit | **（DFT）発見デモ seed が公開アイデアに idea トークンを入れる**＝SC-12「議論の主題」WC が空にならない（過去 bootstrap は未投入で demo 会社の語像が常に空・info N-TC-334 の兄弟）。`_ensure_discovery_idea_tokens` は冪等 | 発見デモ会社DB | `_ensure_discovery_idea_tokens(ts)`（2回）→`tokens_for_owners(ts,'idea',demo_idea_ids)` | demo 公開アイデアに idea トークンが存在（非空）・2回実行で重複しない | 設計§7②／§5.36b／DFT |
+| C-TC-323 | unit | **（DFT）発見デモ seed が公開アイデアに idea トークンを入れる**＝SC-12「議論の主題」WC が空にならない（過去 bootstrap は未投入で demo 会社の語像が常に空・info N-TC-334 の兄弟）。トークンはライブと同一トークナイザ（`persist_entity_tokens`）で抽出・冪等（既存は触らない） | 使い捨て owner_id（空の状態） | `_ensure_idea_tokens_from_text(ts, id, text)`（2回）→`tokens_for_owners(ts,'idea',[id])` | 1回目=挿入(True)・2回目=触らない(False)・トークン非空 | 設計§7②／§5.36b／DFT |
 
 ## 5. パーティー粒度・状態遷移・削除 API（SC-12・C.3/C.5/C.2）
 
