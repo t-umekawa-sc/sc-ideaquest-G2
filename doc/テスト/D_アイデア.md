@@ -18,6 +18,7 @@
 | D-TC-006 | int | 投票 1人1票・初回/切替 | アイデア1件 | `upsert_vote`（approve→oppose） | 初回 created=True／切替 created=False・type 更新・行は1つ | D.5／§5.13 |
 | D-TC-007 | int | 賛成/反対の集計 | 2名が approve/oppose | `count_votes` | `{approve:1, oppose:1}` | D.5 |
 | D-TC-008 | int | 投票取消の冪等 | 投票済み | `remove_vote` を2回 | 1回目 True／2回目 False（XP は戻さない） | D.5／§8-⑥ |
+| D-TC-241 | int | 同時初回投票のレース（uq違反）を 500 でなく切替扱いで冪等化 | 既に初回投票あり＋後続の `get_vote` が stale(None) を返す状況 | `upsert_vote`（別type） | IntegrityError を捕捉し `created=False`・type 更新・行は1つ（500 にしない） | D.5／AUDIT-017（出典: セッション調整/引継/2026-10-10_全ソースコード品質セキュリティ監査.md） |
 | D-TC-009 | int | 版の追加/一覧/取得・UNIQUE | アイデア1件 | `add_revision`×2→`list`/`get` | 新しい順に返る・changes スナップショット取得可 | D.4／§5.14 |
 | D-TC-010 | int | 添付の追加/計数/削除 | アイデア1件 | `add_attachment`→`count`→`remove` | count 1→0（size CHECK 満たす） | D.3／§5.12 |
 | D-TC-011 | int | フォローの冪等 | アイデア1件 | `add_follow`×2→`remove_follow` | 重複行を作らない・is_following True→False | D.6／§5.23 |

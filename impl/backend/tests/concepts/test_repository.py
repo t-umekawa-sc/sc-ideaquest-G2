@@ -286,6 +286,31 @@ def test_p_tc_013_vote_upsert_and_delete(env):
         assert repo.get_vote(ts, cid, env.u2) is None
 
 
+def test_p_tc_016_concurrent_first_vote_race_recovers(env, monkeypatch):
+    """P-TC-016: 同時初回投票のレース（uq違反）を 500 でなく切替扱いで冪等化（AUDIT-017）。"""
+    with get_tenant_session(env.db_identifier) as ts:
+        c = _new_concept(ts, env)
+        repo.upsert_vote(ts, c.id, env.u2, type="approve")  # 先行リクエストの初回投票
+        ts.commit()
+        cid = c.id
+    orig_get_vote = repo.get_vote
+    calls = {"n": 0}
+
+    def flaky_get_vote(session, concept_id, user_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None  # stale read → INSERT パスへ進む
+        return orig_get_vote(session, concept_id, user_id)
+
+    monkeypatch.setattr(repo, "get_vote", flaky_get_vote)
+    with get_tenant_session(env.db_identifier) as ts:
+        v, created = repo.upsert_vote(ts, cid, env.u2, type="oppose")
+        ts.commit()
+        assert created is False and v.type == "oppose"
+    with get_tenant_session(env.db_identifier) as ts:
+        assert repo.count_votes(ts, cid) == {"oppose": 1}  # 1人1票を維持
+
+
 def test_p_tc_014_chat_scopes(env):
     """P-TC-014: チャットスコープ（overall/group/assumption）・前提スレッドは assumption_id 紐付き。"""
     with get_tenant_session(env.db_identifier) as ts:

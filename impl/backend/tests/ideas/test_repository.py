@@ -171,6 +171,36 @@ def test_d_tc_008_remove_vote_idempotent(env):
         assert repo.remove_vote(ts, iid, env.author_id) is False
 
 
+def test_d_tc_241_concurrent_first_vote_race_recovers(env, monkeypatch):
+    """D-TC-241: 同時初回投票のレース（uq違反）を 500 でなく切替扱いで冪等化（AUDIT-017）。
+
+    後続リクエストの `get_vote` が stale(None) を返す状況を再現し、INSERT が uq 違反→
+    IntegrityError を捕捉して相手の行を読み直し `created=False` で切替、行は1つに保つ。
+    """
+    iid = env.new_idea()
+    # 先行リクエストが既に初回投票を作成済み（コミット済み）
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.upsert_vote(ts, iid, env.author_id, type="approve", voted_revision=1)
+        ts.commit()
+    # 後続リクエストの最初の get_vote だけ stale(None) を返す＝レース再現
+    orig_get_vote = repo.get_vote
+    calls = {"n": 0}
+
+    def flaky_get_vote(session, idea_id, user_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None  # stale read → INSERT パスへ進む
+        return orig_get_vote(session, idea_id, user_id)
+
+    monkeypatch.setattr(repo, "get_vote", flaky_get_vote)
+    with get_tenant_session(env.db_identifier) as ts:
+        v, created = repo.upsert_vote(ts, iid, env.author_id, type="oppose", voted_revision=1)
+        ts.commit()
+        assert created is False and v.type == "oppose"
+        rows = ts.execute(select(Vote).where(Vote.idea_id == iid, Vote.user_id == env.author_id)).scalars().all()
+        assert len(rows) == 1  # 1人1票を維持（二重作成しない）
+
+
 def test_d_tc_009_revisions_add_list_get(env):
     """D-TC-009: add_revision→list（新しい順）／get_revision。UNIQUE(idea_id,revision)。"""
     iid = env.new_idea()

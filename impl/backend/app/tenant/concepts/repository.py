@@ -11,6 +11,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.tenant.concepts.orm import (
@@ -425,9 +426,17 @@ def upsert_vote(session: Session, concept_id: uuid.UUID, user_id: uuid.UUID, *, 
         session.flush()
         return existing, False
     v = ConceptVote(id=uuid.uuid4(), concept_id=concept_id, user_id=user_id, type=type)
-    session.add(v)
-    session.flush()
-    return v, True
+    try:
+        with session.begin_nested():  # SAVEPOINT＝INSERT だけを隔離（失敗しても外側 Tx を壊さない）
+            session.add(v)
+            session.flush()
+        return v, True
+    except IntegrityError:
+        # 同時初回投票のレース（uq_concept_votes_*）＝相手が先に作った行を読み直して切替扱い（AUDIT-017）。
+        existing = get_vote(session, concept_id, user_id)
+        existing.type = type
+        session.flush()
+        return existing, False
 
 
 def delete_vote(session: Session, concept_id: uuid.UUID, user_id: uuid.UUID) -> bool:

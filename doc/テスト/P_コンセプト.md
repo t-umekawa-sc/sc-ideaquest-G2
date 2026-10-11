@@ -25,6 +25,7 @@
 | P-TC-013 | int | 投票 upsert（賛成/反対・1人1票・切替/取消） | コンセプト/投票者 | `upsert_vote(approve)`→`(oppose)`→`delete_vote` | `concept_votes` 1→更新→0・集計反映 | §5.46／P.5b |
 | P-TC-014 | int | チャットスコープ（overall/group/assumption） | コンセプト＋前提リンク | `create_scope(group)`／前提リンクで assumption スコープ生成 | `overall`1＋`group`＋`assumption`（assumption_id 紐付き） | §5.45／§3.7 |
 | P-TC-015 | int | 論理削除（監査保持） | コンセプト1 | `soft_delete` | `deleted_at` セット・一覧から除外・行は残る | §5.38 |
+| P-TC-016 | int | 同時初回投票のレース（uq違反）を 500 でなく切替扱いで冪等化 | 既に初回投票あり＋後続の `get_vote` が stale(None) を返す状況 | `upsert_vote`（別type） | IntegrityError を捕捉し `created=False`・type 更新・行は1つ（500 にしない） | §5.46／AUDIT-017（出典: セッション調整/引継/2026-10-10_全ソースコード品質セキュリティ監査.md） |
 
 ## 2. コンセプトの取得・登録・編集・遷移・選定・判定 API（P.1/P.2・SC-61/SC-60/SC-12）
 

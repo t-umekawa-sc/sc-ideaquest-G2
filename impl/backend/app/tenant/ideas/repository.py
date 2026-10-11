@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select, tuple_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.tenant.ideas.orm import Attachment, Follow, Idea, IdeaRevision, IdeaStakeholder, Vote
@@ -224,8 +225,17 @@ def upsert_vote(
         existing.voted_revision = voted_revision
         return existing, False
     vote = Vote(id=uuid.uuid4(), idea_id=idea_id, user_id=user_id, type=type, voted_revision=voted_revision)
-    session.add(vote)
-    return vote, True
+    try:
+        with session.begin_nested():  # SAVEPOINT＝INSERT だけを隔離（失敗しても外側 Tx を壊さない）
+            session.add(vote)
+            session.flush()
+        return vote, True
+    except IntegrityError:
+        # 同時初回投票のレース（uq_votes_idea_user）＝相手が先に作った行を読み直して切替扱い（AUDIT-017）。
+        existing = get_vote(session, idea_id, user_id)
+        existing.type = type
+        existing.voted_revision = voted_revision
+        return existing, False
 
 
 def remove_vote(session: Session, idea_id: uuid.UUID, user_id: uuid.UUID) -> bool:
