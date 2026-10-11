@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報を登録 ダイアログ 調整検討モック — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 検討＝「情報を登録」ダイアログの構成調整（2026-10-11 ユーザー指摘）。
+     対象実装＝impl/frontend/src/features/info-input/components/InfoFormPanel.tsx（正＝SC-50/SC-51）。
+     指摘2点：
+       (1) 配置（タブ）を最上部へ。現状はテンプレート→配置タブの順で、テンプレートが先頭になっている。
+       (2) テンプレートは「選ぶと “以降の各項目” に下書き（タイトル/本文/属性既定）が流し込まれる」操作であり、
+           タイトル・本文・出典…等の “内容メンテ項目” とは役割が異なる。同じ入力欄の並びに混ぜず見た目で区別する。
+     → 本モックの並び：①配置（タブ）＝独立ゾーン（既存 .place-zone を最上部へ）
+                       ②テンプレート＝“下書きアシスト”ブロック（内容項目と別装い・下へ流れる矢印キュー）
+                       ③区切り（ここから入力・編集）④タイトル…以降の内容メンテ項目
+     静的モック（見た目の確認用）。本採用の見た目は末尾バリエーションから選択。 */
+  body { background: var(--color-bg); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); display: flex; flex-direction: column; gap: var(--space-6); }
+  .wrap > h1 { font-size: var(--text-xl); margin: 0; }
+  .intro { background: var(--color-surface-alt); border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
+  .intro strong { color: var(--color-text); }
+  .intro ol { margin: var(--space-2) 0 0; padding-left: 1.4em; }
+
+  /* ダイアログの枠（モーダルの見た目を静的に再現） */
+  .mock-dialog { max-width: 720px; margin: 0 auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg, 14px); box-shadow: 0 12px 40px rgba(15,23,42,.14); overflow: hidden; }
+  .mock-dialog__head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+  .mock-dialog__head h2 { margin: 0; font-size: var(--text-lg); }
+  .mock-dialog__head .hx { display:flex; gap:10px; color: var(--color-text-muted); }
+  .mock-dialog__body { padding: var(--space-5); background: var(--color-surface); }
+  .mock-dialog__foot { display: flex; align-items:center; justify-content: space-between; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); }
+
+  /* ① 配置（タブ）ゾーン＝ヘッダー直下にマージン無しで密着（全幅バンド）。
+       body の左右・上パディングを負マージンで打ち消し、ヘッダーの下罫にくっつける。上角は角丸なし・左アクセント帯なし。 */
+  .place-zone { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border);
+    border-radius: 0; padding: var(--space-3) var(--space-4);
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4); }
+  .place-zone__main { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  .place-zone__label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 700; letter-spacing: .04em; color: var(--color-text-muted); white-space: nowrap; margin: 0; }
+  .place-zone__note { flex-basis: 100%; font-size: var(--text-xs); color: var(--color-text-muted); margin: 2px 0 0; }
+  .place-zone .select { max-width: 320px; }
+
+  /* ② テンプレート＝“下書きアシスト”ブロック（本命案A）。
+       ・内容メンテ項目（白地のフィールド）と明確に別装い＝primary tint の塗り＋アイコンバッジ。
+       ・「下へ流し込む」ことが伝わるよう、ブロック下端に下向きキュー（▼ 選ぶと下の各項目に下書きが入ります）。 */
+  .tpl-zone { position: relative; background: var(--color-primary-soft); border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius); padding: var(--space-3) var(--space-4) var(--space-4); margin-bottom: var(--space-2); }
+  .tpl-zone__head { display: flex; align-items: center; gap: 8px; margin-bottom: var(--space-2); }
+  .tpl-zone__badge { width: 26px; height: 26px; border-radius: 8px; background: var(--color-primary); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: 0 0 auto; }
+  .tpl-zone__title { font-size: var(--text-sm); font-weight: 700; color: var(--color-primary-active); }
+  .tpl-zone__title .opt { font-weight: 500; color: var(--color-text-muted); margin-left: 4px; }
+  .tpl-zone .select { width: 100%; max-width: 100%; }
+  .tpl-zone__hint { font-size: var(--text-xs); color: var(--color-text-muted); margin: 6px 0 0; line-height: 1.6; }
+  .tpl-zone__flow { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: var(--text-xs);
+    font-weight: 600; color: var(--color-primary-active); }
+  .tpl-zone__flow .arw { font-size: 13px; }
+
+  /* ③ 区切り＝ここから内容の入力・編集（テンプレートが流し込む先の境目）。 */
+  .maint-start { position: relative; text-align: center; margin: var(--space-4) 0 var(--space-4); }
+  .maint-start::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed var(--color-border); }
+  .maint-start span { position: relative; background: var(--color-surface); padding: 0 12px; font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; letter-spacing: .03em; }
+
+  /* ④ 内容メンテ項目（白地・標準フィールド） */
+  .field { margin-bottom: var(--space-4); }
+  .field > .dialog-label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-2); }
+  .req { color: var(--color-danger); margin-left: 2px; }
+  .filled { background: #fff; } /* テンプレ適用で下書きが入った状態の見本（薄い印） */
+  .prefill-tag { display:inline-flex; align-items:center; gap:4px; font-size: var(--text-xs); color: var(--color-primary-active); margin-left:6px; font-weight:600; }
+
+  /* 末尾：テンプレ区別の見た目バリエーション比較 */
+  .variants { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+  @media (max-width: 900px) { .variants { grid-template-columns: 1fr; } }
+  .variant { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); }
+  .variant h4 { margin: 0 0 var(--space-3); font-size: var(--text-sm); }
+  .variant .note { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-3); line-height: 1.6; }
+  .sectitle { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: var(--space-2) 0; }
+
+  /* 変種B：ニュートラル＋破線（“ひな形／スタンプ”の印・塗らない） */
+  .tpl-b { border: 1px dashed var(--color-primary); background: var(--color-surface); border-radius: var(--radius); padding: var(--space-3) var(--space-4); }
+  .tpl-b__head { display:flex; align-items:center; gap:6px; font-size: var(--text-sm); font-weight:700; color: var(--color-primary-active); margin-bottom: var(--space-2); }
+  /* 変種C：ヘッダ帯付きカード（上辺を primary 帯で塗ってラベル） */
+  .tpl-c { border: 1px solid var(--color-primary-border); border-radius: var(--radius); overflow:hidden; }
+  .tpl-c__bar { background: var(--color-primary); color:#fff; font-size: var(--text-xs); font-weight:700; padding: 6px var(--space-3); display:flex; align-items:center; gap:6px; }
+  .tpl-c__body { padding: var(--space-3) var(--space-4); background: var(--color-surface); }
+
+  /* ===== 別サンプル：テンプレート選択を “タブっぽく” ===== */
+  /* アシストカード（tpl-zone）内で、select の代わりにアンダーライン・タブで候補を切り替える案。
+     先頭タブ＝「白紙から」。テンプレ名が長い/多い場合は横スクロール。 */
+  .tpl-tabbar { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-primary-border);
+    overflow-x: auto; scrollbar-width: thin; margin-top: 2px; }
+  .tpl-tabbar button { appearance: none; background: none; border: none; font: inherit; font-weight: 500;
+    color: var(--color-text-muted); padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -2px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .tpl-tabbar button:hover { color: var(--color-primary); }
+  .tpl-tabbar button.is-active { color: var(--color-primary-active); border-bottom-color: var(--color-primary); font-weight: 700; }
+
+  /* ===== 別サンプル：テンプレート選択をラジオ2択＋選択時コンボ ===== */
+  .tpl-radios { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+  .tpl-radio { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); cursor: pointer; }
+  .tpl-radio input[type="radio"] { accent-color: var(--color-primary); width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
+  .tpl-radio.is-active { font-weight: 700; color: var(--color-primary-active); }
+  /* 2つ目のラジオ直下＝選択時に出るコンボ。ラジオ文字に合わせて字下げ。 */
+  .tpl-combo-reveal { margin: 8px 0 0 24px; }
+  .tpl-combo-reveal .select { width: 100%; max-width: 100%; }
+  .tpl-combo-reveal[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>「情報を登録」ダイアログ 調整検討</h1>
+
+  <div class="intro">
+    指摘（2026-10-11）を反映した構成。対象＝<strong>情報を登録（SC-51 / InfoFormPanel）</strong>。
+    <ol>
+      <li><strong>配置（タブ）を最上部へ</strong>。現状はテンプレートが先頭になっていたのを入れ替え。</li>
+      <li><strong>テンプレートは「以降の各項目へ下書きを流し込む」操作</strong>なので、タイトル・本文…等の内容メンテ項目とは
+          <strong>別装い（塗り＋アイコン＋下向きキュー）</strong>にして区別。流し込む先との間に区切りを入れる。</li>
+    </ol>
+    ※ テンプレートは新規登録時のみ表示（続報・編集では非表示）。配置（タブ）も新規のみ（続報は親タブを継承）。
+  </div>
+
+  <!-- ===== 本命案：並び替え＋テンプレ=アシストブロック（変種A） ===== -->
+  <div class="mock-dialog">
+    <div class="mock-dialog__head">
+      <h2>情報を登録</h2>
+      <div class="hx"><span title="最大化">⤢</span><span title="閉じる">✕</span></div>
+    </div>
+    <div class="mock-dialog__body">
+
+      <!-- ① 配置（タブ）＝最上部・独立ゾーン -->
+      <div class="place-zone">
+        <div class="place-zone__main">
+          <span class="place-zone__label">🗂 配置（タブ）</span>
+          <select class="select" aria-label="登録先タブ">
+            <option>すべて（既定）</option>
+            <option>業務改善</option>
+            <option>新規事業</option>
+            <option>カメリオ連携</option>
+          </select>
+        </div>
+        <p class="place-zone__note">選んだタブに配置され、一覧ではそのタブに表示されます（変えると表示先が変わります）。タブは分類であり閲覧制限ではありません。</p>
+      </div>
+
+      <!-- ② テンプレート＝下書きアシスト（内容項目と別装い） -->
+      <div class="tpl-zone">
+        <div class="tpl-zone__head">
+          <span class="tpl-zone__badge">✨</span>
+          <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（任意）</span></span>
+        </div>
+        <select class="select" aria-label="テンプレートから作成">
+          <option>テンプレートを使わない（白紙から入力）</option>
+          <option>競合レポート（出典・影響度まで既定）</option>
+          <option>法改正メモ</option>
+          <option>展示会・イベント所感</option>
+        </select>
+        <p class="tpl-zone__hint">選ぶと本文のひな形と分類の既定が入ります（すべて編集できます）。<code>{{today}}</code> は当日の日付へ展開。</p>
+        <span class="tpl-zone__flow"><span class="arw">▼</span> 選ぶと下の各項目に下書きが入ります</span>
+      </div>
+
+      <!-- ③ 区切り＝ここから内容 -->
+      <div class="maint-start"><span>ここから入力・編集</span></div>
+
+      <!-- ④ 内容メンテ項目 -->
+      <div class="field">
+        <label class="dialog-label req" for="dTitle">タイトル<span class="req">*</span></label>
+        <input class="input" id="dTitle" placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）">
+      </div>
+
+      <div class="field">
+        <label class="dialog-label" for="dBody">内容・説明（見出し・強調・箇条書き・リンク・画像・表を使えます）</label>
+        <div class="rt">
+          <div class="rt__bar" role="toolbar" aria-label="書式">
+            <button type="button"><b>B</b></button>
+            <button type="button"><i>I</i></button>
+            <button type="button">• リスト</button>
+            <button type="button">見出し</button>
+            <button type="button">🔗 リンク</button>
+            <button type="button">🖼️ 画像</button>
+          </div>
+          <div class="rt__area" id="dBody" contenteditable="true" data-placeholder="ここに記事本文を貼り付け（Ctrl+V）…"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="dialog-label" for="dUrl">出典URL</label>
+        <input class="input" id="dUrl" type="url" placeholder="https://…（http/https のみ）">
+        <div class="hint">出典を明記すると引用性・信頼性の重み付けに使えます。</div>
+      </div>
+
+      <div class="field">
+        <label class="dialog-label">参考資料（任意・複数可）</label>
+        <div class="dropzone" role="button" tabindex="0">📎 クリックまたはドラッグ＆ドロップで添付</div>
+      </div>
+
+      <div class="field">
+        <label class="dialog-label">自動関連付け</label>
+        <label class="switch">
+          <input type="checkbox" checked>
+          <span class="switch__track"><span class="switch__thumb"></span></span>
+          <span class="switch__text">自動で類似のアイデア/クエストに関連づける</span>
+          <span class="switch__state">ON</span>
+        </label>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <details class="disclosure">
+          <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定</summary>
+          <div class="disclosure__body" style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <div><label class="dialog-label">優先度</label><select class="select"><option>—</option></select></div>
+            <div><label class="dialog-label">情報分類</label><select class="select"><option>—</option></select></div>
+            <div class="hint">※ テンプレートの既定はこの属性群にも流し込まれます（curator のみ）。</div>
+          </div>
+        </details>
+      </div>
+
+    </div>
+    <div class="mock-dialog__foot">
+      <button class="btn btn-outline" type="button">キャンセル</button>
+      <button class="btn btn-primary" type="button">登録する</button>
+    </div>
+  </div>
+
+  <!-- ===== テンプレ適用後（下書きが流し込まれた状態の見本） ===== -->
+  <div>
+    <div class="sectitle">▼ テンプレートを選んだ直後（「競合レポート」適用例）＝下の項目に下書きが入った状態</div>
+    <div class="mock-dialog">
+      <div class="mock-dialog__body">
+        <div class="tpl-zone">
+          <div class="tpl-zone__head">
+            <span class="tpl-zone__badge">✨</span>
+            <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（適用中：競合レポート）</span></span>
+          </div>
+          <select class="select" aria-label="テンプレートから作成">
+            <option selected>競合レポート（出典・影響度まで既定）</option>
+            <option>テンプレートを使わない（白紙から入力）</option>
+          </select>
+          <span class="tpl-zone__flow"><span class="arw">▼</span> 下の各項目に下書きを反映しました（すべて編集できます）</span>
+        </div>
+        <div class="maint-start"><span>ここから入力・編集</span></div>
+        <div class="field">
+          <label class="dialog-label req">タイトル<span class="req">*</span><span class="prefill-tag">✨ 下書き</span></label>
+          <input class="input" value="【競合動向】2026-10-11 ○○社の新サービス">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="dialog-label">内容・説明<span class="prefill-tag">✨ 下書き</span></label>
+          <div class="rt"><div class="rt__area" style="min-height:64px">■ 概要 / ■ 影響 / ■ 当社への示唆 …（ひな形）</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== テンプレ区別の見た目バリエーション ===== -->
+  <div>
+    <div class="sectitle">テンプレートブロックの “区別” 見た目バリエーション（本命＝A）</div>
+    <div class="variants">
+      <div class="variant">
+        <h4>A（本命）：塗りカード＋アイコン＋下向きキュー</h4>
+        <div class="tpl-zone" style="margin-bottom:0">
+          <div class="tpl-zone__head">
+            <span class="tpl-zone__badge">✨</span>
+            <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（任意）</span></span>
+          </div>
+          <select class="select"><option>テンプレートを使わない（白紙から入力）</option></select>
+          <span class="tpl-zone__flow"><span class="arw">▼</span> 選ぶと下の各項目に下書きが入ります</span>
+        </div>
+        <p class="note">primary tint の塗り＝白地の内容項目と最も明確に分離。下向きキューで「下へ流し込む」役割が直感的。</p>
+      </div>
+
+      <div class="variant">
+        <h4>B：破線カード（塗らない・“ひな形”の印）</h4>
+        <div class="tpl-b">
+          <div class="tpl-b__head">✨ テンプレートから下書き（任意）</div>
+          <select class="select"><option>テンプレートを使わない（白紙から入力）</option></select>
+        </div>
+        <p class="note">控えめ。塗りを避けたい場合。配置ゾーン（グレー左帯）との色の競合は少ないが、区別の強さはA未満。</p>
+      </div>
+
+      <div class="variant">
+        <h4>C：ヘッダ帯付きカード</h4>
+        <div class="tpl-c">
+          <div class="tpl-c__bar">✨ テンプレートから下書き（任意）</div>
+          <div class="tpl-c__body"><select class="select"><option>テンプレートを使わない（白紙から入力）</option></select></div>
+        </div>
+        <p class="note">帯で “特別枠” 感が最も強い。やや重い印象になりやすい。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 別サンプル：テンプレート選択を “タブっぽく”（select の代わりにアンダーライン・タブ） ===== -->
+  <div>
+    <div class="sectitle">▼ 別サンプル：テンプレート選択を “タブっぽく”（プルダウンではなくタブで切替）</div>
+    <div class="mock-dialog">
+      <div class="mock-dialog__head">
+        <h2>情報を登録</h2>
+        <div class="hx"><span title="最大化">⤢</span><span title="閉じる">✕</span></div>
+      </div>
+      <div class="mock-dialog__body">
+
+        <!-- ① 配置（タブ）＝ヘッダー直下に密着（本命と同じ） -->
+        <div class="place-zone">
+          <div class="place-zone__main">
+            <span class="place-zone__label">🗂 配置（タブ）</span>
+            <select class="select" aria-label="登録先タブ">
+              <option>すべて（既定）</option>
+              <option>業務改善</option>
+              <option>新規事業</option>
+              <option>カメリオ連携</option>
+            </select>
+          </div>
+          <p class="place-zone__note">選んだタブに配置され、一覧ではそのタブに表示されます（変えると表示先が変わります）。タブは分類であり閲覧制限ではありません。</p>
+        </div>
+
+        <!-- ② テンプレート＝アシストカード。中身の選択を “タブ” に -->
+        <div class="tpl-zone">
+          <div class="tpl-zone__head">
+            <span class="tpl-zone__badge">✨</span>
+            <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（任意）</span></span>
+          </div>
+          <div class="tpl-tabbar" role="tablist" aria-label="テンプレート選択">
+            <button type="button" role="tab" class="is-active" aria-selected="true">白紙から</button>
+            <button type="button" role="tab" aria-selected="false">競合レポート</button>
+            <button type="button" role="tab" aria-selected="false">法改正メモ</button>
+            <button type="button" role="tab" aria-selected="false">展示会・イベント所感</button>
+          </div>
+          <p class="tpl-zone__hint">タブを選ぶと本文のひな形と分類の既定が入ります（すべて編集できます）。<code>{{today}}</code> は当日の日付へ展開。</p>
+          <span class="tpl-zone__flow"><span class="arw">▼</span> 選ぶと下の各項目に下書きが入ります</span>
+        </div>
+
+        <!-- ③ 区切り -->
+        <div class="maint-start"><span>ここから入力・編集</span></div>
+
+        <!-- ④ 内容メンテ項目（抜粋） -->
+        <div class="field">
+          <label class="dialog-label req" for="dTitle2">タイトル<span class="req">*</span></label>
+          <input class="input" id="dTitle2" placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="dialog-label" for="dBody2">内容・説明（見出し・強調・箇条書き・リンク・画像・表を使えます）</label>
+          <div class="rt">
+            <div class="rt__bar" role="toolbar" aria-label="書式">
+              <button type="button"><b>B</b></button>
+              <button type="button"><i>I</i></button>
+              <button type="button">• リスト</button>
+              <button type="button">見出し</button>
+              <button type="button">🔗 リンク</button>
+              <button type="button">🖼️ 画像</button>
+            </div>
+            <div class="rt__area" id="dBody2" contenteditable="true" data-placeholder="ここに記事本文を貼り付け（Ctrl+V）…"></div>
+          </div>
+        </div>
+
+      </div>
+      <div class="mock-dialog__foot">
+        <button class="btn btn-outline" type="button">キャンセル</button>
+        <button class="btn btn-primary" type="button">登録する</button>
+      </div>
+    </div>
+    <p class="note" style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-3);line-height:1.6">
+      ※ タブ案＝候補が一覧で見えて1クリックで切替できる反面、テンプレが増えると横スクロール必須・名前が長いと窮屈。
+      数が少ない前提なら有効。多いなら本命のプルダウン（select）が無難。
+    </p>
+  </div>
+
+  <!-- ===== 別サンプル：ラジオ2択（白紙／選択する）＋選択時にコンボ表示 ===== -->
+  <div>
+    <div class="sectitle">▼ 別サンプル：ラジオ2択（白紙から／テンプレートを選択する）＝下を選ぶとコンボが出る</div>
+
+    <!-- 既定＝「白紙から入力」選択（コンボは非表示） -->
+    <div class="mock-dialog" style="margin-bottom:var(--space-4)">
+      <div class="mock-dialog__head">
+        <h2>情報を登録</h2>
+        <div class="hx"><span title="最大化">⤢</span><span title="閉じる">✕</span></div>
+      </div>
+      <div class="mock-dialog__body">
+        <div class="place-zone">
+          <div class="place-zone__main">
+            <span class="place-zone__label">🗂 配置（タブ）</span>
+            <select class="select" aria-label="登録先タブ"><option>すべて（既定）</option><option>業務改善</option><option>新規事業</option></select>
+          </div>
+          <p class="place-zone__note">選んだタブに配置され、一覧ではそのタブに表示されます（変えると表示先が変わります）。タブは分類であり閲覧制限ではありません。</p>
+        </div>
+
+        <div class="tpl-zone">
+          <div class="tpl-zone__head">
+            <span class="tpl-zone__badge">✨</span>
+            <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（任意）</span></span>
+          </div>
+          <div class="tpl-radios">
+            <label class="tpl-radio is-active"><input type="radio" name="tplA" checked> <span>テンプレートを使わない（白紙から入力）</span></label>
+            <label class="tpl-radio"><input type="radio" name="tplA"> <span>テンプレートを選択する</span></label>
+          </div>
+          <!-- 白紙選択中はコンボ非表示 -->
+          <div class="tpl-combo-reveal" hidden>
+            <select class="select" aria-label="テンプレートを選択"><option>テンプレートを選択…</option></select>
+          </div>
+        </div>
+
+        <div class="maint-start"><span>ここから入力・編集</span></div>
+        <div class="field" style="margin-bottom:0">
+          <label class="dialog-label req">タイトル<span class="req">*</span></label>
+          <input class="input" placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）">
+        </div>
+      </div>
+      <div class="mock-dialog__foot">
+        <button class="btn btn-outline" type="button">キャンセル</button>
+        <button class="btn btn-primary" type="button">登録する</button>
+      </div>
+    </div>
+
+    <!-- 「テンプレートを選択する」を選んだ状態（コンボ表示） -->
+    <div class="mock-dialog">
+      <div class="mock-dialog__head">
+        <h2>情報を登録</h2>
+        <div class="hx"><span title="最大化">⤢</span><span title="閉じる">✕</span></div>
+      </div>
+      <div class="mock-dialog__body">
+        <div class="place-zone">
+          <div class="place-zone__main">
+            <span class="place-zone__label">🗂 配置（タブ）</span>
+            <select class="select" aria-label="登録先タブ"><option>すべて（既定）</option><option>業務改善</option><option>新規事業</option></select>
+          </div>
+          <p class="place-zone__note">選んだタブに配置され、一覧ではそのタブに表示されます（変えると表示先が変わります）。タブは分類であり閲覧制限ではありません。</p>
+        </div>
+
+        <div class="tpl-zone">
+          <div class="tpl-zone__head">
+            <span class="tpl-zone__badge">✨</span>
+            <span class="tpl-zone__title">テンプレートから下書き<span class="opt">（任意）</span></span>
+          </div>
+          <div class="tpl-radios">
+            <label class="tpl-radio"><input type="radio" name="tplB"> <span>テンプレートを使わない（白紙から入力）</span></label>
+            <label class="tpl-radio is-active"><input type="radio" name="tplB" checked> <span>テンプレートを選択する</span></label>
+          </div>
+          <!-- 「選択する」選択中＝コンボ表示 -->
+          <div class="tpl-combo-reveal">
+            <select class="select" aria-label="テンプレートを選択">
+              <option>テンプレートを選択…</option>
+              <option>競合レポート（出典・影響度まで既定）</option>
+              <option>法改正メモ</option>
+              <option>展示会・イベント所感</option>
+            </select>
+          </div>
+          <p class="tpl-zone__hint">選ぶと本文のひな形と分類の既定が入ります（すべて編集できます）。<code>{{today}}</code> は当日の日付へ展開。</p>
+          <span class="tpl-zone__flow"><span class="arw">▼</span> 選ぶと下の各項目に下書きが入ります</span>
+        </div>
+
+        <div class="maint-start"><span>ここから入力・編集</span></div>
+        <div class="field" style="margin-bottom:0">
+          <label class="dialog-label req">タイトル<span class="req">*</span></label>
+          <input class="input" placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）">
+        </div>
+      </div>
+      <div class="mock-dialog__foot">
+        <button class="btn btn-outline" type="button">キャンセル</button>
+        <button class="btn btn-primary" type="button">登録する</button>
+      </div>
+    </div>
+
+    <p class="note" style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-3);line-height:1.6">
+      ※ ラジオ案＝「使わない／使う」の意思を先に明示してからコンボを出す二段構え。白紙が既定だと分かりやすい反面、
+      テンプレを使う時はワンクリック多い。上＝白紙（コンボ非表示）／下＝選択する（コンボ表示）の2状態を上下に並べています。
+    </p>
+  </div>
+</div>
+</body>
+</html>
