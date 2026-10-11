@@ -4,6 +4,7 @@ login はコントロールプレーンで完結し、認証成立時のみ会�
 """
 from __future__ import annotations
 
+import hmac
 import time
 import uuid
 from dataclasses import dataclass
@@ -279,7 +280,7 @@ def verify_mfa(
         audit.record("auth.mfa.verify", {"account_id": preauth["account_id"], "result": "failure", "reason": "otp_expired"})
         raise AppError(401, "otp_expired")
 
-    if hash_token(code) != preauth["otp_hash"]:
+    if not hmac.compare_digest(hash_token(code), preauth["otp_hash"]):
         preauth["attempts"] = preauth.get("attempts", 0) + 1
         attempts_left = max(0, s.otp_max_attempts - preauth["attempts"])
         if attempts_left == 0:
