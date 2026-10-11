@@ -2,8 +2,7 @@
 
 会社DB 動的解決（§1.5・company_id はセッション由来）→ テナントユーザー解決 → クエストのパーティー門番（C.0）を
 満たす範囲で一覧/詳細/作成/編集/公開/削除を行う。作成は `idea_create` 権限、編集/公開/削除は投稿者本人 or
-`owner`/`quest_admin`。公開処理（chat_groups 作成＝E／投稿 XP+50＝G／idea_updated 通知＝H）は各ドメイン実装まで
-no-op フック＋TODO（C の H 通知と同方針）。本スライス＝添付(D.3)/投票(D.5)/フォロー(D.6)/版 GET(D.4) は後続。
+`owner`/`quest_admin`。公開処理（chat_groups 作成＝E／投稿 XP+50＝G／idea_updated 通知＝H）は `_publish_processing` で結線済み（chat_groups UNIQUE＋XP は ref 存在チェックで冪等）。添付(D.3)/投票(D.5)/フォロー(D.6)/版(D.4) も実装済み。
 """
 from __future__ import annotations
 

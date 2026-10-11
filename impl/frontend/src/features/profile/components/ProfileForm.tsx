@@ -5,7 +5,7 @@
 // identity 源泉は accounts（PATCH /me→outbox で users ミラー）。login_id/email/system_role は読み取り専用
 // （email/PW 変更は K.3＝SecuritySection）。残高（Lv/XP/コイン/SP）は表示のみ（canonical は G）。
 // ・3D アバター（VRM）は読取表示＝着せ替えは SC-31（ドメイン G）。プロフィール画像（アイコン）とは別物。
-// ・残高は GET /me 残高の接続まで demo 値（フロントエンド実装フロー規約＝mock 先行・接続時に api へ差替）。
+// ・残高（Lv/XP/コイン/SP）は GET /me の実値を ProfileHero が表示（canonical は G）。
 // ・プロフィール画像は MinIO 基盤前提＝ローカルプレビューのみ（送信しない）。
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";

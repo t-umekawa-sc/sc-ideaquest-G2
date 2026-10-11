@@ -113,7 +113,7 @@ export interface InfoLinkResolved {
   id: string;
   target_type: InfoLinkTarget;
   target_id: string;
-  target_title?: string | null; // ideas/quests から解決（未実装ドメイン/不在は null）
+  target_title?: string | null; // ideas/quests/concepts/assumptions から解決（backend resolve_target_titles・不在は null）
   target_icon_image_url?: string | null; // 対象アイコン（署名URL・ideas 個別→作成者既定/quests）。null は頭文字タイル
   kind: InfoLinkKind;
   origin: InfoLinkOrigin;

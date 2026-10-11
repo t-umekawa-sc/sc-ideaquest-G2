@@ -65,6 +65,7 @@ class Task(CompanyBase):
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="task", server_default="task")  # requirement/task
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 命名注意（AUDIT-030）＝名は account だが格納するのはテナント `users.id`（control-plane の accounts ではない）。将来の誤参照防止。
     assignee_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="todo", server_default="todo")  # todo/doing/done/blocked
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

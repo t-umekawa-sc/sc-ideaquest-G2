@@ -974,7 +974,7 @@ def _notify_refuting(company_id: uuid.UUID, actor_account_id: uuid.UUID, *,
     """反証（refuting）提示の「揺さぶり」通知（§N.6・通知のみ MVP）＝post-commit・best-effort。
 
     宛先＝成果物の作成者/所有者＋評価者（投票者）＋クエスト管理者（owner/quest_admin）。actor は除外。
-    ideas→`ref_idea_id`／quests→`ref_quest_id`。concepts/assumptions（未実装ドメイン）は宛先なし＝no-op。
+    ideas→`ref_idea_id`／quests→`ref_quest_id`。concepts/assumptions も宛先解決済み（作成者＋クエスト管理者・下記分岐）。
     """
     from app.tenant.ideas import repository as ideas_repo
     from app.tenant.notifications import service as notify_svc

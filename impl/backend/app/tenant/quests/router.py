@@ -413,7 +413,7 @@ def publish_quest(
     request: Request,
     session: dict = Depends(require_me),
 ) -> QuestDetailDTO:
-    """下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証・参加通知（H まで no-op）。"""
+    """下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証・参加通知（`quest_party_invited`）は post-commit で H に結線済み（`_notify_party_invited`）。"""
     verify_origin(request)
     verify_csrf(request)
     result = quest_service.publish_quest(
