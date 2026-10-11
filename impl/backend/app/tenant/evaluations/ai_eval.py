@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.tenant._shared import prompt_safety
 from app.tenant.evaluations import repository as repo
 from app.tenant.evaluations.repository import ASPECTS
 from app.tenant.ideas.orm import Idea
@@ -50,7 +51,8 @@ def build_messages(ts: Session, idea_id: uuid.UUID) -> list[dict]:
         "各観点に採点根拠、そして全体の総評を日本語で付けてください。\n"
         f"【観点】\n{rubric}\n"
         "※アイデア本文・クエストに無い事実は創作しないでください。"
-        f"出力は次の JSON オブジェクトのみ（前後に説明やコードフェンスを付けない）：\n{schema}"
+        f"出力は次の JSON オブジェクトのみ（前後に説明やコードフェンスを付けない）：\n{schema}\n"
+        f"{prompt_safety.DATA_NOTICE}"
     )
     parts = [f"# アイデア\nタイトル: {idea.title}\n価値: {idea.value}\n本文: {idea.body}"]
     if quest is not None:
@@ -65,7 +67,7 @@ def build_messages(ts: Session, idea_id: uuid.UUID) -> list[dict]:
         parts.append("# 経営資料（方針との整合＝fit 観点の根拠）\n" + "\n".join(strat_lines))
     return [
         {"role": "system", "content": system},
-        {"role": "user", "content": "\n\n".join(parts)},
+        {"role": "user", "content": prompt_safety.wrap_as_data("\n\n".join(parts))},
     ]
 
 

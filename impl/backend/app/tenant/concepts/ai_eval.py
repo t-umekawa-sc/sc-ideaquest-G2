@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.tenant._shared import prompt_safety
 from app.tenant.concepts import repository as repo
 from app.tenant.concepts.orm import Concept
 from app.tenant.concepts.repository import ALL_ASPECTS, CORE_ASPECTS
@@ -51,7 +52,8 @@ def build_messages(ts: Session, concept_id: uuid.UUID) -> list[dict]:
         "日本語で付けてください。\n"
         f"【観点】\n{rubric}\n"
         "※前提の検証結果（支持/反証/保留）を『前提検証の強さ』採点の根拠にしてください。コンセプトに無い事実は"
-        f"創作しないでください。出力は次の JSON オブジェクトのみ（前後に説明やコードフェンスを付けない）：\n{schema}"
+        f"創作しないでください。出力は次の JSON オブジェクトのみ（前後に説明やコードフェンスを付けない）：\n{schema}\n"
+        f"{prompt_safety.DATA_NOTICE}"
     )
     parts = [
         "# コンセプト",
@@ -90,7 +92,7 @@ def build_messages(ts: Session, concept_id: uuid.UUID) -> list[dict]:
         parts.append("# 経営資料（方針との整合の根拠）\n" + "\n".join(strat_lines))
     return [
         {"role": "system", "content": system},
-        {"role": "user", "content": "\n".join(parts)},
+        {"role": "user", "content": prompt_safety.wrap_as_data("\n".join(parts))},
     ]
 
 
