@@ -1257,7 +1257,7 @@ def post_message(account_id, company_id, scope_id, *, body: str, message_id: str
         _guard_not_completed(quest)
         mid = _parse_uuid(message_id, field="message_id") if message_id else None
         if mid is not None:
-            existing = repo.get_scope_message(ts, mid)  # Idempotency-Key 再送＝既存を返す（二重投稿防止）
+            existing = repo.get_scope_message(ts, sid, mid)  # Idempotency-Key 再送＝当該 scope 内の既存のみ返す（AUDIT-005）
             if existing is not None:
                 return _message_dto(existing, user if existing.author_id == user.id else quests_repo.get_users_by_ids(ts, {existing.author_id}).get(existing.author_id))
         m = repo.post_scope_message(ts, scope_id=sid, author_id=user.id, body=body, message_id=mid)

@@ -172,6 +172,23 @@ def test_p_tc_503_post_message_idempotent(env, client):
     assert len(msgs) == 1 and msgs[0]["body"] == "hello"
 
 
+def test_p_tc_508_idempotency_key_scope_bound(env, client):
+    """P-TC-508: Idempotency-Key は scope 拘束＝別スコープの message_id で他スコープ本文を返さない（AUDIT-005）。"""
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    sid_a = _overall_scope(client, cid)
+    sid_b = client.post(f"/api/v1/concepts/{cid}/chat-scopes", json={"label": "別室"}, headers=_csrf(client)).json()["scope_id"]
+    mid_a = client.post(f"/api/v1/concept-chat-scopes/{sid_a}/messages",
+                        json={"body": "secret-A"}, headers=_csrf(client)).json()["id"]
+    # scope B へ A のメッセージ ID を Idempotency-Key に入れて投稿＝A の本文を返してはいけない
+    h = {**_csrf(client), "Idempotency-Key": mid_a}
+    r = client.post(f"/api/v1/concept-chat-scopes/{sid_b}/messages", json={"body": "post-B"}, headers=h)
+    assert r.status_code == 201
+    assert r.json()["body"] == "post-B"  # A の本文(secret-A)を開示しない
+    msgs_b = client.get(f"/api/v1/concept-chat-scopes/{sid_b}/messages").json()["items"]
+    assert [m["body"] for m in msgs_b] == ["post-B"]
+
+
 def test_p_tc_504_list_messages(env, client):
     """P-TC-504: メッセージ取得（作成順）。"""
     _login_seed(client)

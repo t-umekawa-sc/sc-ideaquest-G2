@@ -533,16 +533,33 @@ def post_scope_message(
     from app.tenant.chat.orm import ChatMessage
 
     thread = get_scope_thread(session, scope_id)
+    # message_id は Idempotency-Key 由来（同一 scope の再送冪等のため PK に採る）。別 scope で既に使われた
+    # 鍵が来ると PK 衝突するため、衝突時は新規 id で入れ直す（scope 跨ぎの流用で 500 にしない・AUDIT-005）。
     msg = ChatMessage(id=message_id or uuid.uuid4(), thread_id=thread.id, author_id=author_id, body=body)
-    session.add(msg)
-    session.flush()
-    return msg
+    try:
+        with session.begin_nested():
+            session.add(msg)
+            session.flush()
+        return msg
+    except IntegrityError:
+        msg = ChatMessage(id=uuid.uuid4(), thread_id=thread.id, author_id=author_id, body=body)
+        session.add(msg)
+        session.flush()
+        return msg
 
 
-def get_scope_message(session: Session, message_id: uuid.UUID):
+def get_scope_message(session: Session, scope_id: uuid.UUID, message_id: uuid.UUID):
+    """当該スコープの thread に属するメッセージのみ返す（Idempotency-Key 再送の scope 拘束・AUDIT-005）。
+
+    message_id だけで引くと別スコープ（権限外のコンセプト総合/グループルーム）のメッセージ本文を
+    開示し得る（会社内 IDOR）。必ず解決済みスコープの thread 制約を併せる。
+    """
     from app.tenant.chat.orm import ChatMessage
 
-    return session.execute(select(ChatMessage).where(ChatMessage.id == message_id)).scalars().first()
+    thread = get_scope_thread(session, scope_id)
+    return session.execute(
+        select(ChatMessage).where(ChatMessage.id == message_id, ChatMessage.thread_id == thread.id)
+    ).scalars().first()
 
 
 def list_scope_messages(session: Session, scope_id: uuid.UUID, *, limit: int = 50):

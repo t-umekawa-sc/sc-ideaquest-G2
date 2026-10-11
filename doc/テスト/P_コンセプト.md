@@ -127,6 +127,7 @@
 | P-TC-505 | api | 既読位置更新（chat_reads・E.7 同型） | scope | `POST .../read`（last_read_message_id） | 204・未読数更新 | P.6／§5.31 |
 | P-TC-506 | api | 門番（非パーティーはスコープ/投稿不可） | 非パーティー | `GET /concepts/{id}/chat-scopes`／`POST .../messages` | 404/403 | P.0 |
 | P-TC-507 | api | グループ・ルームを複数作成（回帰・§5.45 の 3〜5） | owner | `POST /concepts/{id}/chat-scopes` を3ラベル | すべて 201・group 3件（0033 のユニークが group を潰し2個目 500 だった不具合＝migration 0036 で修正） | P.6／§5.45 |
+| P-TC-508 | api | Idempotency-Key は scope 拘束＝別スコープの message_id で他スコープ本文を返さない | scope A/B＋A に投稿済み | `POST /concept-chat-scopes/{B}/messages`（Idempotency-Key=A のmsg id） | 201・B の新規本文を返す（A の本文を返さない）・B は新規1件 | P.6／AUDIT-005（出典: セッション調整/引継/2026-10-10_全ソースコード品質セキュリティ監査.md） |
 | P-TC-510 | api | フル機能パリティ＝rich チャット GET（アイデアと同形・thread 経由） | scope | `GET /concept-chat-scopes/{sid}/chat` | thread_id＋data＋未読・chat_group_id は null（コンセプトは chat_group を持たない・§5.45） | P.6／E.1／§5.14b |
 | P-TC-511 | api | フル機能パリティ＝コンセプトメッセージへ共通 message-id EP でリアクション | scope メッセージ | `POST /concept-chat-scopes/{sid}/chat-messages`→`POST /chat-messages/{id}/reactions` | 200・reactions.normal に付与（中核をホスト非依存で共有） | P.6／E.4／§5.14b |
 | P-TC-512 | api | フル機能パリティ＝rich 既読 EP で未読カーソル前進 | scope メッセージ2件 | `POST /concept-chat-scopes/{sid}/chat/read` | rich GET の unread_count が減る | P.6／E.5／§5.14b |
