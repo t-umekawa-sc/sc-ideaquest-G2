@@ -71,6 +71,12 @@ def test_b_tc_052_create_conflict_and_validation(client):
     r2 = client.post(COMPANIES, json=bad, headers=_csrf(client))
     assert r2.status_code == 422
 
+    # 不正な db_identifier（引用符/大文字/空白/記号/先頭数字）は 422＝DDL/DSN 補間の信頼境界化を防ぐ（AUDIT-008）。
+    for bad_db in ('ev"il', "Ideaquest_Test", "ideaquest test", "1bad", "bad-id"):
+        rb = client.post(COMPANIES, json={**_new_company_body(), "db_identifier": bad_db}, headers=_csrf(client))
+        assert rb.status_code == 422, bad_db
+        assert any(e.get("field") == "db_identifier" for e in rb.json()["errors"]), bad_db
+
 
 def test_b_tc_053_detail_and_404(client, companies):
     """B-TC-053 会社詳細＝200（設定フラグ＋account_count）／不明は 404。根拠 B.1。"""

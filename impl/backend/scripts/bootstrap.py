@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import re
 import uuid
 
 import psycopg
@@ -200,8 +201,15 @@ def _server_conninfo(dbname: str) -> str:
     return f"host={s.postgres_host} port={s.postgres_port} user={s.postgres_user} password={s.postgres_password} dbname={dbname}"
 
 
+# DDL に補間される DB 名の二重検証（defense-in-depth・AUDIT-008）。
+# 入力の第一ゲートは CompanyCreateRequest.db_identifier の validator。ここは prefix 付き全体を許容する最小 allowlist。
+_DBNAME_RE = re.compile(r"[a-z][a-z0-9_]{0,96}")
+
+
 def create_database(dbname: str) -> None:
-    """存在しなければ CREATE DATABASE（autocommit・冪等）。"""
+    """存在しなければ CREATE DATABASE（autocommit・冪等）。dbname は allowlist 検証（DDL 補間）。"""
+    if not _DBNAME_RE.fullmatch(dbname):
+        raise ValueError(f"unsafe database name: {dbname!r}")
     with psycopg.connect(_server_conninfo("postgres"), autocommit=True) as conn:
         exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,)).fetchone()
         if not exists:

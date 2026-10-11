@@ -125,7 +125,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | B-TC-050 | api | 会社一覧の集計付き取得 | system_admin | `GET /admin/companies` | `200`＋`{data, page_info}`・各行に `account_count`・seed 会社を含む | B.1／§1.8 |
 | B-TC-051 | api | 会社作成の suspended 既定とコード正規化 | system_admin | `POST /admin/companies`（小文字 code） | `201`＋**`status=suspended`**＋`company_code` は**大文字正規化** | B.1／§4.1 |
-| B-TC-052 | api | 会社コードの一意と形式検証 | system_admin | 既存 code で作成／不正形式 code | 既存＝`409 conflict`（field=company_code）／形式違反＝`422` | B.1／§4.1 |
+| B-TC-052 | api | 会社コード/DB識別子の一意と形式検証 | system_admin | 既存 code で作成／不正形式 code／不正 db_identifier（記号/大文字/引用符） | 既存＝`409 conflict`（field=company_code）／形式違反＝`422`／不正 db_identifier＝`422`（field=db_identifier・DDL/DSN 補間の信頼境界化を防ぐ） | B.1／§4.1／AUDIT-008（出典: セッション調整/引継/2026-10-10_全ソースコード品質セキュリティ監査.md） |
 | B-TC-053 | api | 会社詳細取得と不明時の秘匿 | system_admin | `GET /admin/companies/{id}`／不明 id | `200`＋設定フラグ＋`account_count`／不明＝`404` | B.1 |
 | B-TC-054 | api | 記名設定時の開示フラグ整合強制 | system_admin | `PATCH .../settings`（`vote_anonymized=false`）／`PATCH .../{id}`（color） | 記名時は **`hide_voters_from_managers` を無効化して保存**（サーバー整合）／プロフィール更新 200 | B.1 |
 | B-TC-055 | api | 会社管理 API の system_admin 専用担保 | general | `GET /admin/companies` | `403 forbidden`（system_admin 専用） | B.1／B.0.1 |

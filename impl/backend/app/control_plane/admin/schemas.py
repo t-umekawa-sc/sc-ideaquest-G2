@@ -8,6 +8,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 _COMPANY_CODE_RE = re.compile(r"[A-Z][A-Z0-9-]{3,19}")  # 英大文字始まり・A-Z/0-9/-・4〜20字（§4.1）
+# db_identifier は DDL/DSN に補間されるため厳格な allowlist（英小文字始まり・a-z/0-9/_・最長63）。
+# 自由入力を信頼境界にしない（AUDIT-008）＝`CREATE DATABASE "<id>"` 破壊/DSN 破損/テナント誤ルーティング防止。
+_DB_IDENTIFIER_RE = re.compile(r"[a-z][a-z0-9_]{0,62}")
 _MAX_MEMBERSHIPS = 100  # 発行/編集で一度に指定できる所属の件数上限（Mass Assignment 抑止・B.2）
 
 
@@ -202,6 +205,14 @@ class CompanyCreateRequest(BaseModel):
         v = v.strip().upper()  # 大小文字は区別しない＝大文字へ正規化（§4.1）
         if not _COMPANY_CODE_RE.fullmatch(v):
             raise ValueError("company_code は英大文字始まり・A-Z/0-9/- ・4〜20字")
+        return v
+
+    @field_validator("db_identifier")
+    @classmethod
+    def _check_db_identifier(cls, v: str) -> str:
+        # DDL/DSN に補間される値＝文字種を厳格に制限（AUDIT-008）。
+        if not _DB_IDENTIFIER_RE.fullmatch(v):
+            raise ValueError("db_identifier は英小文字始まり・a-z/0-9/_・最長63字")
         return v
 
 
