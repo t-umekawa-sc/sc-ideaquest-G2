@@ -981,6 +981,22 @@ def _can_view_eval(concept, user, ev, is_manager: bool) -> bool:
     return is_manager and ev.visibility == "limited"
 
 
+def _validate_eval_scores(body) -> None:
+    """status 不問のスコア検証＝観点キー限定・値 1..5（ideas `_validate_evaluation` と対称・AUDIT-018）。
+
+    下書き（draft）でも範囲外値を受け付けると DB CHECK 違反で 500 になる／不正値が残る。
+    アプリ層で弾いて 422 を返す（ideas と同じ振る舞い）。
+    """
+    errors = []
+    for aspect, v in body.scores.items():
+        if aspect not in repo.ALL_ASPECTS:
+            errors.append({"field": "scores", "aspect": aspect})
+        elif not isinstance(v, int) or not (1 <= v <= 5):
+            errors.append({"field": f"scores.{aspect}"})
+    if errors:
+        raise AppError(422, "validation_error", detail="スコアは観点ごとに1〜5です", errors=errors)
+
+
 def _validate_submitted_eval(body) -> None:
     errors = []
     for aspect in repo.CORE_ASPECTS:
@@ -1101,6 +1117,7 @@ def put_evaluation(account_id, company_id, concept_id, *, body) -> dict:
         _require_evaluator(ts, quest, user)
         _guard_not_completed(quest)
         submitted = body.status == "submitted"
+        _validate_eval_scores(body)  # status 不問の範囲/観点検証（ideas と対称・AUDIT-018）
         if submitted:
             _validate_submitted_eval(body)
         ev, _created = repo.upsert_evaluation(

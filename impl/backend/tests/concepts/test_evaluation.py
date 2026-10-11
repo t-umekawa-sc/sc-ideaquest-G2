@@ -231,6 +231,17 @@ def test_p_tc_410_stale_signal_after_refute(env, client):
     assert client.get(f"/api/v1/concepts/{cid}/evaluation").json()["stale"] is True
 
 
+def test_p_tc_411_draft_score_out_of_range(env, client):
+    """P-TC-411: 下書き（draft）でもスコア範囲外は 422・永続されない（ideas 評価と対称・AUDIT-018）。"""
+    _login_seed(client)
+    cid = _active_concept(client, env.make_quest())
+    r = client.put(f"/api/v1/concepts/{cid}/evaluation",
+                   json={"scores": {"desirability": 6}, "status": "draft"}, headers=_csrf(client))
+    assert r.status_code == 422
+    # 不正値は永続しない（未作成のまま＝status=null）
+    assert client.get(f"/api/v1/concepts/{cid}/evaluation/me").json()["status"] is None
+
+
 def test_p_tc_451_vote_toggle(env, client):
     """P-TC-451: 投票（賛成→反対 切替・集計）。"""
     _login_seed(client)
