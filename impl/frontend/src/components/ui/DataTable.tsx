@@ -902,12 +902,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
             />
           </div>
           {sortableCols.length > 0 && (
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => setSortOpen(true)}>
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setSortOpen(true)}>
               ↕ 並び替え{sort.length > 0 && <span className="dt-badge">{sort.length}</span>}
             </button>
           )}
           {filterableCols.length > 0 && (
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => setFilterOpen(true)}>
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setFilterOpen(true)}>
               ⧩ 絞り込み
               {Object.keys(filters).length > 0 && <span className="dt-badge">{Object.keys(filters).length}</span>}
             </button>
@@ -915,11 +915,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
         </div>
         <div className="tools">
           {!useCard && (
-            <button className="btn btn-outline btn-sm" type="button" ref={colBtnRef} onClick={openColMenu}>
+            <button className="btn btn-primary btn-sm" type="button" ref={colBtnRef} onClick={openColMenu}>
               列設定
             </button>
           )}
-          <button className="btn btn-outline btn-sm" type="button" onClick={exportCsv}>
+          <button className="btn btn-primary btn-sm" type="button" onClick={exportCsv}>
             エクスポート
           </button>
           {/* 密度＋表示切替は一体（.dt-viewctls）＝狭幅でも同じ行に収める。 */}

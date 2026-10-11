@@ -327,14 +327,14 @@ export function CapabilitiesSection() {
             </div>
             {hasNext ? (
               <div className="pick-more-wrap">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShown((s) => s + PER)}>
+                <Button type="button" variant="primary" size="sm" onClick={() => setShown((s) => s + PER)}>
                   もっと見る（残り {candidates.length - shown}）
                 </Button>
               </div>
             ) : null}
           </ModalBody>
           <ModalFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>閉じる</Button>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setOpen(false)}>閉じる</Button>
             <Button type="button" variant="primary" disabled={busy || grantCaps.length === 0 || candidates.length === 0} onClick={() => void grantAll()}>
               対象者 {candidates.length} 名すべてに付与
             </Button>
@@ -411,14 +411,14 @@ export function CapabilitiesSection() {
             </div>
             {revokeHasNext ? (
               <div className="pick-more-wrap">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShown((s) => s + PER)}>
+                <Button type="button" variant="primary" size="sm" onClick={() => setShown((s) => s + PER)}>
                   もっと見る（残り {revokeCandidates.length - shown}）
                 </Button>
               </div>
             ) : null}
           </ModalBody>
           <ModalFooter>
-            <Button type="button" variant="outline" onClick={() => setRevokeOpen(false)}>閉じる</Button>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setRevokeOpen(false)}>閉じる</Button>
             <Button type="button" variant="danger" disabled={busy || revokeCaps.length === 0 || revokeCandidates.length === 0} onClick={() => void revokeAll()}>
               対象者 {revokeCandidates.length} 名すべてから剥奪
             </Button>

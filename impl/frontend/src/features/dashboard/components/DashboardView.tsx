@@ -920,7 +920,7 @@ export function DashboardView({
             </div>
             {bCounts[bSeeAll] > bSeeAllN && (
               <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
-                <button type="button" className="btn btn-outline" onClick={() => setBSeeAllN((n) => n + 15)}>もっと見る（残り{bCounts[bSeeAll] - bSeeAllN}件）</button>
+                <button type="button" className="btn btn-primary" onClick={() => setBSeeAllN((n) => n + 15)}>もっと見る（残り{bCounts[bSeeAll] - bSeeAllN}件）</button>
               </div>
             )}
           </ModalBody>
@@ -944,7 +944,7 @@ export function DashboardView({
             </div>
             {(eSeeAll === "joined" ? joinedAll.length : eSeeAll === "owned" ? ownedAll.length : eSeeAll === "following" ? followingAll.length : requestedAll.length) > eSeeAllN && (
               <div style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
-                <button type="button" className="btn btn-outline" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る</button>
+                <button type="button" className="btn btn-primary" onClick={() => setESeeAllN((n) => n + 15)}>もっと見る</button>
               </div>
             )}
             <p className="dash-panel-empty" style={{ marginTop: "var(--space-4)" }}>

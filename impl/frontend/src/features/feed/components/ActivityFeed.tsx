@@ -111,7 +111,7 @@ export function ActivityFeed({
         </ul>
       )}
       {hasNext && (
-        <button type="button" className="btn btn-outline btn-sm feed__more" onClick={loadMore} disabled={loading}>
+        <button type="button" className="btn btn-primary btn-sm feed__more" onClick={loadMore} disabled={loading}>
           {loading ? "読み込み中…" : "もっと見る"}
         </button>
       )}

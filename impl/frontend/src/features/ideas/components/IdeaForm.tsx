@@ -439,7 +439,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
               <QuestIcon name={subject || "案"} color={quest?.color} size="lg" />
             )}
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>画像をアップロード</Button>
+              <Button type="button" variant="primary" onClick={() => iconInputRef.current?.click()}>画像をアップロード</Button>
               {(iconPreview || iconUrl) && <Button type="button" variant="outline" onClick={onClearIcon}>未設定に戻す</Button>}
               <input ref={iconInputRef} id="idea_icon" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={onPickIcon} />
               <span className="hint">未設定なら「あなたのアイデア用アイコン（プロフィール）→ 件名の先頭1文字＋クエスト色」を自動表示。</span>

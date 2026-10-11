@@ -524,7 +524,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
           <div className="contest-head__actions detail-head__actions">
             {/* 一次アクション＝参加/退席トグル（「参加する」と同じ位置・ユーザー要望）。参加中=退席(確認ダイアログ)／申請中=承認待ち／未参加=参加する。 */}
             {isParticipant ? (
-              <button type="button" className="btn btn-outline" onClick={leave} disabled={busy}>退席</button>
+              <button type="button" className="btn btn-danger" onClick={leave} disabled={busy}>退席</button>
             ) : myStatus === "requested" ? (
               <span className="badge badge-muted">⏳ 承認待ち</span>
             ) : contest.status === "open" ? (
@@ -910,7 +910,7 @@ export function ContestDetailView({ contestId }: { contestId: string }) {
             )}
             {candCursor && (
               <div className="row-center" style={{ justifyContent: "center", marginTop: "var(--space-3)" }}>
-                <button className="btn btn-outline btn-sm" type="button" onClick={() => void loadMoreCandidates()} disabled={candMore}>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => void loadMoreCandidates()} disabled={candMore}>
                   {candMore ? "読み込み中…" : "もっと見る"}
                 </button>
               </div>

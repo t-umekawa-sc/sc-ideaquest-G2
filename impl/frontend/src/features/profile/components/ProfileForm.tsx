@@ -258,7 +258,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               )}
             </span>
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()} disabled={iconBusy}>
+              <Button type="button" variant="primary" onClick={() => iconInputRef.current?.click()} disabled={iconBusy}>
                 {iconBusy ? "処理中…" : "画像を選ぶ"}
               </Button>
               {avatarUrl && (
@@ -287,7 +287,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               )}
             </span>
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => ideaIconInputRef.current?.click()} disabled={ideaIconBusy}>
+              <Button type="button" variant="primary" onClick={() => ideaIconInputRef.current?.click()} disabled={ideaIconBusy}>
                 {ideaIconBusy ? "処理中…" : "画像を選ぶ"}
               </Button>
               {ideaIconUrl && (

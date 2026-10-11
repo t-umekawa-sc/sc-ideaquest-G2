@@ -160,7 +160,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
               )}
             </span>
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>
+              <Button type="button" variant="primary" onClick={() => iconInputRef.current?.click()}>
                 画像を選ぶ
               </Button>
               {iconPreview && (

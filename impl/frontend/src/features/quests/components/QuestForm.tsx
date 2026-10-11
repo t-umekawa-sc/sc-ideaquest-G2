@@ -705,7 +705,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               )}
             </span>
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()} disabled={frozen}>画像をアップロード</Button>
+              <Button type="button" variant="primary" onClick={() => iconInputRef.current?.click()} disabled={frozen}>画像をアップロード</Button>
               {(iconPreview || iconUrl) && <Button type="button" variant="outline" onClick={onClearIcon} disabled={frozen}>未設定に戻す</Button>}
               <input ref={iconInputRef} id="q_icon" type="file" accept="image/*" hidden onChange={onPickIcon} />
               <span className="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。</span>
@@ -873,7 +873,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   )}
                 </div>
                 {candHasNext && (
-                  <button type="button" className="party__addall" style={{ marginTop: "var(--space-2)" }} disabled={candLoadingMore} onClick={() => void loadMoreCands()}>
+                  <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: "var(--space-2)" }} disabled={candLoadingMore} onClick={() => void loadMoreCands()}>
                     {candLoadingMore ? "読み込み中…" : "もっと見る"}
                   </button>
                 )}
@@ -953,7 +953,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             </div>
             {filteredMembers.length > selShown && (
               <div style={{ padding: "var(--space-2) var(--space-4)" }}>
-                <button type="button" className="party__addall" onClick={() => setSelShown((n) => n + SEL_PAGE)}>もっと見る（残り {filteredMembers.length - selShown}）</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setSelShown((n) => n + SEL_PAGE)}>もっと見る（残り {filteredMembers.length - selShown}）</button>
               </div>
             )}
               </div>

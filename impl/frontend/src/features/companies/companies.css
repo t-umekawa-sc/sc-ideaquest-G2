@@ -110,7 +110,7 @@
 /* 帳票DLボタン＝.btn-outline ベース＋帳票アイコン＋⬇（採用＝style-guide §3c ①'）。今後の帳票機能でも再利用。 */
 .btn-report-inline { display: inline-flex; align-items: center; gap: 8px; }
 .btn-report__doc { font-size: 1.1em; line-height: 1; }
-.btn-report__dl { color: var(--color-primary); font-size: 1.05em; line-height: 1; }
+.btn-report__dl { color: inherit; font-size: 1.05em; line-height: 1; }
 .btn-report-inline:disabled .btn-report__dl { color: inherit; }
 
 /* 帳票出力ダイアログ（印刷ダイアログ風）＝左に書面プレビュー・右に出力オプション。 */

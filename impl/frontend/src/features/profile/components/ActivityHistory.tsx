@@ -94,7 +94,7 @@ export function ActivityHistory({ initial }: { initial: Activities }) {
         </ul>
       )}
       {hasNext && (
-        <button type="button" className="btn btn-outline btn-sm activity-history__more" onClick={loadMore} disabled={loading}>
+        <button type="button" className="btn btn-primary btn-sm activity-history__more" onClick={loadMore} disabled={loading}>
           {loading ? "読み込み中…" : "もっと見る"}
         </button>
       )}

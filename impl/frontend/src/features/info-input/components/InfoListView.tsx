@@ -188,6 +188,7 @@ export function InfoListView() {
       } else {
         list.push({
           label: "アーカイブ",
+          danger: true,
           onClick: async () => {
             const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（論理削除・監査保持・情報判定権限）` });
             if (ok) { try { await archiveInfoItemApi(r.id); } catch { /* 403/失敗時は無視 */ } setRefreshToken((n) => n + 1); }

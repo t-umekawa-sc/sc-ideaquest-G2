@@ -960,18 +960,21 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
 .combobox__arrow { color: var(--color-text-muted); transition: transform .15s; }
 .combobox__button[aria-expanded="true"] .combobox__arrow { transform: rotate(180deg); }
 .combobox__list {
-  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
+  /* ボタン幅を下限に、最長候補へ合わせて広がる（✓ と文言が折り返さない）。 */
+  position: absolute; z-index: 30; left: 0; top: calc(100% + 4px);
+  min-width: 100%; width: max-content; max-width: min(360px, 90vw);
   margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow: auto;
   background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius); box-shadow: var(--shadow-lg);
 }
 .combobox__option {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
-  font-size: var(--text-base); cursor: pointer; /* 候補ホバーで指ポインター */
+  font-size: var(--text-base); cursor: pointer; white-space: nowrap; /* 候補ホバーで指ポインター・✓で折り返さない */
 }
 .combobox__option:hover, .combobox__option.is-active { background: var(--color-primary-soft); }
 .combobox__option[aria-selected="true"] { font-weight: 600; color: var(--color-primary-active); }
-.combobox__option[aria-selected="true"]::after { content: "✓"; float: right; }
+.combobox__option[aria-selected="true"]::after { content: "✓"; }
 
 /* --- AI生成コントロール（モデル選択＋生成ボタンの一体型・分割ボタン・案A採用 2026-10-07） ---
    主ボタン「✨ AI で生成する」＋右端 ▾（使用モデル候補）。候補リストは .combobox__list を再利用。
@@ -1895,6 +1898,9 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 
 /* --- 番号ページャ --- */
 .pagination__page { min-width: 2.25em; }
+/* 候補ページ・前後ボタン＝青アウトライン／現在ページ＝青塗り（見分けがつく） */
+.pagination .btn-outline { border-color: var(--color-primary); color: var(--color-primary); }
+.pagination .btn-outline:hover:not(:disabled) { background: var(--color-primary-soft); }
 .pagination .btn.is-current, .pagination__page.is-current { background: var(--color-primary); color: #fff; border-color: var(--color-primary); pointer-events: none; }
 .pagination__ellipsis { padding: 0 4px; color: var(--color-text-muted); }
 /* --- 下部ページングバー（件数〔左〕・番号ページャ〔中央〕・表示件数〔右〕をまとめる） --- */
@@ -1909,7 +1915,7 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .viewtoggle { display: inline-flex; border: 1px solid var(--color-border-strong); border-radius: var(--radius); overflow: hidden; }
 .viewtoggle button { border: 0; background: var(--color-surface); padding: 6px var(--space-3); font: inherit; font-size: var(--text-sm); cursor: pointer; color: var(--color-text-muted); }
 .viewtoggle button + button { border-left: 1px solid var(--color-border-strong); }
-.viewtoggle button.is-on { background: var(--color-primary-soft); color: var(--color-primary-active); font-weight: 600; }
+.viewtoggle button.is-on { background: var(--color-primary); color: #fff; font-weight: 600; }
 /* カードグリッド（SC-01/SC-10 のクエストカードと一貫した見た目） */
 .dt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
 .dt-card { position: relative; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); }

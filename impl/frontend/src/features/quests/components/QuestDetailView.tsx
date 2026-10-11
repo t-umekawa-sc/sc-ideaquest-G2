@@ -632,7 +632,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               {/* 操作エリア統一（デザイン標準 §4.14）＝編集(権限時)→⋮(ステータス遷移・削除danger)。「＋ アイデアを追加」はアイデアタブ上部へ。 */}
               {canEdit && (
                 <>
-                  <button className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストは編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/edit`)}>編集</button>
+                  <button className={`btn btn-primary${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストは編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/edit`)}>編集</button>
                   <RowMenu
                     items={[
                       ...(quest.status !== "completed" && nextStatus

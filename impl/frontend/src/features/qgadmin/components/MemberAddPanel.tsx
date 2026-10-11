@@ -126,14 +126,14 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
         </div>
         {hasNext ? (
           <div className="dir-more">
-            <Button type="button" variant="outline" size="sm" disabled={moreLoading} onClick={() => void loadMore()}>
+            <Button type="button" variant="primary" size="sm" disabled={moreLoading} onClick={() => void loadMore()}>
               {moreLoading ? "読み込み中…" : `もっと見る（残り ${total - directory.length}）`}
             </Button>
           </div>
         ) : null}
       </ModalBody>
       <ModalFooter>
-        <Button type="button" variant="outline" onClick={onClose}>閉じる</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onClose}>閉じる</Button>
       </ModalFooter>
     </>
   );

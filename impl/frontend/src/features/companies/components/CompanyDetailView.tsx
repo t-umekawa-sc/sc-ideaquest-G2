@@ -273,7 +273,7 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
           <div className="icon-field">
             <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_url} size="lg" />
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>
+              <Button type="button" variant="primary" onClick={() => iconInputRef.current?.click()}>
                 画像を選ぶ
               </Button>
               {company.icon_image_url && (

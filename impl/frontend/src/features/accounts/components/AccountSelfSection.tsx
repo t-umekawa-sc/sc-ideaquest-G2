@@ -297,7 +297,7 @@ export function AccountSelfSection({ companyId, companyCode, children, after }: 
         <span title={reportEnabled ? undefined : "この環境では帳票機能が無効です"}>
           <button
             type="button"
-            className="btn btn-outline btn-report-inline"
+            className="btn btn-primary btn-report-inline"
             disabled={!reportEnabled}
             onClick={() => setInvoiceOpen(true)}
           >

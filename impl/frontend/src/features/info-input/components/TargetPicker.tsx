@@ -185,7 +185,7 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
         )}
         {nextCursor ? (
           <div className="pick-more-wrap">
-            <button type="button" className="btn btn-outline btn-sm" onClick={loadMore} disabled={loading}>もっと見る</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={loadMore} disabled={loading}>もっと見る</button>
           </div>
         ) : null}
       </ModalBody>

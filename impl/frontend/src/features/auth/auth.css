@@ -23,6 +23,13 @@
   box-shadow: var(--shadow-lg);
   padding: var(--space-8) var(--space-8) var(--space-6);
 }
+/* ログイン/サインアップは .login-page 直下にラッパ div を1枚挟む（他フォームは .login-card 直下）。
+   ラッパが shrink-to-fit だと中身の固有幅でカードが縮む（入力項目が少ないサインアップが狭くなる）ため、
+   直下要素に幅基準（100%／最大400px）を与えてカード幅をログインと一致させる。 */
+.login-page > div {
+  width: 100%;
+  max-width: 400px;
+}
 .login-logo {
   text-align: center;
   margin-bottom: var(--space-4);

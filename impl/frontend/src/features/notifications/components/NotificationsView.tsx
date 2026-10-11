@@ -221,7 +221,7 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
               </button>
             )
           )}
-          <button className="btn btn-outline" type="button" onClick={() => void markAll()}>
+          <button className="btn btn-primary" type="button" onClick={() => void markAll()}>
             すべて既読にする
           </button>
         </div>

@@ -118,7 +118,7 @@ export function RankingView() {
             </div>
             <div className="myrank__score">
               スコア <span className="exp"><CountUp value={me?.score ?? 0} /></span>
-              <button className="btn btn-outline myrank__jump" type="button" onClick={jumpToMe} disabled={!meRow}>
+              <button className="btn btn-primary myrank__jump" type="button" onClick={jumpToMe} disabled={!meRow}>
                 ▼ 自分の順位へ
               </button>
             </div>
