@@ -16,6 +16,7 @@ from sqlalchemy import bindparam, delete, func, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from app.core import list_query as lq
+from app.core.sqlsearch import like_contains
 from app.tenant.capabilities import repository as caps_repo
 from app.tenant.capabilities.orm import UserCapability
 from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoTab, InfoTemplate
@@ -475,7 +476,7 @@ def search_link_candidates(
     from app.tenant.profile.orm import User
 
     from datetime import date as _date
-    like = f"%{q}%"
+    like = like_contains(q)
     qids = list(quest_ids or [])
     sts = list(statuses or [])
     df = _date.fromisoformat(due_from) if due_from else None  # 文字列→date（Postgres の型不一致回避）
@@ -489,7 +490,7 @@ def search_link_candidates(
                    Idea.icon_image_path, User.idea_icon_image_path)
             .join(Quest, Quest.id == Idea.quest_id)
             .join(User, User.id == Idea.author_id)
-            .where(Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like))
+            .where(Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like, escape="\\"))
         )
         if qids:
             stmt = stmt.where(Idea.quest_id.in_(qids))
@@ -514,7 +515,7 @@ def search_link_candidates(
             select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline, Quest.created_at,
                    Quest.icon_image_path)
             .join(User, User.id == Quest.owner_id)
-            .where(Quest.deleted_at.is_(None), Quest.title.ilike(like))
+            .where(Quest.deleted_at.is_(None), Quest.title.ilike(like, escape="\\"))
         )
         if qids:
             stmt = stmt.where(Quest.id.in_(qids))
@@ -540,7 +541,7 @@ def search_link_candidates(
             select(Concept.id, Concept.title, Quest.title, User.display_name, Concept.status, Concept.created_at)
             .join(Quest, Quest.id == Concept.quest_id)
             .join(User, User.id == Concept.author_id)
-            .where(Concept.deleted_at.is_(None), Concept.title.ilike(like))
+            .where(Concept.deleted_at.is_(None), Concept.title.ilike(like, escape="\\"))
         )
         if qids:
             cstmt = cstmt.where(Concept.quest_id.in_(qids))
@@ -558,7 +559,7 @@ def search_link_candidates(
         astmt = (
             select(Assumption.id, Assumption.statement, Quest.title, Assumption.current_verdict, Assumption.created_at)
             .join(Quest, Quest.id == Assumption.quest_id)
-            .where(Assumption.statement.ilike(like))
+            .where(Assumption.statement.ilike(like, escape="\\"))
         )
         if qids:
             astmt = astmt.where(Assumption.quest_id.in_(qids))
@@ -927,9 +928,9 @@ def list_templates_admin(
     if is_active is not None:
         conds.append(InfoTemplate.is_active.is_(is_active))
     if q:
-        like = f"%{q.strip()}%"
-        conds.append(func.coalesce(InfoTemplate.name, "").ilike(like)
-                     | func.coalesce(InfoTemplate.description, "").ilike(like))
+        like = like_contains(q.strip())
+        conds.append(func.coalesce(InfoTemplate.name, "").ilike(like, escape="\\")
+                     | func.coalesce(InfoTemplate.description, "").ilike(like, escape="\\"))
     total = session.execute(
         select(func.count()).select_from(InfoTemplate).where(*conds)
     ).scalar_one()

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, or_, select
 
 from app.core import list_query as lq
+from app.core.sqlsearch import like_contains
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
@@ -106,9 +107,9 @@ def _company_query(*, q, status, sort, account_count_min, account_count_max, exc
     if statuses:  # enum 多値＝OR（IN）・§1.8.1②
         conds.append(Company.status.in_(statuses))
     if q:
-        like = f"%{q}%"
-        conds.append(or_(Company.name.ilike(like), Company.company_code.ilike(like),
-                         Company.db_identifier.ilike(like)))
+        like = like_contains(q)
+        conds.append(or_(Company.name.ilike(like, escape="\\"), Company.company_code.ilike(like, escape="\\"),
+                         Company.db_identifier.ilike(like, escape="\\")))
     if account_count_min is not None:  # number 範囲＝集計への WHERE・§1.8.1②
         conds.append(account_count >= account_count_min)
     if account_count_max is not None:

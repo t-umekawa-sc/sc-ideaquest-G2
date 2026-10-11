@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, delete, false as sa_false, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
+from app.core.sqlsearch import ilike_contains
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests.orm import (
     Quest,
@@ -417,8 +418,7 @@ def list_quests_for_user(
 
     if q:
         # 簡易絞り＝件名/目的の部分一致（横断全文検索は §1.11 PGroonga に委譲・C.1）。カテゴリ一致は後続。
-        like = f"%{q}%"
-        stmt = stmt.where(or_(Quest.title.ilike(like), Quest.purpose.ilike(like)))
+        stmt = stmt.where(or_(ilike_contains(Quest.title, q), ilike_contains(Quest.purpose, q)))
     if status:
         stmt = stmt.where(Quest.status.in_(status))
     if group_id is not None:
@@ -612,7 +612,7 @@ def list_visible_groups(session: Session, user_id: uuid.UUID, *, q: str | None =
         )
     )
     if q:
-        stmt = stmt.where(QuestGroup.name.ilike(f"%{q}%"))
+        stmt = stmt.where(ilike_contains(QuestGroup.name, q))
     return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
 
 
@@ -624,7 +624,7 @@ def list_all_active_groups(session: Session, *, q: str | None = None) -> list[Qu
     """
     stmt = select(QuestGroup).where(QuestGroup.deleted_at.is_(None))
     if q:
-        stmt = stmt.where(QuestGroup.name.ilike(f"%{q}%"))
+        stmt = stmt.where(ilike_contains(QuestGroup.name, q))
     return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
 
 
@@ -688,7 +688,7 @@ def list_group_member_candidates(
     if exclude_user_ids:
         stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
     if q:
-        stmt = stmt.where(or_(User.display_name.ilike(f"%{q}%"), User.login_id.ilike(f"%{q}%")))  # 名前＋ログインIDで絞り込み
+        stmt = stmt.where(or_(ilike_contains(User.display_name, q), ilike_contains(User.login_id, q)))  # 名前＋ログインIDで絞り込み
     if cursor is not None:
         stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
@@ -726,7 +726,7 @@ def list_cross_group_candidates(
     if exclude_user_ids:
         stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
     if q:
-        stmt = stmt.where(or_(User.display_name.ilike(f"%{q}%"), User.login_id.ilike(f"%{q}%")))  # 名前＋ログインIDで絞り込み
+        stmt = stmt.where(or_(ilike_contains(User.display_name, q), ilike_contains(User.login_id, q)))  # 名前＋ログインIDで絞り込み
     if cursor is not None:
         stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
@@ -940,9 +940,8 @@ def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None
 
     conds = _discoverable_conds(viewer_id, visible_group_ids)
     if q:
-        like = f"%{q}%"
-        cat_hit = exists_category_like(like)
-        conds.append(or_(Quest.title.ilike(like), Quest.purpose.ilike(like), cat_hit))
+        cat_hit = exists_category_like(q)
+        conds.append(or_(ilike_contains(Quest.title, q), ilike_contains(Quest.purpose, q), cat_hit))
     if categories:
         conds.append(exists_category_in(categories))
     if group_id is not None:
@@ -969,9 +968,9 @@ def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None
     return rows_stmt, count_stmt
 
 
-def exists_category_like(like: str):
+def exists_category_like(q: str):
     from sqlalchemy import exists
-    return exists().where(QuestCategory.quest_id == Quest.id, QuestCategory.label.ilike(like))
+    return exists().where(QuestCategory.quest_id == Quest.id, ilike_contains(QuestCategory.label, q))
 
 
 def exists_category_in(labels: list[str]):

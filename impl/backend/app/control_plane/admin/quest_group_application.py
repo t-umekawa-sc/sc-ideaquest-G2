@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
+from app.core.sqlsearch import like_contains
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as chat_repo
@@ -88,8 +89,8 @@ def list_members(session: dict, group_id: uuid.UUID, *, q: str | None = None) ->
         _require_group_admin(ts, actor.id, group_id)
         conds = [QuestGroupMember.quest_group_id == group_id, QuestGroupMember.removed_at.is_(None)]
         if q:
-            like = f"%{q}%"
-            conds.append(or_(User.display_name.ilike(like), User.login_id.ilike(like)))
+            like = like_contains(q)
+            conds.append(or_(User.display_name.ilike(like, escape="\\"), User.login_id.ilike(like, escape="\\")))
         rows = ts.execute(
             select(QuestGroupMember, User)
             .join(User, QuestGroupMember.user_id == User.id)
@@ -122,8 +123,8 @@ def company_directory(session: dict, *, q: str | None = None,
             raise AppError(403, "forbidden")  # QG管理者（1グループ以上で admin）でなければ不可
         conds = [User.status == "active"]
         if q:
-            like = f"%{q}%"
-            conds.append(or_(User.display_name.ilike(like), User.login_id.ilike(like)))
+            like = like_contains(q)
+            conds.append(or_(User.display_name.ilike(like, escape="\\"), User.login_id.ilike(like, escape="\\")))
         if exclude_group_id is not None:  # 既に当該グループの有効メンバーは候補から除外（SC-90 メンバー追加）。
             conds.append(~sa_exists().where(
                 QuestGroupMember.user_id == User.id,

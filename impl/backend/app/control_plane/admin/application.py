@@ -15,6 +15,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.core import list_query as lq
+from app.core.sqlsearch import like_contains
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.orm import Account, Company
@@ -358,9 +359,9 @@ def _account_query(company_id: uuid.UUID, *, q, status, system_role, sort, exclu
     if roles:
         conds.append(Account.system_role.in_(roles))
     if q:
-        like = f"%{q}%"
+        like = like_contains(q)
         conds.append(
-            or_(Account.display_name.ilike(like), Account.login_id.ilike(like), Account.email.ilike(like))
+            or_(Account.display_name.ilike(like, escape="\\"), Account.login_id.ilike(like, escape="\\"), Account.email.ilike(like, escape="\\"))
         )
     if exclude_ids:  # 固定行は非固定母集合（data/total）から除外・§1.8.1④
         conds.append(Account.id.notin_(exclude_ids))

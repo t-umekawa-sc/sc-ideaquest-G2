@@ -13,6 +13,7 @@ from sqlalchemy.orm import aliased
 from app.control_plane.auth.orm import Company
 from app.core import list_query as lq
 from app.core.errors import AppError
+from app.core.sqlsearch import ilike_contains
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification import ledger
@@ -65,8 +66,7 @@ def _items_query(*, user_id, coin_balance, q, slots, rarities, owned, affordable
     if rarities:
         conds.append(Item.rarity.in_(rarities))
     if q:
-        like = f"%{q}%"
-        conds.append(or_(Item.name_ja.ilike(like), Item.name_en.ilike(like)))
+        conds.append(or_(ilike_contains(Item.name_ja, q), ilike_contains(Item.name_en, q)))
     if price_min is not None:
         conds.append(Item.price_coin >= price_min)
     if price_max is not None:

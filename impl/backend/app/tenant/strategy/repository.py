@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
+from app.core.sqlsearch import ilike_contains
 from app.tenant.strategy.orm import IdeaAlignment, QuestStrategyDocument, StrategyDocument
 
 _SORT_COLUMNS = {
@@ -41,8 +42,7 @@ def list_documents(
     """一覧（サーバー委譲・R.1）＝(rows, total)。既定は全 status。sort はホワイトリスト（未知は 422）。"""
     conds = []
     if q:
-        like = f"%{q}%"
-        conds.append(or_(StrategyDocument.title.ilike(like), StrategyDocument.body_text.ilike(like)))
+        conds.append(or_(ilike_contains(StrategyDocument.title, q), ilike_contains(StrategyDocument.body_text, q)))
     if status:
         conds.append(StrategyDocument.status == status)
     if doc_kind:
@@ -61,7 +61,7 @@ def selection_list(session: Session, *, q: str | None) -> list[StrategyDocument]
     """選択用 軽量一覧（active のみ・R.0）＝クエストの適用資料選択に使う。"""
     conds = [StrategyDocument.status == "active"]
     if q:
-        conds.append(StrategyDocument.title.ilike(f"%{q}%"))
+        conds.append(ilike_contains(StrategyDocument.title, q))
     return list(session.execute(
         select(StrategyDocument).where(*conds).order_by(StrategyDocument.updated_at.desc())
     ).scalars().all())
@@ -83,7 +83,7 @@ def quest_candidates(session: Session, *, q: str | None = None, statuses: list[s
     from app.tenant.quests.orm import Quest
     conds = [Quest.deleted_at.is_(None)]
     if q:
-        conds.append(Quest.title.ilike(f"%{q}%"))
+        conds.append(ilike_contains(Quest.title, q))
     if statuses:
         conds.append(Quest.status.in_(statuses))
     if deadline_from:
